@@ -1,13 +1,14 @@
 // Third-party Imports
 import CredentialsProvider from 'next-auth/providers/credentials'
 import GoogleProvider from 'next-auth/providers/google'
-import { PrismaAdapter } from '@auth/prisma-adapter'
-import { PrismaClient } from '@prisma/client'
+// Prisma adapter is optional; enable only if you want to persist users
+// import { PrismaAdapter } from '@auth/prisma-adapter'
+// import { PrismaClient } from '@prisma/client'
 
-const prisma = new PrismaClient()
+// const prisma = new PrismaClient()
 
 export const authOptions = {
-  adapter: PrismaAdapter(prisma),
+  // adapter: PrismaAdapter(prisma), // uncomment if using Prisma
 
   providers: [
     CredentialsProvider({

@@ -1,8 +1,9 @@
 'use client'
 
-// Third-party Imports
-import { SessionProvider } from 'next-auth/react'
-
-export const NextAuthProvider = ({ children, ...rest }) => {
-  return <SessionProvider {...rest}>{children}</SessionProvider>
+// Authentication removed: do not use next-auth client provider.
+// This provider is a noop wrapper so components that import it continue to work.
+export const NextAuthProvider = ({ children }) => {
+  return <>{children}</>
 }
+
+export default NextAuthProvider

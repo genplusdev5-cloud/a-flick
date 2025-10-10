@@ -1,13 +1,9 @@
-// Third-party Imports
-import NextAuth from 'next-auth'
+// Authentication removed: NextAuth API endpoints disabled.
+// Export simple handlers that return 404 so signIn/signOut endpoints are inactive.
+export async function GET() {
+  return new Response('Not Found', { status: 404 })
+}
 
-// Lib Imports
-import { authOptions } from '@/libs/auth'
-
-/*
- * As we do not have backend server, the refresh token feature has not been incorporated into the template.
- * Please refer https://next-auth.js.org/tutorials/refresh-token-rotation link for a reference.
- */
-const handler = NextAuth(authOptions)
-
-export { handler as GET, handler as POST }
+export async function POST() {
+  return new Response('Not Found', { status: 404 })
+}

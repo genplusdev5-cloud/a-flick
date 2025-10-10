@@ -21,7 +21,7 @@ import MenuItem from '@mui/material/MenuItem'
 import Button from '@mui/material/Button'
 
 // Third-party Imports
-import { signOut, useSession } from 'next-auth/react'
+// Authentication removed: do not use next-auth here
 
 // Hook Imports
 import { useSettings } from '@core/hooks/useSettings'
@@ -48,7 +48,8 @@ const UserDropdown = () => {
 
   // Hooks
   const router = useRouter()
-  const { data: session } = useSession()
+  // No session available; show fallback UI
+  const session = null
   const { settings } = useSettings()
   const { lang: locale } = useParams()
 
@@ -68,16 +69,9 @@ const UserDropdown = () => {
     setOpen(false)
   }
 
-  const handleUserLogout = async () => {
-    try {
-      // Sign out from the app
-      await signOut({ callbackUrl: process.env.NEXT_PUBLIC_APP_URL })
-    } catch (error) {
-      console.error(error)
-
-      // Show above error in a toast like following
-      // toastService.error((err as Error).message)
-    }
+  const handleUserLogout = () => {
+    // No session maintenance: navigate to the localized Login V1 page
+    router.push(getLocalizedUrl('/pages/auth/login-v1', locale))
   }
 
   return (
