@@ -56,7 +56,11 @@ const LoginV1 = () => {
   const searchParams = useSearchParams()
 
   // React Hook Form
-  const { control, handleSubmit, formState: { errors } } = useForm({
+  const {
+    control,
+    handleSubmit,
+    formState: { errors }
+  } = useForm({
     resolver: valibotResolver(schema),
     defaultValues: { email: '', password: '' }
   })
@@ -73,39 +77,40 @@ const LoginV1 = () => {
   //     password: data.password,
   //     redirect: false
   //   })
-const onSubmit = async data => {
-  setLoading(true)
-  setErrorMsg(null)
 
-  // ✅ Simulate login delay
-  setTimeout(() => {
-    setLoading(false)
+  //   setLoading(false)
 
-    // Redirect to dashboard regardless of input
-    const redirectURL = '/en/dashboards/crm'
-    router.replace(redirectURL)
-  }, 500) // optional 0.5s delay to show loading spinner
-}
+  //   if (res && res.ok && res.error === null) {
+  //     const redirectURL = searchParams.get('redirectTo') ?? '/'
+  //     router.replace(getLocalizedUrl(redirectURL, locale))
+  //   } else {
+  //     if (res?.error) {
+  //       try {
+  //         const parsed = JSON.parse(res.error)
+  //         setErrorMsg(parsed.message[0] || 'Invalid credentials')
+  //       } catch {
+  //         setErrorMsg('Invalid credentials')
+  //       }
+  //     }
+  //   }
+  // }
 
-    setLoading(false)
+  const onSubmit = async data => {
+    setLoading(true)
+    setErrorMsg(null)
 
-    if (res && res.ok && res.error === null) {
-      const redirectURL = searchParams.get('redirectTo') ?? '/'
-      router.replace(getLocalizedUrl(redirectURL, locale))
-    } else {
-      if (res?.error) {
-        try {
-          const parsed = JSON.parse(res.error)
-          setErrorMsg(parsed.message[0] || 'Invalid credentials')
-        } catch {
-          setErrorMsg('Invalid credentials')
-        }
-      }
-    }
+    // ✅ Simulate login delay
+    setTimeout(() => {
+      setLoading(false)
+
+      // Redirect to dashboard regardless of input
+      const redirectURL = '/en/dashboards/crm'
+      router.replace(redirectURL)
+    }, 500) // optional 0.5s delay to show loading spinner
   }
 
   return (
-   <div className="flex justify-center items-center min-h-screen w-full bg-background">
+    <div className='flex justify-center items-center min-h-screen w-full bg-background'>
       <Card className='flex flex-col sm:is-[450px]'>
         <CardContent className='sm:!p-12'>
           <Link href={getLocalizedUrl('/', locale)} className='flex justify-center mbe-6'>
@@ -148,7 +153,11 @@ const onSubmit = async data => {
                     input: {
                       endAdornment: (
                         <InputAdornment position='end'>
-                          <IconButton edge='end' onClick={handleClickShowPassword} onMouseDown={e => e.preventDefault()}>
+                          <IconButton
+                            edge='end'
+                            onClick={handleClickShowPassword}
+                            onMouseDown={e => e.preventDefault()}
+                          >
                             <i className={isPasswordShown ? 'tabler-eye-off' : 'tabler-eye'} />
                           </IconButton>
                         </InputAdornment>
@@ -162,7 +171,7 @@ const onSubmit = async data => {
 
             {/* Error message */}
             {errorMsg && (
-              <Typography color="error" variant="body2">
+              <Typography color='error' variant='body2'>
                 {errorMsg}
               </Typography>
             )}
@@ -181,7 +190,7 @@ const onSubmit = async data => {
 
             {/* ✅ Button with loading spinner */}
             <Button fullWidth variant='contained' type='submit' disabled={loading}>
-              {loading ? <CircularProgress size={24} color="inherit" /> : 'Login'}
+              {loading ? <CircularProgress size={24} color='inherit' /> : 'Login'}
             </Button>
 
             {/* <div className='flex justify-center items-center flex-wrap gap-2'>
