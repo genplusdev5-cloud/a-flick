@@ -64,32 +64,48 @@ const LoginV1 = () => {
   const handleClickShowPassword = () => setIsPasswordShown(show => !show)
 
   // ✅ Login submit handler
-  const onSubmit = async data => {
-    setLoading(true)
-    setErrorMsg(null)
+  // const onSubmit = async data => {
+  //   setLoading(true)
+  //   setErrorMsg(null)
 
-    const res = await signIn('credentials', {
-      email: data.email,
-      password: data.password,
-      redirect: false
-    })
+  //   const res = await signIn('credentials', {
+  //     email: data.email,
+  //     password: data.password,
+  //     redirect: false
+  //   })
 
+  //   setLoading(false)
+
+  //   if (res && res.ok && res.error === null) {
+  //     const redirectURL = searchParams.get('redirectTo') ?? '/'
+  //     router.replace(getLocalizedUrl(redirectURL, locale))
+  //   } else {
+  //     if (res?.error) {
+  //       try {
+  //         const parsed = JSON.parse(res.error)
+  //         setErrorMsg(parsed.message[0] || 'Invalid credentials')
+  //       } catch {
+  //         setErrorMsg('Invalid credentials')
+  //       }
+  //     }
+  //   }
+  // }
+
+
+
+  const onSubmit = data => {
+  setLoading(true)
+  setErrorMsg(null)
+
+  // Simulate a delay for realism
+  setTimeout(() => {
     setLoading(false)
+    // Directly redirect to CRM dashboard
+    const redirectURL = '/dashboards/crm'
+    router.replace(getLocalizedUrl(redirectURL, locale))
+  }, 500)
+}
 
-    if (res && res.ok && res.error === null) {
-      const redirectURL = searchParams.get('redirectTo') ?? '/'
-      router.replace(getLocalizedUrl(redirectURL, locale))
-    } else {
-      if (res?.error) {
-        try {
-          const parsed = JSON.parse(res.error)
-          setErrorMsg(parsed.message[0] || 'Invalid credentials')
-        } catch {
-          setErrorMsg('Invalid credentials')
-        }
-      }
-    }
-  }
 
   return (
    <div className="flex justify-center items-center min-h-screen w-full bg-background">
