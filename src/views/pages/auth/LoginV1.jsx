@@ -93,16 +93,16 @@ const LoginV1 = () => {
 
 
 
-  const onSubmit = data => {
+const onSubmit = data => {
   setLoading(true)
   setErrorMsg(null)
 
-  // Simulate a delay for realism
   setTimeout(() => {
     setLoading(false)
-    // Directly redirect to CRM dashboard
-    const redirectURL = '/dashboards/crm'
-    router.replace(getLocalizedUrl(redirectURL, locale))
+    // ✅ Set a temporary login flag
+    localStorage.setItem('fake-auth', 'true')
+    // Redirect to CRM dashboard
+    router.replace(getLocalizedUrl('/dashboards/crm', locale))
   }, 500)
 }
 
