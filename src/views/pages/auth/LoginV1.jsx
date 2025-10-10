@@ -64,15 +64,28 @@ const LoginV1 = () => {
   const handleClickShowPassword = () => setIsPasswordShown(show => !show)
 
   // ✅ Login submit handler
-  const onSubmit = async data => {
-    setLoading(true)
-    setErrorMsg(null)
+  // const onSubmit = async data => {
+  //   setLoading(true)
+  //   setErrorMsg(null)
 
-    const res = await signIn('credentials', {
-      email: data.email,
-      password: data.password,
-      redirect: false
-    })
+  //   const res = await signIn('credentials', {
+  //     email: data.email,
+  //     password: data.password,
+  //     redirect: false
+  //   })
+const onSubmit = async data => {
+  setLoading(true)
+  setErrorMsg(null)
+
+  // ✅ Simulate login delay
+  setTimeout(() => {
+    setLoading(false)
+
+    // Redirect to dashboard regardless of input
+    const redirectURL = '/en/dashboards/crm'
+    router.replace(redirectURL)
+  }, 500) // optional 0.5s delay to show loading spinner
+}
 
     setLoading(false)
 
