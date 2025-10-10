@@ -145,7 +145,7 @@ const LoginV1 = () => {
                   {...field}
                   fullWidth
                   label='Password'
-                  placeholder='············'
+                  placeholder='···········'
                   type={isPasswordShown ? 'text' : 'password'}
                   slotProps={{
                     input: {
