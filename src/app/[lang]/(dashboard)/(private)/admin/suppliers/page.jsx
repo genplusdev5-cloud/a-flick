@@ -1,15 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import {
-  Box,
-  Button,
-  IconButton,
-  Drawer,
-  InputAdornment,
-  Typography,
-  TablePagination
-} from '@mui/material'
+import { Box, Button, IconButton, Drawer, InputAdornment, Typography, TablePagination } from '@mui/material'
 import { DataGrid } from '@mui/x-data-grid'
 import Autocomplete from '@mui/material/Autocomplete'
 
@@ -180,7 +172,14 @@ export default function SupplierPage() {
   // Columns
   // ---------------------------
   const columns = [
-    { field: 'serial', headerName: 'S.No', flex: 0.2, minWidth: 80, valueGetter: params => filteredRows.findIndex(r => r.id === params.row.id) + 1, sortable: false },
+    {
+      field: 'serial',
+      headerName: 'S.No',
+      flex: 0.2,
+      minWidth: 80,
+      valueGetter: params => filteredRows.findIndex(r => r.id === params.row.id) + 1,
+      sortable: false
+    },
     {
       field: 'action',
       headerName: 'Action',
@@ -189,11 +188,11 @@ export default function SupplierPage() {
       sortable: false,
       renderCell: params => (
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <IconButton size="small" onClick={() => handleEdit(params.row)}>
-            <EditIcon fontSize="small" />
+          <IconButton size='small' onClick={() => handleEdit(params.row)}>
+            <EditIcon fontSize='small' />
           </IconButton>
-          <IconButton size="small" color="error" onClick={() => handleDelete(params.row.id)}>
-            <DeleteIcon fontSize="small" />
+          <IconButton size='small' color='error' onClick={() => handleDelete(params.row.id)}>
+            <DeleteIcon fontSize='small' />
           </IconButton>
         </Box>
       )
@@ -206,7 +205,12 @@ export default function SupplierPage() {
       minWidth: 140,
       flex: 0.5,
       renderCell: params => (
-        <Button size='small' variant='contained' color={params.value === 'Active' ? 'success' : 'error'} sx={{ borderRadius: '20px', textTransform: 'none', fontWeight: 500 }}>
+        <Button
+          size='small'
+          variant='contained'
+          color={params.value === 'Active' ? 'success' : 'error'}
+          sx={{ borderRadius: '20px', textTransform: 'none', fontWeight: 500 }}
+        >
           {params.value}
         </Button>
       )
@@ -218,12 +222,16 @@ export default function SupplierPage() {
   // ---------------------------
   return (
     <ContentLayout
-      title="Suppliers"
+      title='Suppliers'
       breadcrumbs={[{ label: 'Home', href: '/' }, { label: 'Suppliers' }]}
       actions={
         <Box sx={{ m: 2, display: 'flex', gap: 2 }}>
-          <Button variant='outlined' startIcon={<DownloadIcon />}>Export</Button>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={handleAdd}>Add Supplier</Button>
+          <Button variant='outlined' startIcon={<DownloadIcon />}>
+            Export
+          </Button>
+          <Button variant='contained' startIcon={<AddIcon />} onClick={handleAdd}>
+            Add Supplier
+          </Button>
         </Box>
       }
     >
@@ -234,7 +242,15 @@ export default function SupplierPage() {
           value={searchText}
           onChange={handleSearch}
           sx={{ width: 360 }}
-          slotProps={{ input: { startAdornment: <InputAdornment position='start'><SearchIcon /></InputAdornment> } }}
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position='start'>
+                  <SearchIcon />
+                </InputAdornment>
+              )
+            }
+          }}
         />
       </Box>
 
@@ -249,7 +265,13 @@ export default function SupplierPage() {
         sx={{
           mt: 3,
           '& .MuiDataGrid-row': { minHeight: '60px !important', padding: '12px 0' },
-          '& .MuiDataGrid-cell': { whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'break-word', alignItems: 'flex-start', fontSize: '15px' },
+          '& .MuiDataGrid-cell': {
+            whiteSpace: 'normal',
+            wordBreak: 'break-word',
+            overflowWrap: 'break-word',
+            alignItems: 'flex-start',
+            fontSize: '15px'
+          },
           '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': { outline: 'none' },
           '& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within': { outline: 'none' },
           '& .MuiDataGrid-columnHeaderTitle': { fontSize: '15px', fontWeight: 500 }
@@ -257,7 +279,9 @@ export default function SupplierPage() {
       />
 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2 }}>
-        <Typography variant='body2' sx={{ color: 'text.secondary', ml: 1 }}>{paginationText}</Typography>
+        <Typography variant='body2' sx={{ color: 'text.secondary', ml: 1 }}>
+          {paginationText}
+        </Typography>
         <TablePagination
           rowsPerPageOptions={[5, 10, 25, 50]}
           component='div'
@@ -265,15 +289,20 @@ export default function SupplierPage() {
           rowsPerPage={rowsPerPage}
           page={page}
           onPageChange={(e, newPage) => setPage(newPage)}
-          onRowsPerPageChange={e => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0) }}
+          onRowsPerPageChange={e => {
+            setRowsPerPage(parseInt(e.target.value, 10))
+            setPage(0)
+          }}
         />
       </Box>
 
-      <Drawer anchor="right" open={open} onClose={toggleDrawer}>
+      <Drawer anchor='right' open={open} onClose={toggleDrawer}>
         <Box sx={{ width: 350, p: 3 }}>
-          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-            <Typography variant="h6">{isEdit ? 'Edit Supplier' : 'Add Supplier'}</Typography>
-            <IconButton onClick={toggleDrawer}><CloseIcon /></IconButton>
+          <Box display='flex' justifyContent='space-between' alignItems='center' mb={2}>
+            <Typography variant='h6'>{isEdit ? 'Edit Supplier' : 'Add Supplier'}</Typography>
+            <IconButton onClick={toggleDrawer}>
+              <CloseIcon />
+            </IconButton>
           </Box>
 
           <form onSubmit={handleSubmit}>
@@ -282,34 +311,50 @@ export default function SupplierPage() {
               options={typeOptions}
               value={formData.type}
               onChange={(e, newValue) => handleAutocompleteChange('type', newValue)}
-              renderInput={params => <CustomTextField {...params} label="Supplier Type" margin="normal" fullWidth inputRef={typeRef} />}
-              noOptionsText="No options"
+              renderInput={params => (
+                <CustomTextField {...params} label='Supplier Type' margin='normal' fullWidth inputRef={typeRef} />
+              )}
+              noOptionsText='No options'
             />
             <CustomTextField
               fullWidth
-              label="Supplier Name"
-              name="name"
+              label='Supplier Name'
+              name='name'
               value={formData.name}
               onChange={handleChange}
-              margin="normal"
+              margin='normal'
               inputRef={nameRef}
-              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addressRef.current?.focus() } }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  addressRef.current?.focus()
+                }
+              }}
             />
             <CustomTextField
               fullWidth
               multiline
               rows={3}
-              label="Billing Address"
-              name="address"
+              label='Billing Address'
+              name='address'
               value={formData.address}
               onChange={handleChange}
-              margin="normal"
+              margin='normal'
               inputRef={addressRef}
-              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleSubmit(e) } }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  handleSubmit(e)
+                }
+              }}
             />
-            <Box mt={3} display="flex" gap={2}>
-              <Button type="submit" variant="contained" fullWidth>{isEdit ? 'Update' : 'Save'}</Button>
-              <Button variant="outlined" fullWidth onClick={toggleDrawer}>Cancel</Button>
+            <Box mt={3} display='flex' gap={2}>
+              <Button type='submit' variant='contained' fullWidth>
+                {isEdit ? 'Update' : 'Save'}
+              </Button>
+              <Button variant='outlined' fullWidth onClick={toggleDrawer}>
+                Cancel
+              </Button>
             </Box>
           </form>
         </Box>

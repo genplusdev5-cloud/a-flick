@@ -21,7 +21,7 @@ import MenuItem from '@mui/material/MenuItem'
 import Button from '@mui/material/Button'
 
 // Third-party Imports
-// Authentication removed: do not use next-auth here
+import { signOut, useSession } from 'next-auth/react'
 
 // Hook Imports
 import { useSettings } from '@core/hooks/useSettings'
@@ -48,8 +48,7 @@ const UserDropdown = () => {
 
   // Hooks
   const router = useRouter()
-  // No session available; show fallback UI
-  const session = null
+  const { data: session } = useSession()
   const { settings } = useSettings()
   const { lang: locale } = useParams()
 
@@ -69,9 +68,13 @@ const UserDropdown = () => {
     setOpen(false)
   }
 
-  const handleUserLogout = () => {
-    // No session maintenance: navigate to the localized Login V1 page
-    router.push(getLocalizedUrl('/pages/auth/login-v1', locale))
+  const handleUserLogout = async () => {
+    try {
+      await signOut({ callbackUrl: getLocalizedUrl('/login', locale) })
+    } catch (error) {
+      console.error(error)
+      router.push(getLocalizedUrl('/login', locale))
+    }
   }
 
   return (

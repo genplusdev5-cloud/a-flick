@@ -22,8 +22,6 @@ import { useForm, Controller } from 'react-hook-form'
 // ✅ Component Imports
 import Logo from '@components/layout/shared/Logo'
 import CustomTextField from '@core/components/mui/TextField'
-// Next-auth
-import { signIn } from 'next-auth/react'
 
 // ✅ Config Imports
 import themeConfig from '@configs/themeConfig'
@@ -51,29 +49,10 @@ const LoginV1 = () => {
   // ✅ Toggle Password Visibility
   const handleClickShowPassword = () => setIsPasswordShown(!isPasswordShown)
 
-  // Login Handler: use NextAuth credentials provider
-  const onSubmit = async data => {
-    setLoading(true)
-    setErrorMsg('')
-
-    try {
-      const res = await signIn('credentials', {
-        redirect: false,
-        email: data.email,
-        password: data.password
-      })
-
-      if (res?.error) {
-        setErrorMsg('Invalid email or password')
-      } else {
-        // On success, go to dashboard (or you can use redirect query param)
-        router.push('/en/dashboards/crm')
-      }
-    } catch (err) {
-      setErrorMsg('Something went wrong, please try again.')
-    } finally {
-      setLoading(false)
-    }
+  // Login Handler: immediately navigate to dashboard (no session/jwt maintained)
+  const onSubmit = data => {
+    // Directly redirect to dashboard regardless of input
+    router.push('/en/dashboards/crm')
   }
 
   return (
