@@ -1,20 +1,16 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Box, Typography, Button, IconButton, Drawer, InputAdornment, TablePagination } from '@mui/material'
+import { Box, Typography, Button, IconButton, Drawer, InputAdornment, TablePagination, MenuItem } from '@mui/material'
 import { DataGrid } from '@mui/x-data-grid'
-import { Autocomplete } from '@mui/material'
-import { openDB } from 'idb'
-
-// Icons
+import { MdDelete } from 'react-icons/md'
 import AddIcon from '@mui/icons-material/Add'
 import CloseIcon from '@mui/icons-material/Close'
 import SearchIcon from '@mui/icons-material/Search'
 import EditIcon from '@mui/icons-material/Edit'
 import DownloadIcon from '@mui/icons-material/Download'
-import { MdDelete } from 'react-icons/md'
+import { openDB } from 'idb'
 
-// Wrapper
 import ContentLayout from '@/components/layout/ContentLayout'
 import CustomTextField from '@core/components/mui/TextField'
 
@@ -29,19 +25,15 @@ export default function CallTypePage() {
   const [open, setOpen] = useState(false)
   const [isEdit, setIsEdit] = useState(false)
   const [editRow, setEditRow] = useState(null)
-  const [formData, setFormData] = useState({
-    name: '',
-    sortOrder: '',
-    description: '',
-    status: 'Active'
-  })
-
-  // --- Autocomplete ---
+  const [formData, setFormData] = useState({ name: '', sortOrder: '', description: '', status: 'Active' })
   const statusOptions = ['Active', 'Inactive']
   const [statusOpen, setStatusOpen] = useState(false)
+
+  const submitRef = useRef(null)
   const statusRef = useRef(null)
-  const statusInputRef = useRef(null)
-  const submitButtonRef = useRef(null)
+  const nameRef = useRef(null)
+  const sortRef = useRef(null)
+  const descriptionRef = useRef(null)
 
   // ---------------- IndexedDB ----------------
   const initDB = async () => {
@@ -58,8 +50,7 @@ export default function CallTypePage() {
   const loadRows = async () => {
     const db = await initDB()
     const allRows = await db.getAll(STORE_NAME)
-    const sortedRows = allRows.sort((a, b) => b.id - a.id)
-    setRows(sortedRows)
+    setRows(allRows.sort((a, b) => b.id - a.id))
   }
 
   useEffect(() => {
@@ -67,11 +58,14 @@ export default function CallTypePage() {
   }, [])
 
   const toggleDrawer = () => setOpen(prev => !prev)
+  const handleChange = e => setFormData({ ...formData, [e.target.name]: e.target.value })
+  const handleSearch = e => setSearchText(e.target.value)
 
+  // ---------------- CRUD ----------------
   const handleAdd = () => {
     setIsEdit(false)
-    setFormData({ name: '', sortOrder: '', description: '', status: 'Active' })
     setEditRow(null)
+    setFormData({ name: '', sortOrder: '', description: '', status: 'Active' })
     setOpen(true)
   }
 
@@ -88,77 +82,43 @@ export default function CallTypePage() {
     setRows(prev => prev.filter(r => r.id !== row.id))
   }
 
-  const handleChange = e => {
-    const { name, value } = e.target
-    let finalValue = value
-    if (name === 'sortOrder') {
-      if (value === '' || /^\d+$/.test(value)) finalValue = value
-      else return
-    }
-    setFormData({ ...formData, [name]: finalValue })
-  }
-
   const handleSubmit = async e => {
-    e.preventDefault()
-    if (formData.name && formData.sortOrder && /^\d+$/.test(formData.sortOrder)) {
-      const db = await initDB()
-      const dataToSave = { ...formData, sortOrder: BigInt(formData.sortOrder).toString() } // ✅ Save as string to keep full number
+    if (e && e.preventDefault) e.preventDefault()
+    if (!formData.name || !formData.sortOrder || !/^\d+$/.test(formData.sortOrder)) return
 
-      if (isEdit && editRow) {
-        await db.put(STORE_NAME, { ...dataToSave, id: editRow.id })
-      } else {
-        await db.add(STORE_NAME, dataToSave)
-      }
-      await loadRows()
-      toggleDrawer()
+    const db = await initDB()
+    const dataToSave = { ...formData, sortOrder: BigInt(formData.sortOrder).toString() }
+
+    if (isEdit && editRow) {
+      await db.put(STORE_NAME, { ...dataToSave, id: editRow.id })
+    } else {
+      await db.add(STORE_NAME, dataToSave)
     }
+    await loadRows()
+    toggleDrawer()
   }
 
-  const handleKeyPress = (e, currentFieldIndex) => {
+  // ---------------- Keyboard Navigation ----------------
+  const focusNext = ref => ref?.current?.focus()
+  const handleKeyPress = (e, nextRef) => {
     if (e.key === 'Enter') {
       e.preventDefault()
-      const form = e.target.form
-      const inputs = Array.from(form.querySelectorAll('input, textarea')).filter(
-        el => !el.disabled && el.type !== 'hidden'
-      )
-
-      const currentElement = e.target
-      const currentIndex = inputs.findIndex(input => input === currentElement)
-
-      if (currentFieldIndex === 0) {
-        const nextInput = inputs[currentIndex + 1]
-        nextInput?.focus()
-      } else if (currentFieldIndex === 1) {
-        const nextInput = form.querySelector('textarea[name="description"]')
-        nextInput?.focus()
-      } else if (currentFieldIndex === 2 && statusInputRef.current) {
-        statusInputRef.current.focus()
-        setStatusOpen(true)
-      } else if (currentFieldIndex === 3) {
-        submitButtonRef.current?.focus()
-      } else {
-        const nextIndex = currentIndex + 1
-        if (nextIndex < inputs.length) inputs[nextIndex].focus()
-      }
+      if (nextRef) focusNext(nextRef)
+      else submitRef.current?.focus()
     }
   }
 
-  const handleSearch = e => setSearchText(e.target.value)
-
+  // ---------------- Filtering & Pagination ----------------
   const filteredRows = rows.filter(
-    row =>
-      row.name.toLowerCase().includes(searchText.toLowerCase()) ||
-      String(row.sortOrder).includes(searchText.toLowerCase())
+    row => row.name.toLowerCase().includes(searchText.toLowerCase()) || String(row.sortOrder).includes(searchText)
   )
-
   const paginatedRows = filteredRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-
   const totalRows = filteredRows.length
   const startIndex = totalRows === 0 ? 0 : page * rowsPerPage + 1
   const endIndex = Math.min((page + 1) * rowsPerPage, totalRows)
   const paginationText = `Showing ${startIndex} to ${endIndex} of ${totalRows} entries`
 
-  // ✅ Columns - fixed sortOrder to always show full number
+  // ---------------- Columns ----------------
   const columns = [
     {
       field: 'serial',
@@ -173,7 +133,7 @@ export default function CallTypePage() {
       flex: 0.5,
       sortable: false,
       renderCell: params => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ display: 'flex', gap: 1 }}>
           <IconButton size='small' onClick={() => handleDelete(params.row)}>
             <MdDelete style={{ color: 'red' }} />
           </IconButton>
@@ -184,12 +144,7 @@ export default function CallTypePage() {
       )
     },
     { field: 'name', headerName: 'Call Type Name', flex: 1 },
-    {
-      field: 'sortOrder',
-      headerName: 'Sort Order',
-      flex: 0.5,
-      valueGetter: params => String(params.row.sortOrder) // ✅ Always convert to string to avoid scientific notation
-    },
+    { field: 'sortOrder', headerName: 'Sort Order', flex: 0.5, valueGetter: params => String(params.row.sortOrder) },
     { field: 'description', headerName: 'Description', flex: 1 },
     {
       field: 'status',
@@ -224,7 +179,7 @@ export default function CallTypePage() {
       }
     >
       {/* Search */}
-      <Box sx={{ p: 2, pt: 0, display: 'flex', justifyContent: 'flex-start', alignItems: 'center', mt: 5 }}>
+      <Box sx={{ p: 2, pt: 0, mt: 5 }}>
         <CustomTextField
           size='small'
           placeholder='Search'
@@ -244,7 +199,7 @@ export default function CallTypePage() {
       </Box>
 
       {/* DataGrid */}
-            <DataGrid
+      <DataGrid
         rows={paginatedRows}
         columns={columns}
         disableRowSelectionOnClick
@@ -254,10 +209,7 @@ export default function CallTypePage() {
         getRowId={row => row.id}
         sx={{
           mt: 3,
-          '& .MuiDataGrid-row': {
-            minHeight: '60px !important',
-            padding: '12px 0'
-          },
+          '& .MuiDataGrid-row': { minHeight: '60px !important', padding: '12px 0' },
           '& .MuiDataGrid-cell': {
             whiteSpace: 'normal',
             wordBreak: 'break-word',
@@ -267,10 +219,7 @@ export default function CallTypePage() {
           },
           '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': { outline: 'none' },
           '& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within': { outline: 'none' },
-          '& .MuiDataGrid-columnHeaderTitle': {
-            fontSize: '15px',
-            fontWeight: 500
-          }
+          '& .MuiDataGrid-columnHeaderTitle': { fontSize: '15px', fontWeight: 500 }
         }}
       />
 
@@ -279,7 +228,6 @@ export default function CallTypePage() {
         <Typography variant='body2' sx={{ color: 'text.secondary', ml: 1 }}>
           {paginationText}
         </Typography>
-
         <TablePagination
           rowsPerPageOptions={[5, 10, 25, 50]}
           component='div'
@@ -306,95 +254,84 @@ export default function CallTypePage() {
 
           <form onSubmit={handleSubmit}>
             <CustomTextField
+              inputRef={nameRef}
               fullWidth
               margin='normal'
               label='Call Type Name'
               name='name'
               value={formData.name}
               onChange={handleChange}
-              onKeyDown={e => handleKeyPress(e, 0)}
+              onKeyDown={e => handleKeyPress(e, sortRef)}
             />
-
             <CustomTextField
+              inputRef={sortRef}
               fullWidth
               margin='normal'
               label='Sort Order'
               name='sortOrder'
               value={formData.sortOrder}
-              type='text'
-              onChange={handleChange}
-              inputProps={{
-                inputMode: 'numeric',
-                pattern: '[0-9]*',
-                onKeyDown: e => {
-                  if (['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault()
-                  else if (e.key === 'Enter') {
-                    e.preventDefault()
-                    if (/^\d+$/.test(formData.sortOrder)) {
-                      const nextInput = e.target.form.querySelector('textarea[name="description"]')
-                      nextInput?.focus()
-                    }
-                  }
+              onChange={e => {
+                const value = e.target.value
+                if (/^\d*$/.test(value)) {
+                  handleChange(e)
+                }
+              }}
+              inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  handleKeyPress(e, descriptionRef)
                 }
               }}
             />
+
             <CustomTextField
+              inputRef={descriptionRef}
               fullWidth
               margin='normal'
               label='Description'
               name='description'
-              value={formData.description}
               multiline
               rows={3}
+              value={formData.description}
               onChange={handleChange}
-              onKeyDown={e => {
-                if (e.key === 'Enter' || e.key === 'Tab') {
-                  e.preventDefault()
-                  if (statusInputRef.current) {
-                    statusInputRef.current.focus()
-                    setStatusOpen(true)
-                  }
-                }
-              }}
+              onKeyDown={e => handleKeyPress(e, isEdit ? statusRef : submitRef)}
             />
 
-            <Autocomplete
-              ref={statusRef}
-              freeSolo={false}
-              options={statusOptions}
-              value={formData.status}
-              open={statusOpen}
-              onOpen={() => setStatusOpen(true)}
-              onClose={() => setStatusOpen(false)}
-              onChange={(e, newValue) => setFormData(prev => ({ ...prev, status: newValue }))}
-              onInputChange={(e, newValue, reason) => {
-                if (reason === 'input' && !statusOptions.includes(newValue)) return
-                setFormData(prev => ({ ...prev, status: newValue }))
-              }}
-              noOptionsText='No options'
-              renderInput={params => (
-                <CustomTextField
-                  {...params}
-                  label='Status'
-                  inputRef={statusInputRef}
-                  inputProps={{
-                    ...params.inputProps,
-                    onKeyDown: e => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        if (!statusOpen && statusOptions.includes(formData.status)) {
-                          submitButtonRef.current?.focus()
-                        }
-                      }
+            {isEdit && (
+              <CustomTextField
+                select
+                fullWidth
+                margin='normal'
+                label='Status'
+                value={formData.status}
+                inputRef={statusRef}
+                onChange={async e => {
+                  const newStatus = e.target.value
+                  setFormData(prev => ({ ...prev, status: newStatus }))
+                  if (editRow) {
+                    const updatedRow = { ...editRow, status: newStatus }
+                    setRows(prev => prev.map(r => (r.id === editRow.id ? updatedRow : r)))
+                    const db = await initDB()
+                    await db.put(STORE_NAME, updatedRow)
+                  }
+                }}
+                inputProps={{
+                  onKeyDown: e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      focusNext(submitRef)
                     }
-                  }}
-                />
-              )}
-              sx={{ mt: 2 }}
-            />
+                  }
+                }}
+              >
+                <MenuItem value='Active'>Active</MenuItem>
+                <MenuItem value='Inactive'>Inactive</MenuItem>
+              </CustomTextField>
+            )}
 
             <Box mt={3} display='flex' gap={2}>
-              <Button type='submit' variant='contained' fullWidth ref={submitButtonRef}>
+              <Button type='submit' variant='contained' fullWidth ref={submitRef}>
                 {isEdit ? 'Update' : 'Submit'}
               </Button>
               <Button variant='outlined' fullWidth onClick={toggleDrawer}>

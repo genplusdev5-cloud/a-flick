@@ -9,7 +9,8 @@ import {
   Drawer,
   InputAdornment,
   TablePagination,
-  Autocomplete
+  MenuItem ,
+
 } from '@mui/material'
 import { DataGrid } from '@mui/x-data-grid'
 import { MdDelete } from 'react-icons/md'
@@ -38,7 +39,7 @@ export default function SiteRiskPage() {
   const [statusOpen, setStatusOpen] = useState(false)
   const statusOptions = ['Active', 'Inactive']
 
-  // Refs for keyboard navigation
+  // Refs
   const nameRef = useRef(null)
   const descriptionRef = useRef(null)
   const statusRef = useRef(null)
@@ -112,14 +113,14 @@ export default function SiteRiskPage() {
       e.preventDefault()
       if (currentIndex === 0) {
         descriptionRef.current?.focus()
-      } else if (currentIndex === 1) {
-        // Since Autocomplete is a complex component, we'll try to focus on its input
-        // and open the options list.
+      } else if (currentIndex === 1 && isEdit) {
         const inputElement = statusRef.current?.querySelector('input')
         if (inputElement) {
           inputElement.focus()
           setStatusOpen(true)
         }
+      } else {
+        submitButtonRef.current?.focus()
       }
     }
   }
@@ -133,12 +134,11 @@ export default function SiteRiskPage() {
   )
   const paginatedRows = filteredRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
 
-  // ---------- Pagination Text Logic (NEW) ----------
+  // ---------- Pagination ----------
   const totalRows = filteredRows.length
   const startIndex = totalRows === 0 ? 0 : page * rowsPerPage + 1
   const endIndex = Math.min((page + 1) * rowsPerPage, totalRows)
   const paginationText = `Showing ${startIndex} to ${endIndex} of ${totalRows} entries`
-  // -------------------------------------------------
 
   // ---------- Columns ----------
   const columns = [
@@ -220,7 +220,7 @@ export default function SiteRiskPage() {
       </Box>
 
       {/* DataGrid */}
-          <DataGrid
+      <DataGrid
         rows={paginatedRows}
         columns={columns}
         disableRowSelectionOnClick
@@ -230,10 +230,7 @@ export default function SiteRiskPage() {
         getRowId={row => row.id}
         sx={{
           mt: 3,
-          '& .MuiDataGrid-row': {
-            minHeight: '60px !important',
-            padding: '12px 0'
-          },
+          '& .MuiDataGrid-row': { minHeight: '60px !important', padding: '12px 0' },
           '& .MuiDataGrid-cell': {
             whiteSpace: 'normal',
             wordBreak: 'break-word',
@@ -243,22 +240,15 @@ export default function SiteRiskPage() {
           },
           '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': { outline: 'none' },
           '& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within': { outline: 'none' },
-          '& .MuiDataGrid-columnHeaderTitle': {
-            fontSize: '15px',
-            fontWeight: 500
-          }
+          '& .MuiDataGrid-columnHeaderTitle': { fontSize: '15px', fontWeight: 500 }
         }}
       />
 
-
-      {/* ✅ Pagination (MODIFIED) */}
+      {/* Pagination */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2 }}>
-        {/* Custom Status Text */}
         <Typography variant='body2' sx={{ color: 'text.secondary', ml: 1 }}>
           {paginationText}
         </Typography>
-
-        {/* Table Pagination Component */}
         <TablePagination
           rowsPerPageOptions={[5, 10, 25, 50]}
           component='div'
@@ -308,38 +298,38 @@ export default function SiteRiskPage() {
               onKeyDown={e => handleKeyPress(e, 1)}
             />
 
-            <Autocomplete
-              freeSolo={false}
-              options={statusOptions}
-              value={formData.status}
-              open={statusOpen}
-              onOpen={() => setStatusOpen(true)}
-              onClose={() => setStatusOpen(false)}
-              onChange={(e, newValue) => {
-                setFormData(prev => ({ ...prev, status: newValue }))
-                requestAnimationFrame(() => submitButtonRef.current?.focus())
-              }}
-              renderInput={params => (
-                <CustomTextField
-                  {...params}
-                  label='Status'
-                  inputRef={statusRef}
-                  inputProps={{
-                    ...params.inputProps,
-                    onKeyDown: e => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        // Ensure selection is made before focusing on submit
-                        if (statusOptions.includes(formData.status)) {
-                          submitButtonRef.current?.focus()
-                        }
-                      }
+            {/* Status Field — show only when editing */}
+           {isEdit && (
+              <CustomTextField
+                select
+                fullWidth
+                margin='normal'
+                label='Status'
+                value={formData.status}
+                inputRef={statusRef}
+                onChange={async e => {
+                  const newStatus = e.target.value
+                  setFormData(prev => ({ ...prev, status: newStatus }))
+                  if (editRow) {
+                    const updatedRow = { ...editRow, status: newStatus }
+                    setRows(prev => prev.map(r => (r.id === editRow.id ? updatedRow : r)))
+                    const db = await initDB()
+                    await db.put(STORE_NAME, updatedRow)
+                  }
+                }}
+                inputProps={{
+                  onKeyDown: e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      focusNext(submitRef)
                     }
-                  }}
-                />
-              )}
-              sx={{ mt: 2 }}
-            />
+                  }
+                }}
+              >
+                <MenuItem value='Active'>Active</MenuItem>
+                <MenuItem value='Inactive'>Inactive</MenuItem>
+              </CustomTextField>
+            )}
 
             <Box mt={3} display='flex' gap={2}>
               <Button

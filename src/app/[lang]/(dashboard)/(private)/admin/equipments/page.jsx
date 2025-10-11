@@ -9,7 +9,8 @@ import {
   IconButton,
   Drawer,
   InputAdornment,
-  TablePagination
+  TablePagination,
+  MenuItem
 } from '@mui/material'
 import { DataGrid } from '@mui/x-data-grid'
 import { MdDelete } from 'react-icons/md'
@@ -175,7 +176,7 @@ export default function EquipmentsPage() {
     if (e.key === 'Enter') {
       e.preventDefault()
       if (currentIndex === 0) descriptionRef.current?.focus()
-      else if (currentIndex === 1) {
+      else if (currentIndex === 1 && isEdit) {
         statusInputRef.current?.focus()
         setStatusOpen(true)
       }
@@ -215,7 +216,7 @@ export default function EquipmentsPage() {
         />
       </Box>
 
-      {/* DataGrid with auto height + wrapped text */}
+      {/* DataGrid */}
       <DataGrid
         rows={paginatedRows}
         columns={columns}
@@ -296,37 +297,39 @@ export default function EquipmentsPage() {
               onKeyDown={e => handleKeyPress(e, 1)}
             />
 
-            <Autocomplete
-              freeSolo={false}
-              options={statusOptions}
-              value={formData.status}
-              open={statusOpen}
-              onOpen={() => setStatusOpen(true)}
-              onClose={() => setStatusOpen(false)}
-              onChange={(e, newValue) => {
-                setFormData(prev => ({ ...prev, status: newValue }))
-                requestAnimationFrame(() => submitButtonRef.current?.focus())
-              }}
-              renderInput={params => (
-                <CustomTextField
-                  {...params}
-                  label='Status'
-                  fullWidth
-                  margin='normal'
-                  inputRef={statusInputRef}
-                  inputProps={{
-                    ...params.inputProps,
-                    onKeyDown: e => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        submitButtonRef.current?.focus()
-                      }
+            {/* Show status only when editing */}
+            {isEdit && (
+              <CustomTextField
+                select
+                fullWidth
+                margin='normal'
+                label='Status'
+                name='status'
+                value={formData.status}
+                inputRef={statusInputRef}
+                onChange={async e => {
+                  const newStatus = e.target.value
+                  setFormData(prev => ({ ...prev, status: newStatus }))
+                  if (editRow) {
+                    const updatedRow = { ...editRow, status: newStatus }
+                    setRows(prev => prev.map(r => (r.id === editRow.id ? updatedRow : r)))
+                    const db = await initDB()
+                    await db.put(STORE_NAME, updatedRow)
+                  }
+                }}
+                inputProps={{
+                  onKeyDown: e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      submitButtonRef.current?.focus()
                     }
-                  }}
-                />
-              )}
-            />
-
+                  }
+                }}
+              >
+                <MenuItem value='Active'>Active</MenuItem>
+                <MenuItem value='Inactive'>Inactive</MenuItem>
+              </CustomTextField>
+            )}
             <Box mt={3} display='flex' gap={2}>
               <Button
                 type='submit'

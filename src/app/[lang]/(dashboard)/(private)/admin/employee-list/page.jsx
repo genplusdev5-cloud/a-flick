@@ -10,27 +10,12 @@ import SearchIcon from '@mui/icons-material/Search'
 import EditIcon from '@mui/icons-material/Edit'
 import DownloadIcon from '@mui/icons-material/Download'
 import { MdDelete } from 'react-icons/md'
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
 import ContentLayout from '@/components/layout/ContentLayout'
 import CustomTextField from '@core/components/mui/TextField'
-import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 
-// 📅 Format date as DD/MM/YYYY
-const formatDate = date => {
-  if (!date) return ''
-  const d = new Date(date)
-  const day = ('0' + d.getDate()).slice(-2)
-  const month = ('0' + (d.getMonth() + 1)).slice(-2)
-  const year = d.getFullYear()
-  return `${day}/${month}/${year}`
-}
-
-// 🧠 Parse date for editing
-const parseDateForEdit = value => {
-  if (typeof value === 'number') return new Date(value)
-  if (value instanceof Date) return value
-  return null
-}
+// IndexedDB Config
+const dbName = 'EmployeeDB'
+const storeName = 'employees'
 
 export default function EmployeePage() {
   const [rows, setRows] = useState([])
@@ -41,24 +26,27 @@ export default function EmployeePage() {
   const [isEdit, setIsEdit] = useState(false)
   const [editRow, setEditRow] = useState(null)
   const [formData, setFormData] = useState({
-    client: '',
-    total: '',
-    issued_date: null,
-    balance: '',
-    invoice_status: 'Pending',
+    name: '',
+    phone: '',
+    email: '',
+    city: '',
+    state: '',
+    pincode: '',
+    address1: '',
+    address2: '',
     status: 'Active'
   })
+  const [errors, setErrors] = useState({})
 
-  const clientRef = useRef(null)
-  const totalRef = useRef(null)
-  const datePickerRef = useRef(null)
-  const balanceRef = useRef(null)
+  // File upload states
+  const fileInputRef = useRef(null)
+  const [selectedFile, setSelectedFile] = useState('')
+  const [isDragOver, setIsDragOver] = useState(false)
+
+  const nameRef = useRef(null)
   const submitRef = useRef(null)
 
-  const dbName = 'EmployeeDB'
-  const storeName = 'employees'
-
-  // 📂 IndexedDB init + load
+  // IndexedDB Init
   const initDB = async () => {
     const db = await openDB(dbName, 1, {
       upgrade(db) {
@@ -78,11 +66,8 @@ export default function EmployeePage() {
 
   const saveRow = async row => {
     const db = await openDB(dbName, 1)
-    // Convert Date object to timestamp (number) for storage
-    const issuedTimestamp = row.issued_date instanceof Date ? row.issued_date.getTime() : null
-    const rowToSave = { ...row, issued_date: issuedTimestamp }
-    if (row.id) await db.put(storeName, rowToSave)
-    else await db.add(storeName, rowToSave)
+    if (row.id) await db.put(storeName, row)
+    else await db.add(storeName, row)
     const allRows = await db.getAll(storeName)
     allRows.sort((a, b) => b.id - a.id)
     setRows(allRows)
@@ -96,81 +81,131 @@ export default function EmployeePage() {
     setRows(allRows)
   }
 
-  const toggleDrawer = () => setOpen(prev => !prev)
+  const toggleDrawer = () => {
+    setOpen(prev => !prev)
+    setErrors({})
+  }
+
   const handleAdd = () => {
     setIsEdit(false)
     setEditRow(null)
     setFormData({
-      client: '',
-      total: '',
-      issued_date: null,
-      balance: '',
-      invoice_status: 'Pending',
+      name: '',
+      phone: '',
+      email: '',
+      city: '',
+      state: '',
+      pincode: '',
+      address1: '',
+      address2: '',
       status: 'Active'
     })
+    setSelectedFile('')
+    setErrors({})
     setOpen(true)
-    setTimeout(() => clientRef.current?.focus(), 100)
+    setTimeout(() => nameRef.current?.focus(), 100)
   }
 
   const handleEdit = row => {
     setIsEdit(true)
     setEditRow(row)
-    // Convert timestamp (number) back to Date object for the date picker
-    const dateObject = parseDateForEdit(row.issued_date)
-    setFormData({ ...row, issued_date: dateObject })
+    setFormData(row)
+    setSelectedFile(row.fileName || '')
+    setErrors({})
     setOpen(true)
-    setTimeout(() => clientRef.current?.focus(), 100)
+    setTimeout(() => nameRef.current?.focus(), 100)
   }
 
   const handleDelete = row => deleteRowDB(row.id)
   const handleSearch = e => setSearchText(e.target.value)
+
+  // Validation helpers
+  const validateEmail = email => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+
+  const handleNameChange = e => {
+    const value = e.target.value.replace(/[^a-zA-Z\s]/g, '')
+    setFormData(prev => ({ ...prev, name: value }))
+    setErrors(prev => {
+      const newErrors = { ...prev }
+      if (!value) newErrors.name = 'Name is required'
+      else delete newErrors.name
+      return newErrors
+    })
+  }
+
+  const handlePhoneChange = e => {
+    let value = e.target.value.replace(/\D/g, '')
+    if (value.length > 10) value = value.slice(0, 10)
+    if (value.length > 5) value = value.slice(0, 5) + ' ' + value.slice(5)
+    setFormData(prev => ({ ...prev, phone: value }))
+    setErrors(prev => {
+      const newErrors = { ...prev }
+      if (value.replace(/\s/g, '').length !== 10) newErrors.phone = 'Phone must be 10 digits'
+      else delete newErrors.phone
+      return newErrors
+    })
+  }
+
+  const handleEmailChange = e => {
+    const value = e.target.value
+    setFormData(prev => ({ ...prev, email: value }))
+    setErrors(prev => {
+      const newErrors = { ...prev }
+      if (!validateEmail(value)) newErrors.email = 'Invalid email'
+      else delete newErrors.email
+      return newErrors
+    })
+  }
 
   const handleChange = e => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
-  const handleClientChange = e => {
-    // Only allow letters and spaces
-    const value = e.target.value.replace(/[^a-zA-Z\s]/g, '')
-    setFormData(prev => ({ ...prev, client: value }))
-  }
-
-  const handleNumberChange = (e, field) => {
-    // Only allow numbers
-    const value = e.target.value.replace(/[^0-9]/g, '')
-    setFormData(prev => ({ ...prev, [field]: value }))
-  }
-
   const handleSubmit = e => {
     e.preventDefault()
-    // Basic validation
-    if (!formData.client || !formData.total || !formData.issued_date || !formData.balance) return
+    const tempErrors = {}
+    if (!formData.name) tempErrors.name = 'Name is required'
+    if (!formData.phone || formData.phone.replace(/\s/g, '').length !== 10) tempErrors.phone = 'Phone must be 10 digits'
+    if (!formData.email || !validateEmail(formData.email)) tempErrors.email = 'Invalid email'
+    setErrors(tempErrors)
+    if (Object.keys(tempErrors).length > 0) return
 
-    // Determine whether to update or add
-    if (isEdit && editRow) saveRow({ ...formData, id: editRow.id })
-    else saveRow(formData)
+    const rowData = { ...formData, fileName: selectedFile }
 
+    if (isEdit && editRow) saveRow({ ...rowData, id: editRow.id })
+    else saveRow(rowData)
     toggleDrawer()
   }
 
-  const filteredRows = rows.filter(
-    row =>
-      row.client.toLowerCase().includes(searchText.toLowerCase()) ||
-      // Search by formatted date string as well
-      (row.issued_date ? formatDate(row.issued_date).includes(searchText) : false)
+  // File upload handlers
+  const handleFileChange = e => {
+    const file = e.target.files[0]
+    if (file) setSelectedFile(file.name)
+  }
+
+  const handleFileDrop = e => {
+    e.preventDefault()
+    const file = e.dataTransfer.files[0]
+    if (file) setSelectedFile(file.name)
+    setIsDragOver(false)
+  }
+
+  // Filter & pagination
+  const filteredRows = rows.filter(row =>
+    Object.values(row).some(val =>
+      String(val || '')
+        .toLowerCase()
+        .includes(searchText.toLowerCase())
+    )
   )
   const paginatedRows = filteredRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-
-  // ---------- Pagination Text Logic (NEW) ----------
   const totalRows = filteredRows.length
   const startIndex = totalRows === 0 ? 0 : page * rowsPerPage + 1
   const endIndex = Math.min((page + 1) * rowsPerPage, totalRows)
   const paginationText = `Showing ${startIndex} to ${endIndex} of ${totalRows} entries`
-  // -------------------------------------------------
 
-
-  // 📊 Columns with normal multi-line text
+  // Columns
   const columns = [
     {
       field: 'serial',
@@ -195,31 +230,14 @@ export default function EmployeePage() {
         </Box>
       )
     },
-    { field: 'client', headerName: 'Client', flex: 1 },
-    { field: 'total', headerName: 'Total', flex: 0.5 },
-    {
-      field: 'issued_date',
-      headerName: 'Issued Date',
-      flex: 0.8,
-      // Display the formatted date
-      valueGetter: params => formatDate(params.row.issued_date)
-    },
-    { field: 'balance', headerName: 'Balance', flex: 0.5 },
-    {
-      field: 'invoice_status',
-      headerName: 'Invoice Status',
-      flex: 0.8,
-      renderCell: params => (
-        <Button
-          size='small'
-          variant='contained'
-          color={params.value === 'Paid' ? 'success' : 'warning'}
-          sx={{ borderRadius: '20px', textTransform: 'none', fontWeight: 500 }}
-        >
-          {params.value}
-        </Button>
-      )
-    },
+    { field: 'name', headerName: 'Name', flex: 1 },
+    { field: 'phone', headerName: 'Phone', flex: 0.8 },
+    { field: 'email', headerName: 'Email', flex: 1 },
+    { field: 'city', headerName: 'City', flex: 0.6 },
+    { field: 'state', headerName: 'State', flex: 0.6 },
+    { field: 'pincode', headerName: 'Pin Code', flex: 0.6 },
+    { field: 'address1', headerName: 'Address 1', flex: 1 },
+    { field: 'address2', headerName: 'Address 2', flex: 1 },
     {
       field: 'status',
       headerName: 'Status',
@@ -252,8 +270,8 @@ export default function EmployeePage() {
         </Box>
       }
     >
-      {/* 🔍 Search */}
-      <Box sx={{ p: 2, pt: 0, display: 'flex', justifyContent: 'flex-start', alignItems: 'center', mt: 5 }}>
+      {/* Search */}
+      <Box sx={{ p: 2, pt: 0, display: 'flex', alignItems: 'center', mt: 5 }}>
         <CustomTextField
           size='small'
           placeholder='Search'
@@ -272,8 +290,8 @@ export default function EmployeePage() {
         />
       </Box>
 
-      {/* ✅ DataGrid with wrapped text like Page A */}
-     <DataGrid
+      {/* Table */}
+      <DataGrid
         rows={paginatedRows}
         columns={columns}
         disableRowSelectionOnClick
@@ -283,10 +301,7 @@ export default function EmployeePage() {
         getRowId={row => row.id}
         sx={{
           mt: 3,
-          '& .MuiDataGrid-row': {
-            minHeight: '60px !important',
-            padding: '12px 0'
-          },
+          '& .MuiDataGrid-row': { minHeight: '60px !important', padding: '12px 0' },
           '& .MuiDataGrid-cell': {
             whiteSpace: 'normal',
             wordBreak: 'break-word',
@@ -296,21 +311,15 @@ export default function EmployeePage() {
           },
           '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': { outline: 'none' },
           '& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within': { outline: 'none' },
-          '& .MuiDataGrid-columnHeaderTitle': {
-            fontSize: '15px',
-            fontWeight: 500
-          }
+          '& .MuiDataGrid-columnHeaderTitle': { fontSize: '15px', fontWeight: 500 }
         }}
       />
 
-      {/* ✅ Pagination (MODIFIED) */}
+      {/* Pagination */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2 }}>
-        {/* Custom Status Text */}
         <Typography variant='body2' sx={{ color: 'text.secondary', ml: 1 }}>
           {paginationText}
         </Typography>
-
-        {/* Table Pagination Component */}
         <TablePagination
           rowsPerPageOptions={[5, 10, 25, 50]}
           component='div'
@@ -325,9 +334,9 @@ export default function EmployeePage() {
         />
       </Box>
 
-      {/* ✏️ Drawer Form */}
+      {/* Drawer Form */}
       <Drawer anchor='right' open={open} onClose={toggleDrawer}>
-        <Box sx={{ width: 380, p: 3 }}>
+        <Box sx={{ width: 400, p: 3 }}>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={2}>
             <Typography variant='h6'>{isEdit ? 'Edit Employee' : 'Add Employee'}</Typography>
             <IconButton onClick={toggleDrawer}>
@@ -336,59 +345,165 @@ export default function EmployeePage() {
           </Box>
 
           <form onSubmit={handleSubmit}>
+            {/* Name, Phone, Email */}
             <CustomTextField
               fullWidth
               margin='normal'
-              label='Client Name'
-              name='client'
-              value={formData.client}
-              onChange={handleClientChange}
-              inputRef={clientRef}
-            />
-            <CustomTextField
-              fullWidth
-              margin='normal'
-              label='Total'
-              name='total'
-              type='text'
-              value={formData.total}
-              onChange={e => handleNumberChange(e, 'total')}
-              inputRef={totalRef}
-            />
-            <AppReactDatepicker
-              dateFormat='dd/MM/yyyy'
-              selected={formData.issued_date}
-              onChange={date => setFormData(prev => ({ ...prev, issued_date: date }))}
-              placeholderText='DD/MM/YYYY'
-              ref={datePickerRef}
-              customInput={
-                <CustomTextField
-                  fullWidth
-                  margin='normal'
-                  label='Issued Date'
-                  name='issued_date'
-                  value={formData.issued_date ? formatDate(formData.issued_date) : ''}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position='start'>
-                        <CalendarTodayIcon />
-                      </InputAdornment>
-                    )
-                  }}
-                />
+              label={
+                <span>
+                  Name <span style={{ color: 'red' }}>*</span>
+                </span>
               }
+              name='name'
+              value={formData.name}
+              onChange={handleNameChange}
+              inputRef={nameRef}
+              error={!!errors.name}
+              helperText={errors.name}
             />
             <CustomTextField
               fullWidth
               margin='normal'
-              label='Balance'
-              name='balance'
-              type='text'
-              value={formData.balance}
-              onChange={e => handleNumberChange(e, 'balance')}
-              inputRef={balanceRef}
+              label={
+                <span>
+                  Phone <span style={{ color: 'red' }}>*</span>
+                </span>
+              }
+              name='phone'
+              value={formData.phone}
+              onChange={handlePhoneChange}
+              error={!!errors.phone}
+              helperText={errors.phone}
+            />
+            <CustomTextField
+              fullWidth
+              margin='normal'
+              label={
+                <span>
+                  Email <span style={{ color: 'red' }}>*</span>
+                </span>
+              }
+              name='email'
+              value={formData.email}
+              onChange={handleEmailChange}
+              error={!!errors.email}
+              helperText={errors.email}
             />
 
+            {/* City, State, Pin Code */}
+            <CustomTextField
+              fullWidth
+              margin='normal'
+              label='City'
+              name='city'
+              value={formData.city}
+              onChange={e => setFormData(prev => ({ ...prev, city: e.target.value.replace(/[^a-zA-Z\s]/g, '') }))}
+            />
+            <CustomTextField
+              fullWidth
+              margin='normal'
+              label='State'
+              name='state'
+              value={formData.state}
+              onChange={e => setFormData(prev => ({ ...prev, state: e.target.value.replace(/[^a-zA-Z\s]/g, '') }))}
+            />
+            <CustomTextField
+              fullWidth
+              margin='normal'
+              label='Pin Code'
+              name='pincode'
+              value={formData.pincode}
+              onChange={e => setFormData(prev => ({ ...prev, pincode: e.target.value.replace(/\D/g, '') }))}
+            />
+
+            {/* Address */}
+            <CustomTextField
+              fullWidth
+              margin='normal'
+              label='Address 1'
+              name='address1'
+              multiline
+              rows={3}
+              value={formData.address1}
+              onChange={handleChange}
+            />
+            <CustomTextField
+              fullWidth
+              margin='normal'
+              label='Address 2'
+              name='address2'
+              multiline
+              rows={3}
+              value={formData.address2}
+              onChange={handleChange}
+            />
+
+            {/* File Upload */}
+            {/* File Upload */}
+            {/* File Upload */}
+            <Box>
+              {/* Label using CustomTextField (hidden input, just for label) */}
+              <CustomTextField
+                label='Upload File'
+                fullWidth
+                margin='normal'
+                InputProps={{
+                  readOnly: true
+                }}
+                value=''
+                sx={{
+                  '& .MuiInputBase-root': {
+                    display: 'none'
+                  }
+                }}
+              />
+
+              {/* Actual hidden file input */}
+              <input type='file' ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileChange} />
+
+              {/* Upload button with black border */}
+              <Button
+                variant='outlined'
+                fullWidth
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={e => e.preventDefault()}
+                onDragLeave={e => e.preventDefault()}
+                onDrop={handleFileDrop}
+                sx={{
+                  borderColor: 'black', // always black
+                  borderStyle: 'solid',
+                  borderWidth: 1,
+                  justifyContent: 'space-between',
+                  py: 1.5
+                }}
+              >
+                <Typography sx={{ color: selectedFile ? 'text.primary' : 'text.disabled' }}>
+                  {selectedFile || 'Choose File or Drag & Drop Here'}
+                </Typography>
+                <Typography variant='body2' color='primary'>
+                  Browse
+                </Typography>
+              </Button>
+            </Box>
+
+            {/* Status */}
+            {isEdit && (
+              <CustomTextField
+                fullWidth
+                margin='normal'
+                label='Status'
+                name='status'
+                select
+                SelectProps={{ native: true }}
+                value={formData.status}
+                onChange={handleChange}
+              >
+                <option value='Active'>Active</option>
+                <option value='Inactive'>Inactive</option>
+              </CustomTextField>
+            )}
+
+            {/* Submit Buttons */}
             <Box mt={3} display='flex' gap={2}>
               <Button type='submit' variant='contained' fullWidth ref={submitRef}>
                 {isEdit ? 'Update' : 'Submit'}

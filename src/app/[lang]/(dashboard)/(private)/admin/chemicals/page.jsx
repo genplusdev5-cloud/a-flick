@@ -10,7 +10,7 @@ import {
   Drawer,
   InputAdornment,
   TablePagination,
-  Autocomplete
+  Autocomplete,MenuItem 
 } from '@mui/material'
 import { DataGrid } from '@mui/x-data-grid'
 import { MdDelete } from 'react-icons/md'
@@ -307,7 +307,6 @@ export default function ChemicalsPage() {
           </Box>
 
           <form onSubmit={handleSubmit}>
-
             <CustomTextField
               inputRef={nameRef}
               fullWidth
@@ -315,7 +314,7 @@ export default function ChemicalsPage() {
               label='Chemical Name'
               name='name'
               value={formData.name}
-               sx={{ mt: 2 }}
+              sx={{ mt: 2 }}
               onChange={handleChange}
               onKeyDown={e => {
                 if (e.key === 'Enter') {
@@ -339,7 +338,7 @@ export default function ChemicalsPage() {
               onOpen={() => setUnitOpen(true)}
               onClose={() => setUnitOpen(false)}
               onFocus={() => setUnitOpen(true)}
-               sx={{ mt: 5 }}
+              sx={{ mt: 5 }}
               onInputChange={(e, newValue, reason) => {
                 if (reason === 'input' && !unitOptions.includes(newValue)) return
                 setFormData(prev => ({ ...prev, unit: newValue }))
@@ -366,60 +365,45 @@ export default function ChemicalsPage() {
             />
 
             {/* File Upload */}
-  {/* File Upload */}
-<Box sx={{ mt: 4 }}>
-  <CustomTextField
-    label='Upload File'
-    fullWidth
-    margin='normal'
-    InputProps={{
-      readOnly: true,
-    }}
-    value=''
-    sx={{
-      '& .MuiInputBase-root': {
-        display: 'none'
-      }
-    }}
-  />
-
-  <input
-    type='file'
-    ref={fileInputRef}
-    style={{ display: 'none' }}
-    onChange={handleFileChange}
-  />
-
-  <Button
-    variant='outlined'
-    fullWidth
-    onClick={() => fileInputRef.current?.click()}
-    onDragOver={e => {
-      e.preventDefault()
-      setIsDragOver(true)
-    }}
-    onDragLeave={e => {
-      e.preventDefault()
-      setIsDragOver(false)
-    }}
-    onDrop={handleFileDrop}
-    sx={{
-      borderColor: isDragOver ? 'primary.main' : 'inherit',
-      borderStyle: isDragOver ? 'dashed' : 'solid',
-      borderWidth: isDragOver ? 2 : 1,
-      justifyContent: 'space-between',
-      py: 1.5
-    }}
-  >
-    <Typography sx={{ color: selectedFile ? 'text.primary' : 'text.disabled' }}>
-      {selectedFile || 'Choose File or Drag & Drop Here'}
-    </Typography>
-    <Typography variant='body2' color='primary'>
-      Browse
-    </Typography>
-  </Button>
-</Box>
-
+            <Box sx={{ mt: 4 }}>
+              <CustomTextField
+                label='Upload File'
+                fullWidth
+                margin='normal'
+                InputProps={{
+                  readOnly: true
+                }}
+                value=''
+                sx={{
+                  '& .MuiInputBase-root': {
+                    display: 'none'
+                  }
+                }}
+              />
+              <input type='file' ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileChange} />
+              <Button
+                variant='outlined'
+                fullWidth
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={e => e.preventDefault()}
+                onDragLeave={e => e.preventDefault()}
+                onDrop={handleFileDrop}
+                sx={{
+                  borderColor: 'black',
+                  borderStyle: 'solid',
+                  borderWidth: 1,
+                  justifyContent: 'space-between',
+                  py: 1.5
+                }}
+              >
+                <Typography sx={{ color: selectedFile ? 'text.primary' : 'text.disabled' }}>
+                  {selectedFile || 'Choose File or Drag & Drop Here'}
+                </Typography>
+                <Typography variant='body2' color='primary'>
+                  Browse
+                </Typography>
+              </Button>
+            </Box>
 
             {/* Dosage */}
             <CustomTextField
@@ -429,7 +413,7 @@ export default function ChemicalsPage() {
               label='Dosage'
               name='dosage'
               value={formData.dosage}
-               sx={{ mt: 5 }}
+              sx={{ mt: 5 }}
               onChange={e => /^\d*$/.test(e.target.value) && handleChange(e)}
               inputProps={{
                 inputMode: 'numeric',
@@ -444,14 +428,13 @@ export default function ChemicalsPage() {
             />
 
             {/* Ingredients */}
-            {/* Ingredients */}
             <CustomTextField
               inputRef={ingredientsRef}
               fullWidth
               margin='normal'
               multiline
               rows={3}
-               sx={{ mt: 5   }}
+              sx={{ mt: 5 }}
               label='Ingredients'
               name='ingredients'
               value={formData.ingredients}
@@ -459,49 +442,46 @@ export default function ChemicalsPage() {
               onKeyDown={e => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
-                  // Focus Submit button directly
                   setTimeout(() => {
-                    submitRef.current?.focus()
+                    if (isEdit) focusNext(statusRef)
+                    else focusNext(submitRef)
                   }, 100)
                 }
               }}
             />
 
-            {/* Status */}
-            <Autocomplete
-              ref={statusRef}
-              freeSolo={false}
-              options={statusOptions}
-              value={formData.status}
-              open={statusOpen}
-               sx={{ mt: 5}}
-              onOpen={() => setStatusOpen(true)}
-              onClose={() => setStatusOpen(false)}
-              onFocus={() => setStatusOpen(true)}
-              onInputChange={(e, newValue, reason) => {
-                if (reason === 'input' && !statusOptions.includes(newValue)) return
-                setFormData(prev => ({ ...prev, status: newValue }))
-              }}
-              onChange={(e, newValue) => setFormData(prev => ({ ...prev, status: newValue }))}
-              noOptionsText='No options'
-              renderInput={params => (
-                <CustomTextField
-                  {...params}
-                  label='Status'
-                  inputProps={{
-                    ...params.inputProps,
-                    onKeyDown: e => {
-                      if (e.key === 'Enter' && statusOptions.includes(formData.status)) {
-                        e.preventDefault()
-                        focusNext(submitRef)
-                      } else if (e.key === 'Enter') {
-                        e.preventDefault()
-                      }
+            {/* Status - Only show when editing */}
+             {isEdit && (
+              <CustomTextField
+                select
+                fullWidth
+                margin='normal'
+                label='Status'
+                value={formData.status}
+                inputRef={statusRef}
+                onChange={async e => {
+                  const newStatus = e.target.value
+                  setFormData(prev => ({ ...prev, status: newStatus }))
+                  if (editRow) {
+                    const updatedRow = { ...editRow, status: newStatus }
+                    setRows(prev => prev.map(r => (r.id === editRow.id ? updatedRow : r)))
+                    const db = await initDB()
+                    await db.put(STORE_NAME, updatedRow)
+                  }
+                }}
+                inputProps={{
+                  onKeyDown: e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      focusNext(submitRef)
                     }
-                  }}
-                />
-              )}
-            />
+                  }
+                }}
+              >
+                <MenuItem value='Active'>Active</MenuItem>
+                <MenuItem value='Inactive'>Inactive</MenuItem>
+              </CustomTextField>
+            )}
 
             {/* Submit / Cancel */}
             <Box mt={3} display='flex' gap={2}>

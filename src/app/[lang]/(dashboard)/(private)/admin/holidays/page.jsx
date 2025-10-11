@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Box, Typography, Button, IconButton, Drawer, InputAdornment, TablePagination } from '@mui/material'
+import { Box, Typography, Button, IconButton, Drawer, InputAdornment, TablePagination, MenuItem } from '@mui/material'
 import { DataGrid } from '@mui/x-data-grid'
 import { MdDelete } from 'react-icons/md'
 import AddIcon from '@mui/icons-material/Add'
@@ -10,7 +10,6 @@ import SearchIcon from '@mui/icons-material/Search'
 import EditIcon from '@mui/icons-material/Edit'
 import DownloadIcon from '@mui/icons-material/Download'
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
-import { Autocomplete } from '@mui/material'
 import { openDB } from 'idb'
 
 import ContentLayout from '@/components/layout/ContentLayout'
@@ -50,16 +49,12 @@ export default function HolidayPage() {
   const [editRow, setEditRow] = useState(null)
   const [formData, setFormData] = useState({ name: '', date: '', year: '', status: 'Active' })
 
-  const statusOptions = ['Active', 'Inactive']
-
   const nameRef = useRef(null)
   const dateRef = useRef(null)
   const statusRef = useRef(null)
   const statusInputRef = useRef(null)
   const submitButtonRef = useRef(null)
-  const [statusOpen, setStatusOpen] = useState(false)
 
-  // ✅ Load from IndexedDB
   useEffect(() => {
     (async () => {
       const db = await getDB()
@@ -244,10 +239,7 @@ export default function HolidayPage() {
         getRowId={row => row.id}
         sx={{
           mt: 3,
-          '& .MuiDataGrid-row': {
-            minHeight: '60px !important',
-            padding: '12px 0'
-          },
+          '& .MuiDataGrid-row': { minHeight: '60px !important', padding: '12px 0' },
           '& .MuiDataGrid-cell': {
             whiteSpace: 'normal',
             wordBreak: 'break-word',
@@ -257,13 +249,9 @@ export default function HolidayPage() {
           },
           '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': { outline: 'none' },
           '& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within': { outline: 'none' },
-          '& .MuiDataGrid-columnHeaderTitle': {
-            fontSize: '15px',
-            fontWeight: 500
-          }
+          '& .MuiDataGrid-columnHeaderTitle': { fontSize: '15px', fontWeight: 500 }
         }}
       />
-
 
       {/* Pagination */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2 }}>
@@ -351,45 +339,39 @@ export default function HolidayPage() {
               onKeyDown={e => {
                 if (e.key === 'Enter') {
                   e.preventDefault()
-                  statusInputRef.current?.focus()
-                  setStatusOpen(true)
+                  if (isEdit) {
+                    statusRef.current?.focus()
+                  } else {
+                    submitButtonRef.current?.focus()
+                  }
                 }
               }}
             />
 
-            {/* Status */}
-            <Autocomplete
-              ref={statusRef}
-              freeSolo={false}
-              options={statusOptions}
-              value={formData.status}
-              open={statusOpen}
-              onOpen={() => setStatusOpen(true)}
-              onClose={() => setStatusOpen(false)}
-              onChange={(e, newValue) => {
-                setFormData(prev => ({ ...prev, status: newValue }))
-                requestAnimationFrame(() => submitButtonRef.current?.focus())
-              }}
-              renderInput={params => (
-                <CustomTextField
-                  {...params}
-                  label='Status'
-                  fullWidth
-                  margin='normal'
-                  inputRef={statusInputRef}
-                  inputProps={{
-                    ...params.inputProps,
-                    onFocus: () => setStatusOpen(true),
-                    onKeyDown: e => {
-                      if (e.key === 'Enter' && !statusOpen) {
-                        e.preventDefault()
-                        submitButtonRef.current?.focus()
-                      }
-                    }
-                  }}
-                />
-              )}
-            />
+            {/* ✅ Status (only in edit mode) */}
+            {isEdit && (
+              <CustomTextField
+                select
+                fullWidth
+                margin='normal'
+                label='Status'
+                value={formData.status}
+                inputRef={statusRef}
+                onChange={async e => {
+                  const newStatus = e.target.value
+                  setFormData(prev => ({ ...prev, status: newStatus }))
+                  if (editRow) {
+                    const updatedRow = { ...editRow, status: newStatus }
+                    setRows(prev => prev.map(r => (r.id === editRow.id ? updatedRow : r)))
+                    const db = await getDB()
+                    await db.put(STORE_NAME, updatedRow)
+                  }
+                }}
+              >
+                <MenuItem value='Active'>Active</MenuItem>
+                <MenuItem value='Inactive'>Inactive</MenuItem>
+              </CustomTextField>
+            )}
 
             {/* Buttons */}
             <Box mt={3} display='flex' gap={2}>

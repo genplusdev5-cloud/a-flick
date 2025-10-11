@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Box, Typography, Button, IconButton, Drawer, InputAdornment, TablePagination } from '@mui/material'
+import { Box, Typography, Button, IconButton, Drawer, InputAdornment, TablePagination, MenuItem } from '@mui/material'
 import { DataGrid } from '@mui/x-data-grid'
 import { MdDelete } from 'react-icons/md'
 import AddIcon from '@mui/icons-material/Add'
@@ -25,7 +25,7 @@ export default function DesignationPage() {
   const [open, setOpen] = useState(false)
   const [isEdit, setIsEdit] = useState(false)
   const [editRow, setEditRow] = useState(null)
-  const [formData, setFormData] = useState({ name: '', description: '' })
+  const [formData, setFormData] = useState({ name: '', description: '', status: 'Active' })
 
   const submitRef = useRef(null)
 
@@ -57,14 +57,14 @@ export default function DesignationPage() {
 
   const handleAdd = () => {
     setIsEdit(false)
-    setFormData({ name: '', description: '' })
+    setFormData({ name: '', description: '', status: 'Active' })
     setOpen(true)
   }
 
   const handleEdit = row => {
     setIsEdit(true)
     setEditRow(row)
-    setFormData({ name: row.name, description: row.description })
+    setFormData({ name: row.name, description: row.description, status: row.status || 'Active' })
     setOpen(true)
   }
 
@@ -80,8 +80,7 @@ export default function DesignationPage() {
 
     if (formData.name) {
       if (isEdit && editRow) {
-        const status = editRow.status ?? 'Active'
-        await db.put(STORE_NAME, { ...editRow, ...formData, status })
+        await db.put(STORE_NAME, { ...editRow, ...formData })
       } else {
         await db.add(STORE_NAME, { ...formData, status: 'Active' })
       }
@@ -95,7 +94,7 @@ export default function DesignationPage() {
     if (e.key === 'Enter') {
       e.preventDefault()
       const form = e.target.form
-      const inputs = Array.from(form.querySelectorAll('input, textarea')).filter(
+      const inputs = Array.from(form.querySelectorAll('input, textarea, select')).filter(
         el => !el.disabled && el.type !== 'hidden'
       )
       const nextIndex = inputs.findIndex(input => input === e.target) + 1
@@ -205,8 +204,8 @@ export default function DesignationPage() {
         />
       </Box>
 
-      {/* ✅ DataGrid with multi-line support */}
-     <DataGrid
+      {/* DataGrid */}
+      <DataGrid
         rows={paginatedRows}
         columns={columns}
         disableRowSelectionOnClick
@@ -216,32 +215,19 @@ export default function DesignationPage() {
         getRowId={row => row.id}
         sx={{
           mt: 3,
-          '& .MuiDataGrid-row': {
-            minHeight: '60px !important',
-            padding: '12px 0'
-          },
-          '& .MuiDataGrid-cell': {
-            whiteSpace: 'normal',
-            wordBreak: 'break-word',
-            overflowWrap: 'break-word',
-            alignItems: 'flex-start',
-            fontSize: '15px'
-          },
+          '& .MuiDataGrid-row': { minHeight: '60px !important', padding: '12px 0' },
+          '& .MuiDataGrid-cell': { whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'break-word', alignItems: 'flex-start', fontSize: '15px' },
           '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': { outline: 'none' },
           '& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within': { outline: 'none' },
-          '& .MuiDataGrid-columnHeaderTitle': {
-            fontSize: '15px',
-            fontWeight: 500
-          }
+          '& .MuiDataGrid-columnHeaderTitle': { fontSize: '15px', fontWeight: 500 }
         }}
       />
 
-      {/* ✅ Pagination */}
+      {/* Pagination */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2 }}>
         <Typography variant='body2' sx={{ color: 'text.secondary', ml: 1 }}>
           {paginationText}
         </Typography>
-
         <TablePagination
           rowsPerPageOptions={[5, 10, 25, 50]}
           component='div'
@@ -275,9 +261,7 @@ export default function DesignationPage() {
               value={formData.name}
               onChange={e => {
                 const value = e.target.value
-                if (/^[A-Za-z\s]*$/.test(value)) {
-                  handleChange(e)
-                }
+                if (/^[A-Za-z\s]*$/.test(value)) handleChange(e)
               }}
               onKeyDown={e => handleKeyPress(e, 0)}
             />
@@ -298,6 +282,23 @@ export default function DesignationPage() {
                 }
               }}
             />
+
+            {/* Status dropdown only in edit mode */}
+            {isEdit && (
+              <CustomTextField
+                fullWidth
+                margin='normal'
+                select
+                label='Status'
+                name='status'
+                value={formData.status || 'Active'}
+                onChange={handleChange}
+              >
+                <MenuItem value='Active'>Active</MenuItem>
+                <MenuItem value='Inactive'>Inactive</MenuItem>
+              </CustomTextField>
+            )}
+
             <Box mt={3} display='flex' gap={2}>
               <Button
                 type='submit'

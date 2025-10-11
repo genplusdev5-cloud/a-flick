@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Box,
   Typography,
@@ -9,7 +9,7 @@ import {
   Drawer,
   InputAdornment,
   TablePagination,
-  Autocomplete
+  MenuItem
 } from '@mui/material'
 import { DataGrid } from '@mui/x-data-grid'
 import { MdDelete } from 'react-icons/md'
@@ -34,14 +34,16 @@ export default function UnitOfMeasurementPage() {
   const [open, setOpen] = useState(false)
   const [isEdit, setIsEdit] = useState(false)
   const [editRow, setEditRow] = useState(null)
-  const [formData, setFormData] = useState({ name: '', symbol: '', description: '', status: 'Active' })
-  const [statusOpen, setStatusOpen] = useState(false)
+  const [formData, setFormData] = useState({ name: '', description: '', status: 'Active' })
 
   const submitRef = useRef(null)
   const statusRef = useRef(null)
-  const statusInputRef = useRef(null)
+  const nameRef = useRef(null)
+  const descriptionRef = useRef(null)
+
   const statusOptions = ['Active', 'Inactive']
 
+  // ---------- IndexedDB ----------
   const initDB = async () => {
     const db = await openDB(DB_NAME, 1, {
       upgrade(db) {
@@ -63,15 +65,17 @@ export default function UnitOfMeasurementPage() {
     loadRows()
   }, [])
 
+  // ---------- Handlers ----------
   const toggleDrawer = () => setOpen(prev => !prev)
   const handleChange = e => setFormData({ ...formData, [e.target.name]: e.target.value })
   const handleSearch = e => setSearchText(e.target.value)
 
   const handleAdd = () => {
     setIsEdit(false)
-    setFormData({ name: '', symbol: '', description: '', status: 'Active' })
     setEditRow(null)
+    setFormData({ name: '', description: '', status: 'Active' })
     setOpen(true)
+    setTimeout(() => nameRef.current?.focus(), 100)
   }
 
   const handleEdit = row => {
@@ -79,6 +83,7 @@ export default function UnitOfMeasurementPage() {
     setEditRow(row)
     setFormData({ ...row })
     setOpen(true)
+    setTimeout(() => nameRef.current?.focus(), 100)
   }
 
   const handleDelete = async row => {
@@ -89,61 +94,42 @@ export default function UnitOfMeasurementPage() {
 
   const handleSubmit = async e => {
     if (e && e.preventDefault) e.preventDefault()
+    if (!formData.name) return
 
-    if (formData.name && formData.symbol) {
-      const db = await initDB()
-
-      if (isEdit && editRow) {
-        // Update existing row
-        const updatedRow = { ...editRow, ...formData }
-        await db.put(STORE_NAME, updatedRow)
-        setRows(prev => prev.map(r => (r.id === editRow.id ? updatedRow : r)))
-      } else {
-        // Add new row
-        const newId = await db.add(STORE_NAME, { ...formData })
-        setRows(prev => [{ ...formData, id: newId }, ...prev])
-      }
-
-      toggleDrawer()
-    }
-  }
-
-  // ---------------- Key Press Navigation ----------------
-  // NOTE: This function is slightly adjusted to use `inputRef` if the element is a CustomTextField/Autocomplete
-  const focusNext = ref => {
-    if (ref.current.querySelector('input')) {
-      ref.current.querySelector('input').focus()
+    const db = await initDB()
+    if (isEdit && editRow) {
+      const updatedRow = { ...editRow, ...formData }
+      await db.put(STORE_NAME, updatedRow)
+      setRows(prev => prev.map(r => (r.id === editRow.id ? updatedRow : r)))
     } else {
-      ref.current.focus()
+      const newId = await db.add(STORE_NAME, { ...formData })
+      setRows(prev => [{ ...formData, id: newId }, ...prev])
     }
+    toggleDrawer()
   }
 
+  // ---------- Keyboard Navigation ----------
+  const focusNext = ref => ref?.current?.focus()
   const handleKeyPress = (e, nextRef) => {
     if (e.key === 'Enter') {
       e.preventDefault()
-      if (nextRef) {
-        focusNext(nextRef)
-      } else if (submitRef.current) {
-        submitRef.current.focus()
-      }
+      if (nextRef) focusNext(nextRef)
+      else submitRef.current?.focus()
     }
   }
-  // ------------------------------------------------------
 
+  // ---------- Filtering & Pagination ----------
   const filteredRows = rows.filter(
-    row =>
-      row.name.toLowerCase().includes(searchText.toLowerCase()) ||
-      row.symbol.toLowerCase().includes(searchText.toLowerCase())
+    row => row.name.toLowerCase().includes(searchText.toLowerCase())
   )
-  const paginatedRows = filteredRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
 
-  // ---------------- Pagination Text Logic ----------------
+  const paginatedRows = filteredRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
   const totalRows = filteredRows.length
   const startIndex = totalRows === 0 ? 0 : page * rowsPerPage + 1
   const endIndex = Math.min((page + 1) * rowsPerPage, totalRows)
   const paginationText = `Showing ${startIndex} to ${endIndex} of ${totalRows} entries`
-  // -------------------------------------------------------
 
+  // ---------- DataGrid Columns ----------
   const columns = [
     {
       field: 'serial',
@@ -158,7 +144,7 @@ export default function UnitOfMeasurementPage() {
       flex: 0.5,
       sortable: false,
       renderCell: params => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ display: 'flex', gap: 1 }}>
           <IconButton size='small' onClick={() => handleDelete(params.row)}>
             <MdDelete style={{ color: 'red' }} />
           </IconButton>
@@ -169,7 +155,6 @@ export default function UnitOfMeasurementPage() {
       )
     },
     { field: 'name', headerName: 'UOM Name', flex: 1 },
-    { field: 'symbol', headerName: 'Symbol', flex: 0.5 },
     { field: 'description', headerName: 'Description', flex: 1 },
     {
       field: 'status',
@@ -188,11 +173,7 @@ export default function UnitOfMeasurementPage() {
     }
   ]
 
-  // Refs for navigation
-  const nameRef = useRef(null)
-  const symbolRef = useRef(null)
-  const descriptionRef = useRef(null)
-
+  // ---------- Render ----------
   return (
     <ContentLayout
       title='Unit of Measurement List'
@@ -209,7 +190,7 @@ export default function UnitOfMeasurementPage() {
       }
     >
       {/* Search */}
-      <Box sx={{ p: 2, pt: 0, display: 'flex', justifyContent: 'flex-start', alignItems: 'center', mt: 5 }}>
+      <Box sx={{ p: 2, pt: 0, mt: 5, display: 'flex', justifyContent: 'flex-start' }}>
         <CustomTextField
           size='small'
           placeholder='Search'
@@ -239,36 +220,19 @@ export default function UnitOfMeasurementPage() {
         getRowId={row => row.id}
         sx={{
           mt: 3,
-          '& .MuiDataGrid-row': {
-            minHeight: '60px !important',
-            padding: '12px 0'
-          },
-          '& .MuiDataGrid-cell': {
-            whiteSpace: 'normal',
-            wordBreak: 'break-word',
-            overflowWrap: 'break-word',
-            alignItems: 'flex-start',
-            fontSize: '15px'
-          },
+          '& .MuiDataGrid-row': { minHeight: '60px !important', padding: '12px 0' },
+          '& .MuiDataGrid-cell': { whiteSpace: 'normal', wordBreak: 'break-word', alignItems: 'flex-start', fontSize: '15px' },
           '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': { outline: 'none' },
           '& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within': { outline: 'none' },
-          '& .MuiDataGrid-columnHeaderTitle': {
-            fontSize: '15px',
-            fontWeight: 500
-          }
+          '& .MuiDataGrid-columnHeaderTitle': { fontSize: '15px', fontWeight: 500 }
         }}
       />
 
-      {/* ------------------------------------------------------------- */}
-      {/* ✅ Pagination Footer with Custom Text (Added logic here) */}
-      {/* ------------------------------------------------------------- */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2 }}>
-        {/* Custom Status Text */}
+      {/* Pagination */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2, pr: 2 }}>
         <Typography variant='body2' sx={{ color: 'text.secondary', ml: 1 }}>
           {paginationText}
         </Typography>
-
-        {/* Table Pagination */}
         <TablePagination
           rowsPerPageOptions={[5, 10, 25, 50]}
           component='div'
@@ -282,7 +246,6 @@ export default function UnitOfMeasurementPage() {
           }}
         />
       </Box>
-      {/* ------------------------------------------------------------- */}
 
       {/* Drawer Form */}
       <Drawer anchor='right' open={open} onClose={toggleDrawer}>
@@ -303,16 +266,6 @@ export default function UnitOfMeasurementPage() {
               name='name'
               value={formData.name}
               onChange={handleChange}
-              onKeyDown={e => handleKeyPress(e, symbolRef)}
-            />
-            <CustomTextField
-              inputRef={symbolRef}
-              fullWidth
-              margin='normal'
-              label='Symbol'
-              name='symbol'
-              value={formData.symbol}
-              onChange={handleChange}
               onKeyDown={e => handleKeyPress(e, descriptionRef)}
             />
             <CustomTextField
@@ -326,60 +279,45 @@ export default function UnitOfMeasurementPage() {
               multiline
               rows={4}
               onKeyDown={e => {
-                if (e.key === 'Enter' || e.key === 'Tab') {
+                if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
-                  if (statusInputRef.current) {
-                    focusNext(statusRef)
-                    setStatusOpen(true)
-                  }
+                  if (isEdit) focusNext(statusRef)
+                  else submitRef.current?.focus()
                 }
               }}
             />
-            <Autocomplete
-              ref={statusRef}
-              freeSolo={false}
-              options={statusOptions}
-              value={formData.status}
-              open={statusOpen}
-              onOpen={() => setStatusOpen(true)}
-              onClose={() => setStatusOpen(false)}
-              onInputChange={(e, newValue, reason) => {
-                if (reason === 'input' && !statusOptions.includes(newValue)) return
-                setFormData(prev => ({ ...prev, status: newValue }))
-              }}
-              onChange={(e, newValue) => setFormData(prev => ({ ...prev, status: newValue }))}
-              noOptionsText='No options'
-              renderInput={params => (
-                <CustomTextField
-                  {...params}
-                  label='Status'
-                  inputRef={statusInputRef}
-                  inputProps={{
-                    ...params.inputProps,
-                    onKeyDown: e => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        if (!statusOpen) submitRef.current?.focus()
-                      }
-                    }
-                  }}
-                />
-              )}
-              sx={{ mt: 2 }}
-            />
-            <Box mt={3} display='flex' gap={2}>
-              <Button
-                type='submit'
-                variant='contained'
+
+            {/* ✅ Status field visible ONLY in edit mode */}
+            {isEdit && (
+              <CustomTextField
+                select
                 fullWidth
-                ref={submitRef}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    handleSubmit(e)
+                margin='normal'
+                label='Status'
+                name='status'
+                value={formData.status}
+                inputRef={statusRef}
+                onChange={async e => {
+                  const newStatus = e.target.value
+                  setFormData(prev => ({ ...prev, status: newStatus }))
+                  if (editRow) {
+                    const updatedRow = { ...editRow, status: newStatus }
+                    setRows(prev => prev.map(r => (r.id === editRow.id ? updatedRow : r)))
+                    const db = await initDB()
+                    await db.put(STORE_NAME, updatedRow)
                   }
                 }}
               >
+                {statusOptions.map(opt => (
+                  <MenuItem key={opt} value={opt}>
+                    {opt}
+                  </MenuItem>
+                ))}
+              </CustomTextField>
+            )}
+
+            <Box mt={3} display='flex' gap={2}>
+              <Button type='submit' variant='contained' fullWidth ref={submitRef}>
                 {isEdit ? 'Update' : 'Submit'}
               </Button>
               <Button variant='outlined' fullWidth onClick={toggleDrawer}>

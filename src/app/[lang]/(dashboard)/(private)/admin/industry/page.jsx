@@ -2,7 +2,16 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { openDB } from 'idb'
-import { Box, Typography, Button, IconButton, Drawer, InputAdornment, TablePagination } from '@mui/material'
+import {
+  Box,
+  Typography,
+  Button,
+  IconButton,
+  Drawer,
+  InputAdornment,
+  TablePagination,
+  MenuItem
+} from '@mui/material'
 import { DataGrid } from '@mui/x-data-grid'
 import { MdDelete } from 'react-icons/md'
 import AddIcon from '@mui/icons-material/Add'
@@ -10,7 +19,6 @@ import CloseIcon from '@mui/icons-material/Close'
 import SearchIcon from '@mui/icons-material/Search'
 import EditIcon from '@mui/icons-material/Edit'
 import DownloadIcon from '@mui/icons-material/Download'
-import { Autocomplete } from '@mui/material'
 import ContentLayout from '@/components/layout/ContentLayout'
 import CustomTextField from '@core/components/mui/TextField'
 
@@ -28,11 +36,7 @@ export default function IndustryPage() {
   const nameRef = useRef(null)
   const descriptionRef = useRef(null)
   const statusRef = useRef(null)
-  const statusInputRef = useRef(null)
   const submitButtonRef = useRef(null)
-  const [statusOpen, setStatusOpen] = useState(false)
-
-  const statusOptions = ['Active', 'Inactive']
 
   const dbName = 'industry-db'
   const storeName = 'industries'
@@ -83,7 +87,7 @@ export default function IndustryPage() {
   const handleChange = e => {
     const { name, value } = e.target
     if (name === 'name') {
-      // Allow only letters and spaces for name
+      // Allow only letters and spaces
       const filtered = value.replace(/[^a-zA-Z\s]/g, '')
       setFormData(prev => ({ ...prev, [name]: filtered }))
     } else {
@@ -117,12 +121,10 @@ export default function IndustryPage() {
 
   const paginatedRows = filteredRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
 
-  // ---------------- Pagination Text Logic ----------------
   const totalRows = filteredRows.length
   const startIndex = totalRows === 0 ? 0 : page * rowsPerPage + 1
   const endIndex = Math.min((page + 1) * rowsPerPage, totalRows)
   const paginationText = `Showing ${startIndex} to ${endIndex} of ${totalRows} entries`
-  // -------------------------------------------------------
 
   const columns = [
     {
@@ -182,7 +184,6 @@ export default function IndustryPage() {
         </Box>
       }
     >
-      {/* Search */}
       <Box sx={{ p: 2, pt: 0, display: 'flex', justifyContent: 'flex-start', alignItems: 'center', mt: 5 }}>
         <CustomTextField
           size='small'
@@ -202,7 +203,6 @@ export default function IndustryPage() {
         />
       </Box>
 
-      {/* ✅ Updated DataGrid with auto row height & wrapping */}
       <DataGrid
         rows={paginatedRows}
         columns={columns}
@@ -213,36 +213,18 @@ export default function IndustryPage() {
         getRowId={row => row.id}
         sx={{
           mt: 3,
-          '& .MuiDataGrid-row': {
-            minHeight: '60px !important',
-            padding: '12px 0'
-          },
-          '& .MuiDataGrid-cell': {
-            whiteSpace: 'normal',
-            wordBreak: 'break-word',
-            overflowWrap: 'break-word',
-            alignItems: 'flex-start',
-            fontSize: '15px'
-          },
+          '& .MuiDataGrid-row': { minHeight: '60px !important', padding: '12px 0' },
+          '& .MuiDataGrid-cell': { whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'break-word', alignItems: 'flex-start', fontSize: '15px' },
           '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': { outline: 'none' },
           '& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within': { outline: 'none' },
-          '& .MuiDataGrid-columnHeaderTitle': {
-            fontSize: '15px',
-            fontWeight: 500
-          }
+          '& .MuiDataGrid-columnHeaderTitle': { fontSize: '15px', fontWeight: 500 }
         }}
       />
 
-      {/* ------------------------------------------------------------- */}
-      {/* ✅ Pagination Footer with Custom Text (Added logic here) */}
-      {/* ------------------------------------------------------------- */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2 }}>
-        {/* Custom Status Text */}
         <Typography variant='body2' sx={{ color: 'text.secondary', ml: 1 }}>
           {paginationText}
         </Typography>
-
-        {/* Table Pagination */}
         <TablePagination
           rowsPerPageOptions={[5, 10, 25, 50]}
           component='div'
@@ -256,9 +238,7 @@ export default function IndustryPage() {
           }}
         />
       </Box>
-      {/* ------------------------------------------------------------- */}
 
-      {/* Drawer Form */}
       <Drawer anchor='right' open={open} onClose={toggleDrawer}>
         <Box sx={{ width: 360, p: 3 }}>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={2}>
@@ -301,49 +281,35 @@ export default function IndustryPage() {
                 onKeyDown: e => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault()
-                    setStatusOpen(true)
-                    statusInputRef.current?.focus()
+                    submitButtonRef.current?.focus()
                   }
                 }
               }}
             />
 
-            <Autocomplete
-              ref={statusRef}
-              freeSolo={false}
-              options={statusOptions}
-              value={formData.status}
-              open={statusOpen}
-              onOpen={() => setStatusOpen(true)}
-              onClose={() => setStatusOpen(false)}
-              onInputChange={(e, newValue, reason) => {
-                if (reason === 'input' && !statusOptions.includes(newValue)) return
-                setFormData(prev => ({ ...prev, status: newValue }))
-              }}
-              onChange={(e, newValue) => {
-                setFormData(prev => ({ ...prev, status: newValue }))
-                requestAnimationFrame(() => submitButtonRef.current?.focus())
-              }}
-              renderInput={params => (
-                <CustomTextField
-                  {...params}
-                  label='Status'
-                  inputRef={statusInputRef}
-                  fullWidth
-                  margin='normal'
-                  inputProps={{
-                    ...params.inputProps,
-                    onFocus: () => setStatusOpen(true),
-                    onKeyDown: e => {
-                      if (e.key === 'Enter' && !statusOpen) {
-                        e.preventDefault()
-                        submitButtonRef.current?.focus()
-                      }
-                    }
-                  }}
-                />
-              )}
-            />
+            {isEdit && (
+              <CustomTextField
+                select
+                fullWidth
+                margin='normal'
+                label='Status'
+                value={formData.status}
+                inputRef={statusRef}
+                onChange={async e => {
+                  const newStatus = e.target.value
+                  setFormData(prev => ({ ...prev, status: newStatus }))
+                  if (editRow) {
+                    const updatedRow = { ...editRow, status: newStatus }
+                    setRows(prev => prev.map(r => (r.id === editRow.id ? updatedRow : r)))
+                    const db = await initDB()
+                    await db.put(storeName, updatedRow)
+                  }
+                }}
+              >
+                <MenuItem value='Active'>Active</MenuItem>
+                <MenuItem value='Inactive'>Inactive</MenuItem>
+              </CustomTextField>
+            )}
 
             <Box mt={3} display='flex' gap={2}>
               <Button

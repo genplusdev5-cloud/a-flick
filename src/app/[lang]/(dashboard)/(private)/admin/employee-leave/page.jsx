@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { openDB } from 'idb'
-import { Box, Typography, Button, IconButton, Drawer, InputAdornment, TablePagination } from '@mui/material'
+import { Box, Typography, Button, IconButton, Drawer, InputAdornment, TablePagination, MenuItem } from '@mui/material'
 import { DataGrid } from '@mui/x-data-grid'
 
 // Icons
@@ -49,7 +49,7 @@ export default function EmployeeLeavePage() {
     leaveType: '',
     fromDate: new Date(),
     toDate: new Date(),
-    status: 'Pending'
+    status: 'Pending' // Default status for new entries
   })
 
   const [dateError, setDateError] = useState('')
@@ -253,8 +253,8 @@ export default function EmployeeLeavePage() {
         />
       </Box>
 
-      {/* ✅ DataGrid with multi-line wrapping (like Page A) */}
-   <DataGrid
+      {/* DataGrid */}
+      <DataGrid
         rows={paginatedRows}
         columns={columns}
         disableRowSelectionOnClick
@@ -264,10 +264,7 @@ export default function EmployeeLeavePage() {
         getRowId={row => row.id}
         sx={{
           mt: 3,
-          '& .MuiDataGrid-row': {
-            minHeight: '60px !important',
-            padding: '12px 0'
-          },
+          '& .MuiDataGrid-row': { minHeight: '60px !important', padding: '12px 0' },
           '& .MuiDataGrid-cell': {
             whiteSpace: 'normal',
             wordBreak: 'break-word',
@@ -277,14 +274,11 @@ export default function EmployeeLeavePage() {
           },
           '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': { outline: 'none' },
           '& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within': { outline: 'none' },
-          '& .MuiDataGrid-columnHeaderTitle': {
-            fontSize: '15px',
-            fontWeight: 500
-          }
+          '& .MuiDataGrid-columnHeaderTitle': { fontSize: '15px', fontWeight: 500 }
         }}
       />
 
-      {/* ✅ Pagination with status text */}
+      {/* Pagination */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2 }}>
         <Typography variant='body2' sx={{ color: 'text.secondary', ml: 1 }}>
           {paginationText}
@@ -391,6 +385,23 @@ export default function EmployeeLeavePage() {
               <Typography variant='body2' sx={{ mt: 1, color: 'red', fontWeight: 500 }}>
                 {dateError}
               </Typography>
+            )}
+
+            {/* Status dropdown ONLY when editing */}
+            {isEdit && (
+              <CustomTextField
+                select
+                fullWidth
+                margin='normal'
+                label='Status'
+                name='status'
+                value={formData.status ?? 'Pending'}
+                onChange={e => setFormData(prev => ({ ...prev, status: e.target.value }))}
+              >
+                <MenuItem value='Pending'>Pending</MenuItem>
+                <MenuItem value='Approved'>Approved</MenuItem>
+                <MenuItem value='Rejected'>Rejected</MenuItem>
+              </CustomTextField>
             )}
 
             <Box mt={3} display='flex' gap={2}>

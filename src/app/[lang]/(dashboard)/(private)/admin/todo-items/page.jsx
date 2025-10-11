@@ -1,7 +1,16 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Box, Typography, Button, IconButton, Drawer, InputAdornment, TablePagination } from '@mui/material'
+import {
+  Box,
+  Typography,
+  Button,
+  IconButton,
+  Drawer,
+  InputAdornment,
+  TablePagination,
+  MenuItem
+} from '@mui/material'
 import { DataGrid } from '@mui/x-data-grid'
 import { MdDelete } from 'react-icons/md'
 import AddIcon from '@mui/icons-material/Add'
@@ -9,7 +18,6 @@ import CloseIcon from '@mui/icons-material/Close'
 import SearchIcon from '@mui/icons-material/Search'
 import EditIcon from '@mui/icons-material/Edit'
 import DownloadIcon from '@mui/icons-material/Download'
-import { Autocomplete } from '@mui/material'
 import { openDB } from 'idb'
 
 import ContentLayout from '@/components/layout/ContentLayout'
@@ -27,14 +35,13 @@ export default function TodoItemsPage() {
   const [isEdit, setIsEdit] = useState(false)
   const [editRow, setEditRow] = useState(null)
   const [formData, setFormData] = useState({ title: '', status: 'Active' })
-  const [statusOpen, setStatusOpen] = useState(false)
 
+  // ✅ Proper refs
   const titleRef = useRef(null)
-  const statusInputRef = useRef(null)
+  const statusRef = useRef(null)
   const submitButtonRef = useRef(null)
-  const statusOptions = ['Active', 'Inactive']
 
-  // ------------- IndexedDB functions -------------
+  // ---------- IndexedDB ----------
   const initDB = async () => {
     const db = await openDB(DB_NAME, 1, {
       upgrade(db) {
@@ -49,7 +56,6 @@ export default function TodoItemsPage() {
   const loadRows = async () => {
     const db = await initDB()
     const allRows = await db.getAll(STORE_NAME)
-    // Sort descending by id so latest entries come first
     const sorted = allRows.sort((a, b) => b.id - a.id)
     setRows(sorted)
   }
@@ -58,13 +64,13 @@ export default function TodoItemsPage() {
     loadRows()
   }, [])
 
+  // ---------- Handlers ----------
   const toggleDrawer = () => setOpen(prev => !prev)
 
   const handleChange = e => {
     const { name, value } = e.target
     if (name === 'title') {
-      // Allow letters and spaces only
-      const filtered = value.replace(/[^a-zA-Z\s]/g, '')
+      const filtered = value.replace(/[^a-zA-Z\s]/g, '') // only letters/spaces
       setFormData(prev => ({ ...prev, [name]: filtered }))
     } else {
       setFormData(prev => ({ ...prev, [name]: value }))
@@ -96,7 +102,7 @@ export default function TodoItemsPage() {
 
   const handleSubmit = async e => {
     e.preventDefault()
-    if (!formData.title) return
+    if (!formData.title.trim()) return
     const db = await initDB()
 
     if (isEdit && editRow) {
@@ -109,22 +115,21 @@ export default function TodoItemsPage() {
     toggleDrawer()
   }
 
-  // Filter + Pagination
+  // ---------- Filter + Pagination ----------
   const filteredRows = rows.filter(
     row =>
       row.title.toLowerCase().includes(searchText.toLowerCase()) ||
       row.status.toLowerCase().includes(searchText.toLowerCase())
   )
+
   const paginatedRows = filteredRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
 
-  // ---------------- Pagination Text Logic ----------------
   const totalRows = filteredRows.length
   const startIndex = totalRows === 0 ? 0 : page * rowsPerPage + 1
   const endIndex = Math.min((page + 1) * rowsPerPage, totalRows)
   const paginationText = `Showing ${startIndex} to ${endIndex} of ${totalRows} entries`
-  // -------------------------------------------------------
 
-  // Columns
+  // ---------- Columns ----------
   const columns = [
     {
       field: 'serial',
@@ -154,9 +159,7 @@ export default function TodoItemsPage() {
       headerName: 'Todo Title',
       flex: 1,
       renderCell: params => (
-        <Box sx={{ whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'break-word' }}>
-          {params.value}
-        </Box>
+        <Box sx={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>{params.value}</Box>
       )
     },
     {
@@ -211,7 +214,8 @@ export default function TodoItemsPage() {
         />
       </Box>
 
-      <DataGrid
+      {/* DataGrid */}
+         <DataGrid
         rows={paginatedRows}
         columns={columns}
         disableRowSelectionOnClick
@@ -221,37 +225,19 @@ export default function TodoItemsPage() {
         getRowId={row => row.id}
         sx={{
           mt: 3,
-          '& .MuiDataGrid-row': {
-            minHeight: '60px !important',
-            padding: '12px 0'
-          },
-          '& .MuiDataGrid-cell': {
-            whiteSpace: 'normal',
-            wordBreak: 'break-word',
-            overflowWrap: 'break-word',
-            alignItems: 'flex-start',
-            fontSize: '15px'
-          },
+          '& .MuiDataGrid-row': { minHeight: '60px !important', padding: '12px 0' },
+          '& .MuiDataGrid-cell': { whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'break-word', alignItems: 'flex-start', fontSize: '15px' },
           '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': { outline: 'none' },
           '& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within': { outline: 'none' },
-          '& .MuiDataGrid-columnHeaderTitle': {
-            fontSize: '15px',
-            fontWeight: 500
-          }
+          '& .MuiDataGrid-columnHeaderTitle': { fontSize: '15px', fontWeight: 500 }
         }}
       />
 
-
-      {/* ------------------------------------------------------------- */}
-      {/* ✅ Pagination Footer with Custom Text (Added logic here) */}
-      {/* ------------------------------------------------------------- */}
+      {/* Pagination */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2 }}>
-        {/* Custom Status Text */}
         <Typography variant='body2' sx={{ color: 'text.secondary', ml: 1 }}>
           {paginationText}
         </Typography>
-
-        {/* Table Pagination */}
         <TablePagination
           rowsPerPageOptions={[5, 10, 25, 50]}
           component='div'
@@ -265,7 +251,6 @@ export default function TodoItemsPage() {
           }}
         />
       </Box>
-      {/* ------------------------------------------------------------- */}
 
       {/* Drawer Form */}
       <Drawer anchor='right' open={open} onClose={toggleDrawer}>
@@ -290,42 +275,46 @@ export default function TodoItemsPage() {
                 onKeyDown: e => {
                   if (e.key === 'Enter' || e.key === 'Tab') {
                     e.preventDefault()
-                    statusInputRef.current?.focus()
+                    if (isEdit) statusRef.current?.focus()
+                    else submitButtonRef.current?.focus()
                   }
                 }
               }}
             />
 
-            <Autocomplete
-              freeSolo={false}
-              options={statusOptions}
-              value={formData.status}
-              open={statusOpen}
-              onOpen={() => setStatusOpen(true)}
-              onClose={() => setStatusOpen(false)}
-              onChange={(e, newValue) => {
-                setFormData(prev => ({ ...prev, status: newValue }))
-                requestAnimationFrame(() => submitButtonRef.current?.focus())
-              }}
-              renderInput={params => (
-                <CustomTextField
-                  {...params}
-                  label='Status'
-                  inputRef={statusInputRef}
-                  onFocus={() => setStatusOpen(true)}
-                  inputProps={{
-                    ...params.inputProps,
-                    onKeyDown: e => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        submitButtonRef.current?.focus()
-                      }
+            {/* ✅ Status field only for Edit */}
+            {isEdit && (
+              <CustomTextField
+                select
+                fullWidth
+                margin='normal'
+                label='Status'
+                name='status'
+                value={formData.status}
+                inputRef={statusRef}
+                onChange={async e => {
+                  const newStatus = e.target.value
+                  setFormData(prev => ({ ...prev, status: newStatus }))
+                  if (editRow) {
+                    const updatedRow = { ...editRow, status: newStatus }
+                    setRows(prev => prev.map(r => (r.id === editRow.id ? updatedRow : r)))
+                    const db = await initDB()
+                    await db.put(STORE_NAME, updatedRow)
+                  }
+                }}
+                inputProps={{
+                  onKeyDown: e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      submitButtonRef.current?.focus()
                     }
-                  }}
-                />
-              )}
-              sx={{ mt: 2 }}
-            />
+                  }
+                }}
+              >
+                <MenuItem value='Active'>Active</MenuItem>
+                <MenuItem value='Inactive'>Inactive</MenuItem>
+              </CustomTextField>
+            )}
 
             <Box mt={3} display='flex' gap={2}>
               <Button

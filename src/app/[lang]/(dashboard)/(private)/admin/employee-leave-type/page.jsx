@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { openDB } from 'idb'
 
 // MUI Imports
-import { Box, Typography, Button, IconButton, Drawer, InputAdornment, TablePagination } from '@mui/material'
+import { Box, Typography, Button, IconButton, Drawer, InputAdornment, TablePagination, MenuItem } from '@mui/material'
 import { DataGrid } from '@mui/x-data-grid'
 import { MdDelete } from 'react-icons/md'
 import AddIcon from '@mui/icons-material/Add'
@@ -25,7 +25,7 @@ export default function EmployeeLeaveTypePage() {
   const [open, setOpen] = useState(false)
   const [isEdit, setIsEdit] = useState(false)
   const [editRow, setEditRow] = useState(null)
-  const [formData, setFormData] = useState({ leaveCode: '', name: '' })
+  const [formData, setFormData] = useState({ leaveCode: '', name: '', status: 'Active' })
 
   const leaveCodeRef = useRef(null)
   const nameRef = useRef(null)
@@ -80,7 +80,7 @@ export default function EmployeeLeaveTypePage() {
   const handleAdd = () => {
     setIsEdit(false)
     setEditRow(null)
-    setFormData({ leaveCode: '', name: '' })
+    setFormData({ leaveCode: '', name: '', status: 'Active' })
     setOpen(true)
     setTimeout(() => leaveCodeRef.current?.focus(), 100)
   }
@@ -88,7 +88,7 @@ export default function EmployeeLeaveTypePage() {
   const handleEdit = row => {
     setIsEdit(true)
     setEditRow(row)
-    setFormData({ leaveCode: row.leaveCode, name: row.name })
+    setFormData({ leaveCode: row.leaveCode, name: row.name, status: row.status ?? 'Active' })
     setOpen(true)
     setTimeout(() => leaveCodeRef.current?.focus(), 100)
   }
@@ -102,11 +102,9 @@ export default function EmployeeLeaveTypePage() {
     if (!formData.leaveCode || !formData.name) return
 
     if (isEdit && editRow) {
-      // Ensure status is included in update
-      const status = editRow.status ?? 'Active'
-      saveRowDB({ ...formData, id: editRow.id, status })
+      saveRowDB({ ...formData, id: editRow.id })
     } else {
-      saveRowDB({ ...formData, status: 'Active' })
+      saveRowDB({ ...formData, status: formData.status ?? 'Active' })
     }
 
     setOpen(false)
@@ -132,12 +130,11 @@ export default function EmployeeLeaveTypePage() {
 
   const paginatedRows = filteredRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
 
-  // ---------- Pagination Text Logic (NEW) ----------
+  // ---------- Pagination Text ----------
   const totalRows = filteredRows.length
   const startIndex = totalRows === 0 ? 0 : page * rowsPerPage + 1
   const endIndex = Math.min((page + 1) * rowsPerPage, totalRows)
   const paginationText = `Showing ${startIndex} to ${endIndex} of ${totalRows} entries`
-  // -------------------------------------------------
 
   const columns = [
     {
@@ -218,7 +215,7 @@ export default function EmployeeLeaveTypePage() {
       </Box>
 
       {/* DataGrid */}
-     <DataGrid
+      <DataGrid
         rows={paginatedRows}
         columns={columns}
         disableRowSelectionOnClick
@@ -248,14 +245,12 @@ export default function EmployeeLeaveTypePage() {
         }}
       />
 
-      {/* ✅ Pagination (MODIFIED) */}
+      {/* Pagination */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2 }}>
-        {/* Custom Status Text */}
         <Typography variant='body2' sx={{ color: 'text.secondary', ml: 1 }}>
           {paginationText}
         </Typography>
 
-        {/* Table Pagination Component */}
         <TablePagination
           rowsPerPageOptions={[5, 10, 25, 50]}
           component='div'
@@ -280,46 +275,61 @@ export default function EmployeeLeaveTypePage() {
             </IconButton>
           </Box>
 
-          <form onSubmit={handleSubmit}>
-            <CustomTextField
-              fullWidth
-              margin='normal'
-              label='Leave Code'
-              name='leaveCode'
-              value={formData.leaveCode}
-              onChange={e => setFormData(prev => ({ ...prev, leaveCode: e.target.value }))}
-              inputRef={leaveCodeRef}
-              onKeyDown={e => handleKeyPress(e, 'leaveCode')}
-            />
-            <CustomTextField
-              fullWidth
-              margin='normal'
-              label='Name'
-              name='name'
-              value={formData.name}
-              onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
-              inputRef={nameRef}
-              onKeyDown={e => {
-                // Prevent non-alphabetic/space characters, but allow control keys
-                if (
-                  !/^[a-zA-Z\s]$/.test(e.key) &&
-                  !['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(e.key)
-                ) {
-                  e.preventDefault()
-                }
-                handleKeyPress(e, 'name')
-              }}
-            />
+         <form onSubmit={handleSubmit}>
+  <CustomTextField
+    fullWidth
+    margin='normal'
+    label='Leave Code'
+    name='leaveCode'
+    value={formData.leaveCode}
+    onChange={e => setFormData(prev => ({ ...prev, leaveCode: e.target.value }))}
+    inputRef={leaveCodeRef}
+    onKeyDown={e => handleKeyPress(e, 'leaveCode')}
+  />
+  <CustomTextField
+    fullWidth
+    margin='normal'
+    label='Name'
+    name='name'
+    value={formData.name}
+    onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
+    inputRef={nameRef}
+    onKeyDown={e => {
+      if (
+        !/^[a-zA-Z\s]$/.test(e.key) &&
+        !['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(e.key)
+      ) {
+        e.preventDefault()
+      }
+      handleKeyPress(e, 'name')
+    }}
+  />
 
-            <Box mt={3} display='flex' gap={2}>
-              <Button type='submit' variant='contained' fullWidth ref={submitRef}>
-                {isEdit ? 'Update' : 'Submit'}
-              </Button>
-              <Button variant='outlined' fullWidth onClick={() => setOpen(false)}>
-                Cancel
-              </Button>
-            </Box>
-          </form>
+  {isEdit && (
+    <CustomTextField
+      select
+      fullWidth
+      margin='normal'
+      label='Status'
+      name='status'
+      value={formData.status ?? 'Active'}
+      onChange={e => setFormData(prev => ({ ...prev, status: e.target.value }))}
+    >
+      <MenuItem value='Active'>Active</MenuItem>
+      <MenuItem value='Inactive'>Inactive</MenuItem>
+    </CustomTextField>
+  )}
+
+  <Box mt={3} display='flex' gap={2}>
+    <Button type='submit' variant='contained' fullWidth ref={submitRef}>
+      {isEdit ? 'Update' : 'Submit'}
+    </Button>
+    <Button variant='outlined' fullWidth onClick={() => setOpen(false)}>
+      Cancel
+    </Button>
+  </Box>
+</form>
+
         </Box>
       </Drawer>
     </ContentLayout>

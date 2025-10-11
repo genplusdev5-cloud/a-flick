@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Box, Typography, Button, IconButton, Drawer, InputAdornment, TablePagination } from '@mui/material'
+import { Box, Typography, Button, IconButton, Drawer, InputAdornment, TablePagination, MenuItem } from '@mui/material'
 import { DataGrid } from '@mui/x-data-grid'
 import { MdDelete } from 'react-icons/md'
 import AddIcon from '@mui/icons-material/Add'
@@ -64,7 +64,11 @@ export default function DepartmentPage() {
   const handleEdit = row => {
     setIsEdit(true)
     setEditRow(row)
-    setFormData({ name: row.name, description: row.description })
+    setFormData({
+      name: row.name,
+      description: row.description,
+      status: row.status || 'Active'
+    })
     setOpen(true)
   }
 
@@ -80,11 +84,8 @@ export default function DepartmentPage() {
 
     if (formData.name) {
       if (isEdit && editRow) {
-        // Only update status if it exists in the row (for existing rows)
-        const status = editRow.status ?? 'Active'
-        await db.put(STORE_NAME, { ...editRow, ...formData, status })
+        await db.put(STORE_NAME, { ...editRow, ...formData })
       } else {
-        // Add status for new entries
         await db.add(STORE_NAME, { ...formData, status: 'Active' })
       }
       await loadRows()
@@ -97,11 +98,8 @@ export default function DepartmentPage() {
     if (e.key === 'Enter') {
       e.preventDefault()
       const form = e.target.form
-      // Get all focusable text inputs/textareas
       const inputs = Array.from(form.querySelectorAll('input:not([type="hidden"]):not([disabled]), textarea:not([disabled])'))
-
       const currentIndex = inputs.findIndex(input => input === e.target)
-
       if (currentIndex !== -1 && currentIndex < inputs.length - 1) {
         inputs[currentIndex + 1].focus()
       } else if (submitRef.current) {
@@ -118,13 +116,11 @@ export default function DepartmentPage() {
   )
   const paginatedRows = filteredRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
 
-  // ---------- Pagination Text Logic (NEW) ----------
+  // ---------- Pagination Text Logic ----------
   const totalRows = filteredRows.length
   const startIndex = totalRows === 0 ? 0 : page * rowsPerPage + 1
   const endIndex = Math.min((page + 1) * rowsPerPage, totalRows)
   const paginationText = `Showing ${startIndex} to ${endIndex} of ${totalRows} entries`
-  // -------------------------------------------------
-
 
   const columns = [
     {
@@ -156,9 +152,6 @@ export default function DepartmentPage() {
       field: 'status',
       headerName: 'Status',
       flex: 0.5,
-      // Note: New departments are added with status: 'Active' in handleSubmit,
-      // but existing data might not have a status if the DB was initialized before.
-      // Use default 'Active' if status is missing.
       renderCell: params => (
         <Button
           size='small'
@@ -207,8 +200,8 @@ export default function DepartmentPage() {
         />
       </Box>
 
-      {/* ✅ DataGrid with multi-line cell wrapping */}
-         <DataGrid
+      {/* DataGrid */}
+      <DataGrid
         rows={paginatedRows}
         columns={columns}
         disableRowSelectionOnClick
@@ -218,34 +211,19 @@ export default function DepartmentPage() {
         getRowId={row => row.id}
         sx={{
           mt: 3,
-          '& .MuiDataGrid-row': {
-            minHeight: '60px !important',
-            padding: '12px 0'
-          },
-          '& .MuiDataGrid-cell': {
-            whiteSpace: 'normal',
-            wordBreak: 'break-word',
-            overflowWrap: 'break-word',
-            alignItems: 'flex-start',
-            fontSize: '15px'
-          },
+          '& .MuiDataGrid-row': { minHeight: '60px !important', padding: '12px 0' },
+          '& .MuiDataGrid-cell': { whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'break-word', alignItems: 'flex-start', fontSize: '15px' },
           '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': { outline: 'none' },
           '& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within': { outline: 'none' },
-          '& .MuiDataGrid-columnHeaderTitle': {
-            fontSize: '15px',
-            fontWeight: 500
-          }
+          '& .MuiDataGrid-columnHeaderTitle': { fontSize: '15px', fontWeight: 500 }
         }}
       />
 
-      {/* ✅ Pagination (MODIFIED) */}
+      {/* Pagination */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2 }}>
-        {/* Custom Status Text */}
         <Typography variant='body2' sx={{ color: 'text.secondary', ml: 1 }}>
           {paginationText}
         </Typography>
-
-        {/* Table Pagination Component */}
         <TablePagination
           rowsPerPageOptions={[5, 10, 25, 50]}
           component='div'
@@ -279,9 +257,7 @@ export default function DepartmentPage() {
               value={formData.name}
               onChange={e => {
                 const value = e.target.value
-                if (/^[A-Za-z\s]*$/.test(value)) {
-                  handleChange(e)
-                }
+                if (/^[A-Za-z\s]*$/.test(value)) handleChange(e)
               }}
               onKeyDown={e => handleKeyPress(e, 0)}
             />
@@ -302,6 +278,23 @@ export default function DepartmentPage() {
                 }
               }}
             />
+
+            {/* Status dropdown only in edit mode */}
+            {isEdit && (
+              <CustomTextField
+                fullWidth
+                margin='normal'
+                select
+                label='Status'
+                name='status'
+                value={formData.status || 'Active'}
+                onChange={handleChange}
+              >
+                <MenuItem value='Active'>Active</MenuItem>
+                <MenuItem value='Inactive'>Inactive</MenuItem>
+              </CustomTextField>
+            )}
+
             <Box mt={3} display='flex' gap={2}>
               <Button
                 type='submit'
@@ -311,7 +304,6 @@ export default function DepartmentPage() {
                 onKeyDown={e => {
                   if (e.key === 'Enter') {
                     e.preventDefault()
-                    // Use onClick to trigger form submission naturally
                     e.currentTarget.click()
                   }
                 }}

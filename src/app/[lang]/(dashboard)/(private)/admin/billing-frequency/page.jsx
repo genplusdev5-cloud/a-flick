@@ -10,6 +10,7 @@ import {
   InputAdornment,
   Typography,
   TablePagination,
+  MenuItem,
   Autocomplete
 } from '@mui/material'
 import { DataGrid } from '@mui/x-data-grid'
@@ -45,11 +46,11 @@ export default function BillingFrequencyPage() {
     backlogAge: ''
   })
   const [incrementTypeOpen, setIncrementTypeOpen] = useState(false)
-  const [statusOpen, setStatusOpen] = useState(false) // This is currently unused but kept for consistency
 
   const DB_NAME = 'billing_frequency_db'
   const STORE_NAME = 'frequencies'
 
+  // ---------------- Refs for keyboard navigation ----------------
   const incrementTypeRef = useRef(null)
   const noOfIncrementsRef = useRef(null)
   const backlogAgeRef = useRef(null)
@@ -57,6 +58,7 @@ export default function BillingFrequencyPage() {
   const displayFrequencyRef = useRef(null)
   const sortOrderRef = useRef(null)
   const descriptionRef = useRef(null)
+  const statusRef = useRef(null)
   const submitRef = useRef(null)
 
   const toggleDrawer = () => setOpen(prev => !prev)
@@ -64,7 +66,6 @@ export default function BillingFrequencyPage() {
   const handleSearch = e => setSearchText(e.target.value)
 
   // ---------------- IndexedDB ----------------
-
   const initDB = async () => {
     const db = await openDB(DB_NAME, 1, {
       upgrade(db) {
@@ -86,8 +87,10 @@ export default function BillingFrequencyPage() {
     loadRows()
   }, [])
 
+  // ---------------- CRUD ----------------
   const handleAdd = () => {
     setIsEdit(false)
+    setEditRow(null)
     setFormData({
       displayFrequency: '',
       frequencyCode: '',
@@ -99,13 +102,16 @@ export default function BillingFrequencyPage() {
       backlogAge: ''
     })
     setOpen(true)
-
   }
 
   const handleEdit = row => {
     setIsEdit(true)
     setEditRow(row)
     setFormData({
+      displayFrequency: '',
+      frequencyCode: '',
+      description: '',
+      sortOrder: '',
       status: 'Active',
       incrementType: '',
       noOfIncrements: '',
@@ -113,7 +119,6 @@ export default function BillingFrequencyPage() {
       ...row
     })
     setOpen(true)
-
   }
 
   const handleDelete = async row => {
@@ -126,8 +131,9 @@ export default function BillingFrequencyPage() {
     e.preventDefault()
     const db = await initDB()
     if (isEdit && editRow) {
-      await db.put(STORE_NAME, { ...editRow, ...formData })
-      setRows(prev => prev.map(r => (r.id === editRow.id ? { ...editRow, ...formData } : r)))
+      const updatedRow = { ...editRow, ...formData }
+      await db.put(STORE_NAME, updatedRow)
+      setRows(prev => prev.map(r => (r.id === editRow.id ? updatedRow : r)))
     } else {
       const id = await db.add(STORE_NAME, { ...formData })
       setRows(prev => [{ id, ...formData }, ...prev])
@@ -135,38 +141,25 @@ export default function BillingFrequencyPage() {
     toggleDrawer()
   }
 
-  // ---------------- Keyboard navigation: Enter behaves like Tab ----------------
-
+  // ---------------- Keyboard navigation ----------------
   const focusNext = ref => ref?.current?.focus()
 
   // ---------------- Filtering & Pagination ----------------
-
   const filteredRows = rows.filter(
     row =>
       row.displayFrequency?.toLowerCase().includes(searchText.toLowerCase()) ||
       row.frequencyCode?.toLowerCase().includes(searchText.toLowerCase()) ||
       row.incrementType?.toLowerCase().includes(searchText.toLowerCase())
   )
-
   const paginatedRows = filteredRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-
-  // Logic for Pagination Text
-
   const totalRows = filteredRows.length
   const startIndex = totalRows === 0 ? 0 : page * rowsPerPage + 1
   const endIndex = Math.min((page + 1) * rowsPerPage, totalRows)
   const paginationText = `Showing ${startIndex} to ${endIndex} of ${totalRows} entries`
 
   // ---------------- Columns ----------------
-
   const columns = [
-    {
-      field: 'serial',
-      headerName: 'S.No',
-      flex: 0.2,
-      valueGetter: params => filteredRows.findIndex(r => r.id === params.row.id) + 1,
-      sortable: false
-    },
+    { field: 'serial', headerName: 'S.No', flex: 0.2, valueGetter: params => filteredRows.findIndex(r => r.id === params.row.id) + 1, sortable: false },
     {
       field: 'action',
       headerName: 'Action',
@@ -183,10 +176,10 @@ export default function BillingFrequencyPage() {
         </Box>
       )
     },
- { field: 'displayFrequency', headerName: 'Display Frequency', flex: 1 },
-  { field: 'frequencyCode', headerName: 'Frequency Code', flex: 1 },
-  { field: 'description', headerName: 'Description', flex: 1 },
-  { field: 'sortOrder', headerName: 'Sort Order', flex: 0.7 },
+    { field: 'displayFrequency', headerName: 'Display Frequency', flex: 1 },
+    { field: 'frequencyCode', headerName: 'Frequency Code', flex: 1 },
+    { field: 'description', headerName: 'Description', flex: 1 },
+    { field: 'sortOrder', headerName: 'Sort Order', flex: 0.7 },
     {
       field: 'status',
       headerName: 'Status',
@@ -238,6 +231,7 @@ export default function BillingFrequencyPage() {
           }}
         />
       </Box>
+
       {/* DataGrid */}
       <DataGrid
         rows={paginatedRows}
@@ -249,32 +243,19 @@ export default function BillingFrequencyPage() {
         getRowId={row => row.id}
         sx={{
           mt: 3,
-          '& .MuiDataGrid-row': {
-            minHeight: '60px !important',
-            padding: '12px 0'
-          },
-          '& .MuiDataGrid-cell': {
-            whiteSpace: 'normal',
-            wordBreak: 'break-word',
-            overflowWrap: 'break-word',
-            alignItems: 'flex-start',
-            fontSize: '15px'
-          },
+          '& .MuiDataGrid-row': { minHeight: '60px !important', padding: '12px 0' },
+          '& .MuiDataGrid-cell': { whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'break-word', alignItems: 'flex-start', fontSize: '15px' },
           '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': { outline: 'none' },
           '& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within': { outline: 'none' },
-          '& .MuiDataGrid-columnHeaderTitle': {
-            fontSize: '15px',
-            fontWeight: 500
-          }
+          '& .MuiDataGrid-columnHeaderTitle': { fontSize: '15px', fontWeight: 500 }
         }}
       />
-      {/* Pagination Footer with Custom Text */}
+
+      {/* Pagination */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2, pr: 2 }}>
-        {/* Custom Status Text */}
         <Typography variant='body2' sx={{ color: 'text.secondary', ml: 1 }}>
           {paginationText}
         </Typography>
-        {/* Table Pagination */}
         <TablePagination
           rowsPerPageOptions={[5, 10, 25, 50]}
           component='div'
@@ -288,6 +269,7 @@ export default function BillingFrequencyPage() {
           }}
         />
       </Box>
+
       {/* Drawer Form */}
       <Drawer anchor='right' open={open} onClose={toggleDrawer}>
         <Box sx={{ width: 360, p: 3 }}>
@@ -297,7 +279,9 @@ export default function BillingFrequencyPage() {
               <CloseIcon />
             </IconButton>
           </Box>
+
           <form onSubmit={handleSubmit}>
+            {/* Increment Type */}
             <Autocomplete
               ref={incrementTypeRef}
               freeSolo={false}
@@ -308,7 +292,6 @@ export default function BillingFrequencyPage() {
               onClose={() => setIncrementTypeOpen(false)}
               onFocus={() => setIncrementTypeOpen(true)}
               onInputChange={(e, newValue, reason) => {
-                // ✅ Prevent typing invalid options
                 if (reason === 'input' && !['Year', 'Month', 'Week', 'Day', 'Others'].includes(newValue)) return
                 setFormData(prev => ({ ...prev, incrementType: newValue }))
               }}
@@ -321,16 +304,10 @@ export default function BillingFrequencyPage() {
                   inputProps={{
                     ...params.inputProps,
                     onKeyDown: e => {
-                      // ✅ Only move to next if valid option is selected
-                      if (
-                        e.key === 'Enter' &&
-                        ['Year', 'Month', 'Week', 'Day', 'Others'].includes(formData.incrementType)
-                      ) {
+                      if (e.key === 'Enter' && ['Year', 'Month', 'Week', 'Day', 'Others'].includes(formData.incrementType)) {
                         e.preventDefault()
                         focusNext(noOfIncrementsRef)
-                      } else if (e.key === 'Enter') {
-                        e.preventDefault()
-                      }
+                      } else if (e.key === 'Enter') e.preventDefault()
                     }
                   }}
                   sx={{ minWidth: 200 }}
@@ -338,135 +315,49 @@ export default function BillingFrequencyPage() {
               )}
             />
 
-            {/* No of Increments */}
-            <CustomTextField
-              inputRef={noOfIncrementsRef}
-              fullWidth
-              margin='normal'
-              label='No of Increments'
-              name='noOfIncrements'
-              value={formData.noOfIncrements}
-              onChange={e => /^\d*$/.test(e.target.value) && handleChange(e)}
-              inputProps={{
-                inputMode: 'numeric',
-                pattern: '[0-9]*',
-                onKeyDown: e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    focusNext(backlogAgeRef)
-                  }
-                }
-              }}
-            />
-            {/* Backlog Age */}
-            <CustomTextField
-              inputRef={backlogAgeRef}
-              fullWidth
-              margin='normal'
-              label='Backlog Age'
-              name='backlogAge'
-              value={formData.backlogAge}
-              onChange={e => /^\d*$/.test(e.target.value) && handleChange(e)}
-              inputProps={{
-                inputMode: 'numeric',
-                pattern: '[0-9]*',
-                onKeyDown: e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    focusNext(frequencyCodeRef)
-                  }
-                }
-              }}
-            />
-            {/* Frequency Code */}
-            <CustomTextField
-              inputRef={frequencyCodeRef}
-              fullWidth
-              margin='normal'
-              label='Frequency Code'
-              name='frequencyCode'
-              value={formData.frequencyCode}
-              onChange={handleChange}
-              inputProps={{
-                onKeyDown: e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    focusNext(displayFrequencyRef)
-                  }
-                }
-              }}
-            />
-            {/* Display Frequency */}
-            <CustomTextField
-              inputRef={displayFrequencyRef}
-              fullWidth
-              margin='normal'
-              label='Display Frequency'
-              name='displayFrequency'
-              value={formData.displayFrequency}
-              onChange={handleChange}
-              inputProps={{
-                onKeyDown: e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    focusNext(sortOrderRef)
-                  }
-                }
-              }}
-            />
-            {/* Sort Order */}
-            <CustomTextField
-              inputRef={sortOrderRef}
-              fullWidth
-              margin='normal'
-              label='Sort Order'
-              name='sortOrder'
-              value={formData.sortOrder}
-              onChange={e => /^\d*$/.test(e.target.value) && handleChange(e)}
-              inputProps={{
-                inputMode: 'numeric',
-                pattern: '[0-9]*',
-                onKeyDown: e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    focusNext(descriptionRef)
-                  }
-                }
-              }}
-            />
-            {/* Description */}
-            <CustomTextField
-              inputRef={descriptionRef}
-              fullWidth
-              margin='normal'
-              multiline
-              rows={3}
-              label='Description'
-              name='description'
-              value={formData.description}
-              onChange={handleChange}
-              inputProps={{
-                onKeyDown: e => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault()
-                    focusNext(submitRef)
-                  }
-                }
-              }}
-            />
-            <Box mt={3} display='flex' gap={2}>
-              <Button
-                type='submit'
-                variant='contained'
+            {/* Other fields */}
+            <CustomTextField inputRef={noOfIncrementsRef} fullWidth margin='normal' label='No of Increments' name='noOfIncrements' value={formData.noOfIncrements} onChange={e => /^\d*$/.test(e.target.value) && handleChange(e)} inputProps={{ inputMode: 'numeric', pattern: '[0-9]*', onKeyDown: e => { if (e.key === 'Enter') { e.preventDefault(); focusNext(backlogAgeRef) } } }} />
+            <CustomTextField inputRef={backlogAgeRef} fullWidth margin='normal' label='Backlog Age' name='backlogAge' value={formData.backlogAge} onChange={e => /^\d*$/.test(e.target.value) && handleChange(e)} inputProps={{ inputMode: 'numeric', pattern: '[0-9]*', onKeyDown: e => { if (e.key === 'Enter') { e.preventDefault(); focusNext(frequencyCodeRef) } } }} />
+            <CustomTextField inputRef={frequencyCodeRef} fullWidth margin='normal' label='Frequency Code' name='frequencyCode' value={formData.frequencyCode} onChange={handleChange} inputProps={{ onKeyDown: e => { if (e.key === 'Enter') { e.preventDefault(); focusNext(displayFrequencyRef) } } }} />
+            <CustomTextField inputRef={displayFrequencyRef} fullWidth margin='normal' label='Display Frequency' name='displayFrequency' value={formData.displayFrequency} onChange={handleChange} inputProps={{ onKeyDown: e => { if (e.key === 'Enter') { e.preventDefault(); focusNext(sortOrderRef) } } }} />
+            <CustomTextField inputRef={sortOrderRef} fullWidth margin='normal' label='Sort Order' name='sortOrder' value={formData.sortOrder} onChange={e => /^\d*$/.test(e.target.value) && handleChange(e)} inputProps={{ inputMode: 'numeric', pattern: '[0-9]*', onKeyDown: e => { if (e.key === 'Enter') { e.preventDefault(); focusNext(descriptionRef) } } }} />
+            <CustomTextField inputRef={descriptionRef} fullWidth margin='normal' multiline rows={3} label='Description' name='description' value={formData.description} onChange={handleChange} inputProps={{ onKeyDown: e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); isEdit ? focusNext(statusRef) : focusNext(submitRef) } } }} />
+
+            {/* Status - only editable when editing */}
+            {isEdit && (
+              <CustomTextField
+                select
                 fullWidth
-                ref={submitRef}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    handleSubmit(e)
+                margin='normal'
+                label='Status'
+                value={formData.status}
+                inputRef={statusRef}
+                onChange={async e => {
+                  const newStatus = e.target.value
+                  setFormData(prev => ({ ...prev, status: newStatus }))
+                  if (editRow) {
+                    const updatedRow = { ...editRow, status: newStatus }
+                    setRows(prev => prev.map(r => (r.id === editRow.id ? updatedRow : r)))
+                    const db = await initDB()
+                    await db.put(STORE_NAME, updatedRow)
+                  }
+                }}
+                inputProps={{
+                  onKeyDown: e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      focusNext(submitRef)
+                    }
                   }
                 }}
               >
+                <MenuItem value='Active'>Active</MenuItem>
+                <MenuItem value='Inactive'>Inactive</MenuItem>
+              </CustomTextField>
+            )}
+
+            <Box mt={3} display='flex' gap={2}>
+              <Button type='submit' variant='contained' fullWidth ref={submitRef} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleSubmit(e) } }}>
                 {isEdit ? 'Update' : 'Submit'}
               </Button>
               <Button variant='outlined' fullWidth onClick={toggleDrawer}>

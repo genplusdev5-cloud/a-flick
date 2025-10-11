@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Box, Typography, Button, IconButton, Drawer, InputAdornment, TablePagination } from '@mui/material'
+import { Box, Typography, Button, IconButton, Drawer, InputAdornment, TablePagination, MenuItem } from '@mui/material'
 import { DataGrid } from '@mui/x-data-grid'
 import { openDB } from 'idb'
 
@@ -16,20 +16,17 @@ import { MdDelete } from 'react-icons/md'
 // Layout & Custom Components
 import ContentLayout from '@/components/layout/ContentLayout'
 import CustomTextField from '@core/components/mui/TextField'
-import { Autocomplete } from '@mui/material'
 
 const DB_NAME = 'incident_db'
 const STORE_NAME = 'incidents'
 
 export default function IncidentPage() {
-  // Refs for Enter navigation
+  // Refs
   const nameRef = useRef(null)
   const descriptionRef = useRef(null)
   const statusRef = useRef(null)
   const statusInputRef = useRef(null)
   const submitButtonRef = useRef(null)
-
-  const [statusOpen, setStatusOpen] = useState(false)
 
   const [rows, setRows] = useState([])
   const [page, setPage] = useState(0)
@@ -70,13 +67,13 @@ export default function IncidentPage() {
   const handleChange = e => {
     const { name, value } = e.target
     if (name === 'name') {
-      // Allow only letters and spaces for name
       const filtered = value.replace(/[^a-zA-Z\s]/g, '')
       setFormData(prev => ({ ...prev, [name]: filtered }))
     } else {
       setFormData(prev => ({ ...prev, [name]: value }))
     }
   }
+
   const handleSearch = e => setSearchText(e.target.value)
 
   const handleAdd = () => {
@@ -125,12 +122,10 @@ export default function IncidentPage() {
 
   const paginatedRows = filteredRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
 
-  // ---------------- Pagination Text Logic ----------------
   const totalRows = filteredRows.length
   const startIndex = totalRows === 0 ? 0 : page * rowsPerPage + 1
   const endIndex = Math.min((page + 1) * rowsPerPage, totalRows)
   const paginationText = `Showing ${startIndex} to ${endIndex} of ${totalRows} entries`
-  // -------------------------------------------------------
 
   const columns = [
     {
@@ -210,7 +205,8 @@ export default function IncidentPage() {
         />
       </Box>
 
-       <DataGrid
+      {/* Table */}
+      <DataGrid
         rows={paginatedRows}
         columns={columns}
         disableRowSelectionOnClick
@@ -220,10 +216,7 @@ export default function IncidentPage() {
         getRowId={row => row.id}
         sx={{
           mt: 3,
-          '& .MuiDataGrid-row': {
-            minHeight: '60px !important',
-            padding: '12px 0'
-          },
+          '& .MuiDataGrid-row': { minHeight: '60px !important', padding: '12px 0' },
           '& .MuiDataGrid-cell': {
             whiteSpace: 'normal',
             wordBreak: 'break-word',
@@ -233,24 +226,15 @@ export default function IncidentPage() {
           },
           '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': { outline: 'none' },
           '& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within': { outline: 'none' },
-          '& .MuiDataGrid-columnHeaderTitle': {
-            fontSize: '15px',
-            fontWeight: 500
-          }
+          '& .MuiDataGrid-columnHeaderTitle': { fontSize: '15px', fontWeight: 500 }
         }}
       />
 
-
-      {/* ------------------------------------------------------------- */}
-      {/* ✅ Pagination Footer with Custom Text (Added logic here) */}
-      {/* ------------------------------------------------------------- */}
+      {/* Pagination */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2 }}>
-        {/* Custom Status Text */}
         <Typography variant='body2' sx={{ color: 'text.secondary', ml: 1 }}>
           {paginationText}
         </Typography>
-
-        {/* Table Pagination */}
         <TablePagination
           rowsPerPageOptions={[5, 10, 25, 50]}
           component='div'
@@ -264,7 +248,6 @@ export default function IncidentPage() {
           }}
         />
       </Box>
-      {/* ------------------------------------------------------------- */}
 
       {/* Drawer Form */}
       <Drawer anchor='right' open={open} onClose={toggleDrawer}>
@@ -314,51 +297,42 @@ export default function IncidentPage() {
                 onKeyDown: e => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault()
-                    statusInputRef.current?.focus()
-                    setStatusOpen(true)
+                    if (isEdit) {
+                      statusRef.current?.focus()
+                    } else {
+                      submitButtonRef.current?.focus()
+                    }
                   }
                 }
               }}
             />
 
-            {/* Status Autocomplete */}
-            <Autocomplete
-              ref={statusRef}
-              freeSolo={false}
-              options={statusOptions}
-              value={formData.status}
-              open={statusOpen}
-              onOpen={() => setStatusOpen(true)}
-              onClose={() => setStatusOpen(false)}
-              onInputChange={(e, newValue, reason) => {
-                if (reason === 'input' && !statusOptions.includes(newValue)) return
-                setFormData(prev => ({ ...prev, status: newValue }))
-              }}
-              onChange={(e, newValue) => {
-                setFormData(prev => ({ ...prev, status: newValue }))
-                requestAnimationFrame(() => submitButtonRef.current?.focus())
-              }}
-              renderInput={params => (
-                <CustomTextField
-                  {...params}
-                  label='Status'
-                  fullWidth
-                  margin='normal'
-                  inputRef={statusInputRef}
-                  inputProps={{
-                    ...params.inputProps,
-                    onKeyDown: e => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        submitButtonRef.current?.focus()
-                      }
-                    }
-                  }}
-                />
-              )}
-            />
+            {/* ✅ Status Field — only visible when editing */}
+            {isEdit && (
+              <CustomTextField
+                select
+                fullWidth
+                margin='normal'
+                label='Status'
+                value={formData.status}
+                inputRef={statusRef}
+                onChange={async e => {
+                  const newStatus = e.target.value
+                  setFormData(prev => ({ ...prev, status: newStatus }))
+                  if (editRow) {
+                    const updatedRow = { ...editRow, status: newStatus }
+                    setRows(prev => prev.map(r => (r.id === editRow.id ? updatedRow : r)))
+                    const db = await initDB()
+                    await db.put(STORE_NAME, updatedRow)
+                  }
+                }}
+              >
+                <MenuItem value='Active'>Active</MenuItem>
+                <MenuItem value='Inactive'>Inactive</MenuItem>
+              </CustomTextField>
+            )}
 
-            {/* Submit / Cancel */}
+            {/* Buttons */}
             <Box mt={3} display='flex' gap={2}>
               <Button
                 type='submit'

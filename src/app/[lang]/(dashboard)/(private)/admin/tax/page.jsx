@@ -28,7 +28,7 @@ export default function TaxPage() {
   const [open, setOpen] = useState(false)
   const [isEdit, setIsEdit] = useState(false)
   const [editRow, setEditRow] = useState(null)
-  const [formData, setFormData] = useState({ name: '', tax_value: '' })
+  const [formData, setFormData] = useState({ name: '', tax_value: '', status: 'Active' })
   const [rows, setRows] = useState([])
   const [searchText, setSearchText] = useState('')
   const [page, setPage] = useState(0)
@@ -55,12 +55,11 @@ export default function TaxPage() {
     return db
   }
 
-  // Helper function to format the number as string with no scientific notation and 2 decimal places
+  // Format tax value with 2 decimals
   const formatTaxValue = value => {
     if (typeof value === 'number' || (typeof value === 'string' && value.trim() !== '')) {
       const num = parseFloat(value)
       if (!isNaN(num)) {
-        // Use minimumFractionDigits and maximumFractionDigits to ensure exactly two decimal places (.00)
         return num.toLocaleString('fullwide', {
           useGrouping: false,
           minimumFractionDigits: 2,
@@ -75,11 +74,7 @@ export default function TaxPage() {
     const db = await initDB()
     const allRows = await db.getAll(STORE_NAME)
     const sortedRows = allRows
-      .map(r => ({
-        ...r,
-        // Ensure the stored tax value is formatted for display (e.g., 12.00)
-        tax: formatTaxValue(r.tax)
-      }))
+      .map(r => ({ ...r, tax: formatTaxValue(r.tax) }))
       .sort((a, b) => b.id - a.id)
     setRows(sortedRows)
   }
@@ -89,11 +84,12 @@ export default function TaxPage() {
   }, [])
 
   const toggleDrawer = () => setOpen(prev => !prev)
+
   const handleChange = e => setFormData({ ...formData, [e.target.name]: e.target.value })
 
   const handleAdd = () => {
     setIsEdit(false)
-    setFormData({ name: '', tax_value: '' })
+    setFormData({ name: '', tax_value: '', status: 'Active' })
     setOpen(true)
     setTimeout(() => nameRef.current?.focus(), 100)
   }
@@ -101,8 +97,7 @@ export default function TaxPage() {
   const handleEdit = row => {
     setIsEdit(true)
     setEditRow(row)
-    // row.tax is already formatted with .00 from loadRows
-    setFormData({ name: row.name, tax_value: row.tax })
+    setFormData({ name: row.name, tax_value: row.tax, status: row.status || 'Active' })
     setOpen(true)
     setTimeout(() => nameRef.current?.focus(), 100)
   }
@@ -117,21 +112,31 @@ export default function TaxPage() {
     e.preventDefault()
     if (!formData.name || !formData.tax_value) return
 
-    // The value stored in DB and displayed in table is the formatted one (e.g., "123.00")
     const formattedTax = formatTaxValue(formData.tax_value)
-
-    if (formattedTax === '') return // Basic validation for valid number
+    if (formattedTax === '') return
 
     const db = await initDB()
     if (isEdit && editRow) {
-      await db.put(STORE_NAME, { ...editRow, name: formData.name, tax: formattedTax })
-      setRows(rows.map(r => (r.id === editRow.id ? { ...r, name: formData.name, tax: formattedTax } : r)))
+      await db.put(STORE_NAME, {
+        ...editRow,
+        name: formData.name,
+        tax: formattedTax,
+        status: formData.status || 'Active'
+      })
+      setRows(rows.map(r => r.id === editRow.id
+        ? { ...r, name: formData.name, tax: formattedTax, status: formData.status || 'Active' }
+        : r
+      ))
     } else {
-      const id = await db.add(STORE_NAME, { name: formData.name, tax: formattedTax, status: 'Active' })
-      setRows(prev => [{ id, name: formData.name, tax: formattedTax, status: 'Active' }, ...prev])
+      const id = await db.add(STORE_NAME, {
+        name: formData.name,
+        tax: formattedTax,
+        status: formData.status || 'Active'
+      })
+      setRows(prev => [{ id, name: formData.name, tax: formattedTax, status: formData.status || 'Active' }, ...prev])
     }
 
-    setFormData({ name: '', tax_value: '' })
+    setFormData({ name: '', tax_value: '', status: 'Active' })
     toggleDrawer()
   }
 
@@ -161,7 +166,6 @@ export default function TaxPage() {
   const totalRows = filteredRows.length
   const paginatedRows = filteredRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
 
-  // Dynamically calculate the range text
   const startIndex = totalRows === 0 ? 0 : page * rowsPerPage + 1
   const endIndex = Math.min((page + 1) * rowsPerPage, totalRows)
   const paginationText = `Showing ${startIndex} to ${endIndex} of ${totalRows} entries`
@@ -173,7 +177,6 @@ export default function TaxPage() {
       flex: 0.2,
       minWidth: 70,
       sortable: false,
-      // Find the index in the filteredRows for correct serial numbering
       valueGetter: params => filteredRows.findIndex(r => r.id === params.row.id) + 1
     },
     {
@@ -223,21 +226,11 @@ export default function TaxPage() {
             Export
           </Button>
           <Menu anchorEl={exportAnchorEl} open={exportOpen} onClose={handleExportClose}>
-            <MenuItem onClick={() => handleExportSelect('print')}>
-              <ListItemText>Print</ListItemText>
-            </MenuItem>
-            <MenuItem onClick={() => handleExportSelect('csv')}>
-              <ListItemText>CSV</ListItemText>
-            </MenuItem>
-            <MenuItem onClick={() => handleExportSelect('excel')}>
-              <ListItemText>Excel</ListItemText>
-            </MenuItem>
-            <MenuItem onClick={() => handleExportSelect('pdf')}>
-              <ListItemText>PDF</ListItemText>
-            </MenuItem>
-            <MenuItem onClick={() => handleExportSelect('copy')}>
-              <ListItemText>Copy</ListItemText>
-            </MenuItem>
+            <MenuItem onClick={() => handleExportSelect('print')}><ListItemText>Print</ListItemText></MenuItem>
+            <MenuItem onClick={() => handleExportSelect('csv')}><ListItemText>CSV</ListItemText></MenuItem>
+            <MenuItem onClick={() => handleExportSelect('excel')}><ListItemText>Excel</ListItemText></MenuItem>
+            <MenuItem onClick={() => handleExportSelect('pdf')}><ListItemText>PDF</ListItemText></MenuItem>
+            <MenuItem onClick={() => handleExportSelect('copy')}><ListItemText>Copy</ListItemText></MenuItem>
           </Menu>
           <Button variant='contained' startIcon={<AddIcon />} onClick={handleAdd}>
             Add Tax
@@ -272,34 +265,22 @@ export default function TaxPage() {
         getRowId={row => row.id}
         sx={{
           mt: 3,
-          '& .MuiDataGrid-row': {
-            minHeight: '50px !important',
-            padding: '10px 0'
-          },
+          '& .MuiDataGrid-row': { minHeight: '50px !important', padding: '10px 0' },
           '& .MuiDataGrid-cell': {
             whiteSpace: 'normal',
             wordBreak: 'break-word',
             overflowWrap: 'break-word',
             alignItems: 'flex-start',
-            fontSize: '15px' // <-- Make row text bigger
+            fontSize: '15px'
           },
           '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': { outline: 'none' },
           '& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within': { outline: 'none' },
-          '& .MuiDataGrid-columnHeaderTitle': {
-            fontSize: '15px', // header font bigger
-            fontWeight: 500
-          }
+          '& .MuiDataGrid-columnHeaderTitle': { fontSize: '15px', fontWeight: 500 }
         }}
       />
 
-      {/* Box containing the custom status text and TablePagination */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2 }}>
-        {/* Custom Status Text */}
-        <Typography variant='body2' sx={{ color: 'text.secondary', ml: 1 }}>
-          {paginationText}
-        </Typography>
-
-        {/* Table Pagination Component */}
+        <Typography variant='body2' sx={{ color: 'text.secondary', ml: 1 }}>{paginationText}</Typography>
         <TablePagination
           rowsPerPageOptions={[5, 10, 25, 50]}
           component='div'
@@ -308,7 +289,6 @@ export default function TaxPage() {
           page={page}
           onPageChange={handleChangePage}
           onRowsPerPageChange={handleChangeRowsPerPage}
-          // The TablePagination component automatically displays the page controls
         />
       </Box>
 
@@ -316,9 +296,7 @@ export default function TaxPage() {
         <Box sx={{ width: 360, p: 3 }}>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={2}>
             <Typography variant='h6'>{isEdit ? 'Edit Tax' : 'Add Tax'}</Typography>
-            <IconButton onClick={toggleDrawer}>
-              <CloseIcon />
-            </IconButton>
+            <IconButton onClick={toggleDrawer}><CloseIcon /></IconButton>
           </Box>
 
           <form onSubmit={handleSubmit}>
@@ -345,23 +323,19 @@ export default function TaxPage() {
               inputRef={taxRef}
               onChange={e => {
                 const val = e.target.value
-                // FIX: On Change, only allow raw numeric input to prevent infinite loop.
                 const numericValue = val.match(/^-?\d*\.?\d*$/)?.[0] || ''
                 setFormData({ ...formData, tax_value: numericValue })
               }}
               onBlur={e => {
                 let val = e.target.value
                 if (val !== '' && !isNaN(parseFloat(val))) {
-                  // Formatting (.00 suffix) is done ONLY on blur
                   const num = parseFloat(val)
                   val = num.toLocaleString('fullwide', {
                     useGrouping: false,
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2
                   })
-                } else {
-                  val = ''
-                }
+                } else val = ''
                 setFormData({ ...formData, tax_value: val })
               }}
               onKeyDown={e => handleKeyDown(e, 'tax')}
@@ -369,13 +343,22 @@ export default function TaxPage() {
               inputProps={{ inputMode: 'decimal' }}
             />
 
+            {isEdit && (
+              <CustomTextField
+                fullWidth margin='normal' label='Status' name='status'
+                select value={formData.status}
+                onChange={e => setFormData(prev => ({ ...prev, status: e.target.value }))}
+              >
+                <MenuItem value='Active'>Active</MenuItem>
+                <MenuItem value='Inactive'>Inactive</MenuItem>
+              </CustomTextField>
+            )}
+
             <Box mt={3} display='flex' gap={2}>
               <Button type='submit' variant='contained' fullWidth ref={submitRef}>
                 {isEdit ? 'Update' : 'Submit'}
               </Button>
-              <Button variant='outlined' fullWidth onClick={toggleDrawer}>
-                Cancel
-              </Button>
+              <Button variant='outlined' fullWidth onClick={toggleDrawer}>Cancel</Button>
             </Box>
           </form>
         </Box>

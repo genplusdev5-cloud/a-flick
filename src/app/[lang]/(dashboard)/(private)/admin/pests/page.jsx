@@ -130,12 +130,10 @@ export default function PestPage() {
   )
   const paginatedRows = filteredRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
 
-  // ---------- Pagination Text Logic (ADDED) ----------
   const totalRows = filteredRows.length
   const startIndex = totalRows === 0 ? 0 : page * rowsPerPage + 1
   const endIndex = Math.min((page + 1) * rowsPerPage, totalRows)
   const paginationText = `Showing ${startIndex} to ${endIndex} of ${totalRows} entries`
-  // -------------------------------------------------
 
   // ---------------- Drawer Functions ----------------
   const handleKeyPress = (e, currentFieldIndex) => {
@@ -297,16 +295,6 @@ export default function PestPage() {
         <Box sx={{ display: 'flex', gap: 1 }}>
           <IconButton
             size='small'
-            onClick={() => {
-              setEditPest(params.row)
-              setMainFormData(prev => ({ ...prev, ...params.row }))
-              setMainDrawerOpen(true)
-            }}
-          >
-            <EditIcon />
-          </IconButton>
-          <IconButton
-            size='small'
             color='error'
             onClick={async () => {
               await deletePest(params.row.id)
@@ -314,6 +302,16 @@ export default function PestPage() {
             }}
           >
             <DeleteIcon />
+          </IconButton>
+          <IconButton
+            size='small'
+            onClick={() => {
+              setEditPest(params.row)
+              setMainFormData(prev => ({ ...prev, ...params.row }))
+              setMainDrawerOpen(true)
+            }}
+          >
+            <EditIcon />
           </IconButton>
         </Box>
       )
@@ -467,45 +465,36 @@ export default function PestPage() {
 
       {/* Table */}
       <Box sx={{ width: '100%', overflowX: 'auto', mt: 5 }}>
-  <DataGrid
-        rows={paginatedRows}
-        columns={columns}
-        disableRowSelectionOnClick
-        autoHeight
-        hideFooter
-        getRowHeight={() => 'auto'}
-        getRowId={row => row.id}
-        sx={{
-          mt: 3,
-          '& .MuiDataGrid-row': {
-            minHeight: '60px !important',
-            padding: '12px 0'
-          },
-          '& .MuiDataGrid-cell': {
-            whiteSpace: 'normal',
-            wordBreak: 'break-word',
-            overflowWrap: 'break-word',
-            alignItems: 'flex-start',
-            fontSize: '15px'
-          },
-          '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': { outline: 'none' },
-          '& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within': { outline: 'none' },
-          '& .MuiDataGrid-columnHeaderTitle': {
-            fontSize: '15px',
-            fontWeight: 500
-          }
-        }}
-      />
+        <DataGrid
+          rows={paginatedRows}
+          columns={columns}
+          disableRowSelectionOnClick
+          autoHeight
+          hideFooter
+          getRowHeight={() => 'auto'}
+          getRowId={row => row.id}
+          sx={{
+            mt: 3,
+            '& .MuiDataGrid-row': { minHeight: '60px !important', padding: '12px 0' },
+            '& .MuiDataGrid-cell': {
+              whiteSpace: 'normal',
+              wordBreak: 'break-word',
+              overflowWrap: 'break-word',
+              alignItems: 'flex-start',
+              fontSize: '15px'
+            },
+            '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': { outline: 'none' },
+            '& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within': { outline: 'none' },
+            '& .MuiDataGrid-columnHeaderTitle': { fontSize: '15px', fontWeight: 500 }
+          }}
+        />
       </Box>
 
-      {/* ✅ Pagination (MODIFIED to include status text) */}
+      {/* Pagination */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2 }}>
-        {/* Custom Status Text */}
         <Typography variant='body2' sx={{ color: 'text.secondary', ml: 1 }}>
           {paginationText}
         </Typography>
-
-        {/* Table Pagination Component */}
         <TablePagination
           rowsPerPageOptions={[5, 10, 25, 50]}
           component='div'
@@ -590,24 +579,33 @@ export default function PestPage() {
               onChange={e => setMainFormData({ ...mainFormData, description: e.target.value })}
               onKeyDown={e => handleKeyPress(e, 4)}
             />
-            <Autocomplete
-              freeSolo={false}
-              options={statusOptions}
-              value={mainFormData.status}
-              openOnFocus
-              onChange={(e, val) => setMainFormData(prev => ({ ...prev, status: val }))}
-              renderInput={params => (
-                <CustomTextField
-                  {...params}
-                  label='Status'
-                  inputRef={statusInputRef}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') submitRef.current?.focus()
-                  }}
-                />
-              )}
-              sx={{ mt: 2 }}
-            />
+
+            {/* ✅ Status only in Edit mode */}
+            {editPest && (
+              <Autocomplete
+                freeSolo={false}
+                options={statusOptions}
+                value={mainFormData.status}
+                openOnFocus
+                onChange={(e, val) => {
+                  setMainFormData(prev => ({ ...prev, status: val }))
+                  // Update table immediately
+                  setRows(prev => prev.map(r => (r.id === editPest.id ? { ...r, status: val } : r)))
+                }}
+                renderInput={params => (
+                  <CustomTextField
+                    {...params}
+                    label='Status'
+                    inputRef={statusInputRef}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') submitRef.current?.focus()
+                    }}
+                  />
+                )}
+                sx={{ mt: 2 }}
+              />
+            )}
+
             <Box mt={3} display='flex' gap={2}>
               <Button variant='contained' fullWidth ref={submitRef} onClick={handleMainSubmit}>
                 {editPest ? 'Update' : 'Submit'}
@@ -653,10 +651,7 @@ export default function PestPage() {
               hideFooter
               getRowHeight={() => 'auto'}
               sx={{
-                '& .MuiDataGrid-row': {
-                  minHeight: '50px !important',
-                  padding: '10px 0'
-                },
+                '& .MuiDataGrid-row': { minHeight: '50px !important', padding: '10px 0' },
                 '& .MuiDataGrid-cell': {
                   whiteSpace: 'normal',
                   wordBreak: 'break-word',
@@ -664,12 +659,8 @@ export default function PestPage() {
                   alignItems: 'flex-start',
                   display: 'flex'
                 },
-                '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': {
-                  outline: 'none'
-                },
-                '& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within': {
-                  outline: 'none'
-                }
+                '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': { outline: 'none' },
+                '& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within': { outline: 'none' }
               }}
             />
           </Box>

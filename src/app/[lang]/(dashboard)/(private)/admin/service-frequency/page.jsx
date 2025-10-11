@@ -22,11 +22,10 @@ import DownloadIcon from '@mui/icons-material/Download'
 import EditIcon from '@mui/icons-material/Edit'
 import { MdDelete } from 'react-icons/md'
 import CustomAutocomplete from '@core/components/mui/Autocomplete'
+
 // Wrapper
 import ContentLayout from '@/components/layout/ContentLayout'
-// Vuexy Input
 import CustomTextField from '@core/components/mui/TextField'
-// IndexedDB
 import { openDB } from 'idb'
 
 // ------------------- Columns -------------------
@@ -84,7 +83,6 @@ export default function ServiceFrequencyPage() {
   const [editRow, setEditRow] = useState(null)
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(10)
-
   const [formData, setFormData] = useState({
     incrementType: '',
     noOfIncrements: '',
@@ -92,18 +90,14 @@ export default function ServiceFrequencyPage() {
     frequencyCode: '',
     displayFrequency: '',
     sortOrder: '',
-    description: ''
+    description: '',
+    status: 'Active'
   })
-
   const [anchorEl, setAnchorEl] = useState(null)
   const [menuRow, setMenuRow] = useState(null)
   const [incrementTypeOpen, setIncrementTypeOpen] = useState(false)
   const openMenu = Boolean(anchorEl)
 
-  const toggleDrawer = () => setOpen(prev => !prev)
-  const handleChange = e => setFormData({ ...formData, [e.target.name]: e.target.value })
-
-  // ---------------- IndexedDB Setup ----------------
   const dbName = 'serviceFrequencyDB'
   const storeName = 'frequencies'
 
@@ -121,7 +115,6 @@ export default function ServiceFrequencyPage() {
   const loadRows = async () => {
     const db = await initDB()
     const allRows = await db.getAll(storeName)
-    // Sort by ID descending to show latest first, which is typical for autoIncrement
     setRows(allRows.sort((a, b) => b.id - a.id))
   }
 
@@ -149,7 +142,8 @@ export default function ServiceFrequencyPage() {
       frequencyCode: '',
       displayFrequency: '',
       sortOrder: '',
-      description: ''
+      description: '',
+      status: 'Active'
     })
     setEditRow(null)
     setOpen(true)
@@ -165,26 +159,17 @@ export default function ServiceFrequencyPage() {
   const handleSubmit = async e => {
     e.preventDefault()
     if (isEdit && editRow) {
-      const updatedRow = { ...formData, id: editRow.id, status: editRow.status || 'Active' }
+      const updatedRow = { ...formData, id: editRow.id }
       setRows(prev => prev.map(r => (r.id === editRow.id ? updatedRow : r)))
       await saveRow(updatedRow)
     } else {
-      // NOTE: Relying on IndexedDB's autoIncrement if `id` is not provided in form.
-      // If IndexedDB uses autoIncrement (as defined in initDB), the 'id' will be generated on 'add'.
-      // Here, we save first and then reload/update the local state to get the actual ID if needed,
-      // but for local state update, we'll use a temporary approach as in Page A.
-
-      const newRowData = { ...formData, status: 'Active' }
-
+      const newRowData = { ...formData }
       const db = await initDB()
-      // Use IndexedDB's `add` method which returns the key (ID)
       const newId = await db.add(storeName, newRowData)
       const newRow = { ...newRowData, id: newId }
-
-      // Update local state by prepending the new row
       setRows(prev => [newRow, ...prev])
     }
-    toggleDrawer()
+    setOpen(false)
   }
 
   const handleMenuOpen = (e, row) => {
@@ -232,14 +217,12 @@ export default function ServiceFrequencyPage() {
   const paginatedRows = filteredRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
   const columns = getColumns(handleEdit, handleDelete, paginatedRows)
 
-  // ---------------- Pagination Text Logic (Copied from Page A) ----------------
   const totalRows = filteredRows.length
   const startIndex = totalRows === 0 ? 0 : page * rowsPerPage + 1
   const endIndex = Math.min((page + 1) * rowsPerPage, totalRows)
   const paginationText = `Showing ${startIndex} to ${endIndex} of ${totalRows} entries`
-  // ----------------------------------------------------------------------------
 
-  // ---------------- Refs for Enter navigation ----------------
+  // ---------------- Refs for keyboard navigation ----------------
   const incrementTypeRef = useRef(null)
   const noOfIncrementsRef = useRef(null)
   const backlogAgeRef = useRef(null)
@@ -250,12 +233,12 @@ export default function ServiceFrequencyPage() {
   const submitRef = useRef(null)
 
   const focusNext = ref => {
-    if (ref.current.querySelector('input')) {
-      ref.current.querySelector('input').focus()
-    } else {
-      ref.current.focus()
-    }
+    if (!ref.current) return
+    const input = ref.current.querySelector('input') || ref.current
+    input.focus()
   }
+
+  const toggleDrawer = () => setOpen(prev => !prev)
 
   return (
     <ContentLayout
@@ -290,6 +273,7 @@ export default function ServiceFrequencyPage() {
           }}
         />
       </Box>
+
       <DataGrid
         rows={paginatedRows}
         columns={columns}
@@ -300,10 +284,7 @@ export default function ServiceFrequencyPage() {
         getRowId={row => row.id}
         sx={{
           mt: 3,
-          '& .MuiDataGrid-row': {
-            minHeight: '60px !important',
-            padding: '12px 0'
-          },
+          '& .MuiDataGrid-row': { minHeight: '60px !important', padding: '12px 0' },
           '& .MuiDataGrid-cell': {
             whiteSpace: 'normal',
             wordBreak: 'break-word',
@@ -313,23 +294,14 @@ export default function ServiceFrequencyPage() {
           },
           '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': { outline: 'none' },
           '& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within': { outline: 'none' },
-          '& .MuiDataGrid-columnHeaderTitle': {
-            fontSize: '15px',
-            fontWeight: 500
-          }
+          '& .MuiDataGrid-columnHeaderTitle': { fontSize: '15px', fontWeight: 500 }
         }}
       />
 
-      {/* ------------------------------------------------------------- */}
-      {/* ✅ Pagination Footer with Custom Text (Added logic here) */}
-      {/* ------------------------------------------------------------- */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2, pr: 2 }}>
-        {/* Custom Status Text */}
         <Typography variant='body2' sx={{ color: 'text.secondary', ml: 1 }}>
           {paginationText}
         </Typography>
-
-        {/* Table Pagination */}
         <TablePagination
           rowsPerPageOptions={[5, 10, 25, 50]}
           component='div'
@@ -343,7 +315,6 @@ export default function ServiceFrequencyPage() {
           }}
         />
       </Box>
-      {/* ------------------------------------------------------------- */}
 
       <Menu anchorEl={anchorEl} open={openMenu} onClose={handleMenuClose}>
         <MenuItem
@@ -357,6 +328,7 @@ export default function ServiceFrequencyPage() {
         <MenuItem onClick={() => handleDelete(menuRow)}>Delete</MenuItem>
       </Menu>
 
+      {/* ----------------- Drawer Form ----------------- */}
       <Drawer anchor='right' open={open} onClose={toggleDrawer}>
         <Box sx={{ width: 360, p: 3 }}>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={2}>
@@ -378,7 +350,7 @@ export default function ServiceFrequencyPage() {
               onClose={() => setIncrementTypeOpen(false)}
               onFocus={() => setIncrementTypeOpen(true)}
               onInputChange={(e, newValue, reason) => {
-                if (reason === 'input' && !['Year', 'Month', 'Week', 'Day', 'Others'].includes(newValue)) return
+                if (reason === 'input' && !['Year','Month','Week','Day','Others'].includes(newValue)) return
                 setFormData(prev => ({ ...prev, incrementType: newValue }))
               }}
               onChange={(e, newValue) => setFormData(prev => ({ ...prev, incrementType: newValue }))}
@@ -390,10 +362,7 @@ export default function ServiceFrequencyPage() {
                   inputProps={{
                     ...params.inputProps,
                     onKeyDown: e => {
-                      if (
-                        e.key === 'Enter' &&
-                        ['Year', 'Month', 'Week', 'Day', 'Others'].includes(formData.incrementType)
-                      ) {
+                      if (e.key === 'Enter' && ['Year','Month','Week','Day','Others'].includes(formData.incrementType)) {
                         e.preventDefault()
                         focusNext(noOfIncrementsRef)
                       } else if (e.key === 'Enter') e.preventDefault()
@@ -406,104 +375,81 @@ export default function ServiceFrequencyPage() {
 
             {/* No of Increments */}
             <CustomTextField
-              inputRef={noOfIncrementsRef} // Changed ref to inputRef for CustomTextField
+              inputRef={noOfIncrementsRef}
               fullWidth
               margin='normal'
               label='No of Increments'
               name='noOfIncrements'
               value={formData.noOfIncrements}
-              onChange={e => /^\d*$/.test(e.target.value) && handleChange(e)}
+              onChange={e => /^\d*$/.test(e.target.value) && setFormData(prev => ({ ...prev, noOfIncrements: e.target.value }))}
               inputProps={{
                 inputMode: 'numeric',
                 pattern: '[0-9]*',
                 onKeyDown: e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    focusNext(backlogAgeRef)
-                  }
+                  if (e.key === 'Enter') { e.preventDefault(); focusNext(backlogAgeRef) }
                 }
               }}
             />
 
             {/* Backlog Age */}
             <CustomTextField
-              inputRef={backlogAgeRef} // Changed ref to inputRef
+              inputRef={backlogAgeRef}
               fullWidth
               margin='normal'
               label='Backlog Age'
               name='backlogAge'
               value={formData.backlogAge}
-              onChange={e => /^\d*$/.test(e.target.value) && handleChange(e)}
+              onChange={e => /^\d*$/.test(e.target.value) && setFormData(prev => ({ ...prev, backlogAge: e.target.value }))}
               inputProps={{
                 inputMode: 'numeric',
                 pattern: '[0-9]*',
-                onKeyDown: e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    focusNext(frequencyCodeRef)
-                  }
-                }
+                onKeyDown: e => { if (e.key === 'Enter') { e.preventDefault(); focusNext(frequencyCodeRef) } }
               }}
             />
 
             {/* Frequency Code */}
             <CustomTextField
-              inputRef={frequencyCodeRef} // Changed ref to inputRef
+              inputRef={frequencyCodeRef}
               fullWidth
               margin='normal'
               label='Frequency Code'
               name='frequencyCode'
               value={formData.frequencyCode}
-              onChange={handleChange}
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  focusNext(displayFrequencyRef)
-                }
-              }}
+              onChange={e => setFormData(prev => ({ ...prev, frequencyCode: e.target.value }))}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); focusNext(displayFrequencyRef) } }}
             />
 
             {/* Display Frequency */}
             <CustomTextField
-              inputRef={displayFrequencyRef} // Changed ref to inputRef
+              inputRef={displayFrequencyRef}
               fullWidth
               margin='normal'
               label='Display Frequency'
               name='displayFrequency'
               value={formData.displayFrequency}
-              onChange={handleChange}
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  focusNext(sortOrderRef)
-                }
-              }}
+              onChange={e => setFormData(prev => ({ ...prev, displayFrequency: e.target.value }))}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); focusNext(sortOrderRef) } }}
             />
 
             {/* Sort Order */}
             <CustomTextField
-              inputRef={sortOrderRef} // Changed ref to inputRef
+              inputRef={sortOrderRef}
               fullWidth
               margin='normal'
               label='Sort Order'
               name='sortOrder'
               value={formData.sortOrder}
-              onChange={e => /^\d*$/.test(e.target.value) && handleChange(e)}
+              onChange={e => /^\d*$/.test(e.target.value) && setFormData(prev => ({ ...prev, sortOrder: e.target.value }))}
               inputProps={{
                 inputMode: 'numeric',
                 pattern: '[0-9]*',
-                onKeyDown: e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    focusNext(descriptionRef)
-                  }
-                }
+                onKeyDown: e => { if (e.key === 'Enter') { e.preventDefault(); focusNext(descriptionRef) } }
               }}
             />
 
             {/* Description */}
             <CustomTextField
-              inputRef={descriptionRef} // Changed ref to inputRef
+              inputRef={descriptionRef}
               fullWidth
               margin='normal'
               multiline
@@ -511,30 +457,36 @@ export default function ServiceFrequencyPage() {
               label='Description'
               name='description'
               value={formData.description}
-              onChange={handleChange}
-              inputProps={{
-                onKeyDown: e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    focusNext(submitRef) // focus Submit button
-                  }
-                }
-              }}
+              onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              inputProps={{ onKeyDown: e => { if (e.key === 'Enter') { e.preventDefault(); focusNext(submitRef) } } }}
             />
 
-            <Box mt={3} display='flex' gap={2}>
-              <Button
-                type='submit'
-                variant='contained'
+            {/* Status - Only for Edit */}
+            {isEdit && (
+              <CustomTextField
                 fullWidth
-                ref={submitRef}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    handleSubmit(e) // submit form
+                margin='normal'
+                label='Status'
+                select
+                value={formData.status || 'Active'}
+                onChange={async e => {
+                  const newStatus = e.target.value
+                  setFormData(prev => ({ ...prev, status: newStatus }))
+                  if (editRow) {
+                    const updatedRow = { ...editRow, status: newStatus }
+                    setRows(prev => prev.map(r => (r.id === editRow.id ? updatedRow : r)))
+                    const db = await initDB()
+                    await db.put(storeName, updatedRow)
                   }
                 }}
               >
+                <MenuItem value='Active'>Active</MenuItem>
+                <MenuItem value='Inactive'>Inactive</MenuItem>
+              </CustomTextField>
+            )}
+
+            <Box mt={3} display='flex' gap={2}>
+              <Button type='submit' variant='contained' fullWidth ref={submitRef}>
                 {isEdit ? 'Update' : 'Submit'}
               </Button>
               <Button variant='outlined' fullWidth onClick={toggleDrawer}>

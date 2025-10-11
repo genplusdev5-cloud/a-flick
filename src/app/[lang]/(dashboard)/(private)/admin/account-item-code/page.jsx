@@ -10,6 +10,7 @@ import {
   Drawer,
   InputAdornment,
   TablePagination,
+  MenuItem
 } from '@mui/material'
 import { DataGrid } from '@mui/x-data-grid'
 
@@ -55,24 +56,9 @@ const getColumns = (handleEdit, handleDelete, filteredRows) => [
       </Box>
     )
   },
-  {
-    field: 'name',
-    headerName: 'Name',
-    flex: 1,
-    minWidth: 150
-  },
-  {
-    field: 'itemNumber',
-    headerName: 'Item Number',
-    flex: 1,
-    minWidth: 120
-  },
-  {
-    field: 'description',
-    headerName: 'Description',
-    flex: 1.5,
-    minWidth: 200
-  },
+  { field: 'name', headerName: 'Name', flex: 1, minWidth: 150 },
+  { field: 'itemNumber', headerName: 'Item Number', flex: 1, minWidth: 120 },
+  { field: 'description', headerName: 'Description', flex: 1.5, minWidth: 200 },
   {
     field: 'status',
     headerName: 'Status',
@@ -83,11 +69,7 @@ const getColumns = (handleEdit, handleDelete, filteredRows) => [
         size='small'
         variant='contained'
         color={params.value === 'Active' ? 'success' : 'error'}
-        sx={{
-          borderRadius: '20px',
-          textTransform: 'none',
-          fontWeight: 500
-        }}
+        sx={{ borderRadius: '20px', textTransform: 'none', fontWeight: 500 }}
       >
         {params.value}
       </Button>
@@ -130,7 +112,7 @@ export default function AccountItemCodePage() {
   const [open, setOpen] = useState(false)
   const [isEdit, setIsEdit] = useState(false)
   const [editRow, setEditRow] = useState(null)
-  const [formData, setFormData] = useState({ name: '', itemNumber: '', description: '' })
+  const [formData, setFormData] = useState({ name: '', itemNumber: '', description: '', status: 'Active' })
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(10)
@@ -141,7 +123,6 @@ export default function AccountItemCodePage() {
   const descriptionRef = useRef(null)
   const submitRef = useRef(null)
 
-  // Load data
   useEffect(() => {
     async function loadRows() {
       const allRows = await getAllRows()
@@ -155,7 +136,7 @@ export default function AccountItemCodePage() {
 
   const handleAdd = () => {
     setIsEdit(false)
-    setFormData({ name: '', itemNumber: '', description: '' })
+    setFormData({ name: '', itemNumber: '', description: '', status: 'Active' })
     setEditRow(null)
     setOpen(true)
     setTimeout(() => nameRef.current?.focus(), 100)
@@ -165,7 +146,12 @@ export default function AccountItemCodePage() {
     if (!row) return
     setIsEdit(true)
     setEditRow(row)
-    setFormData({ name: row.name, itemNumber: row.itemNumber, description: row.description })
+    setFormData({
+      name: row.name,
+      itemNumber: row.itemNumber,
+      description: row.description,
+      status: row.status || 'Active'
+    })
     setOpen(true)
     setTimeout(() => nameRef.current?.focus(), 100)
   }
@@ -177,19 +163,21 @@ export default function AccountItemCodePage() {
 
   const handleSubmit = async e => {
     e.preventDefault()
-    if (formData.name && formData.itemNumber) {
-      if (isEdit && editRow) {
-        const updatedRow = { ...editRow, ...formData }
-        setRows(prev => prev.map(r => (r.id === editRow.id ? updatedRow : r)))
-        await addOrUpdateRow(updatedRow)
-      } else {
-        const newId = rows.length ? Math.max(...rows.map(r => r.id)) + 1 : 1
-        const newRow = { id: newId, ...formData, status: 'Active' }
-        setRows(prev => [newRow, ...prev])
-        await addOrUpdateRow(newRow)
-      }
-      toggleDrawer()
+    if (!formData.name || !formData.itemNumber) return
+
+    if (isEdit && editRow) {
+      const updatedRow = { ...editRow, ...formData }
+      setRows(prev => prev.map(r => (r.id === editRow.id ? updatedRow : r)))
+      await addOrUpdateRow(updatedRow)
+    } else {
+      const newId = rows.length ? Math.max(...rows.map(r => r.id)) + 1 : 1
+      const newRow = { id: newId, ...formData }
+      setRows(prev => [newRow, ...prev])
+      await addOrUpdateRow(newRow)
     }
+
+    setFormData({ name: '', itemNumber: '', description: '', status: 'Active' })
+    toggleDrawer()
   }
 
   const handleKeyDown = (e, field) => {
@@ -229,12 +217,8 @@ export default function AccountItemCodePage() {
       breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Account Item Code' }]}
       actions={
         <Box sx={{ m: 2, display: 'flex', gap: 2 }}>
-          <Button variant='outlined' startIcon={<DownloadIcon />}>
-            Export
-          </Button>
-          <Button variant='contained' startIcon={<AddIcon />} onClick={handleAdd}>
-            Add Item
-          </Button>
+          <Button variant='outlined' startIcon={<DownloadIcon />}>Export</Button>
+          <Button variant='contained' startIcon={<AddIcon />} onClick={handleAdd}>Add Item</Button>
         </Box>
       }
     >
@@ -246,19 +230,11 @@ export default function AccountItemCodePage() {
           value={search}
           onChange={e => setSearch(e.target.value)}
           sx={{ width: 360 }}
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position='start'>
-                  <SearchIcon />
-                </InputAdornment>
-              )
-            }
-          }}
+          slotProps={{ input: { startAdornment: <InputAdornment position='start'><SearchIcon /></InputAdornment> } }}
         />
       </Box>
 
-      {/* ✅ Page A Style DataGrid */}
+      {/* DataGrid */}
       <DataGrid
         rows={paginatedRows}
         columns={columns}
@@ -269,31 +245,17 @@ export default function AccountItemCodePage() {
         getRowId={row => row.id}
         sx={{
           mt: 3,
-          '& .MuiDataGrid-row': {
-            minHeight: '60px !important',
-            padding: '12px 0'
-          },
-          '& .MuiDataGrid-cell': {
-            whiteSpace: 'normal',
-            wordBreak: 'break-word',
-            overflowWrap: 'break-word',
-            alignItems: 'flex-start',
-            fontSize: '15px'
-          },
+          '& .MuiDataGrid-row': { minHeight: '60px !important', padding: '12px 0' },
+          '& .MuiDataGrid-cell': { whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'break-word', alignItems: 'flex-start', fontSize: '15px' },
           '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': { outline: 'none' },
           '& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within': { outline: 'none' },
-          '& .MuiDataGrid-columnHeaderTitle': {
-            fontSize: '15px',
-            fontWeight: 500
-          }
+          '& .MuiDataGrid-columnHeaderTitle': { fontSize: '15px', fontWeight: 500 }
         }}
       />
 
-      {/* ✅ Pagination Footer */}
+      {/* Pagination */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2, pr: 2 }}>
-        <Typography variant='body2' sx={{ color: 'text.secondary', ml: 1 }}>
-          {paginationText}
-        </Typography>
+        <Typography variant='body2' sx={{ color: 'text.secondary', ml: 1 }}>{paginationText}</Typography>
         <TablePagination
           rowsPerPageOptions={[5, 10, 25, 50]}
           component='div'
@@ -301,10 +263,7 @@ export default function AccountItemCodePage() {
           rowsPerPage={rowsPerPage}
           page={page}
           onPageChange={(e, newPage) => setPage(newPage)}
-          onRowsPerPageChange={e => {
-            setRowsPerPage(parseInt(e.target.value, 10))
-            setPage(0)
-          }}
+          onRowsPerPageChange={e => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0) }}
         />
       </Box>
 
@@ -313,47 +272,39 @@ export default function AccountItemCodePage() {
         <Box sx={{ width: 360, p: 3 }}>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={2}>
             <Typography variant='h6'>{isEdit ? 'Edit Account Item' : 'Add New Account Item'}</Typography>
-            <IconButton onClick={toggleDrawer}>
-              <CloseIcon />
-            </IconButton>
+            <IconButton onClick={toggleDrawer}><CloseIcon /></IconButton>
           </Box>
           <form onSubmit={handleSubmit}>
             <CustomTextField
-              fullWidth
-              margin='normal'
-              label='Name'
-              value={formData.name}
-              inputRef={nameRef}
+              fullWidth margin='normal' label='Name' value={formData.name} inputRef={nameRef}
               onChange={e => setFormData(prev => ({ ...prev, name: e.target.value.replace(/[^a-zA-Z\s]/g, '') }))}
               onKeyDown={e => handleKeyDown(e, 'name')}
             />
             <CustomTextField
-              fullWidth
-              margin='normal'
-              label='Item Number'
-              value={formData.itemNumber}
-              inputRef={itemNumberRef}
+              fullWidth margin='normal' label='Item Number' value={formData.itemNumber} inputRef={itemNumberRef}
               onChange={e => setFormData(prev => ({ ...prev, itemNumber: e.target.value.replace(/\D/g, '') }))}
               onKeyDown={e => handleKeyDown(e, 'itemNumber')}
             />
             <CustomTextField
-              fullWidth
-              margin='normal'
-              label='Description'
-              multiline
-              rows={3}
-              value={formData.description}
-              inputRef={descriptionRef}
+              fullWidth margin='normal' label='Description' multiline rows={3} value={formData.description} inputRef={descriptionRef}
               onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
               onKeyDown={e => handleKeyDown(e, 'description')}
             />
+
+            {/* Status appears only in edit */}
+            {isEdit && (
+              <CustomTextField
+                fullWidth margin='normal' label='Status' select value={formData.status}
+                onChange={e => setFormData(prev => ({ ...prev, status: e.target.value }))}
+              >
+                <MenuItem value='Active'>Active</MenuItem>
+                <MenuItem value='Inactive'>Inactive</MenuItem>
+              </CustomTextField>
+            )}
+
             <Box mt={3} display='flex' gap={2}>
-              <Button type='submit' variant='contained' fullWidth ref={submitRef}>
-                {isEdit ? 'Update' : 'Submit'}
-              </Button>
-              <Button variant='outlined' fullWidth onClick={toggleDrawer}>
-                Cancel
-              </Button>
+              <Button type='submit' variant='contained' fullWidth ref={submitRef}>{isEdit ? 'Update' : 'Submit'}</Button>
+              <Button variant='outlined' fullWidth onClick={toggleDrawer}>Cancel</Button>
             </Box>
           </form>
         </Box>
