@@ -20,8 +20,16 @@ const Providers = async props => {
   const settingsCookie = await getSettingsFromCookie()
   const systemMode = await getSystemMode()
 
+  // Protect against unexpanded env values like '${BASEPATH}' which can
+  // produce malformed URLs when used by NextAuth. Use a sensible default
+  // of '/api/auth' when NEXTAUTH_BASEPATH is missing or contains '${'.
+  const nextAuthBasePath =
+    process.env.NEXTAUTH_BASEPATH && !process.env.NEXTAUTH_BASEPATH.includes('${')
+      ? process.env.NEXTAUTH_BASEPATH
+      : '/api/auth'
+
   return (
-    <NextAuthProvider basePath={process.env.NEXTAUTH_BASEPATH}>
+    <NextAuthProvider basePath={nextAuthBasePath}>
       <VerticalNavProvider>
         <SettingsProvider settingsCookie={settingsCookie} mode={mode}>
           <ThemeProvider direction={direction} systemMode={systemMode}>
