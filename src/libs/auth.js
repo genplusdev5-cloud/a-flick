@@ -55,7 +55,8 @@ export const authOptions = {
   },
 
   pages: {
-    signIn: '/login'
+    // Use admin login as the canonical sign-in page
+    signIn: '/admin/login'
   },
 
   callbacks: {
