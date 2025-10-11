@@ -23,17 +23,22 @@ export const authOptions = {
       async authorize(credentials) {
         const { email, password } = credentials ?? {}
 
-        // ✅ Demo login (no backend required)
-        if (email === 'admin@a-flick.com.sg' && password === '123456') {
-          return { id: 1, name: 'Admin', email }
+        // normalize email for demo matching
+        const normalized = (email || '').toLowerCase().trim()
+
+        // ✅ Demo logins (no backend required)
+        // Accept both variants the user mentioned and the original demo email.
+        if ((normalized === 'admin@a-flick.com.sg' || normalized === 'admin@aflcik.com.sg') && password === '123456') {
+          return { id: 1, name: 'Admin', email: normalized }
         }
 
-        if (email === 'stark@gmail.com' && password === '123456') {
-          return { id: 2, name: 'Stark', email }
+        if (normalized === 'stark@gmail.com' && password === '123456') {
+          return { id: 2, name: 'Stark', email: normalized }
         }
 
-        // ❌ If no match, throw error
-        throw new Error(JSON.stringify({ message: ['Email or Password is invalid'] }))
+        // ❌ No match => return null (NextAuth will return 401)
+        // Throwing an Error with JSON was previously used; returning null is cleaner.
+        return null
       }
     }),
 

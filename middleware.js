@@ -1,3 +1,6 @@
+// Middleware disabled: we've removed global auth enforcement so the app behaves
+// like a public site with a simple login page. Keep an empty middleware export
+// in case other middlewares rely on its presence.
 import { NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 

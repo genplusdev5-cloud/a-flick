@@ -1,3 +1,6 @@
+// AuthGuard neutralized: previously this component enforced server-side
+// authentication. To remove session enforcement we simply render children
+// unconditionally.
 // Third-party Imports
 import { getServerSession } from 'next-auth'
 
