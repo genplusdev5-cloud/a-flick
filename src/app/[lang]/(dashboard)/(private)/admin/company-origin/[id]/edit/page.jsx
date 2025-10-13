@@ -260,20 +260,19 @@ export default function EditCompanyPage() {
                   onChange={handleChange}
                 />
               </Grid>
-           <Grid item xs={12} md={3}>
-  <CustomTextField
-    fullWidth
-    label="City"
-    name="city"
-    value={formData.city}
-    onChange={(e) => {
-      // Remove any non-letter characters
-      const value = e.target.value.replace(/[^a-zA-Z\s]/g, '');
-      handleChange({ target: { name: 'city', value } });
-    }}
-  />
-</Grid>
-
+              <Grid item xs={12} md={3}>
+                <CustomTextField
+                  fullWidth
+                  label='City'
+                  name='city'
+                  value={formData.city}
+                  onChange={e => {
+                    // Remove any non-letter characters
+                    const value = e.target.value.replace(/[^a-zA-Z\s]/g, '')
+                    handleChange({ target: { name: 'city', value } })
+                  }}
+                />
+              </Grid>
 
               <Grid item xs={12} md={3}>
                 <CustomTextField
@@ -311,31 +310,31 @@ export default function EditCompanyPage() {
                   onChange={handleChange}
                 />
               </Grid>
-<Grid item xs={12} md={3}>
-  <CustomTextField
-    fullWidth
-    label='UEN Number'
-    name='uenNumber'
-    value={formData.uenNumber}
-    onChange={(e) => {
-      let value = e.target.value.replace(/\D/g, ''); // remove non-numbers
-      setFormData({ ...formData, uenNumber: value });
-    }}
-  />
-</Grid>
+              <Grid item xs={12} md={3}>
+                <CustomTextField
+                  fullWidth
+                  label='UEN Number'
+                  name='uenNumber'
+                  value={formData.uenNumber}
+                  onChange={e => {
+                    let value = e.target.value.replace(/\D/g, '') // remove non-numbers
+                    setFormData({ ...formData, uenNumber: value })
+                  }}
+                />
+              </Grid>
 
-<Grid item xs={12} md={3}>
-  <CustomTextField
-    fullWidth
-    label='GST Reg. Number'
-    name='gstNumber'
-    value={formData.gstNumber}
-    onChange={(e) => {
-      let value = e.target.value.replace(/\D/g, ''); // remove non-numbers
-      setFormData({ ...formData, gstNumber: value });
-    }}
-  />
-</Grid>
+              <Grid item xs={12} md={3}>
+                <CustomTextField
+                  fullWidth
+                  label='GST Reg. Number'
+                  name='gstNumber'
+                  value={formData.gstNumber}
+                  onChange={e => {
+                    let value = e.target.value.replace(/\D/g, '') // remove non-numbers
+                    setFormData({ ...formData, gstNumber: value })
+                  }}
+                />
+              </Grid>
 
               <Grid item xs={12} md={3}>
                 <CustomTextField
@@ -346,18 +345,18 @@ export default function EditCompanyPage() {
                   onChange={handleChange}
                 />
               </Grid>
-          <Grid item xs={12} md={3}>
-  <CustomTextField
-    fullWidth
-    label='Invoice Start No.'
-    name='invoiceStartNumber'
-    value={formData.invoiceStartNumber}
-    onChange={(e) => {
-      let value = e.target.value.replace(/\D/g, ''); // remove non-numbers
-      setFormData({ ...formData, invoiceStartNumber: value });
-    }}
-  />
-</Grid>
+              <Grid item xs={12} md={3}>
+                <CustomTextField
+                  fullWidth
+                  label='Invoice Start No.'
+                  name='invoiceStartNumber'
+                  value={formData.invoiceStartNumber}
+                  onChange={e => {
+                    let value = e.target.value.replace(/\D/g, '') // remove non-numbers
+                    setFormData({ ...formData, invoiceStartNumber: value })
+                  }}
+                />
+              </Grid>
 
               <Grid item xs={12} md={3}>
                 <CustomTextField

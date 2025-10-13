@@ -85,7 +85,7 @@ const VerticalMenu = ({ scrollMenu }) => {
         </MenuItem>
 
         {/* ✅ Master */}
-        {showHeadings && <SectionHeader label="Master" />}
+
         <SubMenu label="Master" icon={<i className='tabler-database' />}>
           <MenuItem href={`/${locale}/admin/tax`}>Tax</MenuItem>
           <MenuItem href={`/${locale}/admin/company-origin`}>Company Origin</MenuItem>
@@ -119,7 +119,7 @@ const VerticalMenu = ({ scrollMenu }) => {
         </MenuItem>
 
         {/* ✅ Customers */}
-        {showHeadings && <SectionHeader label="Customers" />}
+
         <MenuItem href={`/${locale}/admin/customers`} icon={<i className='tabler-users' />}>
           Customers
         </MenuItem>
@@ -135,7 +135,7 @@ const VerticalMenu = ({ scrollMenu }) => {
         </MenuItem>
 
         {/* ✅ Suppliers & Stock */}
-        {showHeadings && <SectionHeader label="Suppliers & Stock" />}
+        {/* {showHeadings && <SectionHeader label="Suppliers & Stock" />} */}
 
         <MenuItem href={`/${locale}/admin/suppliers`} icon={<i className='tabler-building-store' />}>
           Suppliers

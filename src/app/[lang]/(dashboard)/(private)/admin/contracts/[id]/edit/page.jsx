@@ -1,9 +1,26 @@
 'use client'
 
-import { useState, useRef, useCallback, useEffect } from 'react'
-import { Box, Button, Grid, Card, Typography } from '@mui/material'
-import { useRouter, useParams } from 'next/navigation' // <-- Import useParams
-import SaveIcon from '@mui/icons-material/Save'
+import { useState, useRef, useCallback, useEffect } from 'react' // useEffect ஐ சேர்த்தல்
+import {
+  Box,
+  Button,
+  Grid,
+  Card,
+  Typography,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
+  IconButton
+} from '@mui/material'
+// useParams ஐ next/navigation லிருந்து பெறவும்
+import { useRouter, useParams } from 'next/navigation'
+
+import DeleteIcon from '@mui/icons-material/Delete'
+import EditIcon from '@mui/icons-material/Edit'
+import AddIcon from '@mui/icons-material/Add'
+import SaveIcon from '@mui/icons-material/Save' // Save Icon ஐ சேர்த்தல்
 
 // Layout + Inputs (Assuming these paths are correct)
 import ContentLayout from '@/components/layout/ContentLayout'
@@ -11,27 +28,104 @@ import CustomTextField from '@core/components/mui/TextField'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import { Autocomplete } from '@mui/material'
 
-// Function to safely get contracts from Local Storage
-const getContracts = () => {
+// ----------------------------------------------------------------------
+// INDEXEDDB HELPER FUNCTIONS (Based on AddContractPage)
+// ----------------------------------------------------------------------
+
+const DB_NAME = 'ContractDB'
+const DB_VERSION = 1
+const STORE_NAME = 'contracts'
+
+/**
+ * Opens the IndexedDB database, creating the object store if it doesn't exist.
+ * @returns {Promise<IDBDatabase>} The database instance.
+ */
+const openDB = () => {
+  return new Promise((resolve, reject) => {
+    if (!('indexedDB' in window)) {
+      console.error('IndexedDB not supported.')
+      reject(new Error('IndexedDB not supported.'))
+      return
+    }
+
+    const request = indexedDB.open(DB_NAME, DB_VERSION)
+
+    request.onerror = event => {
+      console.error('Database error:', event.target.error)
+      reject(event.target.error)
+    }
+
+    request.onsuccess = event => {
+      resolve(event.target.result)
+    }
+
+    request.onupgradeneeded = event => {
+      const db = event.target.result
+      // Create an object store to hold information about contracts.
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: 'id' })
+      }
+    }
+  })
+}
+
+/**
+ * Retrieves a single contract by its unique ID from IndexedDB.
+ * @param {string} id - The unique ID of the contract to retrieve.
+ * @returns {Promise<object | null>} A promise that resolves to the contract object or null.
+ */
+const getContractWithPestItemsById = async id => {
   try {
-    const savedContracts = localStorage.getItem('contracts')
-    return JSON.parse(savedContracts || '[]')
+    const db = await openDB()
+    const transaction = db.transaction([STORE_NAME], 'readonly')
+    const store = transaction.objectStore(STORE_NAME)
+    const request = store.get(id) // Use store.get(key) for single retrieval
+
+    return new Promise((resolve, reject) => {
+      request.onsuccess = event => {
+        resolve(event.target.result)
+      }
+      request.onerror = event => {
+        console.error('Error retrieving contract by ID from IndexedDB:', event.target.error)
+        reject(event.target.error)
+      }
+    })
   } catch (error) {
-    console.error('Error reading contracts from localStorage:', error)
-    return []
+    console.error('Failed to open DB or get contract by ID:', error)
+    return null
   }
 }
 
-// Function to safely save contracts to Local Storage
-const saveContracts = contracts => {
+/**
+ * Updates an existing contract in the IndexedDB.
+ * @param {object} contract - The contract data to update. Must contain the 'id' key.
+ */
+const updateContractWithPestItems = async contract => {
   try {
-    localStorage.setItem('contracts', JSON.stringify(contracts))
+    const db = await openDB()
+    const transaction = db.transaction([STORE_NAME], 'readwrite')
+    const store = transaction.objectStore(STORE_NAME)
+    const request = store.put(contract) // Use store.put(data) for updating (or adding if key doesn't exist)
+
+    return new Promise((resolve, reject) => {
+      request.onsuccess = () => {
+        resolve()
+      }
+      request.onerror = event => {
+        console.error('Error updating contract to IndexedDB:', event.target.error)
+        reject(event.target.error)
+      }
+    })
   } catch (error) {
-    console.error('Error writing contracts to localStorage:', error)
+    console.error('Failed to open DB or update contract:', error)
   }
 }
 
-// Initial state template for all fields
+// ----------------------------------------------------------------------
+// EDIT CONTRACT PAGE COMPONENT
+// ----------------------------------------------------------------------
+
+// Initial state template for all fields (copied from AddPage)
 const initialFormData = {
   salesMode: '',
   customer: '',
@@ -65,14 +159,6 @@ const initialFormData = {
   latitude: '',
   longitude: '',
   file: '',
-  pest: '',
-  frequency: '',
-  pestCount: '',
-  pestValue: '',
-  total: '',
-  time: '',
-  chemicals: '',
-  noOfItems: '',
   billingRemarks: '',
   agreement1: '',
   agreement2: '',
@@ -83,85 +169,36 @@ const initialFormData = {
 export default function EditContractPage() {
   const router = useRouter()
   const params = useParams()
-  // contractId is now the S.No (e.g., '1') from the URL
-  const serialNumberParam = params.id
+  // contractId is the unique ID (e.g., 'mgjb284qlgzahfvbr8') from the URL
+  const contractId = params.id
 
+  // ----------------------------------------------------------------------
+  // State and Options (Copied from AddContractPage)
+  // ----------------------------------------------------------------------
   const [formData, setFormData] = useState(initialFormData)
+
+  // NEW STATE for the input fields for a single pest item
+  const [currentPestItem, setCurrentPestItem] = useState({
+    pest: '',
+    frequency: '',
+    pestCount: '',
+    pestValue: '',
+    total: '',
+    time: '',
+    chemicals: '',
+    noOfItems: ''
+  })
+
+  // NEW STATE for the list of pest items (The table/data grid)
+  const [pestItems, setPestItems] = useState([])
+
+  // NEW STATE: Tracks the ID of the item currently being edited
+  const [editingItemId, setEditingItemId] = useState(null)
+
   const [reportEmailError, setReportEmailError] = useState(false)
   const [selectedFile, setSelectedFile] = useState('')
   const [isDragOver, setIsDragOver] = useState(false)
   const [loading, setLoading] = useState(true)
-
-  // --- START OF CRITICAL CHANGE ---
-  // New state to hold the actual unique ID (e.g., 'mgjb284qlgzahfvbr8') for saving
-  const [contractUniqueId, setContractUniqueId] = useState(null)
-  // --- END OF CRITICAL CHANGE ---
-
-  // ----------------------------------------------------------------------
-  // Data Loading Logic for Edit Page - CORE FIX IMPLEMENTED HERE
-  // ----------------------------------------------------------------------
-
-  useEffect(() => {
-    // 1. Get the S.No from the URL and convert it to array index
-    const serialNumber = parseInt(serialNumberParam) // Convert '1' to 1
-
-    if (isNaN(serialNumber) || serialNumber < 1) {
-      setLoading(false)
-      router.push('/admin/contracts')
-      return
-    }
-
-    const contracts = getContracts()
-    // Retrieve the contract based on the index (serialNumber - 1)
-    const contractToEdit = contracts[serialNumber - 1] // Array index is S.No - 1
-
-    if (contractToEdit) {
-      // Helper function to safely ensure a value is a string (or Date object)
-      const safeValue = value => {
-        if (value === null || typeof value === 'undefined') {
-          return ''
-        }
-        if (typeof value === 'object' && !(value instanceof Date)) {
-          if (value.name) return value.name
-          if (Object.keys(value).length === 0) return ''
-          return String(value)
-        }
-        return value
-      }
-
-      // Prepare the data with date objects
-      const loadedFormData = {
-        ...contractToEdit,
-        // Convert date strings back to Date objects for the date pickers
-        poExpiry: contractToEdit.poExpiry ? new Date(contractToEdit.poExpiry) : new Date(),
-        startDate: contractToEdit.startDate ? new Date(contractToEdit.startDate) : new Date(),
-        endDate: contractToEdit.endDate ? new Date(contractToEdit.endDate) : new Date(),
-        reminderDate: contractToEdit.reminderDate ? new Date(contractToEdit.reminderDate) : new Date()
-      }
-
-      // Iterate over the loaded data and apply safeValue to every field except Dates
-      const finalSafeFormData = Object.keys(loadedFormData).reduce((acc, key) => {
-        const value = loadedFormData[key]
-        if (value instanceof Date) {
-          acc[key] = value
-        } else {
-          acc[key] = safeValue(value)
-        }
-        return acc
-      }, {})
-
-      setFormData(finalSafeFormData)
-      setSelectedFile(finalSafeFormData.file || '')
-
-      // --- CRITICAL CHANGE: Store the unique ID for saving/updating ---
-      setContractUniqueId(contractToEdit.id)
-    } else {
-      console.error(`Contract with S.No ${serialNumber} not found.`)
-      // If contract not found, redirect to list page
-      router.push('/admin/contracts')
-    }
-    setLoading(false)
-  }, [serialNumberParam, router])
 
   // Autocomplete Fields Definition (Unchanged)
   const autocompleteFields = [
@@ -187,52 +224,119 @@ export default function EditContractPage() {
   const setOpenStates = {}
 
   autocompleteFields.forEach(({ name }) => {
-    // Refs for Autocomplete component and its input
     refs[name + 'Ref'] = useRef(null)
     refs[name + 'InputRef'] = useRef(null)
-
-    // State for controlling Autocomplete dropdown open/close
     // eslint-disable-next-line react-hooks/rules-of-hooks
     const [isOpen, setIsOpen] = useState(false)
     openStates[name + 'Open'] = isOpen
     setOpenStates[name + 'SetOpen'] = setIsOpen
   })
 
-  // Explicit Refs for CustomTextFields and Datepickers (Unchanged) - (Refs are reused from Page B structure)
-  const coveredLocationRef = useRef(null)
-  const contractCodeRef = useRef(null)
-  const serviceAddressRef = useRef(null)
-  const postalCodeRef = useRef(null)
-  const poNumberRef = useRef(null)
-  const poExpiryRef = useRef(null)
-  const preferredTimeRef = useRef(null)
-  const reportEmailRef = useRef(null)
-  const contactPersonRef = useRef(null)
-  const sitePhoneRef = useRef(null)
-  const mobileRef = useRef(null)
-  const groupCodeRef = useRef(null)
-  const startDateRef = useRef(null)
-  const endDateRef = useRef(null)
-  const reminderDateRef = useRef(null)
-  const contractValueRef = useRef(null)
-  const invoiceCountRef = useRef(null)
-  const invoiceRemarksRef = useRef(null)
-  const latitudeRef = useRef(null)
-  const longitudeRef = useRef(null)
-  const fileInputRef = useRef(null)
+  // Explicit Refs (Unchanged)
+  const coveredLocationRef = useRef(null),
+    contractCodeRef = useRef(null),
+    serviceAddressRef = useRef(null)
+  const postalCodeRef = useRef(null),
+    poNumberRef = useRef(null),
+    poExpiryRef = useRef(null)
+  const preferredTimeRef = useRef(null),
+    reportEmailRef = useRef(null),
+    contactPersonRef = useRef(null)
+  const sitePhoneRef = useRef(null),
+    mobileRef = useRef(null),
+    groupCodeRef = useRef(null)
+  const startDateRef = useRef(null),
+    endDateRef = useRef(null),
+    reminderDateRef = useRef(null)
+  const contractValueRef = useRef(null),
+    invoiceCountRef = useRef(null),
+    invoiceRemarksRef = useRef(null)
+  const latitudeRef = useRef(null),
+    longitudeRef = useRef(null),
+    fileInputRef = useRef(null)
   const fileUploadButtonRef = useRef(null)
-  const pestCountRef = useRef(null)
-  const pestValueRef = useRef(null)
-  const totalRef = useRef(null)
-  const chemicalsRef = useRef(null)
-  const noOfItemsRef = useRef(null)
-  const billingRemarksRef = useRef(null)
-  const agreement1Ref = useRef(null)
-  const agreement2Ref = useRef(null)
-  const technicianRemarksRef = useRef(null)
-  const appointmentRemarksRef = useRef(null)
-  const closeButtonRef = useRef(null)
+
+  // NEW Refs for the Add Pest Item fields (Unchanged)
+  const currentPestCountRef = useRef(null),
+    currentPestValueRef = useRef(null),
+    currentTotalRef = useRef(null)
+  const currentChemicalsRef = useRef(null),
+    currentNoOfItemsRef = useRef(null),
+    addPestButtonRef = useRef(null)
+
+  const billingRemarksRef = useRef(null),
+    agreement1Ref = useRef(null),
+    agreement2Ref = useRef(null)
+  const technicianRemarksRef = useRef(null),
+    appointmentRemarksRef = useRef(null),
+    closeButtonRef = useRef(null)
   const saveButtonRef = useRef(null)
+
+  // Helper function to generate a simple unique ID (Used for Pest Items only)
+  const generateUniqueId = () => Date.now().toString(36) + Math.random().toString(36).substring(2)
+
+  // ----------------------------------------------------------------------
+  // DATA LOADING LOGIC (NEW FOR EDIT PAGE)
+  // ----------------------------------------------------------------------
+  useEffect(() => {
+    const loadContractData = async () => {
+      if (!contractId) {
+        setLoading(false)
+        router.push('/admin/contracts') // ID இல்லை என்றால் திருப்பி அனுப்பவும்
+        return
+      }
+
+      const contractToEdit = await getContractWithPestItemsById(contractId)
+
+      if (contractToEdit) {
+        // Helper function to safely ensure a value is a string (or Date object)
+        const safeValue = value => {
+          if (value === null || typeof value === 'undefined') return ''
+          return value
+        }
+
+        // Prepare the data with date objects and set states
+        const loadedFormData = {
+          ...contractToEdit,
+          // Date strings ஐ Date ஆப்ஜெக்ட்களாக மாற்றவும்
+          poExpiry: contractToEdit.poExpiry ? new Date(contractToEdit.poExpiry) : new Date(),
+          startDate: contractToEdit.startDate ? new Date(contractToEdit.startDate) : new Date(),
+          endDate: contractToEdit.endDate ? new Date(contractToEdit.endDate) : new Date(),
+          reminderDate: contractToEdit.reminderDate ? new Date(contractToEdit.reminderDate) : new Date()
+        }
+
+        // Iterate over the loaded data and apply safeValue
+        const finalSafeFormData = Object.keys(initialFormData).reduce((acc, key) => {
+          const value = loadedFormData[key]
+          if (value instanceof Date) {
+            acc[key] = value
+          } else {
+            acc[key] = safeValue(value)
+          }
+          return acc
+        }, {})
+
+        // Form data மற்றும் Pest Items-ஐ அமைக்கவும்
+        setFormData(finalSafeFormData)
+        setPestItems(contractToEdit.pestItems || [])
+        setSelectedFile(contractToEdit.file instanceof File ? contractToEdit.file.name : contractToEdit.file || '')
+      } else {
+        console.error(`Contract with ID ${contractId} not found.`)
+        router.push('/admin/contracts') // காண்டிராக்ட் கிடைக்கவில்லை என்றால் திருப்பி அனுப்பவும்
+      }
+      setLoading(false)
+    }
+
+    loadContractData()
+  }, [contractId, router]) // contractId மாறும் போது தரவை மீண்டும் ஏற்றவும்
+
+  if (loading) {
+    return (
+      <ContentLayout title={<Box sx={{ m: 2 }}>{'Edit Contract'}</Box>}>
+        <Typography>Loading contract data...</Typography>
+      </ContentLayout>
+    )
+  }
 
   // Group all focusable element refs for keyboard navigation sequence (Unchanged)
   const focusableElementRefs = [
@@ -270,12 +374,13 @@ export default function EditContractPage() {
     fileUploadButtonRef,
     refs.pestInputRef,
     refs.frequencyInputRef,
-    pestCountRef,
-    pestValueRef,
-    totalRef,
+    currentPestCountRef,
+    currentPestValueRef,
+    currentTotalRef,
     refs.timeInputRef,
-    chemicalsRef,
-    noOfItemsRef,
+    currentChemicalsRef,
+    currentNoOfItemsRef,
+    addPestButtonRef,
     billingRemarksRef,
     agreement1Ref,
     agreement2Ref,
@@ -286,11 +391,36 @@ export default function EditContractPage() {
   ].filter(ref => ref)
 
   // ----------------------------------------------------------------------
-  // Handlers (Most remain the same, only handleSubmit changes)
+  // Handlers (Mostly Copied from AddContractPage - Only handleSubmit changes)
   // ----------------------------------------------------------------------
 
   const handleChange = e => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
+  }
+
+  // Handler for the current pest item input fields (Unchanged)
+  const handleCurrentPestItemChange = e => {
+    const { name, value } = e.target
+    let updatedValue = value
+
+    if (['pestCount', 'total', 'noOfItems'].includes(name)) {
+      updatedValue = value.replace(/\D/g, '')
+    }
+
+    // Auto-calculate Total (Pest Count * Pest Value)
+    if (name === 'pestCount' || name === 'pestValue') {
+      const count = name === 'pestCount' ? Number(updatedValue || 0) : Number(currentPestItem.pestCount || 0)
+      const val = name === 'pestValue' ? Number(updatedValue || 0) : Number(currentPestItem.pestValue || 0)
+
+      setCurrentPestItem(prev => ({
+        ...prev,
+        [name]: updatedValue,
+        total: (count * val).toString()
+      }))
+      return
+    }
+
+    setCurrentPestItem(prev => ({ ...prev, [name]: updatedValue }))
   }
 
   // Focus management helper function (Unchanged)
@@ -327,7 +457,7 @@ export default function EditContractPage() {
     [...Object.values(refs), ...Object.values(setOpenStates), focusableElementRefs]
   )
 
-  // Universal onKeyDown handler for all inputs and autocompletes (Unchanged)
+  // Universal onKeyDown handler (Unchanged)
   const handleKeyDown = (e, currentRef, isMultiline = false) => {
     if (e.key === 'Enter') {
       if (isMultiline && e.shiftKey) {
@@ -339,9 +469,19 @@ export default function EditContractPage() {
     }
   }
 
-  // Autocomplete change handler that also moves focus (Unchanged)
+  // Autocomplete change handler that also moves focus (Unchanged, for main form data)
   const handleAutocompleteChange = (name, newValue, currentInputRef) => {
     setFormData(prev => ({ ...prev, [name]: newValue }))
+    const setStateFunc = setOpenStates[name + 'SetOpen']
+    if (setStateFunc) {
+      setStateFunc(false)
+    }
+    focusNextElement(currentInputRef)
+  }
+
+  // NEW: Autocomplete change handler for CURRENT PEST ITEM (Unchanged)
+  const handleCurrentPestItemAutocompleteChange = (name, newValue, currentInputRef) => {
+    setCurrentPestItem(prev => ({ ...prev, [name]: newValue }))
     const setStateFunc = setOpenStates[name + 'SetOpen']
     if (setStateFunc) {
       setStateFunc(false)
@@ -354,17 +494,23 @@ export default function EditContractPage() {
     if (reason === 'input' && !options.includes(newValue) && !autocompleteFields.find(f => f.name === name).freeSolo) {
       return
     }
-    setFormData(prev => ({ ...prev, [name]: newValue }))
+    // This handler must work for both formData and currentPestItem
+    if (['pest', 'frequency', 'time'].includes(name)) {
+      setCurrentPestItem(prev => ({ ...prev, [name]: newValue }))
+    } else {
+      setFormData(prev => ({ ...prev, [name]: newValue }))
+    }
   }
 
-  // Datepicker change handler that also moves focus (Unchanged)
+  // Datepicker change handler (Unchanged)
   const handleDateChange = (name, date, currentInputRef) => {
     setFormData(prev => ({ ...prev, [name]: date }))
     focusNextElement(currentInputRef)
   }
 
   // File handler functions (Unchanged)
-  const handleFileChange = file => {
+  const handleNativeFileChange = e => {
+    const file = e.target.files?.[0] || null
     if (file) {
       setSelectedFile(file.name)
       setFormData(prev => ({ ...prev, file: file }))
@@ -372,22 +518,14 @@ export default function EditContractPage() {
       setSelectedFile('')
       setFormData(prev => ({ ...prev, file: '' }))
     }
-  }
-
-  const handleNativeFileChange = e => {
-    const file = e.target.files?.[0] || null
-    handleFileChange(file)
     focusNextElement(fileUploadButtonRef)
   }
-
   const handleFileDrop = e => {
     e.preventDefault()
     setIsDragOver(false)
-    const droppedFiles = e.dataTransfer.files
-    const file = droppedFiles?.[0] || null
-    handleFileChange(file)
+    const file = e.dataTransfer.files?.[0] || null
+    handleNativeFileChange({ target: { files: [file] } })
   }
-
   const handleDragOver = e => {
     e.preventDefault()
     setIsDragOver(true)
@@ -397,44 +535,108 @@ export default function EditContractPage() {
     setIsDragOver(false)
   }
 
-  // UPDATED: Logic to Update to Local Storage and Redirect
-  const handleSubmit = () => {
-    // --- CRITICAL CHECK: Ensure we have the actual unique ID ---
-    if (!contractUniqueId) {
-      console.error('Cannot save: Unique contract ID is missing.')
+  // Function to load an item for editing (Unchanged)
+  const handleEditPestItem = item => {
+    // Load item data into the current input state
+    setCurrentPestItem({
+      pest: item.pest,
+      frequency: item.frequency,
+      pestCount: item.noOfItems, // Map 'noOfItems' back to 'pestCount' input
+      pestValue: item.pestValue,
+      total: item.totalValue,
+      time: item.workTime,
+      chemicals: item.chemicals,
+      noOfItems: item.noOfItems
+    })
+
+    // Set the editing ID
+    setEditingItemId(item.id)
+
+    // Focus on the first input field
+    refs.pestInputRef.current?.focus()
+  }
+
+  // Function to save (Add or Update) the current item to the list (Unchanged)
+  const handleSavePestItem = () => {
+    // Basic validation (Pest and Frequency are required)
+    if (!currentPestItem.pest || !currentPestItem.frequency) {
+      alert('Pest and Frequency are required to add/update an item.')
       return
     }
 
-    const fileToStore =
-      formData.file && typeof formData.file === 'object' && formData.file.name
-        ? formData.file.name
-        : formData.file || ''
+    const itemPayload = {
+      pest: currentPestItem.pest,
+      frequency: currentPestItem.frequency,
+      pestValue: currentPestItem.pestValue || '0',
+      totalValue: currentPestItem.total || '0',
+      workTime: currentPestItem.time || '0:00',
+      chemicals: currentPestItem.chemicals || '',
+      noOfItems: currentPestItem.noOfItems || currentPestItem.pestCount || '0'
+    }
 
+    if (editingItemId) {
+      // Logic for UPDATING an existing item
+      setPestItems(prev => prev.map(item => (item.id === editingItemId ? { ...itemPayload, id: item.id } : item)))
+      setEditingItemId(null) // Clear edit state
+    } else {
+      // Logic for ADDING a new item (Uses the same ID logic as AddContractPage)
+      setPestItems(prev => [...prev, { ...itemPayload, id: generateUniqueId() }])
+    }
+
+    // Reset the current input fields
+    setCurrentPestItem({
+      pest: '',
+      frequency: '',
+      pestCount: '',
+      pestValue: '',
+      total: '',
+      time: '',
+      chemicals: '',
+      noOfItems: ''
+    })
+
+    // Focus back to the first field of the pest block
+    refs.pestInputRef.current?.focus()
+  }
+
+  // Function to delete an item from the list (Unchanged)
+  const handleDeletePestItem = id => {
+    if (editingItemId === id) {
+      setEditingItemId(null)
+      setCurrentPestItem({
+        pest: '',
+        frequency: '',
+        pestCount: '',
+        pestValue: '',
+        total: '',
+        time: '',
+        chemicals: '',
+        noOfItems: ''
+      })
+    }
+    setPestItems(prev => prev.filter(item => item.id !== id))
+  }
+
+  // Logic to Save to IndexedDB and Redirect (UPDATED for Edit)
+  const handleSubmit = async () => {
+    // Use the existing contractId for the update
     const updatedContract = {
       ...formData,
-      id: contractUniqueId, // <-- Use the stored unique ID for saving!
-      file: fileToStore,
-      // Convert Date objects to strings for storage
+      id: contractId, // CRITICAL: Use the existing ID for update
       poExpiry: formData.poExpiry.toISOString(),
       startDate: formData.startDate.toISOString(),
       endDate: formData.endDate.toISOString(),
-      reminderDate: formData.reminderDate.toISOString()
+      reminderDate: formData.reminderDate.toISOString(),
+      pestItems: pestItems // Include the list of pest items
     }
 
-    // 1. Get existing contracts
-    const existingContracts = getContracts()
-
-    // 2. Find and replace the contract being edited
-    const updatedContracts = existingContracts.map(contract =>
-      // Match the contract by its stored UNIQUE ID, NOT the S.No from the URL
-      contract.id === contractUniqueId ? updatedContract : contract
-    )
-
-    // 3. Save updated list back to local storage
-    saveContracts(updatedContracts)
-
-    // 4. Redirect to list page
-    router.push('/admin/contracts')
+    try {
+      await updateContractWithPestItems(updatedContract) // Use the new update function
+      router.push('/admin/contracts')
+    } catch (error) {
+      alert('Failed to update contract to database. See console for details.')
+      console.error('Submission failed:', error)
+    }
   }
 
   // ----------------------------------------------------------------------
@@ -470,39 +672,23 @@ export default function EditContractPage() {
   }
 
   // ----------------------------------------------------------------------
-  // Form Structure (Title and Button changed)
+  // Form Structure (Copied from AddContractPage, Updated Title/Button)
   // ----------------------------------------------------------------------
-
-  if (loading) {
-    return (
-      <ContentLayout
-        title={<Box sx={{ m: 2 }}>{'Edit Contract'}</Box>}
-        breadcrumbs={[
-          { label: 'Dashboard', href: '/' },
-          { label: 'Contracts', href: '/admin/contracts' },
-          { label: 'Edit Contract' }
-        ]}
-      >
-        <Typography>Loading contract data...</Typography>
-      </ContentLayout>
-    )
-  }
-
-  // Display S.No in the breadcrumb
-  const breadcrumbLabel = 'Edit Contract'
 
   return (
     <ContentLayout
+      // Title changed to 'Edit Contract'
       title={<Box sx={{ m: 2 }}>{'Edit Contract'}</Box>}
       breadcrumbs={[
         { label: 'Dashboard', href: '/' },
         { label: 'Contracts', href: '/admin/contracts' },
-        { label: breadcrumbLabel }
+        // Breadcrumb changed to 'Edit Contract'
+        { label: 'Edit Contract' }
       ]}
     >
       <Card sx={{ p: 4, boxShadow: 'none' }} elevation={0}>
         <Grid container spacing={6}>
-          {/* Row 1 */}
+          {/* Row 1 to Row 9: Unchanged (uses formData state which is now pre-filled) */}
           {renderAutocomplete({
             name: 'salesMode',
             label: 'Sales Mode',
@@ -529,8 +715,6 @@ export default function EditContractPage() {
               onKeyDown={e => handleKeyDown(e, coveredLocationRef)}
             />
           </Grid>
-
-          {/* Row 2 */}
           <Grid item xs={12} md={3}>
             <CustomTextField
               fullWidth
@@ -569,8 +753,6 @@ export default function EditContractPage() {
             label: 'Account Item Code',
             options: autocompleteFields.find(f => f.name === 'accountItemCode').options
           })}
-
-          {/* Row 3 */}
           <Grid item xs={12} md={3}>
             <CustomTextField
               fullWidth
@@ -596,7 +778,6 @@ export default function EditContractPage() {
               customInput={<CustomTextField label='PO Expiry Date' fullWidth inputRef={poExpiryRef} />}
             />
           </Grid>
-
           <Grid item xs={12} md={3}>
             <CustomTextField
               type='time'
@@ -628,8 +809,6 @@ export default function EditContractPage() {
               onKeyDown={e => handleKeyDown(e, reportEmailRef)}
             />
           </Grid>
-
-          {/* Row 4 */}
           <Grid item xs={12} md={3}>
             <CustomTextField
               fullWidth
@@ -645,7 +824,6 @@ export default function EditContractPage() {
               inputProps={{ inputMode: 'text', pattern: '[A-Za-z ]*' }}
             />
           </Grid>
-
           <Grid item xs={12} md={3}>
             <CustomTextField
               fullWidth
@@ -661,7 +839,6 @@ export default function EditContractPage() {
               onKeyDown={e => handleKeyDown(e, sitePhoneRef)}
             />
           </Grid>
-
           <Grid item xs={12} md={3}>
             <CustomTextField
               fullWidth
@@ -677,14 +854,11 @@ export default function EditContractPage() {
               onKeyDown={e => handleKeyDown(e, mobileRef)}
             />
           </Grid>
-
           {renderAutocomplete({
             name: 'callType',
             label: 'Call Type',
             options: autocompleteFields.find(f => f.name === 'callType').options
           })}
-
-          {/* Row 5 (Dates) */}
           <Grid item xs={12} md={3}>
             <CustomTextField
               fullWidth
@@ -706,7 +880,6 @@ export default function EditContractPage() {
               customInput={<CustomTextField label='Start Date' fullWidth inputRef={startDateRef} />}
             />
           </Grid>
-
           <Grid item xs={12} md={3}>
             <AppReactDatepicker
               selected={formData.endDate}
@@ -718,7 +891,6 @@ export default function EditContractPage() {
               minDate={formData.startDate}
             />
           </Grid>
-
           <Grid item xs={12} md={3}>
             <AppReactDatepicker
               selected={formData.reminderDate}
@@ -731,8 +903,6 @@ export default function EditContractPage() {
               maxDate={formData.endDate}
             />
           </Grid>
-
-          {/* Row 6 - Reordered as requested */}
           {renderAutocomplete({
             name: 'industry',
             label: 'Industry',
@@ -763,8 +933,6 @@ export default function EditContractPage() {
             label: 'Payment Term',
             options: autocompleteFields.find(f => f.name === 'paymentTerm').options
           })}
-
-          {/* Row 7 - Reordered as requested */}
           {renderAutocomplete({
             name: 'salesPerson',
             label: 'Sales Person',
@@ -777,8 +945,6 @@ export default function EditContractPage() {
             options: autocompleteFields.find(f => f.name === 'supervisor').options,
             gridProps: { xs: 12, md: 6 }
           })}
-
-          {/* Row 8 - Reordered as requested */}
           {renderAutocomplete({
             name: 'billingFrequency',
             label: 'Billing Frequency',
@@ -821,8 +987,6 @@ export default function EditContractPage() {
               onKeyDown={e => handleKeyDown(e, latitudeRef)}
             />
           </Grid>
-
-          {/* Row 9 - Reordered as requested */}
           <Grid item xs={12} md={6}>
             <CustomTextField
               fullWidth
@@ -834,12 +998,10 @@ export default function EditContractPage() {
               onKeyDown={e => handleKeyDown(e, longitudeRef)}
             />
           </Grid>
-
           <Grid item xs={12} md={6}>
             <Typography variant='body2' sx={{ mb: 1, fontWeight: 500 }}>
               Upload File
             </Typography>
-            {/* Hidden native file input */}
             <input
               type='file'
               ref={fileInputRef}
@@ -847,7 +1009,6 @@ export default function EditContractPage() {
               name='file'
               onChange={handleNativeFileChange}
             />
-            {/* Button that acts as the drop zone */}
             <Button
               variant='outlined'
               fullWidth
@@ -871,122 +1032,263 @@ export default function EditContractPage() {
             </Button>
           </Grid>
 
-          {/* Row 10 - Reordered as requested */}
-          {renderAutocomplete({
-            name: 'pest',
-            label: 'Pest',
-            options: autocompleteFields.find(f => f.name === 'pest').options
-          })}
-          {renderAutocomplete({
-            name: 'frequency',
-            label: 'Frequency',
-            options: autocompleteFields.find(f => f.name === 'frequency').options
-          })}
-          <Grid item xs={12} md={3}>
+          {/* --- PEST ITEM INPUTS (Unchanged) --- */}
+          <Grid item xs={12}>
+            <Typography variant='h6' sx={{ mb: 4, mt: 4 }}>
+              Pest Item Details ({editingItemId ? 'Editing Mode' : 'Add Mode'})
+            </Typography>
+          </Grid>
+
+          {/* Row 10 - Pest, Frequency, Pest Count, Pest Value, Total */}
+          <Grid item xs={12} md={2.4}>
+            {/* Pest Autocomplete */}
+            <Autocomplete
+              ref={refs.pestRef}
+              freeSolo={false}
+              options={autocompleteFields.find(f => f.name === 'pest').options}
+              value={currentPestItem.pest}
+              open={openStates.pestOpen}
+              onFocus={() => setOpenStates.pestSetOpen(true)}
+              onBlur={() => setOpenStates.pestSetOpen(false)}
+              onOpen={() => setOpenStates.pestSetOpen(true)}
+              onClose={() => setOpenStates.pestSetOpen(false)}
+              onInputChange={(e, newValue, reason) =>
+                handleAutocompleteInputChange(
+                  'pest',
+                  autocompleteFields.find(f => f.name === 'pest').options,
+                  newValue,
+                  reason
+                )
+              }
+              onChange={(e, newValue) => handleCurrentPestItemAutocompleteChange('pest', newValue, refs.pestInputRef)}
+              onKeyDown={e => handleKeyDown(e, refs.pestInputRef)}
+              noOptionsText='No options'
+              renderInput={params => <CustomTextField {...params} label='Pest' inputRef={refs.pestInputRef} />}
+            />
+          </Grid>
+          <Grid item xs={12} md={2.4}>
+            {/* Frequency Autocomplete */}
+            <Autocomplete
+              ref={refs.frequencyRef}
+              freeSolo={false}
+              options={autocompleteFields.find(f => f.name === 'frequency').options}
+              value={currentPestItem.frequency}
+              open={openStates.frequencyOpen}
+              onFocus={() => setOpenStates.frequencySetOpen(true)}
+              onBlur={() => setOpenStates.frequencySetOpen(false)}
+              onOpen={() => setOpenStates.frequencySetOpen(true)}
+              onClose={() => setOpenStates.frequencySetOpen(false)}
+              onInputChange={(e, newValue, reason) =>
+                handleAutocompleteInputChange(
+                  'frequency',
+                  autocompleteFields.find(f => f.name === 'frequency').options,
+                  newValue,
+                  reason
+                )
+              }
+              onChange={(e, newValue) =>
+                handleCurrentPestItemAutocompleteChange('frequency', newValue, refs.frequencyInputRef)
+              }
+              onKeyDown={e => handleKeyDown(e, refs.frequencyInputRef)}
+              noOptionsText='No options'
+              renderInput={params => (
+                <CustomTextField {...params} label='Frequency' inputRef={refs.frequencyInputRef} />
+              )}
+            />
+          </Grid>
+          <Grid item xs={12} md={2.4}>
+            {/* Pest Count */}
             <CustomTextField
               fullWidth
               label='Pest Count'
               name='pestCount'
-              value={formData.pestCount || ''}
-              onChange={e => {
-                const numericValue = e.target.value.replace(/\D/g, '')
-                setFormData(prev => ({ ...prev, pestCount: numericValue }))
-              }}
-              inputRef={pestCountRef}
-              onKeyDown={e => handleKeyDown(e, pestCountRef)}
+              value={currentPestItem.pestCount || ''}
+              onChange={handleCurrentPestItemChange}
+              inputRef={currentPestCountRef}
+              onKeyDown={e => handleKeyDown(e, currentPestCountRef)}
               inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
             />
           </Grid>
-          <Grid item xs={12} md={3}>
+          <Grid item xs={12} md={2.4}>
+            {/* Pest Value */}
             <CustomTextField
               type='number'
               fullWidth
               label='Pest Value'
               name='pestValue'
-              value={formData.pestValue || ''}
-              onChange={handleChange}
-              inputRef={pestValueRef}
-              onKeyDown={e => handleKeyDown(e, pestValueRef)}
+              value={currentPestItem.pestValue || ''}
+              onChange={handleCurrentPestItemChange}
+              inputRef={currentPestValueRef}
+              onKeyDown={e => handleKeyDown(e, currentPestValueRef)}
               inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
               sx={{
-                '& input[type=number]': {
-                  MozAppearance: 'textfield'
-                },
-                '& input[type=number]::-webkit-outer-spin-button': {
-                  WebkitAppearance: 'none',
-                  margin: 0
-                },
-                '& input[type=number]::-webkit-inner-spin-button': {
+                '& input[type=number]': { MozAppearance: 'textfield' },
+                '& input[type=number]::-webkit-outer-spin-button, & input[type=number]::-webkit-inner-spin-button': {
                   WebkitAppearance: 'none',
                   margin: 0
                 }
               }}
             />
           </Grid>
-
-          {/* Row 11 - Reordered as requested */}
-          <Grid item xs={12} md={3}>
+          <Grid item xs={12} md={2.4}>
+            {/* Total */}
             <CustomTextField
               fullWidth
               label='Total'
               name='total'
-              value={formData.total || ''}
-              onChange={e => {
-                const numericValue = e.target.value.replace(/\D/g, '')
-                setFormData(prev => ({ ...prev, total: numericValue }))
-              }}
-              inputRef={totalRef}
-              onKeyDown={e => handleKeyDown(e, totalRef)}
+              value={currentPestItem.total || ''}
+              onChange={handleCurrentPestItemChange}
+              inputRef={currentTotalRef}
+              onKeyDown={e => handleKeyDown(e, currentTotalRef)}
               inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
+              disabled
             />
           </Grid>
-          {renderAutocomplete({
-            name: 'time',
-            label: 'Time',
-            options: autocompleteFields.find(f => f.name === 'time').options
-          })}
+
+          {/* Row 11 - Time, Chemicals, No of Items, +ADD/UPDATE PEST Button */}
           <Grid item xs={12} md={3}>
+            {/* Time Autocomplete */}
+            <Autocomplete
+              ref={refs.timeRef}
+              freeSolo={false}
+              options={autocompleteFields.find(f => f.name === 'time').options}
+              value={currentPestItem.time}
+              open={openStates.timeOpen}
+              onFocus={() => setOpenStates.timeSetOpen(true)}
+              onBlur={() => setOpenStates.timeSetOpen(false)}
+              onOpen={() => setOpenStates.timeSetOpen(true)}
+              onClose={() => setOpenStates.timeSetOpen(false)}
+              onInputChange={(e, newValue, reason) =>
+                handleAutocompleteInputChange(
+                  'time',
+                  autocompleteFields.find(f => f.name === 'time').options,
+                  newValue,
+                  reason
+                )
+              }
+              onChange={(e, newValue) => handleCurrentPestItemAutocompleteChange('time', newValue, refs.timeInputRef)}
+              onKeyDown={e => handleKeyDown(e, refs.timeInputRef)}
+              noOptionsText='No options'
+              renderInput={params => <CustomTextField {...params} label='Time' inputRef={refs.timeInputRef} />}
+            />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            {/* Chemicals */}
             <CustomTextField
               fullWidth
               label='Chemicals'
               name='chemicals'
-              value={formData.chemicals}
-              onChange={handleChange}
-              inputRef={chemicalsRef}
-              onKeyDown={e => handleKeyDown(e, chemicalsRef)}
+              value={currentPestItem.chemicals}
+              onChange={handleCurrentPestItemChange}
+              inputRef={currentChemicalsRef}
+              onKeyDown={e => handleKeyDown(e, currentChemicalsRef)}
             />
           </Grid>
           <Grid item xs={12} md={3}>
+            {/* No of Items */}
             <CustomTextField
               type='number'
               fullWidth
               label='No of Items'
               name='noOfItems'
-              value={formData.noOfItems || ''}
-              onChange={e => {
-                const numericValue = e.target.value.replace(/\D/g, '')
-                setFormData(prev => ({ ...prev, noOfItems: numericValue }))
-              }}
-              inputRef={noOfItemsRef}
-              onKeyDown={e => handleKeyDown(e, noOfItemsRef)}
+              value={currentPestItem.noOfItems || ''}
+              onChange={handleCurrentPestItemChange}
+              inputRef={currentNoOfItemsRef}
+              onKeyDown={e => handleKeyDown(e, currentNoOfItemsRef)}
               inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
               sx={{
-                '& input[type=number]': {
-                  MozAppearance: 'textfield'
-                },
-                '& input[type=number]::-webkit-outer-spin-button': {
-                  WebkitAppearance: 'none',
-                  margin: 0
-                },
-                '& input[type=number]::-webkit-inner-spin-button': {
+                '& input[type=number]': { MozAppearance: 'textfield' },
+                '& input[type=number]::-webkit-outer-spin-button, & input[type=number]::-webkit-inner-spin-button': {
                   WebkitAppearance: 'none',
                   margin: 0
                 }
               }}
             />
           </Grid>
+          <Grid item xs={12} md={3} sx={{ display: 'flex', alignItems: 'flex-end' }}>
+            <Button
+              variant='contained'
+              fullWidth
+              onClick={handleSavePestItem} // Use the new save handler
+              ref={addPestButtonRef}
+              onKeyDown={e => handleKeyDown(e, addPestButtonRef)}
+              color={editingItemId ? 'success' : 'primary'}
+            >
+              {editingItemId ? 'UPDATE PEST' : 'ADD PEST'}
+            </Button>
+          </Grid>
+          {/* ---------------------------------------------------- */}
+          {/* --- PEST ITEMS TABLE (MUI DESIGN - Left Aligned) --- */}
+          {/* ---------------------------------------------------- */}
+          <Grid item xs={12} sx={{ mt: 4 }}>
+            <Box sx={{ overflowX: 'auto', border: '1px solid #e0e0e0', borderRadius: 1 }}>
+              <Table sx={{ minWidth: 950 }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ width: '5%' }}>#</TableCell>
+                    <TableCell align='center' sx={{ width: '10%' }}>
+                      {' '}
+                      Action{' '}
+                    </TableCell>
+                    <TableCell sx={{ width: '15%' }}>Pest</TableCell>
+                    <TableCell sx={{ width: '12%' }}>Frequency</TableCell>
+                    <TableCell sx={{ width: '10%' }}>Pest Value</TableCell>
+                    <TableCell sx={{ width: '10%' }}>Total Value</TableCell>
+                    <TableCell sx={{ width: '10%' }}>Work Time</TableCell>
+                    <TableCell sx={{ width: '20%' }}>Chemicals</TableCell>
+                    <TableCell sx={{ width: '8%' }}>No Of Items</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {pestItems.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={9} align='center' sx={{ fontStyle: '', color: 'text.secondary' }}>
+                        No pest added
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    pestItems.map((item, index) => (
+                      <TableRow
+                        key={item.id}
+                        sx={{ backgroundColor: editingItemId === item.id ? 'action.selected' : 'inherit' }}
+                      >
+                        <TableCell>{index + 1}</TableCell>
+                        <TableCell align='center'>
+                          <IconButton
+                            size='small'
+                            color='error'
+                            onClick={() => handleDeletePestItem(item.id)}
+                            sx={{ p: 1 }}
+                          >
+                            <DeleteIcon fontSize='small' />
+                          </IconButton>
+                          <IconButton
+                            size='small'
+                            color='primary'
+                            onClick={() => handleEditPestItem(item)}
+                            disabled={editingItemId === item.id}
+                            sx={{ p: 1 }}
+                          >
+                            <EditIcon fontSize='small' />
+                          </IconButton>
+                        </TableCell>
+                        <TableCell>{item.pest}</TableCell>
+                        <TableCell>{item.frequency}</TableCell>
+                        <TableCell>{item.pestValue}</TableCell>
+                        <TableCell>{item.totalValue}</TableCell>
+                        <TableCell>{item.workTime}</TableCell>
+                        <TableCell>{item.chemicals}</TableCell>
+                        <TableCell>{item.noOfItems}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </Box>
+          </Grid>
+          {/* --- END PEST ITEMS TABLE --- */}
 
-          {/* Row 12 - Multiline Text Fields */}
+          {/* Row 12 - Multiline Text Fields (Unchanged) */}
           <Grid item xs={4}>
             <CustomTextField
               multiline
@@ -997,7 +1299,7 @@ export default function EditContractPage() {
               value={formData.billingRemarks}
               onChange={handleChange}
               inputRef={billingRemarksRef}
-              onKeyDown={e => handleKeyDown(e, billingRemarksRef, true)} // 👈 Multiline keydown
+              onKeyDown={e => handleKeyDown(e, billingRemarksRef, true)}
             />
           </Grid>
           <Grid item xs={4}>
@@ -1005,8 +1307,7 @@ export default function EditContractPage() {
               multiline
               rows={2}
               fullWidth
-              label='
-Agreement Add On 1'
+              label='Agreement Add On 1'
               name='agreement1'
               value={formData.agreement1}
               onChange={handleChange}
@@ -1019,8 +1320,7 @@ Agreement Add On 1'
               multiline
               rows={2}
               fullWidth
-              label='
-Agreement Add On 2'
+              label='Agreement Add On 2'
               name='agreement2'
               value={formData.agreement2}
               onChange={handleChange}
@@ -1046,8 +1346,7 @@ Agreement Add On 2'
               multiline
               rows={2}
               fullWidth
-              label='
-Appointment Remarks (For Office View only)'
+              label='Appointment Remarks (For Office View only)'
               name='appointmentRemarks'
               value={formData.appointmentRemarks}
               onChange={handleChange}
@@ -1056,12 +1355,12 @@ Appointment Remarks (For Office View only)'
             />
           </Grid>
 
-          {/* Actions */}
+          {/* Actions - Button text changed to 'Update' */}
           <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 4, pt: 8 }}>
             <Button variant='outlined' onClick={() => router.push('/admin/contracts')} ref={closeButtonRef}>
               Close
             </Button>
-            <Button variant='contained' onClick={handleSubmit} ref={saveButtonRef} >
+            <Button variant='contained' onClick={handleSubmit} ref={saveButtonRef} startIcon={<SaveIcon />}>
               Update
             </Button>
           </Grid>
