@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { openDB } from 'idb'
 import {
   Box,
   Typography,
@@ -8,81 +9,77 @@ import {
   IconButton,
   Drawer,
   InputAdornment,
-  Menu,
   MenuItem,
-  TablePagination
+  Card,
+  Divider,
+  FormControl,
+  Select,
+  Pagination,
+  Menu
 } from '@mui/material'
-import { DataGrid } from '@mui/x-data-grid'
 
 // Icons
 import AddIcon from '@mui/icons-material/Add'
+import DownloadIcon from '@mui/icons-material/Download'
 import CloseIcon from '@mui/icons-material/Close'
 import SearchIcon from '@mui/icons-material/Search'
-import DownloadIcon from '@mui/icons-material/Download'
 import EditIcon from '@mui/icons-material/Edit'
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward' // Icon for sorting up
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward' // Icon for sorting down
 import { MdDelete } from 'react-icons/md'
-import CustomAutocomplete from '@core/components/mui/Autocomplete'
 
 // Wrapper
-import ContentLayout from '@/components/layout/ContentLayout'
 import CustomTextField from '@core/components/mui/TextField'
-import { openDB } from 'idb'
+import CustomAutocomplete from '@core/components/mui/Autocomplete'
+import Link from 'next/link' // Added for Breadcrumb
 
-// ------------------- Columns -------------------
-const getColumns = (handleEdit, handleDelete, paginatedRows) => [
-  {
-    field: 'serial',
-    headerName: 'S.No',
-    flex: 0.3,
-    minWidth: 70,
-    sortable: false,
-    valueGetter: params => paginatedRows.findIndex(r => r.id === params.row.id) + 1
-  },
-  {
-    field: 'action',
-    headerName: 'Action',
-    flex: 0.8,
-    sortable: false,
-    renderCell: params => (
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <IconButton size='small' onClick={() => handleDelete(params.row)}>
-          <MdDelete style={{ color: 'red' }} />
-        </IconButton>
-        <IconButton size='small' onClick={() => handleEdit(params.row)}>
-          <EditIcon />
-        </IconButton>
-      </Box>
-    )
-  },
-  { field: 'displayFrequency', headerName: 'Display Frequency', flex: 1 },
-  { field: 'frequencyCode', headerName: 'Frequency Code', flex: 1 },
-  { field: 'description', headerName: 'Description', flex: 1 },
-  { field: 'sortOrder', headerName: 'Sort Order', flex: 0.5 },
-  {
-    field: 'status',
-    headerName: 'Status',
-    flex: 0.8,
-    renderCell: params => (
-      <Button
-        size='small'
-        variant='contained'
-        color={params.value === 'Active' ? 'success' : 'error'}
-        sx={{ borderRadius: '20px', textTransform: 'none', fontWeight: 500 }}
-      >
-        {params.value}
-      </Button>
-    )
-  }
-]
+// ------------------- IndexedDB Setup -------------------
+const dbName = 'serviceFrequencyDB'
+const storeName = 'frequencies'
 
+async function initDB() {
+  return openDB(dbName, 1, {
+    upgrade(db) {
+      if (!db.objectStoreNames.contains(storeName)) {
+        db.createObjectStore(storeName, { keyPath: 'id', autoIncrement: true })
+      }
+    }
+  })
+}
+
+async function getAllRows() {
+  const db = await initDB()
+  return db.getAll(storeName)
+}
+
+async function addOrUpdateRow(row) {
+  const db = await initDB()
+  // IndexedDB .put() handles both add (if no key) and update (if key exists)
+  await db.put(storeName, row)
+}
+
+async function deleteRowFromDB(id) {
+  const db = await initDB()
+  await db.delete(storeName, id)
+}
+
+// ------------------- Component -------------------
 export default function ServiceFrequencyPage() {
   const [rows, setRows] = useState([])
   const [search, setSearch] = useState('')
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(false) // Drawer for Add/Edit
   const [isEdit, setIsEdit] = useState(false)
   const [editRow, setEditRow] = useState(null)
-  const [page, setPage] = useState(0)
-  const [rowsPerPage, setRowsPerPage] = useState(10)
+
+  // State for Sorting (from Page A)
+  const [sortField, setSortField] = useState('id') // Default sort by ID
+  const [sortDirection, setSortDirection] = useState('desc') // Default sort descending
+
+  // State variables for Pagination (from Page A)
+  const [page, setPage] = useState(1) // 1-based indexing
+  const [pageSize, setPageSize] = useState(10)
+
   const [formData, setFormData] = useState({
     incrementType: '',
     noOfIncrements: '',
@@ -93,46 +90,60 @@ export default function ServiceFrequencyPage() {
     description: '',
     status: 'Active'
   })
+
+  // Menu for action dropdown (removed from table, but keeping state for future use if needed)
   const [anchorEl, setAnchorEl] = useState(null)
   const [menuRow, setMenuRow] = useState(null)
   const [incrementTypeOpen, setIncrementTypeOpen] = useState(false)
-  const openMenu = Boolean(anchorEl)
+  const [exportAnchorEl, setExportAnchorEl] = useState(null)
+  const exportOpen = Boolean(exportAnchorEl)
 
-  const dbName = 'serviceFrequencyDB'
-  const storeName = 'frequencies'
+  // Refs for form navigation
+  const incrementTypeRef = useRef(null)
+  const noOfIncrementsRef = useRef(null)
+  const backlogAgeRef = useRef(null)
+  const frequencyCodeRef = useRef(null)
+  const displayFrequencyRef = useRef(null)
+  const sortOrderRef = useRef(null)
+  const descriptionRef = useRef(null)
+  const submitRef = useRef(null)
 
-  const initDB = async () => {
-    const db = await openDB(dbName, 1, {
-      upgrade(db) {
-        if (!db.objectStoreNames.contains(storeName)) {
-          db.createObjectStore(storeName, { keyPath: 'id', autoIncrement: true })
-        }
-      }
-    })
-    return db
-  }
-
-  const loadRows = async () => {
-    const db = await initDB()
-    const allRows = await db.getAll(storeName)
-    setRows(allRows.sort((a, b) => b.id - a.id))
-  }
-
-  const saveRow = async row => {
-    const db = await initDB()
-    await db.put(storeName, row)
-  }
-
-  const deleteRowFromDB = async id => {
-    const db = await initDB()
-    await db.delete(storeName, id)
-  }
-
+  // ------------------- Initial Load -------------------
   useEffect(() => {
+    async function loadRows() {
+      const allRows = await getAllRows()
+      // Initial load: sort by ID descending (latest first)
+      allRows.sort((a, b) => b.id - a.id)
+      setRows(allRows)
+    }
     loadRows()
   }, [])
 
-  // ---------------- CRUD Handlers ----------------
+  // ------------------- Helpers -------------------
+
+  const toggleDrawer = () => setOpen(prev => !prev)
+
+  const focusNext = ref => {
+    if (!ref.current) return
+    const input = ref.current.querySelector('input') || ref.current
+    input.focus()
+  }
+
+  // Helper component to render the sort icon (from Page A)
+  const SortIcon = ({ field }) => {
+    if (sortField !== field) return null
+    return sortDirection === 'asc' ? <ArrowUpwardIcon sx={{ fontSize: 16, ml: 0.5 }} /> : <ArrowDownwardIcon sx={{ fontSize: 16, ml: 0.5 }} />
+  }
+
+  const handleKeyDown = (e, nextRef) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      focusNext(nextRef)
+    }
+  }
+
+  // ------------------- CRUD Handlers -------------------
+
   const handleAdd = () => {
     setIsEdit(false)
     setFormData({
@@ -147,39 +158,26 @@ export default function ServiceFrequencyPage() {
     })
     setEditRow(null)
     setOpen(true)
+
   }
 
   const handleEdit = row => {
+    if (!row) return
     setIsEdit(true)
     setEditRow(row)
-    setFormData({ ...row })
+    // Ensure all keys are present for formData
+    setFormData({
+      incrementType: row.incrementType || '',
+      noOfIncrements: row.noOfIncrements || '',
+      backlogAge: row.backlogAge || '',
+      frequencyCode: row.frequencyCode || '',
+      displayFrequency: row.displayFrequency || '',
+      sortOrder: row.sortOrder || '',
+      description: row.description || '',
+      status: row.status || 'Active'
+    })
     setOpen(true)
-  }
-
-  const handleSubmit = async e => {
-    e.preventDefault()
-    if (isEdit && editRow) {
-      const updatedRow = { ...formData, id: editRow.id }
-      setRows(prev => prev.map(r => (r.id === editRow.id ? updatedRow : r)))
-      await saveRow(updatedRow)
-    } else {
-      const newRowData = { ...formData }
-      const db = await initDB()
-      const newId = await db.add(storeName, newRowData)
-      const newRow = { ...newRowData, id: newId }
-      setRows(prev => [newRow, ...prev])
-    }
-    setOpen(false)
-  }
-
-  const handleMenuOpen = (e, row) => {
-    setAnchorEl(e.currentTarget)
-    setMenuRow(row)
-  }
-
-  const handleMenuClose = () => {
-    setAnchorEl(null)
-    setMenuRow(null)
+    
   }
 
   const handleDelete = async rowToDelete => {
@@ -187,10 +185,35 @@ export default function ServiceFrequencyPage() {
       setRows(prev => prev.filter(r => r.id !== rowToDelete.id))
       await deleteRowFromDB(rowToDelete.id)
     }
-    handleMenuClose()
   }
 
-  const handleSearch = e => setSearch(e.target.value)
+  const handleSubmit = async e => {
+    e.preventDefault()
+    if (!formData.frequencyCode || !formData.displayFrequency) return // Simple validation
+
+    let rowToSave
+    if (isEdit && editRow) {
+      rowToSave = { ...editRow, ...formData }
+      setRows(prev => prev.map(r => (r.id === editRow.id ? rowToSave : r)))
+    } else {
+      // IndexedDB handles autoIncrement, so we save without an 'id' and retrieve the full row.
+      const newRowData = { ...formData }
+      const db = await initDB()
+      const newId = await db.add(storeName, newRowData)
+      rowToSave = { ...newRowData, id: newId }
+      // Add new row to the front and sort by 'id' descending to see it immediately
+      setRows(prev => {
+        const newRows = [rowToSave, ...prev.filter(r => r.id !== newId)] // Ensure no duplicates
+        return newRows.sort((a, b) => b.id - a.id)
+      })
+    }
+
+    await addOrUpdateRow(rowToSave)
+    setOpen(false)
+    // Reset sort to 'id' desc to show the new/updated row easily
+    setSortField('id')
+    setSortDirection('desc')
+  }
 
   const handleExport = () => {
     if (!rows.length) return
@@ -206,129 +229,285 @@ export default function ServiceFrequencyPage() {
     a.download = 'service-frequency.csv'
     a.click()
     URL.revokeObjectURL(url)
+    setExportAnchorEl(null)
   }
 
-  const filteredRows = rows.filter(
-    r =>
-      r.displayFrequency.toLowerCase().includes(search.toLowerCase()) ||
-      r.frequencyCode.toLowerCase().includes(search.toLowerCase())
+  // ------------------- Sorting Logic (from Page A) -------------------
+
+  const handleSort = field => {
+    if (sortField === field) {
+      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+    setPage(1) // Reset to first page on sort change
+  }
+
+  const sortedRows = [...rows].sort((a, b) => {
+    const aValue = a[sortField] || ''
+    const bValue = b[sortField] || ''
+
+    let comparison = 0
+    // Check if values are numerical (for sortOrder and id)
+    if (!isNaN(Number(aValue)) && !isNaN(Number(bValue)) && ['sortOrder', 'id', 'noOfIncrements', 'backlogAge'].includes(sortField)) {
+      comparison = Number(aValue) - Number(bValue)
+    } else {
+      // Case-insensitive string comparison
+      comparison = String(aValue).localeCompare(String(bValue), undefined, { sensitivity: 'base' })
+    }
+
+    // Apply the sort direction
+    return sortDirection === 'asc' ? comparison : comparison * -1
+  })
+
+  // ------------------- Filtering and Pagination Logic (from Page A) -------------------
+
+  // Client-side filtering based on search text
+  const filteredRows = sortedRows.filter(
+    row =>
+      row.displayFrequency?.toLowerCase().includes(search.toLowerCase()) ||
+      row.frequencyCode?.toLowerCase().includes(search.toLowerCase()) ||
+      row.description?.toLowerCase().includes(search.toLowerCase())
   )
 
-  const paginatedRows = filteredRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-  const columns = getColumns(handleEdit, handleDelete, paginatedRows)
+  // Client-side pagination logic
+  const rowCount = filteredRows.length
+  const pageCount = Math.max(1, Math.ceil(rowCount / pageSize))
+  const paginatedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize)
+  const startIndex = rowCount === 0 ? 0 : (page - 1) * pageSize + 1
+  const endIndex = Math.min(page * pageSize, rowCount)
 
-  const totalRows = filteredRows.length
-  const startIndex = totalRows === 0 ? 0 : page * rowsPerPage + 1
-  const endIndex = Math.min((page + 1) * rowsPerPage, totalRows)
-  const paginationText = `Showing ${startIndex} to ${endIndex} of ${totalRows} entries`
-
-  // ---------------- Refs for keyboard navigation ----------------
-  const incrementTypeRef = useRef(null)
-  const noOfIncrementsRef = useRef(null)
-  const backlogAgeRef = useRef(null)
-  const frequencyCodeRef = useRef(null)
-  const displayFrequencyRef = useRef(null)
-  const sortOrderRef = useRef(null)
-  const descriptionRef = useRef(null)
-  const submitRef = useRef(null)
-
-  const focusNext = ref => {
-    if (!ref.current) return
-    const input = ref.current.querySelector('input') || ref.current
-    input.focus()
-  }
-
-  const toggleDrawer = () => setOpen(prev => !prev)
+  // ------------------- Render -------------------
 
   return (
-    <ContentLayout
-      title='Service Frequency'
-      breadcrumbs={[{ label: 'Home', href: '/' }, { label: 'Service Frequency' }]}
-      actions={
-        <Box sx={{ m: 2, display: 'flex', gap: 2 }}>
-          <Button variant='outlined' startIcon={<DownloadIcon />} onClick={handleExport}>
-            Export
-          </Button>
-          <Button variant='contained' startIcon={<AddIcon />} onClick={handleAdd}>
-            Service Frequency
-          </Button>
-        </Box>
-      }
-    >
-      <Box sx={{ p: 2, mt: 5, pt: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <CustomTextField
-          size='small'
-          placeholder='Search'
-          value={search}
-          onChange={handleSearch}
-          sx={{ width: 360 }}
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position='start'>
-                  <SearchIcon />
-                </InputAdornment>
-              )
-            }
-          }}
-        />
-      </Box>
-
-      <DataGrid
-        rows={paginatedRows}
-        columns={columns}
-        disableRowSelectionOnClick
-        autoHeight
-        hideFooter
-        getRowHeight={() => 'auto'}
-        getRowId={row => row.id}
-        sx={{
-          mt: 3,
-          '& .MuiDataGrid-row': { minHeight: '60px !important', padding: '12px 0' },
-          '& .MuiDataGrid-cell': {
-            whiteSpace: 'normal',
-            wordBreak: 'break-word',
-            overflowWrap: 'break-word',
-            alignItems: 'flex-start',
-            fontSize: '15px'
-          },
-          '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': { outline: 'none' },
-          '& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within': { outline: 'none' },
-          '& .MuiDataGrid-columnHeaderTitle': { fontSize: '15px', fontWeight: 500 }
-        }}
-      />
-
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2, pr: 2 }}>
-        <Typography variant='body2' sx={{ color: 'text.secondary', ml: 1 }}>
-          {paginationText}
+    <Box>
+      {/* Breadcrumb (from Page A) */}
+      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
+        <Link href='/' style={{ color: '#7367F0', textDecoration: 'none', fontSize: 14 }}>
+          Dashboard
+        </Link>
+        <Typography sx={{ mx: 1, color: 'text.secondary' }}>/</Typography>
+        <Typography variant='body2' sx={{ fontSize: 14 }}>
+          Service Frequency
         </Typography>
-        <TablePagination
-          rowsPerPageOptions={[5, 10, 25, 50]}
-          component='div'
-          count={filteredRows.length}
-          rowsPerPage={rowsPerPage}
-          page={page}
-          onPageChange={(e, newPage) => setPage(newPage)}
-          onRowsPerPageChange={e => {
-            setRowsPerPage(parseInt(e.target.value, 10))
-            setPage(0)
-          }}
-        />
       </Box>
 
-      <Menu anchorEl={anchorEl} open={openMenu} onClose={handleMenuClose}>
-        <MenuItem
-          onClick={() => {
-            alert(`Details of ${menuRow?.displayFrequency}`)
-            handleMenuClose()
+      <Card sx={{ p: 6 }}>
+        {/* Header + actions (from Page A) */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+          <Typography variant='h6'>Service Frequency List</Typography>
+
+          <Box display='flex' gap={1}>
+            <Button
+              variant='outlined'
+              endIcon={<ArrowDropDownIcon />}
+              onClick={e => setExportAnchorEl(e.currentTarget)}
+            >
+              Export
+            </Button>
+            <Button variant='contained' startIcon={<AddIcon />} onClick={handleAdd}>
+              Add Frequency
+            </Button>
+             <Menu anchorEl={exportAnchorEl} open={exportOpen} onClose={() => setExportAnchorEl(null)}>
+                <MenuItem onClick={handleExport}>Download CSV</MenuItem>
+              </Menu>
+          </Box>
+        </Box>
+
+        <Divider sx={{ mb: 3 }} />
+
+        {/* Search / entries (from Page A) */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <FormControl size='small' sx={{ minWidth: 120 }}>
+            <Select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }}>
+              {[10, 25, 50, 100].map(i => (
+                <MenuItem key={i} value={i}>
+                  {i} entries
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <CustomTextField
+            size='small'
+            placeholder='Search by Display/Frequency Code...'
+            value={search}
+            onChange={e => {
+              setSearch(e.target.value)
+              setPage(1) // reset page on search change
+            }}
+            sx={{ width: 420 }}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position='start'>
+                    <SearchIcon />
+                  </InputAdornment>
+                )
+              }
+            }}
+          />
+        </Box>
+
+        {/* Table (Manual HTML Table from Page A) */}
+        <Box sx={{ overflowX: 'auto' }}>
+          <table
+            style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              tableLayout: 'fixed',
+              minWidth: '850px' // Added min-width for better display of all columns
+            }}
+          >
+            <thead>
+              <tr style={{ textAlign: 'left', borderBottom: '1px solid #E5E7EB' }}>
+                {/* S.No Header (Sorts by ID) */}
+                <th
+                  onClick={() => handleSort('id')}
+                  style={{ padding: '12px', width: '60px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box display='flex' alignItems='center'>
+                    S.No <SortIcon field='id' />
+                  </Box>
+                </th>
+
+                <th style={{ padding: '12px', width: '100px' }}>Action</th>
+
+                {/* Display Frequency Header */}
+                <th
+                  onClick={() => handleSort('displayFrequency')}
+                  style={{ padding: '12px', width: '180px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box display='flex' alignItems='center'>
+                    Display Frequency <SortIcon field='displayFrequency' />
+                  </Box>
+                </th>
+
+                {/* Frequency Code Header */}
+                <th
+                  onClick={() => handleSort('frequencyCode')}
+                  style={{ padding: '12px', width: '120px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box display='flex' alignItems='center'>
+                    Frequency Code <SortIcon field='frequencyCode' />
+                  </Box>
+                </th>
+
+                {/* Description Header */}
+                <th
+                  onClick={() => handleSort('description')}
+                  style={{ padding: '12px', width: '300px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box display='flex' alignItems='center'>
+                    Description <SortIcon field='description' />
+                  </Box>
+                </th>
+
+                {/* Sort Order Header */}
+                <th
+                  onClick={() => handleSort('sortOrder')}
+                  style={{ padding: '12px', width: '100px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box display='flex' alignItems='center'>
+                    Sort Order <SortIcon field='sortOrder' />
+                  </Box>
+                </th>
+
+                {/* Status Header */}
+                <th
+                  onClick={() => handleSort('status')}
+                  style={{ padding: '12px', width: '100px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box display='flex' alignItems='center'>
+                    Status <SortIcon field='status' />
+                  </Box>
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {paginatedRows.map((r, i) => (
+                <tr key={r.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
+                  <td style={{ padding: '12px', wordWrap: 'break-word', whiteSpace: 'normal' }}>
+                    {(page - 1) * pageSize + i + 1}
+                  </td>
+                  <td style={{ padding: '12px' }}>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <IconButton size='small' onClick={() => handleEdit(r)}>
+                        <EditIcon />
+                      </IconButton>
+                      <IconButton size='small' color='error' onClick={() => handleDelete(r)}>
+                        <MdDelete />
+                      </IconButton>
+                    </Box>
+                  </td>
+                  <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.displayFrequency}</td>
+                  <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.frequencyCode}</td>
+                  <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.description}</td>
+                  <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.sortOrder}</td>
+                  <td style={{ padding: '12px' }}>
+                    <Box
+                      component='span'
+                      sx={{
+                        fontWeight: 600,
+                        color: '#fff',
+                        backgroundColor: r.status === 'Active' ? 'success.main' : 'error.main',
+                        px: 1.5,
+                        py: 0.5,
+                        borderRadius: '6px',
+                        display: 'inline-block'
+                      }}
+                    >
+                      {r.status}
+                    </Box>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {rowCount === 0 && (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <Typography color='text.secondary'>No results found</Typography>
+            </Box>
+          )}
+        </Box>
+
+        {/* Pagination (from Page A) */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            px: 2,
+            py: 2,
+            mt: 2,
+            flexWrap: 'wrap'
           }}
         >
-          View Details
-        </MenuItem>
-        <MenuItem onClick={() => handleDelete(menuRow)}>Delete</MenuItem>
-      </Menu>
+          <Typography variant='body2' color='text.secondary'>
+            Showing {startIndex} to {endIndex} of {rowCount} entries
+          </Typography>
 
-      {/* ----------------- Drawer Form ----------------- */}
+          <Box display='flex' alignItems='center' gap={2}>
+            <Typography variant='body2' color='text.secondary'>
+              Page {page} of {pageCount}
+            </Typography>
+
+            <Pagination
+              count={pageCount}
+              page={page}
+              onChange={(e, value) => setPage(value)}
+              shape='rounded'
+              color='primary'
+              showFirstButton
+              showLastButton
+            />
+          </Box>
+        </Box>
+      </Card>
+
+      {/* ----------------- Drawer Form ----------------- (Retained from Page B)*/}
       <Drawer anchor='right' open={open} onClose={toggleDrawer}>
         <Box sx={{ width: 360, p: 3 }}>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={2}>
@@ -385,9 +564,7 @@ export default function ServiceFrequencyPage() {
               inputProps={{
                 inputMode: 'numeric',
                 pattern: '[0-9]*',
-                onKeyDown: e => {
-                  if (e.key === 'Enter') { e.preventDefault(); focusNext(backlogAgeRef) }
-                }
+                onKeyDown: e => handleKeyDown(e, backlogAgeRef)
               }}
             />
 
@@ -403,7 +580,7 @@ export default function ServiceFrequencyPage() {
               inputProps={{
                 inputMode: 'numeric',
                 pattern: '[0-9]*',
-                onKeyDown: e => { if (e.key === 'Enter') { e.preventDefault(); focusNext(frequencyCodeRef) } }
+                onKeyDown: e => handleKeyDown(e, frequencyCodeRef)
               }}
             />
 
@@ -416,7 +593,7 @@ export default function ServiceFrequencyPage() {
               name='frequencyCode'
               value={formData.frequencyCode}
               onChange={e => setFormData(prev => ({ ...prev, frequencyCode: e.target.value }))}
-              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); focusNext(displayFrequencyRef) } }}
+              onKeyDown={e => handleKeyDown(e, displayFrequencyRef)}
             />
 
             {/* Display Frequency */}
@@ -428,7 +605,7 @@ export default function ServiceFrequencyPage() {
               name='displayFrequency'
               value={formData.displayFrequency}
               onChange={e => setFormData(prev => ({ ...prev, displayFrequency: e.target.value }))}
-              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); focusNext(sortOrderRef) } }}
+              onKeyDown={e => handleKeyDown(e, sortOrderRef)}
             />
 
             {/* Sort Order */}
@@ -443,7 +620,7 @@ export default function ServiceFrequencyPage() {
               inputProps={{
                 inputMode: 'numeric',
                 pattern: '[0-9]*',
-                onKeyDown: e => { if (e.key === 'Enter') { e.preventDefault(); focusNext(descriptionRef) } }
+                onKeyDown: e => handleKeyDown(e, descriptionRef)
               }}
             />
 
@@ -458,7 +635,7 @@ export default function ServiceFrequencyPage() {
               name='description'
               value={formData.description}
               onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              inputProps={{ onKeyDown: e => { if (e.key === 'Enter') { e.preventDefault(); focusNext(submitRef) } } }}
+              inputProps={{ onKeyDown: e => handleKeyDown(e, submitRef) }}
             />
 
             {/* Status - Only for Edit */}
@@ -475,8 +652,8 @@ export default function ServiceFrequencyPage() {
                   if (editRow) {
                     const updatedRow = { ...editRow, status: newStatus }
                     setRows(prev => prev.map(r => (r.id === editRow.id ? updatedRow : r)))
-                    const db = await initDB()
-                    await db.put(storeName, updatedRow)
+                    // Directly update DB on status change for a quick save
+                    await addOrUpdateRow(updatedRow)
                   }
                 }}
               >
@@ -496,6 +673,6 @@ export default function ServiceFrequencyPage() {
           </form>
         </Box>
       </Drawer>
-    </ContentLayout>
+    </Box>
   )
 }

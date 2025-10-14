@@ -63,11 +63,11 @@ const VerticalMenu = ({ scrollMenu }) => {
       {...(isBreakpointReached
         ? {
             className: 'bs-full overflow-y-auto overflow-x-hidden',
-            onScroll: container => scrollMenu(container, false)
+            // onScroll: container => scrollMenu(container, false)
           }
         : {
             options: { wheelPropagation: false, suppressScrollX: true },
-            onScrollY: container => scrollMenu(container, true)
+            // onScrollY: container => scrollMenu(container, true)
           })}
     >
       <Menu

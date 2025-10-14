@@ -1,50 +1,95 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Box, Typography, Button, IconButton, Drawer, InputAdornment, TablePagination, MenuItem } from '@mui/material'
-import { DataGrid } from '@mui/x-data-grid'
+import {
+  Box,
+  Typography,
+  Button,
+  IconButton,
+  Drawer,
+  InputAdornment,
+  MenuItem,
+  Card, // Added Card for Page A's container style
+  Divider, // Added Divider for Page A's visual separation
+  FormControl, // Added for entries per page select
+  Select, // Added for entries per page select
+  Pagination // Added for page navigation
+} from '@mui/material'
 import { MdDelete } from 'react-icons/md'
 import AddIcon from '@mui/icons-material/Add'
 import CloseIcon from '@mui/icons-material/Close'
 import SearchIcon from '@mui/icons-material/Search'
 import EditIcon from '@mui/icons-material/Edit'
 import DownloadIcon from '@mui/icons-material/Download'
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown' // Added for Export button
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward' // Added for sorting up
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward' // Added for sorting down
 import { openDB } from 'idb'
+import Link from 'next/link' // Added for Breadcrumb
 
+// Wrapper (Keeping ContentLayout import but will use manual layout to match Page A's design)
 import ContentLayout from '@/components/layout/ContentLayout'
 import CustomTextField from '@core/components/mui/TextField'
 
 const DB_NAME = 'designation_db'
 const STORE_NAME = 'designations'
 
+// ---------- IndexedDB Functions (Re-used) ----------
+const initDB = async () => {
+  const db = await openDB(DB_NAME, 1, {
+    upgrade(db) {
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true })
+      }
+    }
+  })
+  return db
+}
+
+const getAllRows = async () => {
+  const db = await initDB()
+  return db.getAll(STORE_NAME)
+}
+
+async function addOrUpdateRow(row) {
+  const db = await initDB()
+  await db.put(STORE_NAME, row)
+}
+
+async function deleteRowFromDB(id) {
+  const db = await initDB()
+  await db.delete(STORE_NAME, id)
+}
+// --------------------------------------------------
+
 export default function DesignationPage() {
   const [rows, setRows] = useState([])
-  const [page, setPage] = useState(0)
-  const [rowsPerPage, setRowsPerPage] = useState(10)
-  const [searchText, setSearchText] = useState('')
   const [open, setOpen] = useState(false)
   const [isEdit, setIsEdit] = useState(false)
   const [editRow, setEditRow] = useState(null)
   const [formData, setFormData] = useState({ name: '', description: '', status: 'Active' })
+  const [searchText, setSearchText] = useState('')
+
+  // State for Sorting (from Page A)
+  const [sortField, setSortField] = useState('id') // Default sort by ID
+  const [sortDirection, setSortDirection] = useState('desc') // Default sort descending
+
+  // State variables for Pagination (from Page A)
+  const [page, setPage] = useState(1) // 1-based indexing
+  const [pageSize, setPageSize] = useState(10)
+
+  // UI State
+  const [exportAnchorEl, setExportAnchorEl] = useState(null)
+  const exportOpen = Boolean(exportAnchorEl)
 
   const submitRef = useRef(null)
-
-  // ---------- IndexedDB ----------
-  const initDB = async () => {
-    const db = await openDB(DB_NAME, 1, {
-      upgrade(db) {
-        if (!db.objectStoreNames.contains(STORE_NAME)) {
-          db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true })
-        }
-      }
-    })
-    return db
-  }
+  const disRef = useRef(null)
 
   const loadRows = async () => {
-    const db = await initDB()
-    const allRows = await db.getAll(STORE_NAME)
-    setRows(allRows.sort((a, b) => b.id - a.id))
+    const allRows = await getAllRows()
+    // Initial load: sort by ID descending (latest first)
+    allRows.sort((a, b) => b.id - a.id)
+    setRows(allRows)
   }
 
   useEffect(() => {
@@ -53,11 +98,17 @@ export default function DesignationPage() {
 
   const toggleDrawer = () => setOpen(prev => !prev)
   const handleChange = e => setFormData({ ...formData, [e.target.name]: e.target.value })
-  const handleSearch = e => setSearchText(e.target.value)
+
+  // Adjusted to reset page on search change
+  const handleSearch = e => {
+    setSearchText(e.target.value)
+    setPage(1)
+  }
 
   const handleAdd = () => {
     setIsEdit(false)
     setFormData({ name: '', description: '', status: 'Active' })
+    setEditRow(null)
     setOpen(true)
   }
 
@@ -69,180 +120,300 @@ export default function DesignationPage() {
   }
 
   const handleDelete = async row => {
-    const db = await initDB()
-    await db.delete(STORE_NAME, row.id)
     setRows(prev => prev.filter(r => r.id !== row.id))
+    await deleteRowFromDB(row.id)
   }
 
   const handleSubmit = async e => {
     if (e && e.preventDefault) e.preventDefault()
-    const db = await initDB()
 
-    if (formData.name) {
-      if (isEdit && editRow) {
-        await db.put(STORE_NAME, { ...editRow, ...formData })
-      } else {
-        await db.add(STORE_NAME, { ...formData, status: 'Active' })
-      }
-      await loadRows()
-      toggleDrawer()
+    if (!formData.name) return
+
+    let rowToSave
+    if (isEdit && editRow) {
+      rowToSave = { ...editRow, ...formData }
+    } else {
+      // Logic for new row ID generation like Page A
+      const newId = rows.length ? Math.max(...rows.map(r => r.id)) + 1 : 1
+      rowToSave = { id: newId, ...formData, status: 'Active' }
     }
+
+    await addOrUpdateRow(rowToSave)
+    await loadRows() // Reload to get the latest data with correct ID from DB
+
+    setFormData({ name: '', description: '', status: 'Active' })
+    toggleDrawer()
+    // Reset sort to 'id' desc to show the new/updated row easily, matching Page A
+    setSortField('id')
+    setSortDirection('desc')
   }
 
-  // ---------- Key Navigation ----------
-  const handleKeyPress = (e, currentFieldIndex) => {
+  // ---------- Key Navigation (Simplified from Page B) ----------
+  const handleKeyPress = (e, nextRef) => {
     if (e.key === 'Enter') {
       e.preventDefault()
-      const form = e.target.form
-      const inputs = Array.from(form.querySelectorAll('input, textarea, select')).filter(
-        el => !el.disabled && el.type !== 'hidden'
-      )
-      const nextIndex = inputs.findIndex(input => input === e.target) + 1
-      if (nextIndex < inputs.length) inputs[nextIndex].focus()
-      else submitRef.current?.focus()
+      nextRef?.current?.focus()
     }
   }
 
-  // ---------- Filter + Pagination ----------
-  const filteredRows = rows.filter(
+  // ------------------- Sorting Logic (From Page A) -------------------
+
+  const handleSort = field => {
+    if (sortField === field) {
+      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+    setPage(1) // Reset to first page on sort change
+  }
+
+  const sortedRows = [...rows].sort((a, b) => {
+    const aValue = a[sortField] || ''
+    const bValue = b[sortField] || ''
+
+    let comparison = 0
+    // ID comparison (numerical)
+    if (sortField === 'id') {
+      comparison = Number(aValue) - Number(bValue)
+    } else {
+      // Case-insensitive string comparison for name, description, status
+      comparison = String(aValue).localeCompare(String(bValue), undefined, { sensitivity: 'base' })
+    }
+
+    // Apply the sort direction
+    return sortDirection === 'asc' ? comparison : comparison * -1
+  })
+
+  // ------------------- Filtering and Pagination (From Page A) -------------------
+
+  // Client-side filtering based on search text (using Page B's searchText)
+  const filteredRows = sortedRows.filter(
     row =>
       row.name.toLowerCase().includes(searchText.toLowerCase()) ||
-      (row.description && row.description.toLowerCase().includes(searchText.toLowerCase()))
+      row.description?.toLowerCase().includes(searchText.toLowerCase())
   )
-  const paginatedRows = filteredRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
 
-  // ---------- Pagination Text ----------
-  const totalRows = filteredRows.length
-  const startIndex = totalRows === 0 ? 0 : page * rowsPerPage + 1
-  const endIndex = Math.min((page + 1) * rowsPerPage, totalRows)
-  const paginationText = `Showing ${startIndex} to ${endIndex} of ${totalRows} entries`
+  // Client-side pagination logic
+  const rowCount = filteredRows.length
+  const pageCount = Math.max(1, Math.ceil(rowCount / pageSize))
+  const paginatedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize)
+  const startIndex = rowCount === 0 ? 0 : (page - 1) * pageSize + 1
+  const endIndex = Math.min(page * pageSize, rowCount)
 
-  // ---------- Columns ----------
-  const columns = [
-    {
-      field: 'serial',
-      headerName: 'S.No',
-      flex: 0.2,
-      valueGetter: params => filteredRows.findIndex(r => r.id === params.row.id) + 1,
-      sortable: false
-    },
-    {
-      field: 'action',
-      headerName: 'Action',
-      flex: 0.5,
-      sortable: false,
-      renderCell: params => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <IconButton size='small' onClick={() => handleDelete(params.row)}>
-            <MdDelete style={{ color: 'red' }} />
-          </IconButton>
-          <IconButton size='small' onClick={() => handleEdit(params.row)}>
-            <EditIcon />
-          </IconButton>
-        </Box>
-      )
-    },
-    {
-      field: 'name',
-      headerName: 'Designation Name',
-      flex: 1
-    },
-    {
-      field: 'description',
-      headerName: 'Description',
-      flex: 1.5
-    },
-    {
-      field: 'status',
-      headerName: 'Status',
-      flex: 0.5,
-      renderCell: params => (
-        <Button
-          size='small'
-          variant='contained'
-          color={params.value === 'Inactive' ? 'error' : 'success'}
-          sx={{ borderRadius: '20px', textTransform: 'none', fontWeight: 500 }}
-        >
-          {params.value || 'Active'}
-        </Button>
-      )
-    }
-  ]
+  // Helper component to render the sort icon (From Page A)
+  const SortIcon = ({ field }) => {
+    if (sortField !== field) return null
+    return sortDirection === 'asc' ? <ArrowUpwardIcon sx={{ fontSize: 16, ml: 0.5 }} /> : <ArrowDownwardIcon sx={{ fontSize: 16, ml: 0.5 }} />
+  }
 
+  // ------------------- Render -------------------
+
+  // Removing ContentLayout and using Page A's Card/Box structure
   return (
-    <ContentLayout
-      title='Designation Management'
-      breadcrumbs={[{ label: 'Home', href: '/' }, { label: 'Designation' }]}
-      actions={
-        <Box sx={{ m: 2, display: 'flex', gap: 2 }}>
-          <Button variant='outlined' startIcon={<DownloadIcon />}>
-            Export
-          </Button>
-          <Button variant='contained' startIcon={<AddIcon />} onClick={handleAdd}>
-            Add Designation
-          </Button>
-        </Box>
-      }
-    >
-      {/* Search */}
-      <Box sx={{ p: 2, pt: 0, display: 'flex', justifyContent: 'flex-start', alignItems: 'center', mt: 5 }}>
-        <CustomTextField
-          size='small'
-          placeholder='Search'
-          value={searchText}
-          onChange={handleSearch}
-          sx={{ width: 360 }}
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position='start'>
-                  <SearchIcon />
-                </InputAdornment>
-              )
-            }
-          }}
-        />
-      </Box>
-
-      {/* DataGrid */}
-      <DataGrid
-        rows={paginatedRows}
-        columns={columns}
-        disableRowSelectionOnClick
-        autoHeight
-        hideFooter
-        getRowHeight={() => 'auto'}
-        getRowId={row => row.id}
-        sx={{
-          mt: 3,
-          '& .MuiDataGrid-row': { minHeight: '60px !important', padding: '12px 0' },
-          '& .MuiDataGrid-cell': { whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'break-word', alignItems: 'flex-start', fontSize: '15px' },
-          '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': { outline: 'none' },
-          '& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within': { outline: 'none' },
-          '& .MuiDataGrid-columnHeaderTitle': { fontSize: '15px', fontWeight: 500 }
-        }}
-      />
-
-      {/* Pagination */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2 }}>
-        <Typography variant='body2' sx={{ color: 'text.secondary', ml: 1 }}>
-          {paginationText}
+    <Box>
+      {/* Breadcrumb (From Page A) */}
+      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
+        <Link href='/' style={{ color: '#7367F0', textDecoration: 'none', fontSize: 14 }}>
+          Dashboard
+        </Link>
+        <Typography sx={{ mx: 1, color: 'text.secondary' }}>/</Typography>
+        <Typography variant='body2' sx={{ fontSize: 14 }}>
+          Designation
         </Typography>
-        <TablePagination
-          rowsPerPageOptions={[5, 10, 25, 50]}
-          component='div'
-          count={filteredRows.length}
-          rowsPerPage={rowsPerPage}
-          page={page}
-          onPageChange={(e, newPage) => setPage(newPage)}
-          onRowsPerPageChange={e => {
-            setRowsPerPage(parseInt(e.target.value, 10))
-            setPage(0)
-          }}
-        />
       </Box>
 
-      {/* Drawer Form */}
+      <Card sx={{ p: 6 }}>
+        {/* Header + actions (Modified from Page B's ContentLayout actions) */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+          <Typography variant='h6'>Designation List</Typography>
+
+          <Box display='flex' gap={1}>
+            <Button
+              variant='outlined'
+              endIcon={<ArrowDropDownIcon />}
+              onClick={e => setExportAnchorEl(e.currentTarget)}
+            >
+              Export
+            </Button>
+            <Button variant='contained' startIcon={<AddIcon />} onClick={handleAdd}>
+              Add Designation
+            </Button>
+            {/* Export menu content is missing, but preserving the button functionality */}
+            <Drawer anchor='right' open={exportOpen} onClose={() => setExportAnchorEl(null)} />
+          </Box>
+        </Box>
+
+        <Divider sx={{ mb: 3 }} />
+
+        {/* Search / entries (From Page A) */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <FormControl size='small' sx={{ minWidth: 120 }}>
+            <Select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }}>
+              {[10, 25, 50, 100].map(i => (
+                <MenuItem key={i} value={i}>
+                  {i} entries
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <CustomTextField
+            size='small'
+            placeholder='Search by Name or Description...'
+            value={searchText}
+            onChange={handleSearch}
+            sx={{ width: 420 }}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position='start'>
+                    <SearchIcon />
+                  </InputAdornment>
+                )
+              }
+            }}
+          />
+        </Box>
+
+        {/* Table (Manual HTML Table from Page A, adapted for Page B's fields) */}
+        <Box sx={{ overflowX: 'auto' }}>
+          <table
+            style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              tableLayout: 'fixed'
+            }}
+          >
+            <thead>
+              <tr style={{ textAlign: 'left', borderBottom: '1px solid #E5E7EB' }}>
+                {/* ID Header for S.No */}
+                <th
+                  onClick={() => handleSort('id')}
+                  style={{ padding: '12px', width: '60px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box display='flex' alignItems='center'>
+                    S.No <SortIcon field='id' />
+                  </Box>
+                </th>
+
+                <th style={{ padding: '12px', width: '100px' }}>Action</th>
+
+                {/* Name Header */}
+                <th
+                  onClick={() => handleSort('name')}
+                  style={{ padding: '12px', width: '200px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box display='flex' alignItems='center'>
+                    Designation Name <SortIcon field='name' />
+                  </Box>
+                </th>
+
+                {/* Description Header */}
+                <th
+                  onClick={() => handleSort('description')}
+                  style={{ padding: '12px', width: '400px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box display='flex' alignItems='center'>
+                    Description <SortIcon field='description' />
+                  </Box>
+                </th>
+
+                {/* Status Header */}
+                <th
+                  onClick={() => handleSort('status')}
+                  style={{ padding: '12px', width: '100px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box display='flex' alignItems='center'>
+                    Status <SortIcon field='status' />
+                  </Box>
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {paginatedRows.map((r, i) => (
+                <tr key={r.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
+                  {/* S.No calculation */}
+                  <td style={{ padding: '12px', wordWrap: 'break-word', whiteSpace: 'normal' }}>
+                    {(page - 1) * pageSize + i + 1}
+                  </td>
+                  {/* Actions */}
+                  <td style={{ padding: '12px' }}>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <IconButton size='small' onClick={() => handleEdit(r)}>
+                        <EditIcon />
+                      </IconButton>
+                      <IconButton size='small' color='error' onClick={() => handleDelete(r)}>
+                        <MdDelete />
+                      </IconButton>
+                    </Box>
+                  </td>
+                  <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.name}</td>
+                  <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.description}</td>
+                  {/* Status badge style from Page A */}
+                  <td style={{ padding: '12px' }}>
+                    <Box
+                      component='span'
+                      sx={{
+                        fontWeight: 600,
+                        color: '#fff',
+                        backgroundColor: r.status === 'Active' ? 'success.main' : 'error.main',
+                        px: 1.5,
+                        py: 0.5,
+                        borderRadius: '6px',
+                        display: 'inline-block'
+                      }}
+                    >
+                      {r.status || 'Active'}
+                    </Box>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {rowCount === 0 && (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <Typography color='text.secondary'>No results found</Typography>
+            </Box>
+          )}
+        </Box>
+
+        {/* Pagination (From Page A) */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            px: 2,
+            py: 2,
+            mt: 2,
+            flexWrap: 'wrap'
+          }}
+        >
+          <Typography variant='body2' color='text.secondary'>
+            Showing {startIndex} to {endIndex} of {rowCount} entries
+          </Typography>
+
+          <Box display='flex' alignItems='center' gap={2}>
+            <Typography variant='body2' color='text.secondary'>
+              Page {page} of {pageCount}
+            </Typography>
+
+            <Pagination
+              count={pageCount}
+              page={page}
+              onChange={(e, value) => setPage(value)}
+              shape='rounded'
+              color='primary'
+              showFirstButton
+              showLastButton
+            />
+          </Box>
+        </Box>
+      </Card>
+
+      {/* Drawer Form (Unchanged functionality) */}
       <Drawer anchor='right' open={open} onClose={toggleDrawer}>
         <Box sx={{ width: 360, p: 3 }}>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={2}>
@@ -261,9 +432,10 @@ export default function DesignationPage() {
               value={formData.name}
               onChange={e => {
                 const value = e.target.value
+                // Only allow letters and spaces (Page B's validation)
                 if (/^[A-Za-z\s]*$/.test(value)) handleChange(e)
               }}
-              onKeyDown={e => handleKeyPress(e, 0)}
+              onKeyDown={e => handleKeyPress(e,disRef )}
             />
 
             <CustomTextField
@@ -274,6 +446,7 @@ export default function DesignationPage() {
               value={formData.description}
               onChange={handleChange}
               multiline
+                ref={disRef}
               rows={4}
               onKeyDown={e => {
                 if (e.key === 'Enter') {
@@ -321,6 +494,6 @@ export default function DesignationPage() {
           </form>
         </Box>
       </Drawer>
-    </ContentLayout>
+    </Box>
   )
 }

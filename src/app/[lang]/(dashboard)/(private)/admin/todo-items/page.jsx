@@ -8,80 +8,99 @@ import {
   IconButton,
   Drawer,
   InputAdornment,
-  TablePagination,
-  MenuItem
+  MenuItem,
+  FormControl,
+  Select,
+  Pagination,
+  Card,
+  Divider
 } from '@mui/material'
-import { DataGrid } from '@mui/x-data-grid'
-import { MdDelete } from 'react-icons/md'
+import { openDB } from 'idb'
+import Link from 'next/link'
+
+// Icons
 import AddIcon from '@mui/icons-material/Add'
 import CloseIcon from '@mui/icons-material/Close'
 import SearchIcon from '@mui/icons-material/Search'
 import EditIcon from '@mui/icons-material/Edit'
 import DownloadIcon from '@mui/icons-material/Download'
-import { openDB } from 'idb'
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
+import { MdDelete } from 'react-icons/md'
 
-import ContentLayout from '@/components/layout/ContentLayout'
+// Layout & Custom Components
 import CustomTextField from '@core/components/mui/TextField'
 
+// ------------------- IndexedDB -------------------
 const DB_NAME = 'todo_db'
 const STORE_NAME = 'todos'
 
+async function getDB() {
+  return openDB(DB_NAME, 1, {
+    upgrade(db) {
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true })
+      }
+    }
+  })
+}
+
+// ------------------- Component -------------------
 export default function TodoItemsPage() {
+  // Refs
+  const titleRef = useRef(null)
+  const statusRef = useRef(null)
+  const submitButtonRef = useRef(null)
+
   const [rows, setRows] = useState([])
-  const [page, setPage] = useState(0)
-  const [rowsPerPage, setRowsPerPage] = useState(10)
+
+  // State for Custom Pagination (1-based index)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+
   const [searchText, setSearchText] = useState('')
   const [open, setOpen] = useState(false)
   const [isEdit, setIsEdit] = useState(false)
   const [editRow, setEditRow] = useState(null)
   const [formData, setFormData] = useState({ title: '', status: 'Active' })
 
-  // ✅ Proper refs
-  const titleRef = useRef(null)
-  const statusRef = useRef(null)
-  const submitButtonRef = useRef(null)
+  // State for Sorting
+  const [sortField, setSortField] = useState('id')
+  const [sortDirection, setSortDirection] = useState('desc')
 
-  // ---------- IndexedDB ----------
-  const initDB = async () => {
-    const db = await openDB(DB_NAME, 1, {
-      upgrade(db) {
-        if (!db.objectStoreNames.contains(STORE_NAME)) {
-          db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true })
-        }
-      }
-    })
-    return db
-  }
+  const [exportAnchorEl, setExportAnchorEl] = useState(null)
+  const exportOpen = Boolean(exportAnchorEl)
 
+  // ------------------- Data Load -------------------
   const loadRows = async () => {
-    const db = await initDB()
+    const db = await getDB()
     const allRows = await db.getAll(STORE_NAME)
-    const sorted = allRows.sort((a, b) => b.id - a.id)
-    setRows(sorted)
+    allRows.sort((a, b) => b.id - a.id)
+    setRows(allRows)
   }
 
   useEffect(() => {
     loadRows()
   }, [])
 
-  // ---------- Handlers ----------
+  // ------------------- Handlers -------------------
   const toggleDrawer = () => setOpen(prev => !prev)
 
   const handleChange = e => {
     const { name, value } = e.target
     if (name === 'title') {
-      const filtered = value.replace(/[^a-zA-Z\s]/g, '') // only letters/spaces
+      const filtered = value.replace(/[^a-zA-Z\s]/g, '')
       setFormData(prev => ({ ...prev, [name]: filtered }))
     } else {
       setFormData(prev => ({ ...prev, [name]: value }))
     }
   }
 
-  const handleSearch = e => setSearchText(e.target.value)
-
   const handleAdd = () => {
     setIsEdit(false)
     setFormData({ title: '', status: 'Active' })
+    setEditRow(null)
     setOpen(true)
     setTimeout(() => titleRef.current?.focus(), 100)
   }
@@ -95,7 +114,7 @@ export default function TodoItemsPage() {
   }
 
   const handleDelete = async row => {
-    const db = await initDB()
+    const db = await getDB()
     await db.delete(STORE_NAME, row.id)
     setRows(prev => prev.filter(r => r.id !== row.id))
   }
@@ -103,7 +122,7 @@ export default function TodoItemsPage() {
   const handleSubmit = async e => {
     e.preventDefault()
     if (!formData.title.trim()) return
-    const db = await initDB()
+    const db = await getDB()
 
     if (isEdit && editRow) {
       await db.put(STORE_NAME, { ...editRow, ...formData })
@@ -113,146 +132,304 @@ export default function TodoItemsPage() {
 
     await loadRows()
     toggleDrawer()
+    setSortField('id')
+    setSortDirection('desc')
   }
 
-  // ---------- Filter + Pagination ----------
-  const filteredRows = rows.filter(
+  // ------------------- Export Function (CSV) -------------------
+  const handleExport = () => {
+    const exportRows = [...rows].sort((a, b) => b.id - a.id);
+
+    const headers = ['S.No', 'Todo Title', 'Status']
+    const csv = [
+      headers.join(','),
+      ...exportRows.map((r, i) => [
+        `${i + 1}`,
+        `"${r.title.replace(/"/g, '""')}"`,
+        r.status
+      ].join(','))
+    ].join('\n')
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'todo_items.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+
+    setExportAnchorEl(null);
+  }
+
+  // ------------------- Sorting Logic -------------------
+  const handleSort = field => {
+    if (sortField === field) {
+      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+    setPage(1)
+  }
+
+  const sortedRows = [...rows].sort((a, b) => {
+    const aValue = a[sortField] || ''
+    const bValue = b[sortField] || ''
+
+    let comparison = 0
+    if (sortField === 'id') {
+      comparison = Number(aValue) - Number(bValue)
+    } else {
+      comparison = String(aValue).localeCompare(String(bValue), undefined, { sensitivity: 'base' })
+    }
+
+    return sortDirection === 'asc' ? comparison : comparison * -1
+  })
+
+  // Helper component to render the sort icon
+  const SortIcon = ({ field }) => {
+    if (sortField !== field) return null
+    return sortDirection === 'asc' ? <ArrowUpwardIcon sx={{ fontSize: 16, ml: 0.5 }} /> : <ArrowDownwardIcon sx={{ fontSize: 16, ml: 0.5 }} />
+  }
+
+  // ------------------- Filtering and Pagination Logic -------------------
+  const handleSearch = e => {
+    setSearchText(e.target.value)
+    setPage(1)
+  }
+
+  const filteredRows = sortedRows.filter(
     row =>
       row.title.toLowerCase().includes(searchText.toLowerCase()) ||
       row.status.toLowerCase().includes(searchText.toLowerCase())
   )
 
-  const paginatedRows = filteredRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+  const rowCount = filteredRows.length
+  const pageCount = Math.max(1, Math.ceil(rowCount / pageSize))
+  const paginatedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize)
+  const startIndex = rowCount === 0 ? 0 : (page - 1) * pageSize + 1
+  const endIndex = Math.min(page * pageSize, rowCount)
 
-  const totalRows = filteredRows.length
-  const startIndex = totalRows === 0 ? 0 : page * rowsPerPage + 1
-  const endIndex = Math.min((page + 1) * rowsPerPage, totalRows)
-  const paginationText = `Showing ${startIndex} to ${endIndex} of ${totalRows} entries`
-
-  // ---------- Columns ----------
-  const columns = [
-    {
-      field: 'serial',
-      headerName: 'S.No',
-      flex: 0.2,
-      valueGetter: params => filteredRows.findIndex(r => r.id === params.row.id) + 1,
-      sortable: false
-    },
-    {
-      field: 'action',
-      headerName: 'Action',
-      flex: 0.5,
-      sortable: false,
-      renderCell: params => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <IconButton size='small' onClick={() => handleDelete(params.row)}>
-            <MdDelete style={{ color: 'red' }} />
-          </IconButton>
-          <IconButton size='small' onClick={() => handleEdit(params.row)}>
-            <EditIcon />
-          </IconButton>
-        </Box>
-      )
-    },
-    {
-      field: 'title',
-      headerName: 'Todo Title',
-      flex: 1,
-      renderCell: params => (
-        <Box sx={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>{params.value}</Box>
-      )
-    },
-    {
-      field: 'status',
-      headerName: 'Status',
-      flex: 0.5,
-      renderCell: params => (
-        <Button
-          size='small'
-          variant='contained'
-          color={params.value === 'Active' ? 'success' : 'error'}
-          sx={{ borderRadius: '20px', textTransform: 'none', fontWeight: 500 }}
-        >
-          {params.value}
-        </Button>
-      )
-    }
-  ]
+  // ------------------- Render -------------------
 
   return (
-    <ContentLayout
-      title='Todo Items List'
-      breadcrumbs={[{ label: 'Home', href: '/' }, { label: 'Todo Items' }]}
-      actions={
-        <Box sx={{ m: 2, display: 'flex', gap: 2 }}>
-          <Button variant='outlined' startIcon={<DownloadIcon />}>
-            Export
-          </Button>
-          <Button variant='contained' startIcon={<AddIcon />} onClick={handleAdd}>
-            Add Todo
-          </Button>
-        </Box>
-      }
-    >
-      {/* Search Bar */}
-      <Box sx={{ p: 2, pt: 0, display: 'flex', justifyContent: 'flex-start', alignItems: 'center', mt: 5 }}>
-        <CustomTextField
-          size='small'
-          placeholder='Search'
-          value={searchText}
-          onChange={handleSearch}
-          sx={{ width: 360 }}
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position='start'>
-                  <SearchIcon />
-                </InputAdornment>
-              )
-            }
-          }}
-        />
-      </Box>
-
-      {/* DataGrid */}
-         <DataGrid
-        rows={paginatedRows}
-        columns={columns}
-        disableRowSelectionOnClick
-        autoHeight
-        hideFooter
-        getRowHeight={() => 'auto'}
-        getRowId={row => row.id}
-        sx={{
-          mt: 3,
-          '& .MuiDataGrid-row': { minHeight: '60px !important', padding: '12px 0' },
-          '& .MuiDataGrid-cell': { whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'break-word', alignItems: 'flex-start', fontSize: '15px' },
-          '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': { outline: 'none' },
-          '& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within': { outline: 'none' },
-          '& .MuiDataGrid-columnHeaderTitle': { fontSize: '15px', fontWeight: 500 }
-        }}
-      />
-
-      {/* Pagination */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2 }}>
-        <Typography variant='body2' sx={{ color: 'text.secondary', ml: 1 }}>
-          {paginationText}
+    <Box>
+      {/* Breadcrumb */}
+      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
+        <Link href='/' style={{ color: '#7367F0', textDecoration: 'none', fontSize: 14 }}>
+          Home
+        </Link>
+        <Typography sx={{ mx: 1, color: 'text.secondary' }}>/</Typography>
+        <Typography variant='body2' sx={{ fontSize: 14 }}>
+          Todo Items List
         </Typography>
-        <TablePagination
-          rowsPerPageOptions={[5, 10, 25, 50]}
-          component='div'
-          count={filteredRows.length}
-          rowsPerPage={rowsPerPage}
-          page={page}
-          onPageChange={(e, newPage) => setPage(newPage)}
-          onRowsPerPageChange={e => {
-            setRowsPerPage(parseInt(e.target.value, 10))
-            setPage(0)
-          }}
-        />
       </Box>
 
-      {/* Drawer Form */}
+      <Card sx={{ p: 6 }}>
+        {/* Header + actions */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+          <Typography variant='h6'>Todo Items List</Typography>
+
+          {/* Actions - Export and Add */}
+          <Box display='flex' gap={1}>
+            <Button
+              variant='outlined'
+              endIcon={<ArrowDropDownIcon />}
+              onClick={e => setExportAnchorEl(e.currentTarget)}
+            >
+              Export
+            </Button>
+            <Button variant='contained' startIcon={<AddIcon />} onClick={handleAdd}>
+              Add Todo
+            </Button>
+            {/* Export Drawer */}
+            <Drawer anchor='right' open={exportOpen} onClose={() => setExportAnchorEl(null)}>
+              <Box sx={{ width: 300, p: 3 }}>
+                <Box display='flex' justifyContent='space-between' alignItems='center' mb={2}>
+                    <Typography variant='h6'>Export Data</Typography>
+                    <IconButton onClick={() => setExportAnchorEl(null)}><CloseIcon /></IconButton>
+                </Box>
+                <Divider sx={{ mb: 2 }} />
+                <Button onClick={handleExport} startIcon={<DownloadIcon />} fullWidth variant='contained'>
+                    Download All as CSV
+                </Button>
+              </Box>
+            </Drawer>
+          </Box>
+        </Box>
+
+        <Divider sx={{ mb: 3 }} />
+
+        {/* Entries / Search */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <FormControl size='small' sx={{ minWidth: 120 }}>
+            <Select
+              value={pageSize}
+              onChange={e => {
+                setPageSize(Number(e.target.value));
+                setPage(1)
+              }}
+              displayEmpty
+            >
+              {[10, 25, 50, 100].map(i => (
+                <MenuItem key={i} value={i}>
+                  {i} entries
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <CustomTextField
+            size='small'
+            placeholder='Search by Todo Title or Status...'
+            value={searchText}
+            onChange={handleSearch}
+            sx={{ width: 360 }}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position='start'>
+                    <SearchIcon />
+                  </InputAdornment>
+                )
+              }
+            }}
+          />
+        </Box>
+
+        {/* Table (Manual HTML Table) */}
+        <Box sx={{ overflowX: 'auto' }}>
+          <table
+            style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              tableLayout: 'fixed'
+            }}
+          >
+            <thead>
+              <tr style={{ textAlign: 'left', borderBottom: '1px solid #E5E7EB' }}>
+                {/* S.No Header */}
+                <th
+                  onClick={() => handleSort('id')}
+                  style={{ padding: '12px', width: '60px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box display='flex' alignItems='center'>
+                    S.No <SortIcon field='id' />
+                  </Box>
+                </th>
+
+                {/* Action Header - FIXED WIDTH: 100px */}
+                <th style={{ padding: '12px', width: '100px' }}>Action</th>
+
+                {/* Todo Title Header - DYNAMIC WIDTH: auto */}
+                <th
+                  onClick={() => handleSort('title')}
+                  style={{ padding: '12px', width: '200px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box display='flex' alignItems='center'>
+                    Todo Title <SortIcon field='title' />
+                  </Box>
+                </th>
+
+                {/* Status Header - FIXED WIDTH: 150px */}
+                <th
+                  onClick={() => handleSort('status')}
+                  style={{ padding: '12px', width: '150px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box display='flex' alignItems='center'>
+                    Status <SortIcon field='status' />
+                  </Box>
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {paginatedRows.map((r, i) => (
+                <tr key={r.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
+                  {/* S.No cell */}
+                  <td style={{ padding: '12px', wordWrap: 'break-word', whiteSpace: 'normal' }}>
+                    {(page - 1) * pageSize + i + 1}
+                  </td>
+
+                  {/* Action cell */}
+                  <td style={{ padding: '12px' }}>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                    <IconButton size='small' onClick={() => handleEdit(r)}>
+                        <EditIcon />
+                      </IconButton>
+                      <IconButton size='small' color='error' onClick={() => handleDelete(r)}>
+                        <MdDelete />
+                      </IconButton>
+                  
+                    </Box>
+                  </td>
+
+                  {/* Data cells */}
+                  <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.title}</td>
+
+                  {/* Status cell */}
+                  <td style={{ padding: '12px' }}>
+                    <Box
+                      component='span'
+                      sx={{
+                        fontWeight: 600,
+                        color: '#fff',
+                        backgroundColor: r.status === 'Active' ? 'success.main' : 'error.main',
+                        px: 1.5,
+                        py: 0.5,
+                        borderRadius: '6px',
+                        display: 'inline-block'
+                      }}
+                    >
+                      {r.status}
+                    </Box>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {rowCount === 0 && (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <Typography color='text.secondary'>No results found</Typography>
+            </Box>
+          )}
+        </Box>
+
+        {/* Custom Pagination Footer */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            px: 2,
+            py: 2,
+            mt: 2,
+            flexWrap: 'wrap'
+          }}
+        >
+          <Typography variant='body2' color='text.secondary'>
+            Showing {startIndex} to {endIndex} of {rowCount} entries
+          </Typography>
+
+          <Box display='flex' alignItems='center' gap={2}>
+            <Typography variant='body2' color='text.secondary'>
+              Page {page} of {pageCount}
+            </Typography>
+
+            <Pagination
+              count={pageCount}
+              page={page}
+              onChange={(e, value) => setPage(value)}
+              shape='rounded'
+              color='primary'
+              showFirstButton
+              showLastButton
+            />
+          </Box>
+        </Box>
+      </Card>
+
+      {/* Drawer Form (Unchanged functionality) */}
       <Drawer anchor='right' open={open} onClose={toggleDrawer}>
         <Box sx={{ width: 360, p: 3 }}>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={2}>
@@ -282,7 +459,7 @@ export default function TodoItemsPage() {
               }}
             />
 
-            {/* ✅ Status field only for Edit */}
+            {/* Status field only for Edit */}
             {isEdit && (
               <CustomTextField
                 select
@@ -298,7 +475,7 @@ export default function TodoItemsPage() {
                   if (editRow) {
                     const updatedRow = { ...editRow, status: newStatus }
                     setRows(prev => prev.map(r => (r.id === editRow.id ? updatedRow : r)))
-                    const db = await initDB()
+                    const db = await getDB()
                     await db.put(STORE_NAME, updatedRow)
                   }
                 }}
@@ -338,6 +515,6 @@ export default function TodoItemsPage() {
           </form>
         </Box>
       </Drawer>
-    </ContentLayout>
+    </Box>
   )
 }
