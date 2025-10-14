@@ -109,7 +109,7 @@ const VerticalMenu = ({ scrollMenu }) => {
           <MenuItem href={`/${locale}/admin/designation`}>Designation</MenuItem>
           <MenuItem href={`/${locale}/admin/employee-list`}>Employee List</MenuItem>
           <MenuItem href={`/${locale}/admin/employee-leave-type`}>Employee Leave Type</MenuItem>
-          <MenuItem href={`/${locale}/admin/employee-leave`}>Employee Leave</MenuItem>
+          <MenuItem href={`/${locale}/admin/employee-leave`}>Employee Leaves</MenuItem>
           <MenuItem href={`/${locale}/admin/user-privilege`}>User Privilege</MenuItem>
         </SubMenu>
 

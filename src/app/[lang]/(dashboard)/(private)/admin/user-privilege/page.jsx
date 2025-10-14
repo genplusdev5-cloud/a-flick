@@ -1,27 +1,60 @@
+
+
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Box, Button, IconButton, Drawer, InputAdornment, Typography, Checkbox, TablePagination } from '@mui/material'
-import { DataGrid } from '@mui/x-data-grid'
+import { openDB } from 'idb'
+import {
+  Box,
+  Typography,
+  Button,
+  IconButton,
+  Drawer,
+  InputAdornment,
+  MenuItem,
+  Card, // 💡 ADDED
+  Divider, // 💡 ADDED
+  FormControl, // 💡 ADDED
+  Select, // 💡 ADDED
+  Pagination, // 💡 ADDED
+  Menu, // 💡 ADDED
+  Checkbox // KEPT
+} from '@mui/material'
+
+// Icons
 import AddIcon from '@mui/icons-material/Add'
 import DownloadIcon from '@mui/icons-material/Download'
 import SearchIcon from '@mui/icons-material/Search'
 import CloseIcon from '@mui/icons-material/Close'
 import EditIcon from '@mui/icons-material/Edit'
+// 💡 ADDED from page A for sorting/dropdown
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import { MdDelete } from 'react-icons/md'
-import { openDB } from 'idb'
 
-import ContentLayout from '@/components/layout/ContentLayout'
+// Removed ContentLayout
 import CustomTextField from '@core/components/mui/TextField'
+import Link from 'next/link' // 💡 ADDED for Breadcrumb
 
 export default function UserPrivilegePage() {
   const [rows, setRows] = useState([])
-  const [page, setPage] = useState(0)
-  const [rowsPerPage, setRowsPerPage] = useState(10)
+  // 💡 UPDATED: 1-based page, pageSize
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const [searchText, setSearchText] = useState('')
   const [open, setOpen] = useState(false)
   const [isEdit, setIsEdit] = useState(false)
   const [editRow, setEditRow] = useState(null)
+
+  // 💡 ADDED: Sorting State
+  const [sortField, setSortField] = useState('id')
+  const [sortDirection, setSortDirection] = useState('desc')
+
+  // 💡 ADDED: Export Menu State
+  const [exportAnchorEl, setExportAnchorEl] = useState(null)
+  const exportOpen = Boolean(exportAnchorEl)
+
   const [formData, setFormData] = useState({ module: '', create: false, view: false, update: false, delete: false })
   const submitRef = useRef(null)
   const dbName = 'UserPrivilegeDB'
@@ -95,131 +128,285 @@ export default function UserPrivilegePage() {
       setRows(prev => [newRow, ...prev].sort((a, b) => b.id - a.id))
     }
     toggleDrawer()
+    setSortField('id') // Reset sorting after submission
+    setSortDirection('desc')
   }
 
-  const handleSearch = e => setSearchText(e.target.value)
+  const handleSearch = e => {
+    setSearchText(e.target.value)
+    setPage(1) // Reset page on search
+  }
 
-  const filteredRows = rows.filter(
+  // 💡 ADDED: Sorting Handler (from page A)
+  const handleSort = field => {
+    if (sortField === field) {
+      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+    setPage(1)
+  }
+
+  // 💡 ADDED: Export Handler (adapted from page A)
+  const handleExport = () => {
+    if (!rows.length) return
+    const headers = ['ID', 'Module', 'Create', 'View', 'Update', 'Delete']
+    const csvRows = rows.map(r =>
+      [
+        r.id,
+        `"${r.module}"`,
+        r.create ? 'Yes' : 'No',
+        r.view ? 'Yes' : 'No',
+        r.update ? 'Yes' : 'No',
+        r.delete ? 'Yes' : 'No'
+      ].join(',')
+    )
+    const csv = [headers.join(','), ...csvRows].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'user-privileges.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+    setExportAnchorEl(null)
+  }
+
+  // 💡 ADDED: Sort Icon Helper (from page A)
+  const SortIcon = ({ field }) => {
+    if (sortField !== field) return null
+    return sortDirection === 'asc' ? <ArrowUpwardIcon sx={{ fontSize: 16, ml: 0.5 }} /> : <ArrowDownwardIcon sx={{ fontSize: 16, ml: 0.5 }} />
+  }
+
+  // 💡 ADDED: Sorting Logic
+  const sortedRows = [...rows].sort((a, b) => {
+    const aValue = a[sortField] || ''
+    const bValue = b[sortField] || ''
+
+    let comparison = 0
+    if (['id'].includes(sortField)) {
+      comparison = Number(aValue) - Number(bValue)
+    } else {
+      comparison = String(aValue).localeCompare(String(bValue), undefined, { sensitivity: 'base' })
+    }
+
+    return sortDirection === 'asc' ? comparison : comparison * -1
+  })
+
+  // 💡 UPDATED: Filtering Logic (using sortedRows)
+  const filteredRows = sortedRows.filter(
     row =>
-      row.module.toLowerCase().includes(searchText.toLowerCase()) ||
-      row.id.toString().includes(searchText.toLowerCase())
+      row.module.toLowerCase().includes(searchText.toLowerCase())
   )
 
-  const paginatedRows = filteredRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+  // 💡 UPDATED: Pagination Logic (from page A)
+  const rowCount = filteredRows.length
+  const pageCount = Math.max(1, Math.ceil(rowCount / pageSize))
+  const paginatedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize)
+  const startIndex = rowCount === 0 ? 0 : (page - 1) * pageSize + 1
+  const endIndex = Math.min(page * pageSize, rowCount)
+  const paginationText = `Showing ${startIndex} to ${endIndex} of ${rowCount} entries`
 
-  // ---------- Pagination Text Logic (ADDED) ----------
-  const totalRows = filteredRows.length
-  const startIndex = totalRows === 0 ? 0 : page * rowsPerPage + 1
-  const endIndex = Math.min((page + 1) * rowsPerPage, totalRows)
-  const paginationText = `Showing ${startIndex} to ${endIndex} of ${totalRows} entries`
-  // -------------------------------------------------
+  // 💡 ADDED: Table structure definition
+  const tableColumns = [
+    { label: 'Module', field: 'module', minWidth: '250px' },
+    { label: 'Create', field: 'create', minWidth: '100px' },
+    { label: 'View', field: 'view', minWidth: '100px' },
+    { label: 'Edit/Update', field: 'update', minWidth: '140px' },
+    { label: 'Delete', field: 'delete', minWidth: '100px' }
+  ];
+  // Calculate minimum width dynamically
+  const totalMinWidth = 60 + 100 + tableColumns.reduce((sum, col) => sum + parseInt(col.minWidth), 0) + 'px';
 
-  // Columns
-  const columns = [
-    {
-      field: 'serial',
-      headerName: 'S.No',
-      flex: 0.2,
-      valueGetter: params => filteredRows.findIndex(r => r.id === params.row.id) + 1,
-      sortable: false
-    },
-    {
-      field: 'action',
-      headerName: 'Action',
-      flex: 0.5,
-      sortable: false,
-      renderCell: params => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <IconButton size='small' onClick={() => handleDelete(params.row)}>
-            <MdDelete style={{ color: 'red' }} />
-          </IconButton>
-          <IconButton size='small' onClick={() => handleEdit(params.row)}>
-            <EditIcon />
-          </IconButton>
-        </Box>
-      )
-    },
-    { field: 'module', headerName: 'Module', flex: 1 },
-    { field: 'create', headerName: 'Create', flex: 0.5, renderCell: params => <Checkbox checked={params.value} disabled /> },
-    { field: 'view', headerName: 'View', flex: 0.5, renderCell: params => <Checkbox checked={params.value} disabled /> },
-    { field: 'update', headerName: 'Edit/Update', flex: 0.6, renderCell: params => <Checkbox checked={params.value} disabled /> },
-    { field: 'delete', headerName: 'Delete', flex: 0.5, renderCell: params => <Checkbox checked={params.value} disabled /> }
-  ]
 
   return (
-    <ContentLayout
-      title='User Privilege'
-      breadcrumbs={[{ label: 'Home', href: '/' }, { label: 'User Privilege' }]}
-      actions={
-        <Box sx={{ display: 'flex', gap: 2, m: 2 }}>
-          <Button variant='outlined' startIcon={<DownloadIcon />}>Export</Button>
-          <Button variant='contained' startIcon={<AddIcon />} onClick={handleAdd}>Add Module</Button>
-        </Box>
-      }
-    >
-      {/* Search */}
-      <Box sx={{ p: 2, pt: 0, display: 'flex', justifyContent: 'flex-start', alignItems: 'center', mt: 5 }}>
-        <CustomTextField
-          size='small'
-          placeholder='Search'
-          value={searchText}
-          onChange={handleSearch}
-          sx={{ width: 360 }}
-          slotProps={{ input: { startAdornment: <InputAdornment position='start'><SearchIcon /></InputAdornment> } }}
-        />
-      </Box>
-
-      {/* Updated DataGrid with multiline support */}
-      <DataGrid
-        rows={paginatedRows}
-        columns={columns}
-        disableRowSelectionOnClick
-        autoHeight
-        hideFooter
-        getRowHeight={() => 'auto'}
-        getRowId={row => row.id}
-        sx={{
-          mt: 3,
-          '& .MuiDataGrid-row': {
-            minHeight: '60px !important',
-            padding: '12px 0'
-          },
-          '& .MuiDataGrid-cell': {
-            whiteSpace: 'normal',
-            wordBreak: 'break-word',
-            overflowWrap: 'break-word',
-            alignItems: 'flex-start',
-            fontSize: '15px'
-          },
-          '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': { outline: 'none' },
-          '& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within': { outline: 'none' },
-          '& .MuiDataGrid-columnHeaderTitle': {
-            fontSize: '15px',
-            fontWeight: 500
-          }
-        }}
-      />
-
-      {/* ✅ Pagination (MODIFIED to include status text) */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2 }}>
-        {/* Custom Status Text */}
-        <Typography variant='body2' sx={{ color: 'text.secondary', ml: 1 }}>
-          {paginationText}
+    <Box>
+      {/* Breadcrumb (from page A) */}
+      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
+        <Link href='/' style={{ color: '#7367F0', textDecoration: 'none', fontSize: 14 }}>
+          Dashboard
+        </Link>
+        <Typography sx={{ mx: 1, color: 'text.secondary' }}>/</Typography>
+        <Typography variant='body2' sx={{ fontSize: 14 }}>
+          User Privilege
         </Typography>
-
-        {/* Table Pagination Component */}
-        <TablePagination
-          rowsPerPageOptions={[5, 10, 25, 50]}
-          component='div'
-          count={filteredRows.length}
-          rowsPerPage={rowsPerPage}
-          page={page}
-          onPageChange={(e, newPage) => setPage(newPage)}
-          onRowsPerPageChange={e => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0) }}
-        />
       </Box>
 
-      {/* Drawer Form */}
+      <Card sx={{ p: 6 }}>
+        {/* Header + actions (from page A) */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+          <Typography variant='h6'>User Privilege List</Typography>
+
+          <Box display='flex' gap={1}>
+            <Button
+              variant='outlined'
+              endIcon={<ArrowDropDownIcon />}
+              onClick={e => setExportAnchorEl(e.currentTarget)}
+            >
+              Export
+            </Button>
+            <Button variant='contained' startIcon={<AddIcon />} onClick={handleAdd}>
+              Add Module
+            </Button>
+            {/* Export Menu */}
+             <Menu anchorEl={exportAnchorEl} open={exportOpen} onClose={() => setExportAnchorEl(null)}>
+                <MenuItem onClick={handleExport}>Download CSV</MenuItem>
+              </Menu>
+          </Box>
+        </Box>
+
+        <Divider sx={{ mb: 3 }} />
+
+        {/* Search / entries (from page A) */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <FormControl size='small' sx={{ minWidth: 120 }}>
+            {/* Rows per page control */}
+            <Select
+              value={pageSize}
+              onChange={e => {
+                setPageSize(Number(e.target.value))
+                setPage(1)
+              }}
+            >
+              {[10, 25, 50, 100].map(i => (
+                <MenuItem key={i} value={i}>
+                  {i} entries
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {/* Search TextField */}
+          <CustomTextField
+            size='small'
+            placeholder='Search by Module...'
+            value={searchText}
+            onChange={handleSearch}
+            sx={{ width: 420 }}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position='start'>
+                    <SearchIcon />
+                  </InputAdornment>
+                )
+              }
+            }}
+          />
+        </Box>
+
+        {/* Table (Manual HTML Table from page A) */}
+        <Box sx={{ overflowX: 'auto' }}>
+          <table
+            style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              tableLayout: 'fixed',
+              minWidth: totalMinWidth
+            }}
+          >
+            <thead>
+              <tr style={{ textAlign: 'left', borderBottom: '1px solid #E5E7EB' }}>
+                {/* S.No Header */}
+                <th
+                  onClick={() => handleSort('id')}
+                  style={{ padding: '12px', width: '60px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box display='flex' alignItems='center'>
+                    S.No <SortIcon field='id' />
+                  </Box>
+                </th>
+
+                <th style={{ padding: '12px', width: '100px' }}>Action</th>
+
+                {/* Dynamic Data Columns */}
+                {tableColumns.map(col => (
+                  <th
+                    key={col.field}
+                    onClick={() => handleSort(col.field)}
+                    style={{ padding: '12px', width: col.minWidth, cursor: 'pointer', userSelect: 'none' }}
+                  >
+                    <Box display='flex' alignItems='center'>
+                      {col.label}
+                      {/* Sort only on 'Module' and 'S.No'/'id' */}
+                      {['module'].includes(col.field) ? <SortIcon field={col.field} /> : null}
+                    </Box>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+
+            <tbody>
+              {paginatedRows.map((r, i) => (
+                <tr key={r.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
+                  <td style={{ padding: '12px', wordWrap: 'break-word', whiteSpace: 'normal' }}>
+                    {(page - 1) * pageSize + i + 1}
+                  </td>
+                  {/* Actions */}
+                  <td style={{ padding: '12px' }}>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <IconButton size='small' onClick={() => handleEdit(r)}>
+                        <EditIcon />
+                      </IconButton>
+                      <IconButton size='small' color='error' onClick={() => handleDelete(r)}>
+                        <MdDelete />
+                      </IconButton>
+                    </Box>
+                  </td>
+                  {/* Data Cells */}
+                  <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.module}</td>
+                  {/* Checkbox Cells */}
+                  <td style={{ padding: '12px', textAlign: 'start' }}><Checkbox checked={r.create} disabled size='small' /></td>
+                  <td style={{ padding: '12px', textAlign: 'start' }}><Checkbox checked={r.view} disabled size='small' /></td>
+                  <td style={{ padding: '12px', textAlign: 'start' }}><Checkbox checked={r.update} disabled size='small' /></td>
+                  <td style={{ padding: '12px', textAlign: 'start' }}><Checkbox checked={r.delete} disabled size='small' /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {rowCount === 0 && (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <Typography color='text.secondary'>No results found</Typography>
+            </Box>
+          )}
+        </Box>
+
+        {/* Pagination (from page A) */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            px: 2,
+            py: 2,
+            mt: 2,
+            flexWrap: 'wrap'
+          }}
+        >
+          <Typography variant='body2' color='text.secondary'>
+            {paginationText}
+          </Typography>
+
+          <Box display='flex' alignItems='center' gap={2}>
+            <Typography variant='body2' color='text.secondary'>
+              Page {page} of {pageCount}
+            </Typography>
+
+            <Pagination
+              count={pageCount}
+              page={page}
+              onChange={(e, value) => setPage(value)}
+              shape='rounded'
+              color='primary'
+              showFirstButton
+              showLastButton
+            />
+          </Box>
+        </Box>
+      </Card>
+
+      {/* Drawer Form - No structural change needed here */}
       <Drawer anchor='right' open={open} onClose={toggleDrawer}>
         <Box sx={{ width: 360, p: 3 }}>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={2}>
@@ -251,6 +438,6 @@ export default function UserPrivilegePage() {
           </form>
         </Box>
       </Drawer>
-    </ContentLayout>
+    </Box>
   )
 }

@@ -10,16 +10,16 @@ import {
   Drawer,
   InputAdornment,
   MenuItem,
-  Card, // Added Card for Page A's container style
-  Divider, // Added Divider for Page A's visual separation
-  FormControl, // Added for entries per page select
-  Select, // Added for entries per page select
-  Pagination // Added for page navigation
+  Card,
+  Divider,
+  FormControl,
+  Select,
+  Pagination,
+  Menu // Added Menu for Export like Page A
 } from '@mui/material'
 
 // Icons
 import AddIcon from '@mui/icons-material/Add'
-import DownloadIcon from '@mui/icons-material/Download'
 import CloseIcon from '@mui/icons-material/Close'
 import SearchIcon from '@mui/icons-material/Search'
 import EditIcon from '@mui/icons-material/Edit'
@@ -35,7 +35,7 @@ import Link from 'next/link'
 // IndexedDB Config
 const dbName = 'EmployeeDB'
 const storeName = 'employees'
-const DB_VERSION = 2 // <--- RESOLVES THE VersionError
+const DB_VERSION = 2
 
 // ------------------- IndexedDB Operations -------------------
 
@@ -43,6 +43,7 @@ const initDB = async () => {
   return openDB(dbName, DB_VERSION, {
     upgrade(db) {
       if (!db.objectStoreNames.contains(storeName)) {
+        // NOTE: All employee fields must be created here
         db.createObjectStore(storeName, { keyPath: 'id', autoIncrement: true })
       }
     }
@@ -85,19 +86,20 @@ export default function EmployeePage() {
   const [errors, setErrors] = useState({})
   const [searchText, setSearchText] = useState('')
 
-  // State for Sorting (from Page A)
+  // State for Sorting
   const [sortField, setSortField] = useState('id')
   const [sortDirection, setSortDirection] = useState('desc')
 
-  // State variables for Pagination (from Page A)
-  const [page, setPage] = useState(1) // 1-based indexing
+  // State variables for Pagination
+  const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
   // File upload states
   const fileInputRef = useRef(null)
-  const [selectedFile, setSelectedFile] = useState('')
+  const [selectedFile, setSelectedFile] = useState('') // This holds the file name for the form
   const [isDragOver, setIsDragOver] = useState(false)
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
+  const exportOpen = Boolean(exportAnchorEl)
 
   // Input refs for Drawer
   const nameRef = useRef(null)
@@ -108,9 +110,16 @@ export default function EmployeePage() {
   const pincodeRef = useRef(null)
   const address1Ref = useRef(null)
   const address2Ref = useRef(null)
-  const fileRef = useRef(null)
   const statusRef = useRef(null)
   const submitRef = useRef(null)
+
+  // Helper for keyboard navigation
+  const focusNext = ref => {
+    if (!ref.current) return
+    // Focus the actual input element within the CustomTextField component
+    const input = ref.current.querySelector('input') || ref.current.querySelector('textarea') || ref.current.querySelector('button') || ref.current
+    input.focus()
+  }
 
   // ------------------- Data Loading -------------------
 
@@ -185,7 +194,6 @@ export default function EmployeePage() {
 
   const handlePhoneChange = e => {
     let value = e.target.value.replace(/\D/g, '')
-    // Applying the formatting and max length from original logic
     const displayValue = value.slice(0, 10)
     setFormData(prev => ({ ...prev, phone: displayValue }))
     setErrors(prev => {
@@ -214,7 +222,7 @@ export default function EmployeePage() {
     if (name === 'city' || name === 'state') {
       processedValue = value.replace(/[^a-zA-Z\s]/g, '')
     } else if (name === 'pincode') {
-      processedValue = value.replace(/\D/g, '').slice(0, 6) // Assuming max 6 digits for pincode
+      processedValue = value.replace(/\D/g, '').slice(0, 6)
     }
 
     setFormData(prev => ({ ...prev, [name]: processedValue }))
@@ -232,35 +240,42 @@ export default function EmployeePage() {
     setErrors(tempErrors)
     if (Object.keys(tempErrors).length > 0) return
 
+    // Save the file name from state
     const rowData = { ...formData, fileName: selectedFile }
 
+    let rowToSave
     if (isEdit && editRow) {
-      await addOrUpdateRow({ ...rowData, id: editRow.id })
+      rowToSave = { ...rowData, id: editRow.id }
+      await addOrUpdateRow(rowToSave)
     } else {
-      await addOrUpdateRow(rowData) // IndexedDB handles ID for new row
+      const newId = await initDB().then(db => db.add(storeName, rowData))
+      rowToSave = { ...rowData, id: newId }
     }
 
-    await loadRows() // Reload and sort desc to see the new entry
+    await loadRows()
     setSortField('id')
     setSortDirection('desc')
 
     toggleDrawer()
   }
 
-  // ------------------- Key Navigation (Simplified for focus) -------------------
+  // ------------------- Key Navigation -------------------
 
+  // Using Page A's handleKeyDown logic for refs
   const handleKeyDown = (e, nextRef) => {
-    if (e.key === 'Enter' && nextRef?.current) {
+    if (e.key === 'Enter') {
       e.preventDefault()
-      nextRef.current.focus()
-    } else if (e.key === 'Enter' && e.target.name === 'address2') {
-      e.preventDefault()
-      submitRef.current?.focus()
-    } else if (e.key === 'Enter' && e.target.name === 'status') {
-      e.preventDefault()
-      submitRef.current?.focus()
+      // Special case for multiline text areas (address1/address2)
+      if (e.target.name === 'address1' || e.target.name === 'address2') {
+        if (!e.shiftKey) { // Allows Shift+Enter for new line
+          focusNext(nextRef)
+        }
+      } else {
+        focusNext(nextRef)
+      }
     }
   }
+
 
   // ------------------- File Upload Handlers -------------------
 
@@ -276,16 +291,36 @@ export default function EmployeePage() {
     setIsDragOver(false)
   }
 
-  // ------------------- Sorting Logic (From Page A) -------------------
+  // ------------------- Export Handler -------------------
+
+  const handleExport = () => {
+    if (!rows.length) return
+    // Export all fields from the data model, including file name, even if not shown in table
+    const headers = ['ID', 'Name', 'Phone', 'Email', 'City', 'State', 'Pin Code', 'Address 1', 'Address 2', 'File Name', 'Status']
+    const csvRows = rows.map(r =>
+      [r.id, `"${r.name}"`, r.phone, r.email, `"${r.city}"`, `"${r.state}"`, r.pincode, `"${r.address1 || ''}"`, `"${r.address2 || ''}"`, r.fileName || '', r.status].join(',')
+    )
+    const csv = [headers.join(','), ...csvRows].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'employee.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+    setExportAnchorEl(null)
+  }
+
+  // ------------------- Sorting Logic -------------------
 
   const handleSort = field => {
     if (sortField === field) {
       setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'))
     } else {
       setSortField(field)
-      setSortDirection(['id', 'phone', 'pincode'].includes(field) ? 'desc' : 'asc') // Default numeric to desc, string to asc
+      setSortDirection(['id', 'phone', 'pincode'].includes(field) ? 'desc' : 'asc')
     }
-    setPage(1) // Reset to first page on sort change
+    setPage(1)
   }
 
   const sortedRows = [...rows].sort((a, b) => {
@@ -296,21 +331,19 @@ export default function EmployeePage() {
     const isNumeric = ['id', 'phone', 'pincode'].includes(sortField)
 
     if (isNumeric) {
-      // Numerical comparison
       comparison = Number(String(aValue).replace(/\s/g, '')) - Number(String(bValue).replace(/\s/g, ''))
     } else {
-      // Case-insensitive string comparison
       comparison = String(aValue).localeCompare(String(bValue), undefined, { sensitivity: 'base' })
     }
 
     return sortDirection === 'asc' ? comparison : comparison * -1
   })
 
-  // ------------------- Filtering and Pagination (From Page A) -------------------
+  // ------------------- Filtering and Pagination -------------------
 
   const handleSearch = e => {
     setSearchText(e.target.value)
-    setPage(1) // reset page on search change
+    setPage(1)
   }
 
   // Client-side filtering based on search text (optimized for all fields)
@@ -328,18 +361,36 @@ export default function EmployeePage() {
   const paginatedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize)
   const startIndex = rowCount === 0 ? 0 : (page - 1) * pageSize + 1
   const endIndex = Math.min(page * pageSize, rowCount)
+  const paginationText = `Showing ${startIndex} to ${endIndex} of ${rowCount} entries`
 
-  // Helper component to render the sort icon (From Page A)
+  // Helper component to render the sort icon
   const SortIcon = ({ field }) => {
     if (sortField !== field) return null
     return sortDirection === 'asc' ? <ArrowUpwardIcon sx={{ fontSize: 16, ml: 0.5 }} /> : <ArrowDownwardIcon sx={{ fontSize: 16, ml: 0.5 }} />
   }
 
+  // Define ALL columns for the table EXCEPT 'File Name'
+  const tableColumns = [
+    { label: 'Name', field: 'name', minWidth: '150px' },
+    { label: 'Phone', field: 'phone', minWidth: '120px' },
+    { label: 'Email', field: 'email', minWidth: '220px' },
+    { label: 'City', field: 'city', minWidth: '120px' },
+    { label: 'State', field: 'state', minWidth: '120px' },
+    { label: 'Pin Code', field: 'pincode', minWidth: '100px' },
+    { label: 'Address 1', field: 'address1', minWidth: '180px' },
+    { label: 'Address 2', field: 'address2', minWidth: '180px' },
+    { label: 'Status', field: 'status', minWidth: '100px' }
+  ];
+
+  // Total minimum width needed for the table (S.No + Action + all data columns)
+  const totalMinWidth = 60 + 100 + tableColumns.reduce((sum, col) => sum + parseInt(col.minWidth), 0) + 'px';
+
+
   // ------------------- Render -------------------
 
   return (
     <Box>
-      {/* Breadcrumb (From Page A) */}
+      {/* Breadcrumb (Modified for Employee page) */}
       <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
         <Link href='/' style={{ color: '#7367F0', textDecoration: 'none', fontSize: 14 }}>
           Dashboard
@@ -366,8 +417,10 @@ export default function EmployeePage() {
             <Button variant='contained' startIcon={<AddIcon />} onClick={handleAdd}>
               Add Employee
             </Button>
-            {/* Export drawer for consistency */}
-            <Drawer anchor='right' open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)} />
+            {/* Export Menu (Like Page A) */}
+             <Menu anchorEl={exportAnchorEl} open={exportOpen} onClose={() => setExportAnchorEl(null)}>
+                <MenuItem onClick={handleExport}>Download CSV</MenuItem>
+              </Menu>
           </Box>
         </Box>
 
@@ -403,44 +456,36 @@ export default function EmployeePage() {
           />
         </Box>
 
-        {/* Table (Manual HTML Table from Page A) */}
+        {/* Table (Manual HTML Table from Page A, adjusted to exclude File Name) */}
         <Box sx={{ overflowX: 'auto' }}>
           <table
             style={{
               width: '100%',
               borderCollapse: 'collapse',
-              tableLayout: 'auto' // Use auto layout for better column sizing
+              tableLayout: 'fixed', // Fixed layout from Page A
+              minWidth: totalMinWidth // Ensures all visible columns fit
             }}
           >
             <thead>
               <tr style={{ textAlign: 'left', borderBottom: '1px solid #E5E7EB' }}>
+                {/* S.No Header */}
                 <th
                   onClick={() => handleSort('id')}
-                  style={{ padding: '12px', minWidth: '60px', cursor: 'pointer', userSelect: 'none' }}
+                  style={{ padding: '12px', width: '60px', cursor: 'pointer', userSelect: 'none' }}
                 >
                   <Box display='flex' alignItems='center'>
                     S.No <SortIcon field='id' />
                   </Box>
                 </th>
 
-                <th style={{ padding: '12px', minWidth: '100px' }}>Action</th>
+                <th style={{ padding: '12px', width: '100px' }}>Action</th>
 
-                {/* Data Columns */}
-                {[
-                  { label: 'Name', field: 'name', minWidth: '150px' },
-                  { label: 'Phone', field: 'phone', minWidth: '100px' },
-                  { label: 'Email', field: 'email', minWidth: '150px' },
-                  { label: 'City', field: 'city', minWidth: '100px' },
-                  { label: 'State', field: 'state', minWidth: '100px' },
-                  { label: 'Pin Code', field: 'pincode', minWidth: '100px' },
-                  { label: 'Address 1', field: 'address1', minWidth: '200px' },
-                  { label: 'Address 2', field: 'address2', minWidth: '200px' },
-                  { label: 'Status', field: 'status', minWidth: '100px' }
-                ].map(col => (
+                {/* Dynamic Data Columns (9 fields) */}
+                {tableColumns.map(col => (
                   <th
                     key={col.field}
                     onClick={() => handleSort(col.field)}
-                    style={{ padding: '12px', minWidth: col.minWidth, cursor: 'pointer', userSelect: 'none' }}
+                    style={{ padding: '12px', width: col.minWidth, cursor: 'pointer', userSelect: 'none' }}
                   >
                     <Box display='flex' alignItems='center'>
                       {col.label} <SortIcon field={col.field} />
@@ -467,7 +512,7 @@ export default function EmployeePage() {
                       </IconButton>
                     </Box>
                   </td>
-                  {/* Data Cells */}
+                  {/* Data Cells (9 fields) */}
                   <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.name}</td>
                   <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.phone}</td>
                   <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.email}</td>
@@ -517,7 +562,7 @@ export default function EmployeePage() {
           }}
         >
           <Typography variant='body2' color='text.secondary'>
-            Showing {startIndex} to {endIndex} of {rowCount} entries
+            {paginationText}
           </Typography>
 
           <Box display='flex' alignItems='center' gap={2}>
@@ -538,9 +583,9 @@ export default function EmployeePage() {
         </Box>
       </Card>
 
-      {/* Drawer Form (Modified for improved flow/refs) */}
+      {/* Drawer Form (Page A width and flow applied) */}
       <Drawer anchor='right' open={open} onClose={toggleDrawer}>
-        <Box sx={{ width: 400, p: 3 }}>
+        <Box sx={{ width: 360, p: 3 }}> {/* Width 360px from Page A */}
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={2}>
             <Typography variant='h6'>{isEdit ? 'Edit Employee' : 'Add Employee'}</Typography>
             <IconButton onClick={toggleDrawer}>
@@ -549,52 +594,54 @@ export default function EmployeePage() {
           </Box>
 
           <form onSubmit={handleSubmit}>
-            {/* Name, Phone, Email */}
+            {/* Name, Phone, Email (Mandatory fields with validation) */}
             <CustomTextField
               fullWidth margin='normal' label={<span>Name <span style={{ color: 'red' }}>*</span></span>}
               name='name' value={formData.name} onChange={handleNameChange} inputRef={nameRef}
-              onKeyDown={e => handleKeyDown(e, phoneRef)}
+              inputProps={{ onKeyDown: e => handleKeyDown(e, phoneRef) }}
               error={!!errors.name} helperText={errors.name}
             />
             <CustomTextField
               fullWidth margin='normal' label={<span>Phone <span style={{ color: 'red' }}>*</span></span>}
               name='phone' value={formData.phone} onChange={handlePhoneChange} inputRef={phoneRef}
-              onKeyDown={e => handleKeyDown(e, emailRef)}
+              inputProps={{ onKeyDown: e => handleKeyDown(e, emailRef) }}
               error={!!errors.phone} helperText={errors.phone}
             />
             <CustomTextField
               fullWidth margin='normal' label={<span>Email <span style={{ color: 'red' }}>*</span></span>}
               name='email' value={formData.email} onChange={handleEmailChange} inputRef={emailRef}
-              onKeyDown={e => handleKeyDown(e, cityRef)}
+              inputProps={{ onKeyDown: e => handleKeyDown(e, cityRef) }}
               error={!!errors.email} helperText={errors.email}
             />
 
             {/* City, State, Pin Code */}
             <CustomTextField
               fullWidth margin='normal' label='City' name='city' value={formData.city} onChange={handleGenericChange} inputRef={cityRef}
-              onKeyDown={e => handleKeyDown(e, stateRef)}
+              inputProps={{ onKeyDown: e => handleKeyDown(e, stateRef) }}
             />
             <CustomTextField
               fullWidth margin='normal' label='State' name='state' value={formData.state} onChange={handleGenericChange} inputRef={stateRef}
-              onKeyDown={e => handleKeyDown(e, pincodeRef)}
+              inputProps={{ onKeyDown: e => handleKeyDown(e, pincodeRef) }}
             />
             <CustomTextField
               fullWidth margin='normal' label='Pin Code' name='pincode' value={formData.pincode} onChange={handleGenericChange} inputRef={pincodeRef}
-              onKeyDown={e => handleKeyDown(e, address1Ref)}
+              inputProps={{ onKeyDown: e => handleKeyDown(e, address1Ref) }}
             />
 
-            {/* Address */}
+            {/* Address (using multiline/rows from Page A's description field) */}
             <CustomTextField
               fullWidth margin='normal' label='Address 1' name='address1' multiline rows={3} value={formData.address1} onChange={handleGenericChange} inputRef={address1Ref}
-              onKeyDown={e => handleKeyDown(e, address2Ref)}
+              inputProps={{ onKeyDown: e => handleKeyDown(e, address2Ref) }}
             />
             <CustomTextField
               fullWidth margin='normal' label='Address 2' name='address2' multiline rows={3} value={formData.address2} onChange={handleGenericChange} inputRef={address2Ref}
-              // The submit button is next, handled below
+              inputProps={{ onKeyDown: e => {
+                 if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); isEdit ? focusNext(statusRef) : focusNext(submitRef) }
+              }}}
             />
 
-            {/* File Upload */}
-            <Box mt={2}>
+            {/* File Upload (Retained as is, but not shown in table) */}
+            <Box mt={2} mb={isEdit ? 0 : 3}>
               {/* Hidden input to trigger file selection */}
               <input type='file' ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileChange} />
               <Typography variant="caption" display="block" color="text.secondary" mb={0.5}>Upload File</Typography>
@@ -626,21 +673,28 @@ export default function EmployeePage() {
             </Box>
 
 
-            {/* Status (Only in edit mode) */}
+            {/* Status (Only in edit mode, using CustomTextField select like Page A) */}
             {isEdit && (
               <CustomTextField
+                select
                 fullWidth
                 margin='normal'
                 label='Status'
                 name='status'
-                select
-                SelectProps={{ native: true }}
                 value={formData.status}
                 onChange={handleGenericChange}
                 inputRef={statusRef}
+                inputProps={{
+                  onKeyDown: e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      focusNext(submitRef)
+                    }
+                  }
+                }}
               >
-                <option value='Active'>Active</option>
-                <option value='Inactive'>Inactive</option>
+                <MenuItem value='Active'>Active</MenuItem>
+                <MenuItem value='Inactive'>Inactive</MenuItem>
               </CustomTextField>
             )}
 
