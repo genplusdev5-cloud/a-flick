@@ -33,7 +33,7 @@ import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward' // For sorting
 // Custom Components
 import CustomTextField from '@core/components/mui/TextField'
 import Link from 'next/link' // Used for Breadcrumbs
-
+import { useTheme } from '@mui/material/styles'
 // IndexedDB config
 const dbName = 'EmployeeLeaveDB'
 const storeName = 'leaveTypes'
@@ -244,14 +244,21 @@ export default function EmployeeLeaveTypePage() {
       <ArrowDownwardIcon sx={{ fontSize: 16, ml: 0.5 }} />
     )
   }
-
+  const theme = useTheme()
   return (
     <Box>
       {/* Breadcrumb (Like Page A) */}
       <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
-        <Link href='/' style={{ color: '#7367F0', textDecoration: 'none', fontSize: 14 }}>
-          Dashboard
-        </Link>
+      <Link
+      href='/admin/dashboards'
+      style={{
+        textDecoration: 'none',
+        fontSize: 14,
+        color: theme.palette.primary.main // 👈 Theme primary color used
+      }}
+    >
+      Dashboard
+    </Link>
         <Typography sx={{ mx: 1, color: 'text.secondary' }}>/</Typography>
         <Typography variant='body2' sx={{ fontSize: 14 }}>
           Employee Leave Type
@@ -367,7 +374,7 @@ export default function EmployeeLeaveTypePage() {
                       <IconButton size='small' color='error' onClick={() => handleDelete(r)}>
                         <MdDelete />
                       </IconButton>
-    
+
                     </Box>
                   </td>
                   {/* Data Cells */}

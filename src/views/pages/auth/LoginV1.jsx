@@ -60,17 +60,22 @@ const LoginV1 = () => {
       const res = await signIn('credentials', {
         redirect: false,
         email: data.email,
-        password: data.password
+        password: data.password,
+        callbackUrl: '/en/admin/dashboards'
       })
 
       if (res?.error) {
         setErrorMsg('Invalid email or password')
+      } else if (res?.url) {
+        // On success, go to the callback URL
+        router.push(res.url)
       } else {
-        // On success, go to dashboard (or you can use redirect query param)
-        router.push('/en/dashboards/crm')
+        // Fallback redirect
+        router.push('/en/admin/dashboards')
       }
     } catch (err) {
-      setErrorMsg('Something went wrong, please try again.')
+      console.error('Login error:', err)
+      setErrorMsg('Invalid credentials or connection error. Please try again.')
     } finally {
       setLoading(false)
     }

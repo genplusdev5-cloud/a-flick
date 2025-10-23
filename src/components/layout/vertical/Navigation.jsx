@@ -102,7 +102,7 @@ const Navigation = props => {
     >
       {/* Nav Header including Logo & nav toggle icons  */}
       <NavHeader>
-        <Link href={getLocalizedUrl('/', locale)}>
+        <Link href={getLocalizedUrl('/admin/dashboards', locale)}>
           <Logo />
         </Link>
         {!(isCollapsed && !isHovered) && (

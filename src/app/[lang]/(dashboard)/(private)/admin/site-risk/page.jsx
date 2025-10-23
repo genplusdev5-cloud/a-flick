@@ -28,6 +28,7 @@ import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward' // Icon for so
 import { MdDelete } from 'react-icons/md'
 
 import { openDB } from 'idb'
+import { useTheme } from '@mui/material/styles'
 // import ContentLayout from '@/components/layout/ContentLayout' // Removed as layout logic is now inside
 import CustomTextField from '@core/components/mui/TextField'
 import Link from 'next/link' // Added Link for breadcrumb
@@ -225,16 +226,23 @@ export default function SiteRiskPage() {
   const paginatedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize)
   const startIndex = rowCount === 0 ? 0 : (page - 1) * pageSize + 1
   const endIndex = Math.min(page * pageSize, rowCount)
-
+  const theme = useTheme()
   // ------------------- Render -------------------
 
   return (
     <Box>
       {/* Breadcrumb (From Page A) */}
       <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
-        <Link href='/' style={{ color: '#7367F0', textDecoration: 'none', fontSize: 14 }}>
-          Dashboard
-        </Link>
+         <Link
+      href='/admin/dashboards'
+      style={{
+        textDecoration: 'none',
+        fontSize: 14,
+        color: theme.palette.primary.main // 👈 Theme primary color used
+      }}
+    >
+      Dashboard
+    </Link>
         <Typography sx={{ mx: 1, color: 'text.secondary' }}>/</Typography>
         <Typography variant='body2' sx={{ fontSize: 14 }}>
           Site Risk
@@ -373,7 +381,7 @@ export default function SiteRiskPage() {
                       <IconButton size='small' color='error' onClick={() => handleDelete(r)}>
                         <MdDelete />
                       </IconButton>
-                  
+
                     </Box>
                   </td>
                   <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.name}</td>

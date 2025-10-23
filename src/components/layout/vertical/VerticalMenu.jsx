@@ -80,7 +80,7 @@ const VerticalMenu = ({ scrollMenu }) => {
         menuSectionStyles={menuSectionStyles(verticalNavOptions, theme)}
       >
         {/* ✅ Dashboard */}
-        <MenuItem href={`/${locale}/dashboards/crm`} icon={<i className='tabler-home' />}>
+        <MenuItem href={`/${locale}/admin/dashboards`} icon={<i className='tabler-home' />}>
           Dashboard
         </MenuItem>
 

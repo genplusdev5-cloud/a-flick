@@ -16,7 +16,7 @@ import {
   Select,
   Pagination
 } from '@mui/material'
-
+import { useTheme } from '@mui/material/styles'
 // Icons
 import AddIcon from '@mui/icons-material/Add'
 import DownloadIcon from '@mui/icons-material/Download'
@@ -228,16 +228,27 @@ export default function AccountItemCodePage() {
   // Helper component to render the sort icon
   const SortIcon = ({ field }) => {
     if (sortField !== field) return null
-    return sortDirection === 'asc' ? <ArrowUpwardIcon sx={{ fontSize: 16, ml: 0.5 }} /> : <ArrowDownwardIcon sx={{ fontSize: 16, ml: 0.5 }} />
+    return sortDirection === 'asc' ? (
+      <ArrowUpwardIcon sx={{ fontSize: 16, ml: 0.5 }} />
+    ) : (
+      <ArrowDownwardIcon sx={{ fontSize: 16, ml: 0.5 }} />
+    )
   }
 
   // ------------------- Render -------------------
-
+  const theme = useTheme()
   return (
     <Box>
       {/* Breadcrumb */}
       <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
-        <Link href='/' style={{ color: '#7367F0', textDecoration: 'none', fontSize: 14 }}>
+        <Link
+          href='/admin/dashboards'
+          style={{
+            textDecoration: 'none',
+            fontSize: 14,
+            color: theme.palette.primary.main // 👈 Theme color used
+          }}
+        >
           Dashboard
         </Link>
         <Typography sx={{ mx: 1, color: 'text.secondary' }}>/</Typography>
@@ -273,7 +284,13 @@ export default function AccountItemCodePage() {
         {/* Search / entries */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <FormControl size='small' sx={{ minWidth: 120 }}>
-            <Select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }}>
+            <Select
+              value={pageSize}
+              onChange={e => {
+                setPageSize(Number(e.target.value))
+                setPage(1)
+              }}
+            >
               {[10, 25, 50, 100].map(i => (
                 <MenuItem key={i} value={i}>
                   {i} entries
@@ -453,21 +470,49 @@ export default function AccountItemCodePage() {
         <Box sx={{ width: 360, p: 3 }}>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={2}>
             <Typography variant='h6'>{isEdit ? 'Edit Account Item' : 'Add New Account Item'}</Typography>
-            <IconButton onClick={toggleDrawer}><CloseIcon /></IconButton>
+            <IconButton onClick={toggleDrawer}>
+              <CloseIcon />
+            </IconButton>
           </Box>
           <form onSubmit={handleSubmit}>
             <CustomTextField
-              fullWidth margin='normal' label='Name' value={formData.name} inputRef={nameRef}
+              fullWidth
+              margin='normal'
+              label='Name'
+              value={formData.name}
+              inputRef={nameRef}
               onChange={e => setFormData(prev => ({ ...prev, name: e.target.value.replace(/[^a-zA-Z\s]/g, '') }))}
               onKeyDown={e => handleKeyDown(e, 'name')}
             />
+
+
+<CustomTextField
+    fullWidth
+    margin='normal'
+    label='Item Number'
+
+    name='itemNumber'
+    value={formData.itemNumber || ''}
+    inputRef={itemNumberRef}
+
+    onChange={e => setFormData(prev => ({
+        ...prev,
+        itemNumber: e.target.value // Entha filtering-um illai
+    }))}
+
+    // Nīṅkaḷ payaṉpaṭuttum onKeyDown function
+    onKeyDown={e => handleKeyDown(e, 'itemNumber')}
+/>
+
+
             <CustomTextField
-              fullWidth margin='normal' label='Item Number' value={formData.itemNumber} inputRef={itemNumberRef}
-              onChange={e => setFormData(prev => ({ ...prev, itemNumber: e.target.value.replace(/\D/g, '') }))}
-              onKeyDown={e => handleKeyDown(e, 'itemNumber')}
-            />
-            <CustomTextField
-              fullWidth margin='normal' label='Description' multiline rows={3} value={formData.description} inputRef={descriptionRef}
+              fullWidth
+              margin='normal'
+              label='Description'
+              multiline
+              rows={3}
+              value={formData.description}
+              inputRef={descriptionRef}
               onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
               onKeyDown={e => handleKeyDown(e, 'description')}
             />
@@ -475,7 +520,11 @@ export default function AccountItemCodePage() {
             {/* Status appears only in edit */}
             {isEdit && (
               <CustomTextField
-                fullWidth margin='normal' label='Status' select value={formData.status}
+                fullWidth
+                margin='normal'
+                label='Status'
+                select
+                value={formData.status}
                 onChange={e => setFormData(prev => ({ ...prev, status: e.target.value }))}
               >
                 <MenuItem value='Active'>Active</MenuItem>
@@ -484,8 +533,12 @@ export default function AccountItemCodePage() {
             )}
 
             <Box mt={3} display='flex' gap={2}>
-              <Button type='submit' variant='contained' fullWidth ref={submitRef}>{isEdit ? 'Update' : 'Submit'}</Button>
-              <Button variant='outlined' fullWidth onClick={toggleDrawer}>Cancel</Button>
+              <Button type='submit' variant='contained' fullWidth ref={submitRef}>
+                {isEdit ? 'Update' : 'Submit'}
+              </Button>
+              <Button variant='outlined' fullWidth onClick={toggleDrawer}>
+                Cancel
+              </Button>
             </Box>
           </form>
         </Box>

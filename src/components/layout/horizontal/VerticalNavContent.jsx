@@ -68,7 +68,7 @@ const VerticalNavContent = ({ children }) => {
   return (
     <>
       <NavHeader>
-        <Link href={getLocalizedUrl('/', locale)}>
+        <Link href={getLocalizedUrl('/admin/dashboards', locale)}>
           <Logo />
         </Link>
         <NavCollapseIcons

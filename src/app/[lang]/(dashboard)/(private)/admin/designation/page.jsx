@@ -26,7 +26,7 @@ import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward' // Added for sorti
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward' // Added for sorting down
 import { openDB } from 'idb'
 import Link from 'next/link' // Added for Breadcrumb
-
+import { useTheme } from '@mui/material/styles'
 // Wrapper (Keeping ContentLayout import but will use manual layout to match Page A's design)
 import ContentLayout from '@/components/layout/ContentLayout'
 import CustomTextField from '@core/components/mui/TextField'
@@ -206,7 +206,7 @@ export default function DesignationPage() {
     if (sortField !== field) return null
     return sortDirection === 'asc' ? <ArrowUpwardIcon sx={{ fontSize: 16, ml: 0.5 }} /> : <ArrowDownwardIcon sx={{ fontSize: 16, ml: 0.5 }} />
   }
-
+ const theme = useTheme()
   // ------------------- Render -------------------
 
   // Removing ContentLayout and using Page A's Card/Box structure
@@ -214,9 +214,16 @@ export default function DesignationPage() {
     <Box>
       {/* Breadcrumb (From Page A) */}
       <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
-        <Link href='/' style={{ color: '#7367F0', textDecoration: 'none', fontSize: 14 }}>
-          Dashboard
-        </Link>
+      <Link
+      href='/admin/dashboards'
+      style={{
+        textDecoration: 'none',
+        fontSize: 14,
+        color: theme.palette.primary.main // 👈 Theme primary color used
+      }}
+    >
+      Dashboard
+    </Link>
         <Typography sx={{ mx: 1, color: 'text.secondary' }}>/</Typography>
         <Typography variant='body2' sx={{ fontSize: 14 }}>
           Designation

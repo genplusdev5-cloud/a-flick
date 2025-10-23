@@ -9,24 +9,33 @@ import {
   IconButton,
   Drawer,
   InputAdornment,
-  TablePagination,
-  Autocomplete,MenuItem
+  Autocomplete,
+  MenuItem,
+  Card, // Added for Card layout
+  Divider, // Added for Divider
+  FormControl, // Added for Select
+  Select, // Added for Select
+  Pagination // Added for Pagination
 } from '@mui/material'
-import { DataGrid } from '@mui/x-data-grid'
+
+// Icons (Updated to include sorting icons)
 import { MdDelete } from 'react-icons/md'
 import AddIcon from '@mui/icons-material/Add'
 import CloseIcon from '@mui/icons-material/Close'
 import SearchIcon from '@mui/icons-material/Search'
 import EditIcon from '@mui/icons-material/Edit'
 import DownloadIcon from '@mui/icons-material/Download'
-import ContentLayout from '@/components/layout/ContentLayout'
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
+
+// Custom Components
 import CustomTextField from '@core/components/mui/TextField'
+import Link from 'next/link' // Added for Breadcrumb Link
 
 export default function ChemicalsPage() {
   // ---------------- State ----------------
   const [rows, setRows] = useState([])
-  const [page, setPage] = useState(0)
-  const [rowsPerPage, setRowsPerPage] = useState(10)
   const [searchText, setSearchText] = useState('')
   const [open, setOpen] = useState(false)
   const [isEdit, setIsEdit] = useState(false)
@@ -39,16 +48,21 @@ export default function ChemicalsPage() {
     status: 'Active',
     file: ''
   })
-  const [unitOpen, setUnitOpen] = useState(false)
-  const [statusOpen, setStatusOpen] = useState(false)
+  const [unitOpen, setUnitOpen] = useState(false) // Used for Autocomplete control
+
+  // State for Sorting (From Page A)
+  const [sortField, setSortField] = useState('id')
+  const [sortDirection, setSortDirection] = useState('desc')
+
+  // State for Pagination (From Page A)
+  const [page, setPage] = useState(1) // 1-based indexing
+  const [pageSize, setPageSize] = useState(10) // Equivalent to rowsPerPage
 
   const unitOptions = ['kg', 'litre', 'bottle', 'pkt', 'box']
-  const statusOptions = ['Active', 'Inactive']
 
   // File Upload
   const fileInputRef = useRef(null)
   const [selectedFile, setSelectedFile] = useState('')
-  const [isDragOver, setIsDragOver] = useState(false)
 
   // Keyboard Refs
   const nameRef = useRef(null)
@@ -76,6 +90,7 @@ export default function ChemicalsPage() {
   const loadRows = async () => {
     const db = await initDB()
     const all = await db.getAll(STORE_NAME)
+    // Initial load: sort by ID descending (latest first)
     setRows(all.sort((a, b) => b.id - a.id))
   }
 
@@ -92,6 +107,7 @@ export default function ChemicalsPage() {
     setIsEdit(false)
     setFormData({ name: '', unit: '', dosage: '', ingredients: '', status: 'Active', file: '' })
     setSelectedFile('')
+    setEditRow(null)
     setOpen(true)
     setTimeout(() => nameRef.current?.focus(), 100)
   }
@@ -117,13 +133,24 @@ export default function ChemicalsPage() {
     const dataToSave = { ...formData, file: selectedFile }
 
     if (isEdit && editRow) {
-      await db.put(STORE_NAME, { ...editRow, ...dataToSave })
-      setRows(prev => prev.map(r => (r.id === editRow.id ? { ...editRow, ...dataToSave } : r)))
+      const rowToSave = { ...editRow, ...dataToSave }
+      await db.put(STORE_NAME, rowToSave)
+      setRows(prev => prev.map(r => (r.id === editRow.id ? rowToSave : r)))
     } else {
+      // IndexedDB auto-increments, so we just use the ID returned by db.add
       const id = await db.add(STORE_NAME, dataToSave)
-      setRows(prev => [{ id, ...dataToSave }, ...prev])
+      const newRow = { id, ...dataToSave }
+
+      // Add new row to the front and sort by 'id' descending to see it immediately
+      setRows(prev => {
+        const newRows = [newRow, ...prev.filter(r => r.id !== newRow.id)]
+        return newRows.sort((a, b) => b.id - a.id)
+      })
     }
     toggleDrawer()
+    // Reset sort to 'id' desc to show the new/updated row easily
+    setSortField('id')
+    setSortDirection('desc')
   }
 
   // ---------------- File Upload ----------------
@@ -137,7 +164,6 @@ export default function ChemicalsPage() {
 
   const handleFileDrop = e => {
     e.preventDefault()
-    setIsDragOver(false)
     const file = e.dataTransfer.files[0]
     if (file) {
       setSelectedFile(file.name)
@@ -145,158 +171,308 @@ export default function ChemicalsPage() {
     }
   }
 
-  // ---------------- Keyboard Navigation ----------------
-  const focusNext = ref => ref?.current?.focus()
+  // ---------------- Sorting Logic (From Page A) ----------------
+  const handleSort = field => {
+    // If clicking the current sort field, toggle direction
+    if (sortField === field) {
+      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'))
+    } else {
+      // If clicking a new field, set it as the sort field and default to 'asc'
+      setSortField(field)
+      setSortDirection('asc')
+    }
+    setPage(1) // Reset to first page on sort change
+  }
 
-  // ---------------- Search & Pagination ----------------
-  const handleSearch = e => setSearchText(e.target.value)
+  const sortedRows = [...rows].sort((a, b) => {
+    const aValue = a[sortField] || ''
+    const bValue = b[sortField] || ''
 
-  const filteredRows = rows.filter(
+    let comparison = 0
+    // Check if values are numerical (for dosage and id)
+    if (sortField === 'id' || sortField === 'dosage') {
+      comparison = Number(a[sortField] || 0) - Number(b[sortField] || 0)
+    } else {
+      // Case-insensitive string comparison
+      comparison = String(aValue).localeCompare(String(bValue), undefined, { sensitivity: 'base' })
+    }
+
+    // Apply the sort direction
+    return sortDirection === 'asc' ? comparison : comparison * -1
+  })
+
+  // Helper component to render the sort icon
+  const SortIcon = ({ field }) => {
+    if (sortField !== field) return null
+    return sortDirection === 'asc' ? (
+      <ArrowUpwardIcon sx={{ fontSize: 16, ml: 0.5 }} />
+    ) : (
+      <ArrowDownwardIcon sx={{ fontSize: 16, ml: 0.5 }} />
+    )
+  }
+
+  // ---------------- Filtering and Pagination (From Page A) ----------------
+  const handleSearch = e => {
+    setSearchText(e.target.value)
+    setPage(1) // Reset page on search
+  }
+
+  // Client-side filtering based on search text (uses sortedRows)
+  const filteredRows = sortedRows.filter(
     row =>
       row.name?.toLowerCase().includes(searchText.toLowerCase()) ||
       row.unit?.toLowerCase().includes(searchText.toLowerCase()) ||
       row.ingredients?.toLowerCase().includes(searchText.toLowerCase())
   )
 
-  const paginatedRows = filteredRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+  // Client-side pagination logic
+  const rowCount = filteredRows.length
+  const pageCount = Math.max(1, Math.ceil(rowCount / pageSize))
+  const paginatedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize)
+  const startIndex = rowCount === 0 ? 0 : (page - 1) * pageSize + 1
+  const endIndex = Math.min(page * pageSize, rowCount)
 
-  const totalRows = filteredRows.length
-  const startIndex = totalRows === 0 ? 0 : page * rowsPerPage + 1
-  const endIndex = Math.min((page + 1) * rowsPerPage, totalRows)
-  const paginationText = `Showing ${startIndex} to ${endIndex} of ${totalRows} entries`
+  // ---------------- Keyboard Navigation ----------------
+  const focusNext = ref => ref?.current?.focus()
 
-  // ---------------- Columns ----------------
-  const columns = [
-    {
-      field: 'serial',
-      headerName: 'S.No',
-      flex: 0.2,
-      valueGetter: params => filteredRows.findIndex(r => r.id === params.row.id) + 1,
-      sortable: false
-    },
-    {
-      field: 'action',
-      headerName: 'Action',
-      flex: 0.5,
-      sortable: false,
-      renderCell: params => (
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <IconButton size='small' onClick={() => handleDelete(params.row)}>
-            <MdDelete style={{ color: 'red' }} />
-          </IconButton>
-          <IconButton size='small' onClick={() => handleEdit(params.row)}>
-            <EditIcon />
-          </IconButton>
-        </Box>
-      )
-    },
-    { field: 'name', headerName: 'Chemical Name', flex: 1 },
-    { field: 'unit', headerName: 'Unit', flex: 0.6 },
-    { field: 'dosage', headerName: 'Dosage', flex: 0.6 },
-    { field: 'ingredients', headerName: 'Ingredients', flex: 1 },
-    {
-      field: 'status',
-      headerName: 'Status',
-      flex: 0.6,
-      renderCell: params => (
-        <Button
-          size='small'
-          variant='contained'
-          color={params.value === 'Active' ? 'success' : 'error'}
-          sx={{ borderRadius: '20px', textTransform: 'none', fontWeight: 500 }}
-        >
-          {params.value}
-        </Button>
-      )
+  // This handles the status update logic which was immediate in Page B original
+  const handleStatusChange = async (e) => {
+    const newStatus = e.target.value;
+    setFormData(prev => ({ ...prev, status: newStatus }));
+
+    // Only update DB/State immediately if we are in Edit mode
+    if (isEdit && editRow) {
+      const updatedRow = { ...editRow, status: newStatus };
+      setRows(prev => prev.map(r => (r.id === editRow.id ? updatedRow : r)));
+      const db = await initDB();
+      await db.put(STORE_NAME, updatedRow);
     }
-  ]
+  }
+
 
   return (
-    <ContentLayout
-      title='Chemicals'
-      breadcrumbs={[{ label: 'Home', href: '/' }, { label: 'Chemicals' }]}
-      actions={
-        <Box sx={{ m: 2, display: 'flex', gap: 2 }}>
-          <Button variant='outlined' startIcon={<DownloadIcon />}>
-            Export
-          </Button>
-          <Button variant='contained' startIcon={<AddIcon />} onClick={handleAdd}>
-            Add Chemical
-          </Button>
-        </Box>
-      }
-    >
-      {/* Search */}
-      <Box sx={{ p: 2, pt: 0, mt: 5, display: 'flex', justifyContent: 'flex-start' }}>
-        <CustomTextField
-          size='small'
-          placeholder='Search'
-          value={searchText}
-          onChange={handleSearch}
-          sx={{ width: 360 }}
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position='start'>
-                  <SearchIcon />
-                </InputAdornment>
-              )
-            }
-          }}
-        />
-      </Box>
-
-      {/* DataGrid */}
-      <DataGrid
-        rows={paginatedRows}
-        columns={columns}
-        disableRowSelectionOnClick
-        autoHeight
-        hideFooter
-        getRowHeight={() => 'auto'}
-        getRowId={row => row.id}
-        sx={{
-          mt: 3,
-          '& .MuiDataGrid-row': {
-            minHeight: '60px !important',
-            padding: '12px 0'
-          },
-          '& .MuiDataGrid-cell': {
-            whiteSpace: 'normal',
-            wordBreak: 'break-word',
-            overflowWrap: 'break-word',
-            alignItems: 'flex-start',
-            fontSize: '15px'
-          },
-          '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': { outline: 'none' },
-          '& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within': { outline: 'none' },
-          '& .MuiDataGrid-columnHeaderTitle': {
-            fontSize: '15px',
-            fontWeight: 500
-          }
-        }}
-      />
-
-      {/* Pagination Footer */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2, pr: 2 }}>
-        <Typography variant='body2' sx={{ color: 'text.secondary', ml: 1 }}>
-          {paginationText}
+    <Box>
+      {/* Breadcrumb (From Page A) */}
+      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
+        <Link href='/' style={{ color: '#7367F0', textDecoration: 'none', fontSize: 14 }}>
+          Dashboard
+        </Link>
+        <Typography sx={{ mx: 1, color: 'text.secondary' }}>/</Typography>
+        <Typography variant='body2' sx={{ fontSize: 14 }}>
+          Chemicals
         </Typography>
-        <TablePagination
-          rowsPerPageOptions={[5, 10, 25, 50]}
-          component='div'
-          count={filteredRows.length}
-          rowsPerPage={rowsPerPage}
-          page={page}
-          onPageChange={(e, newPage) => setPage(newPage)}
-          onRowsPerPageChange={e => {
-            setRowsPerPage(parseInt(e.target.value, 10))
-            setPage(0)
-          }}
-        />
       </Box>
 
-      {/* Drawer Form */}
+      <Card sx={{ p: 6 }}>
+        {/* Header + actions (From Page A's structure) */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+          <Typography variant='h6'>Chemicals List</Typography>
+
+          <Box display='flex' gap={1}>
+            <Button variant='outlined' endIcon={<ArrowDropDownIcon />}>
+              Export
+            </Button>
+            <Button variant='contained' startIcon={<AddIcon />} onClick={handleAdd}>
+              Add Chemical
+            </Button>
+          </Box>
+        </Box>
+
+        <Divider sx={{ mb: 3 }} />
+
+        {/* Search / entries (From Page A) */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <FormControl size='small' sx={{ minWidth: 120 }}>
+            <Select
+              value={pageSize}
+              onChange={e => {
+                setPageSize(Number(e.target.value))
+                setPage(1)
+              }}
+            >
+              {[10, 25, 50, 100].map(i => (
+                <MenuItem key={i} value={i}>
+                  {i} entries
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <CustomTextField
+            size='small'
+            placeholder='Search by Name, Unit, or Ingredients...'
+            value={searchText}
+            onChange={handleSearch}
+            sx={{ width: 420 }}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position='start'>
+                    <SearchIcon />
+                  </InputAdornment>
+                )
+              }
+            }}
+          />
+        </Box>
+
+        {/* Table (Manual HTML Table - From Page A) */}
+        <Box sx={{ overflowX: 'auto' }}>
+          <table
+            style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              tableLayout: 'fixed'
+            }}
+          >
+            <thead>
+              <tr style={{ textAlign: 'left', borderBottom: '1px solid #E5E7EB' }}>
+                {/* S.No Header */}
+                <th
+                  onClick={() => handleSort('id')}
+                  style={{ padding: '12px', width: '60px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box display='flex' alignItems='center'>
+                    S.No <SortIcon field='id' />
+                  </Box>
+                </th>
+
+                <th style={{ padding: '12px', width: '100px' }}>Action</th>
+
+                {/* Chemical Name Header */}
+                <th
+                  onClick={() => handleSort('name')}
+                  style={{ padding: '12px', width: '150px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box display='flex' alignItems='center'>
+                    Chemical Name <SortIcon field='name' />
+                  </Box>
+                </th>
+
+                {/* Unit Header */}
+                <th
+                  onClick={() => handleSort('unit')}
+                  style={{ padding: '12px', width: '100px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box display='flex' alignItems='center'>
+                    Unit <SortIcon field='unit' />
+                  </Box>
+                </th>
+
+                {/* Dosage Header */}
+                <th
+                  onClick={() => handleSort('dosage')}
+                  style={{ padding: '12px', width: '100px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box display='flex' alignItems='center'>
+                    Dosage <SortIcon field='dosage' />
+                  </Box>
+                </th>
+
+                {/* Ingredients Header */}
+                <th
+                  onClick={() => handleSort('ingredients')}
+                  style={{ padding: '12px', width: '300px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box display='flex' alignItems='center'>
+                    Ingredients <SortIcon field='ingredients' />
+                  </Box>
+                </th>
+
+                {/* Status Header */}
+                <th
+                  onClick={() => handleSort('status')}
+                  style={{ padding: '12px', width: '100px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box display='flex' alignItems='center'>
+                    Status <SortIcon field='status' />
+                  </Box>
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {paginatedRows.map((r, i) => (
+                <tr key={r.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
+                  <td style={{ padding: '12px', wordWrap: 'break-word', whiteSpace: 'normal' }}>
+                    {(page - 1) * pageSize + i + 1}
+                  </td>
+                  <td style={{ padding: '12px' }}>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <IconButton size='small' onClick={() => handleEdit(r)}>
+                        <EditIcon />
+                      </IconButton>
+                      <IconButton size='small' color='error' onClick={() => handleDelete(r)}>
+                        <MdDelete />
+                      </IconButton>
+                    </Box>
+                  </td>
+                  <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.name}</td>
+                  <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.unit}</td>
+                  <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.dosage}</td>
+                  <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.ingredients}</td>
+                  <td style={{ padding: '12px' }}>
+                    <Box
+                      component='span'
+                      sx={{
+                        fontWeight: 600,
+                        color: '#fff',
+                        backgroundColor: r.status === 'Active' ? 'success.main' : 'error.main',
+                        px: 1.5,
+                        py: 0.5,
+                        borderRadius: '6px',
+                        display: 'inline-block'
+                      }}
+                    >
+                      {r.status}
+                    </Box>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {rowCount === 0 && (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <Typography color='text.secondary'>No results found</Typography>
+            </Box>
+          )}
+        </Box>
+
+        {/* Pagination Footer (From Page A) */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            px: 2,
+            py: 2,
+            mt: 2,
+            flexWrap: 'wrap'
+          }}
+        >
+          <Typography variant='body2' color='text.secondary'>
+            Showing {startIndex} to {endIndex} of {rowCount} entries
+          </Typography>
+
+          <Box display='flex' alignItems='center' gap={2}>
+            <Typography variant='body2' color='text.secondary'>
+              Page {page} of {pageCount}
+            </Typography>
+
+            <Pagination
+              count={pageCount}
+              page={page}
+              onChange={(e, value) => setPage(value)}
+              shape='rounded'
+              color='primary'
+              showFirstButton
+              showLastButton
+            />
+          </Box>
+        </Box>
+      </Card>
+
+      {/* Drawer Form (Retains original logic and fields) */}
       <Drawer anchor='right' open={open} onClose={toggleDrawer}>
         <Box sx={{ width: 360, p: 3 }}>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={2}>
@@ -328,7 +504,7 @@ export default function ChemicalsPage() {
               }}
             />
 
-            {/* Unit */}
+            {/* Unit (Autocomplete retained from Page B) */}
             <Autocomplete
               ref={unitRef}
               freeSolo={false}
@@ -339,8 +515,7 @@ export default function ChemicalsPage() {
               onClose={() => setUnitOpen(false)}
               onFocus={() => setUnitOpen(true)}
               sx={{ mt: 5 }}
-              onInputChange={(e, newValue, reason) => {
-                if (reason === 'input' && !unitOptions.includes(newValue)) return
+              onInputChange={(e, newValue) => {
                 setFormData(prev => ({ ...prev, unit: newValue }))
               }}
               onChange={(e, newValue) => setFormData(prev => ({ ...prev, unit: newValue }))}
@@ -364,15 +539,13 @@ export default function ChemicalsPage() {
               )}
             />
 
-            {/* File Upload */}
+            {/* File Upload (Retained from Page B) */}
             <Box sx={{ mt: 4 }}>
               <CustomTextField
                 label='Upload File'
                 fullWidth
                 margin='normal'
-                InputProps={{
-                  readOnly: true
-                }}
+                InputProps={{ readOnly: true }}
                 value=''
                 sx={{
                   '& .MuiInputBase-root': {
@@ -405,7 +578,7 @@ export default function ChemicalsPage() {
               </Button>
             </Box>
 
-            {/* Dosage */}
+            {/* Dosage (Retained from Page B - numeric only) */}
             <CustomTextField
               inputRef={dosageRef}
               fullWidth
@@ -450,8 +623,8 @@ export default function ChemicalsPage() {
               }}
             />
 
-            {/* Status - Only show when editing */}
-             {isEdit && (
+            {/* Status - Only show when editing (Logic retained from Page B) */}
+            {isEdit && (
               <CustomTextField
                 select
                 fullWidth
@@ -459,16 +632,8 @@ export default function ChemicalsPage() {
                 label='Status'
                 value={formData.status}
                 inputRef={statusRef}
-                onChange={async e => {
-                  const newStatus = e.target.value
-                  setFormData(prev => ({ ...prev, status: newStatus }))
-                  if (editRow) {
-                    const updatedRow = { ...editRow, status: newStatus }
-                    setRows(prev => prev.map(r => (r.id === editRow.id ? updatedRow : r)))
-                    const db = await initDB()
-                    await db.put(STORE_NAME, updatedRow)
-                  }
-                }}
+                // Uses the dedicated handler to update status immediately on change
+                onChange={handleStatusChange}
                 inputProps={{
                   onKeyDown: e => {
                     if (e.key === 'Enter') {
@@ -495,6 +660,6 @@ export default function ChemicalsPage() {
           </form>
         </Box>
       </Drawer>
-    </ContentLayout>
+    </Box>
   )
 }

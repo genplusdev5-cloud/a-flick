@@ -21,10 +21,11 @@ import EditIcon from '@mui/icons-material/Edit'
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import { MdDelete } from 'react-icons/md'
-
+import Link from 'next/link'
+import { useTheme } from '@mui/material/styles'
 // Next.js router
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+
 
 // Vuexy input
 import CustomTextField from '@core/components/mui/TextField'
@@ -74,23 +75,83 @@ export default function CompanyOriginPage() {
 
   useEffect(() => {
     const fetchCompanies = async () => {
-      const allCompanies = await getAllCompanies()
+      const db = await getDB()
+      let allCompanies = await db.getAll('companies')
+
       if (allCompanies.length === 0) {
-        // Ensuring a unique 'id' for IndexedDB purposes, which will then be used for sorting
+        // Default Data with full fields, including logo details
         const defaultRows = [
           {
-            id: Date.now(), // Using Date.now() for unique initial ID if db is empty
+            // The id will be auto-incremented by IndexedDB when using db.add,
+            // but since we use db.put on first run, we set it to a unique value like Date.now()
+            // for the first insertion. We must ensure to use db.put which will handle
+            // the case where the data already exists.
+
+            // Note: Since the IndexedDB helper uses `db.put` and expects an `id`
+            // when loading from IndexedDB, we must ensure it's not present for a
+            // fresh insert if the store is configured with autoIncrement.
+            // However, the existing logic sets it:
+            // const id = Date.now() // Using Date.now() for unique initial ID if db is empty
+            // To ensure the default row has an ID for immediate display/sorting,
+            // and since the `getDB` only creates the store with `autoIncrement: true`
+            // but the `saveCompany` uses `db.put`, we'll keep the `id: Date.now()`
+            // structure for the initial insertion, which will override/update
+            // if an item with that ID exists (which it won't on first run).
+
+            // To be more robust, we will check if any default row exists before
+            // inserting the default data, to avoid multiple insertions.
+
+            // Using a high fixed number for a deterministic default ID for testing.
+            // If the store is empty, IndexedDB will assign a new ID on `db.put`
+            // if we omit the `id`, but since the original code structure sets `id: Date.now()`
+            // on the object passed to `db.put`, we must provide a unique one
+            // to avoid overwriting on subsequent app loads if `db.put` is used.
+            // Let's ensure a complete default row is defined.
+
+            // --- FULL DEFAULT DATA FOR EDIT TESTING ---
+            // If we omit `id` here, IndexedDB will assign one on `saveCompany` (db.put)
+            // But Page A uses the id for the `key` prop and to send to Page B.
+            // We'll trust the original code's `id: Date.now()` to create a unique one
+            // if the DB is empty and then use that ID.
+
             companyCode: 'C001',
             companyName: 'Default Company 1',
             phone: '12345 67890',
-            address: '123, Main Street',
-            status: 'Active'
+            email: 'default@example.com',
+            taxNumber: 'TN-001',
+            addressLine1: '123, Main Street, Default Area',
+            addressLine2: 'Near Default Landmark',
+            city: 'Default City',
+            glContractAccount: 'GLC001',
+            glJobAccount: 'GLJ001',
+            glContJobAccount: 'GLCJ001',
+            glWarrantyAccount: 'GLW001',
+            uenNumber: 'UEN12345678Z',
+            gstNumber: 'GST987654321',
+            invoicePrefixCode: 'INV-D',
+            invoiceStartNumber: '1001',
+            contractPrefixCode: 'CON-D',
+            status: 'Active',
+            bankName: 'Default Bank',
+            bankAccountNumber: '9876543210',
+            bankCode: 'DBK',
+            swiftCode: 'DBKIDDXXXX',
+            accountingDate: new Date().toISOString(), // Default date
+            uploadedFileName: 'default_logo.png',
+            // Placeholder URL, in a real app this would be a real file URL/blob
+            uploadedFileURL: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
           }
         ]
-        for (const row of defaultRows) {
-          await saveCompany(row)
+
+        // Only insert if the database is truly empty
+        if (allCompanies.length === 0) {
+            const rowToSave = { ...defaultRows[0], id: Date.now() }; // Assign ID before saving
+            await saveCompany(rowToSave)
+            setRows([rowToSave]) // Set state with the saved row
+        } else {
+            setRows(allCompanies)
         }
-        setRows(defaultRows)
+
       } else {
         setRows(allCompanies)
       }
@@ -174,14 +235,21 @@ export default function CompanyOriginPage() {
   const paginatedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize)
   const startIndex = rowCount === 0 ? 0 : (page - 1) * pageSize + 1
   const endIndex = Math.min(page * pageSize, rowCount)
-
+ const theme = useTheme()
   return (
     <Box>
       {/* Breadcrumb (from Page A) */}
       <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
-        <Link href='/' style={{ color: '#7367F0', textDecoration: 'none', fontSize: 14 }}>
-          Dashboard
-        </Link>
+       <Link
+      href='/admin/dashboards'
+      style={{
+        textDecoration: 'none',
+        fontSize: 14,
+        color: theme.palette.primary.main  // 👈 Theme color used
+      }}
+    >
+      Dashboard
+    </Link>
         <Typography sx={{ mx: 1, color: 'text.secondary' }}>/</Typography>
         <Typography variant='body2' sx={{ fontSize: 14 }}>
           Company Origin
@@ -192,7 +260,6 @@ export default function CompanyOriginPage() {
         {/* Header + actions (Simplified for this page) */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
           <Typography variant='h6'>Origin Company List</Typography>
-       
         </Box>
 
         <Divider sx={{ mb: 3 }} />

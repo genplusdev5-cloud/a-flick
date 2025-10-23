@@ -3,20 +3,28 @@ const nextConfig = {
   basePath: process.env.BASEPATH,
   async redirects() {
     return [
-      // Redirect root to default dashboard
+      // Redirect root to admin dashboard
       {
         source: '/',
-        destination: '/en/dashboards/crm',
+        destination: '/admin/dashboards',
         permanent: true,
-        locale: false,
+        locale: false
       },
 
-      // Redirect language-only paths to dashboard
+      // Redirect language-only paths to admin dashboard
       {
         source: '/:lang(en|fr|ar)',
-        destination: '/:lang/dashboards/crm',
+        destination: '/admin/dashboards',
         permanent: true,
-        locale: false,
+        locale: false
+      },
+
+      // Redirect any path containing /dashboards/crm to /admin/dashboards
+      {
+        source: '/:prefix*/dashboards/crm/:suffix*',
+        destination: '/admin/dashboards',
+        permanent: true,
+        locale: false
       },
 
       // ✅ Redirect everything else to /en/*,
@@ -27,15 +35,15 @@ const nextConfig = {
           {
             type: 'header',
             key: 'accept',
-            value: 'text/html', // only redirect real pages (not assets)
-          },
+            value: 'text/html' // only redirect real pages (not assets)
+          }
         ],
         destination: '/en/:path*',
         permanent: true,
-        locale: false,
-      },
+        locale: false
+      }
     ]
-  },
+  }
 }
 
 export default nextConfig

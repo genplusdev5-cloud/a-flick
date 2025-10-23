@@ -1,19 +1,29 @@
-// File Path: /admin/customers/add/page.jsx (Page B - Add/Edit Form)
+// File Path: /admin/customers/add/page.jsx (Revised Page B with Page A Design)
 
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Box, Button, Grid, Typography, Card, Autocomplete, IconButton } from '@mui/material'
-import { useRouter, useSearchParams } from 'next/navigation' // 👈 Using useSearchParams to read ?id=
+import { Box, Button, Grid, Typography, Card, Autocomplete, IconButton, Divider } from '@mui/material' // Added Divider
+import { useRouter, useSearchParams } from 'next/navigation'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
-import { DataGrid } from '@mui/x-data-grid'
+// import { DataGrid } from '@mui/x-data-grid' // REMOVED: Using manual table from Page A
 import { openDB } from 'idb'
 
 import ContentLayout from '@/components/layout/ContentLayout'
 import CustomTextField from '@core/components/mui/TextField'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 
+// Consistent cell style for text wrapping (From Page A)
+const tableCellStyle = {
+  padding: '12px',
+  wordWrap: 'break-word',
+  whiteSpace: 'normal',
+  wordBreak: 'break-word',
+  overflowWrap: 'break-word'
+}
+
+// 🟢 Initial form data (Retained from Page B - includes 'origin', 'cardId', 'abssCustomerName', 'loginEmail', 'password', 'remarks1', 'remarks2')
 const initialFormData = {
   origin: '',
   commenceDate: new Date(),
@@ -62,11 +72,11 @@ async function getCustomerDB() {
 
 export default function AddCustomerPage() {
   const router = useRouter()
-  // 🔴 Reads ID from query parameters, e.g., /add?id=123
   const searchParams = useSearchParams()
   const customerId = searchParams.get('id')
 
   const [formData, setFormData] = useState(initialFormData)
+  // Renamed from picEmailError to spocEmailError in Page A, but keeping the state name from Page B for logic consistency
   const [picEmailError, setPicEmailError] = useState(false)
   const [billingEmailError, setBillingEmailError] = useState(false)
 
@@ -77,9 +87,9 @@ export default function AddCustomerPage() {
   const [contactForm, setContactForm] = useState({ miniName: '', miniEmail: '', miniPhone: '' })
   const [editingContact, setEditingContact] = useState(null)
   const [miniEmailError, setMiniEmailError] = useState(false)
-  const [loginEmailError, setLoginEmailError] = useState('')
+  const [loginEmailError, setLoginEmailError] = useState('') // Retained from Page B
 
-  // ✅ Core Logic: Load data and setup contacts for Edit Mode
+  // ✅ Core Logic: Load data and setup contacts for Edit Mode (Retained from Page B)
   useEffect(() => {
     ;(async () => {
       // 1. Clear temporary contacts storage on page load
@@ -99,7 +109,7 @@ export default function AddCustomerPage() {
           if (customerData) {
             setEditCustomerId(idAsNumber)
 
-            // Set main form data
+            // Set main form data (Retained from Page B)
             setFormData({
               ...customerData,
               commenceDate: customerData.commenceDate ? new Date(customerData.commenceDate) : new Date(),
@@ -132,7 +142,7 @@ export default function AddCustomerPage() {
     })()
   }, [customerId])
 
-  // Sync temporary contacts DB with local contacts state (rest of the logic)
+  // Sync temporary contacts DB with local contacts state (rest of the logic - Retained from Page B)
   useEffect(() => {
     ;(async () => {
       if (!isEditMode && contacts.length === 0) return
@@ -148,6 +158,7 @@ export default function AddCustomerPage() {
 
   const pageTitle = isEditMode ? 'Edit Customer' : 'Add Customer'
 
+  // Phone Change Logic (Retained from Page B)
   const handlePhoneChange = (e, name) => {
     let value = e.target.value.replace(/\D/g, '')
     if (value.length > 10) value = value.slice(0, 10)
@@ -155,11 +166,21 @@ export default function AddCustomerPage() {
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
+  // Generic Change Handler (Retained from Page B)
   const handleChange = e => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
+  // Custom: Handler for fields with special logic (Retained from Page B)
+  const handleTypedChange = (e, regex, name) => {
+    const { value } = e.target
+    if (regex.test(value)) {
+      setFormData(prev => ({ ...prev, [name]: value }))
+    }
+  }
+
+  // Handle Enter Focus (Retained from Page B)
   const handleEnterFocus = (e, nextFieldName) => {
     if (e.key === 'Enter') {
       e.preventDefault()
@@ -167,11 +188,10 @@ export default function AddCustomerPage() {
     }
   }
 
+  // Contact CRUD Logic (Retained from Page B)
   const handleAddOrUpdateContact = () => {
-    // ✅ Only require Name
     if (!contactForm.miniName) return
 
-    // Optional: Validate email only if filled
     if (contactForm.miniEmail) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
       if (!emailRegex.test(contactForm.miniEmail)) {
@@ -221,34 +241,29 @@ export default function AddCustomerPage() {
 
   const handleFinalCancel = () => router.push('/admin/customers')
 
-  // ✅ Final Save/Update Logic: Saves to main IndexedDB
+  // Final Save/Update Logic (Retained from Page B)
   const handleFinalSave = async () => {
-    // 1. Prepare the complete customer object
     const customerRecord = {
       ...formData,
       commenceDate: formData.commenceDate?.toISOString() || new Date().toISOString(),
-      contracts: formData.companyPrefix,
+      contracts: formData.companyPrefix, // Page B included 'contracts: formData.companyPrefix'
       status: 'Active',
-      contacts: contacts // Include the multiple contacts array
+      contacts: contacts
     }
 
     if (isEditMode && editCustomerId) {
-      customerRecord.id = editCustomerId // Retain existing ID for update
+      customerRecord.id = editCustomerId
     }
 
     try {
       const db = await getCustomerDB()
-
-      // IndexedDB .put() handles both add (if no id or id is new) and update (if id exists)
       await db.put('customers', customerRecord)
 
       console.log(`✅ Customer ${isEditMode ? 'Updated' : 'Saved'} successfully.`)
 
-      // Clear the temporary contacts list
       const contactsDb = await getDB()
       await contactsDb.clear('contacts')
 
-      // Navigate back to the list page (Page A)
       router.push('/admin/customers')
     } catch (error) {
       console.error('Failed to save/update customer:', error)
@@ -256,70 +271,42 @@ export default function AddCustomerPage() {
     }
   }
 
-  const contactColumns = [
-    {
-      field: 'actions',
-      headerName: 'Actions',
-      flex: 0.4,
-      sortable: false,
-      renderCell: params => (
-        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, width: '100%', border: 'none' }}>
-          <IconButton size='small' onClick={() => handleDeleteContact(params.row.id)}>
+  // Columns adapted for manual table (From Page A, but using data fields from Page B's contact logic)
+  const contactManualColumns = [
+    { key: 'actions', header: 'Actions', align: 'center', width: '100px', render: r => (
+        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1 }}>
+          <IconButton size='small' onClick={() => handleDeleteContact(r.id)}>
             <DeleteIcon sx={{ color: 'red', fontSize: 18 }} />
           </IconButton>
-          <IconButton size='small' onClick={() => handleEditContact(params.row)}>
+          <IconButton size='small' onClick={() => handleEditContact(r)}>
             <EditIcon sx={{ fontSize: 18 }} />
           </IconButton>
         </Box>
       )
     },
-    {
-      field: 'miniName',
-      headerName: 'Name',
-      flex: 1,
-      renderCell: params => (
-        <Box sx={{ whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.5, border: 'none' }}>
-          {params.value}
-        </Box>
-      )
-    },
-    {
-      field: 'miniEmail',
-      headerName: 'Email',
-      flex: 1,
-      renderCell: params => (
-        <Box sx={{ whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.5, border: 'none' }}>
-          {params.value}
-        </Box>
-      )
-    },
-    {
-      field: 'miniPhone',
-      headerName: 'Phone',
-      flex: 0.8,
-      renderCell: params => (
-        <Box sx={{ whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.5, border: 'none' }}>
-          {params.value}
-        </Box>
-      )
-    }
-  ]
+    { key: 'miniName', header: 'Name', align: 'left', render: r => r.miniName || '-' },
+    { key: 'miniEmail', header: 'Email', align: 'left', render: r => r.miniEmail || '-' },
+    { key: 'miniPhone', header: 'Phone', align: 'left', render: r => r.miniPhone || '-' }
+]
+
 
   return (
-    <ContentLayout
-      title={<Box sx={{ m: 2 }}>{pageTitle}</Box>}
-      breadcrumbs={[
-        { label: 'Home', href: '/' },
-        { label: 'Customer', href: '/admin/customers' },
-        { label: pageTitle }
-      ]}
-    >
-      <Grid container spacing={2}>
-        {/* LEFT BIG FORM */}
-        <Grid item xs={12} md={8}>
-          <Card sx={{ p: 4, boxShadow: 'none' }} elevation={0}>
-            <Grid container spacing={6}>
-              {/* Origin */}
+    // 🟢 Start Layout from Page A
+    <Grid container spacing={4}>
+      {/* LEFT SIDE - Customer Details (8 columns) */}
+      <Grid item xs={12} md={8}>
+        <ContentLayout
+          title={<Box sx={{ m: 2 }}>{pageTitle} Details</Box>}
+          breadcrumbs={[
+            { label: 'Home', href: '/' },
+            { label: 'Customer', href: '/admin/customers' },
+            { label: pageTitle }
+          ]}
+        >
+          <Card sx={{ p: 4, boxShadow: 'none' }}>
+            {/* 🟢 Spacing and Fields Retained from Page B, with Page A's spacing={4} */}
+            <Grid container spacing={4}>
+              {/* Origin (Retained from Page B) */}
               <Grid item xs={12} md={4}>
                 <Autocomplete
                   freeSolo={false}
@@ -351,32 +338,32 @@ export default function AddCustomerPage() {
                   onKeyDown={e => handleEnterFocus(e, 'customerName')}
                 />
               </Grid>
+
+              {/* Customer Name */}
               <Grid item xs={12} md={4}>
                 <CustomTextField
                   fullWidth
                   label='Customer Name'
                   name='customerName'
                   value={formData.customerName}
-                  onChange={e => {
-                    const value = e.target.value
-                    if (/^[a-zA-Z\s]*$/.test(value)) setFormData(prev => ({ ...prev, customerName: value }))
-                  }}
+                  onChange={e => handleTypedChange(e, /^[a-zA-Z\s]*$/, 'customerName')}
                   onKeyDown={e => handleEnterFocus(e, 'abssCustomerName')}
                 />
               </Grid>
+
+              {/* ABSS Customer Name (Retained from Page B) */}
               <Grid item xs={12} md={4}>
                 <CustomTextField
                   fullWidth
                   label='ABSS Customer Name'
                   name='abssCustomerName'
                   value={formData.abssCustomerName}
-                  onChange={e => {
-                    const value = e.target.value
-                    if (/^[a-zA-Z\s]*$/.test(value)) setFormData(prev => ({ ...prev, abssCustomerName: value }))
-                  }}
+                  onChange={e => handleTypedChange(e, /^[a-zA-Z\s]*$/, 'abssCustomerName')}
                   onKeyDown={e => handleEnterFocus(e, 'cardId')}
                 />
               </Grid>
+
+              {/* Card ID (Retained from Page B) */}
               <Grid item xs={12} md={4}>
                 <CustomTextField
                   fullWidth
@@ -387,20 +374,20 @@ export default function AddCustomerPage() {
                   onKeyDown={e => handleEnterFocus(e, 'picName')}
                 />
               </Grid>
+
+              {/* PIC Name */}
               <Grid item xs={12} md={4}>
                 <CustomTextField
                   fullWidth
                   label='PIC Name'
                   name='picName'
                   value={formData.picName}
-                  onChange={e => {
-                    const value = e.target.value
-                    if (/^[a-zA-Z\s]*$/.test(value)) setFormData(prev => ({ ...prev, picName: value }))
-                  }}
+                  onChange={e => handleTypedChange(e, /^[a-zA-Z\s]*$/, 'picName')}
                   onKeyDown={e => handleEnterFocus(e, 'picEmail')}
                 />
               </Grid>
 
+              {/* PIC Email */}
               <Grid item xs={12} md={4}>
                 <CustomTextField
                   fullWidth
@@ -419,6 +406,7 @@ export default function AddCustomerPage() {
                 />
               </Grid>
 
+              {/* PIC Phone */}
               <Grid item xs={12} md={4}>
                 <CustomTextField
                   fullWidth
@@ -426,37 +414,28 @@ export default function AddCustomerPage() {
                   name='picPhone'
                   value={formData.picPhone}
                   onChange={e => {
-                    let value = e.target.value
-                    // Remove non-digits
-                    value = value.replace(/\D/g, '')
-
-                    // Limit to 10 digits
+                    let value = e.target.value.replace(/\D/g, '')
                     if (value.length > 10) value = value.slice(0, 10)
-
-                    // Insert space after 5 digits
-                    if (value.length > 5) {
-                      value = value.slice(0, 5) + ' ' + value.slice(5)
-                    }
-
+                    if (value.length > 5) value = value.slice(0, 5) + ' ' + value.slice(5)
                     setFormData(prev => ({ ...prev, picPhone: value }))
                   }}
                   onKeyDown={e => handleEnterFocus(e, 'billingName')}
                 />
               </Grid>
+
+              {/* Billing Contact Name (Page B uses 'billingName') */}
               <Grid item xs={12} md={4}>
                 <CustomTextField
                   fullWidth
                   label='Billing Contact Name'
                   name='billingName'
                   value={formData.billingName}
-                  onChange={e => {
-                    const value = e.target.value
-                    if (/^[a-zA-Z\s]*$/.test(value)) setFormData(prev => ({ ...prev, billingName: value }))
-                  }}
+                  onChange={e => handleTypedChange(e, /^[a-zA-Z\s]*$/, 'billingName')}
                   onKeyDown={e => handleEnterFocus(e, 'billingEmail')}
                 />
               </Grid>
 
+              {/* Billing Email */}
               <Grid item xs={12} md={4}>
                 <CustomTextField
                   fullWidth
@@ -475,6 +454,7 @@ export default function AddCustomerPage() {
                 />
               </Grid>
 
+              {/* Billing Phone */}
               <Grid item xs={12} md={4}>
                 <CustomTextField
                   fullWidth
@@ -485,19 +465,20 @@ export default function AddCustomerPage() {
                   onKeyDown={e => handleEnterFocus(e, 'city')}
                 />
               </Grid>
+
+              {/* City */}
               <Grid item xs={12} md={4}>
                 <CustomTextField
                   fullWidth
                   label='City'
                   name='city'
                   value={formData.city}
-                  onChange={e => {
-                    const value = e.target.value
-                    if (/^[a-zA-Z\s]*$/.test(value)) setFormData(prev => ({ ...prev, city: value }))
-                  }}
+                  onChange={e => handleTypedChange(e, /^[a-zA-Z\s]*$/, 'city')}
                   onKeyDown={e => handleEnterFocus(e, 'postalCode')}
                 />
               </Grid>
+
+              {/* Postal Code */}
               <Grid item xs={12} md={4}>
                 <CustomTextField
                   fullWidth
@@ -509,6 +490,7 @@ export default function AddCustomerPage() {
                 />
               </Grid>
 
+              {/* Payment Terms */}
               <Grid item xs={12} md={4}>
                 <Autocomplete
                   freeSolo={false}
@@ -523,6 +505,7 @@ export default function AddCustomerPage() {
                 />
               </Grid>
 
+              {/* Sales Person */}
               <Grid item xs={12} md={4}>
                 <Autocomplete
                   freeSolo={false}
@@ -530,7 +513,6 @@ export default function AddCustomerPage() {
                   value={formData.salesperson || ''}
                   onChange={(e, newValue) => {
                     setFormData(prev => ({ ...prev, salesperson: newValue }))
-                    // Move focus to next field (Login Email)
                     document.querySelector('[name="loginEmail"]')?.focus()
                   }}
                   onKeyDown={e => {
@@ -544,6 +526,7 @@ export default function AddCustomerPage() {
                 />
               </Grid>
 
+              {/* Login Email (Retained from Page B) */}
               <Grid item xs={12} md={4}>
                 <CustomTextField
                   fullWidth
@@ -553,7 +536,6 @@ export default function AddCustomerPage() {
                   onChange={e => {
                     const value = e.target.value
                     setFormData(prev => ({ ...prev, loginEmail: value }))
-
                     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
                     setLoginEmailError(value && !emailRegex.test(value) ? 'Invalid email address' : '')
                   }}
@@ -562,6 +544,8 @@ export default function AddCustomerPage() {
                   helperText={loginEmailError}
                 />
               </Grid>
+
+              {/* Password (Retained from Page B) */}
               <Grid item xs={12} md={4}>
                 <CustomTextField
                   fullWidth
@@ -573,6 +557,8 @@ export default function AddCustomerPage() {
                   onKeyDown={e => handleEnterFocus(e, 'billingAddress')}
                 />
               </Grid>
+
+              {/* Billing Address */}
               <Grid item xs={12} md={4}>
                 <CustomTextField
                   fullWidth
@@ -585,6 +571,8 @@ export default function AddCustomerPage() {
                   onKeyDown={e => handleEnterFocus(e, 'remarks1')}
                 />
               </Grid>
+
+              {/* Remarks 1 (Retained from Page B) */}
               <Grid item xs={12} md={4}>
                 <CustomTextField
                   fullWidth
@@ -597,6 +585,8 @@ export default function AddCustomerPage() {
                   onKeyDown={e => handleEnterFocus(e, 'remarks2')}
                 />
               </Grid>
+
+              {/* Remarks 2 (Retained from Page B) */}
               <Grid item xs={12} md={4}>
                 <CustomTextField
                   fullWidth
@@ -610,124 +600,141 @@ export default function AddCustomerPage() {
               </Grid>
             </Grid>
           </Card>
-        </Grid>
-
-        {/* RIGHT SIDE CONTACT MANAGEMENT */}
-        <Grid item xs={12} md={4}>
-          <Card sx={{ p: 4, boxShadow: 'none' }} elevation={0}>
-            <Typography variant='h6' mb={4} align='center'>
-              Customer Contacts
-            </Typography>
-
-            {/* Name Field (Required) */}
-            <CustomTextField
-              fullWidth
-              label={
-                <span>
-                  Name <span style={{ color: 'red' }}>*</span>
-                </span>
-              }
-              name='miniName'
-              value={contactForm.miniName}
-              onChange={e => setContactForm(prev => ({ ...prev, miniName: e.target.value }))}
-            />
-            <Box mt={4} />
-
-            {/* Email Field */}
-            <CustomTextField
-              fullWidth
-              label='Email'
-              name='miniEmail'
-              value={contactForm.miniEmail}
-              onChange={e => {
-                const value = e.target.value
-                setContactForm(prev => ({ ...prev, miniEmail: value }))
-
-                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-                // If email is not empty, validate it
-                setMiniEmailError(value ? !emailRegex.test(value) : false)
-              }}
-              error={miniEmailError}
-              helperText={miniEmailError ? 'Please enter a valid email address' : ''}
-            />
-            <Box mt={4} />
-
-            {/* Phone Field */}
-            <CustomTextField
-              fullWidth
-              label='Phone'
-              name='miniPhone'
-              value={contactForm.miniPhone}
-              onChange={e => {
-                let value = e.target.value.replace(/\D/g, '')
-                if (value.length > 10) value = value.slice(0, 10)
-                if (value.length > 5) value = value.slice(0, 5) + ' ' + value.slice(5)
-                setContactForm(prev => ({ ...prev, miniPhone: value }))
-              }}
-            />
-
-            <Box mt={3} display='flex' gap={2}>
-              {editingContact && (
-                <Button variant='outlined' color='secondary' fullWidth onClick={handleCancelEdit}>
-                  Cancel
-                </Button>
-              )}
-              <Button
-                variant='contained'
-                color={editingContact ? 'success' : 'primary'}
-                fullWidth
-                onClick={handleAddOrUpdateContact}
-                // Only disable if email is entered and invalid
-                disabled={contactForm.miniEmail && miniEmailError}
-              >
-                {editingContact ? 'Update Contact' : 'Add Contact'}
-              </Button>
-            </Box>
-          </Card>
-
-          <Card sx={{ mt: 4, p: 2, boxShadow: 'none' }} elevation={0}>
-            <Typography variant='h6' sx={{ mb: 2 }}>
-              Customer Contacts List
-            </Typography>
-
-            <DataGrid
-              rows={contacts}
-              columns={contactColumns}
-              getRowId={row => row.id}
-              autoHeight
-              disableRowSelectionOnClick
-              hideFooter
-              getRowHeight={() => 'auto'}
-              sx={{
-                border: 'none', // Remove outer table border
-                '& .MuiDataGrid-columnHeaders': {
-                  borderBottom: 'none',
-                  borderTop: 'none'
-                },
-                '& .MuiDataGrid-columnHeader, & .MuiDataGrid-cell': {
-                  border: 'none',
-                  outline: 'none',
-                  '&:focus': { outline: 'none' }
-                },
-                '& .MuiDataGrid-row': {
-                  borderBottom: 'none', // Remove default row bottom border
-                  borderTop: '1px solid #ccc', // Add 1px top border
-                  '&:hover': { backgroundColor: 'transparent' } // Optional: remove hover effect
-                }
-              }}
-            />
-
-            <Box mt={4} display='flex' gap={2} justifyContent='flex-end'>
-              <Button variant='outlined' onClick={handleFinalCancel}>
-                Cancel
-              </Button>
-              <Button variant='contained' onClick={handleFinalSave}>
-                {isEditMode ? 'Update Customer' : 'Save'}
-              </Button>
-            </Box>
-          </Card>
-        </Grid>
+        </ContentLayout>
       </Grid>
-    </ContentLayout>
+
+      {/* -------------------- RIGHT SIDE - Customer Team (4 columns, ContentLayout from Page A) -------------------- */}
+      <Grid item xs={12} md={4} sx={{ mt: 5 }}> {/* Added mt: 5 from Page A */}
+        <ContentLayout
+          title={<Box sx={{ m: 2 }}>Customer Contact</Box>}
+        >
+          <Grid container spacing={1}>
+            <Grid item xs={12} md={12}>
+              <Box sx={{ p: 4 }}> {/* Inner padding for contact form/list */}
+
+                {/* Contact Form Fields (Retained from Page B) */}
+                <CustomTextField
+                  fullWidth
+                  label={<span>Name <span style={{ color: 'red' }}>*</span></span>}
+                  name='miniName'
+                  value={contactForm.miniName}
+                  onChange={e => setContactForm(prev => ({ ...prev, miniName: e.target.value }))}
+                />
+                <Box mt={3} />
+                <CustomTextField
+                  fullWidth
+                  label='Email'
+                  name='miniEmail'
+                  value={contactForm.miniEmail}
+                  onChange={e => {
+                    const value = e.target.value
+                    setContactForm(prev => ({ ...prev, miniEmail: value }))
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+                    setMiniEmailError(value ? !emailRegex.test(value) : false)
+                  }}
+                  error={miniEmailError}
+                  helperText={miniEmailError ? 'Invalid email' : ''}
+                />
+                <Box mt={3} />
+                <CustomTextField
+                  fullWidth
+                  label='Phone'
+                  name='miniPhone'
+                  value={contactForm.miniPhone}
+                  onChange={e => {
+                    let v = e.target.value.replace(/\D/g, '')
+                    if (v.length > 10) v = v.slice(0, 10)
+                    if (v.length > 5) v = v.slice(0, 5) + ' ' + v.slice(5)
+                    setContactForm(prev => ({ ...prev, miniPhone: v }))
+                  }}
+                />
+
+                {/* Contact Buttons */}
+                <Box mt={3} display='flex' gap={2}>
+                  {editingContact && (
+                    <Button variant='outlined' color='secondary' fullWidth onClick={handleCancelEdit}>
+                      Cancel
+                    </Button>
+                  )}
+                  <Button
+                    variant='contained'
+                    fullWidth
+                    color={editingContact ? 'success' : 'primary'}
+                    onClick={handleAddOrUpdateContact}
+                    disabled={contactForm.miniEmail && miniEmailError}
+                  >
+                    {editingContact ? 'Update Member' : 'Add Member'}
+                  </Button>
+                </Box>
+
+                {/* Team List Header (From Page A) */}
+                <Typography variant='h6' sx={{ mt: 5, p: 2 }}>
+                  Customer Contact List
+                </Typography>
+
+                {/* 🔴 MANUAL HTML TABLE FROM PAGE A DESIGN (Replacing DataGrid from Page B) */}
+                <Box sx={{ overflowX: 'auto' }}>
+                  <table
+                    style={{
+                      width: '100%',
+                      borderCollapse: 'collapse',
+                      tableLayout: 'auto'
+                    }}
+                  >
+                    <thead>
+                      <tr style={{ textAlign: 'left', borderBottom: '1px solid #E5E7EB' }}>
+                        {contactManualColumns.map(col => (
+                          <th
+                            key={col.key}
+                            style={{
+                              padding: '12px',
+                              width: col.width || 'auto',
+                              minWidth: col.minWidth || '100px',
+                              userSelect: 'none',
+                              textAlign: col.align || 'left'
+                            }}
+                          >
+                            <Box display='flex' alignItems='center'>
+                              {col.header}
+                            </Box>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {contacts.map((r, i) => (
+                        <tr key={r.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
+                          {contactManualColumns.map(col => (
+                            <td key={col.key} style={{ ...tableCellStyle, textAlign: col.align || 'left' }}>
+                              {col.render(r, i)}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {contacts.length === 0 && (
+                    <Box sx={{ textAlign: 'center', py: 4 }}>
+                      <Typography color='text.secondary'>No team members added</Typography>
+                    </Box>
+                  )}
+                </Box>
+                {/* END MANUAL HTML TABLE */}
+
+                <Divider sx={{ mt: 4 }} />
+
+                {/* Final Buttons (Moved to follow the table, like in Page A) */}
+                <Box mt={2} p={2} display='flex' gap={2} justifyContent='flex-end'>
+                  <Button variant='outlined' onClick={handleFinalCancel}>Cancel</Button>
+                  <Button variant='contained' onClick={handleFinalSave}>{isEditMode ? 'Update Customer' : 'Save'}</Button>
+                </Box>
+
+              </Box> {/* End of Box with inner padding */}
+            </Grid>
+          </Grid>
+        </ContentLayout>
+      </Grid>
+    </Grid>
   )
 }

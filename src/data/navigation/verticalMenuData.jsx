@@ -12,7 +12,7 @@ const verticalMenuData = dictionary => [
       {
         label: dictionary['navigation'].crm,
         icon: 'tabler-circle',
-        href: '/dashboards/crm'
+        href: '/admin/dashboards'
       },
       {
         label: dictionary['navigation'].analytics,

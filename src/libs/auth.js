@@ -8,8 +8,6 @@ import GoogleProvider from 'next-auth/providers/google'
 // const prisma = new PrismaClient()
 
 export const authOptions = {
-  // adapter: PrismaAdapter(prisma), // uncomment if using Prisma
-
   providers: [
     CredentialsProvider({
       name: 'Credentials',
@@ -27,7 +25,6 @@ export const authOptions = {
         const normalized = (email || '').toLowerCase().trim()
 
         // ✅ Demo logins (no backend required)
-        // Accept both variants the user mentioned and the original demo email.
         if ((normalized === 'admin@a-flick.com.sg' || normalized === 'admin@aflcik.com.sg') && password === '123456') {
           return { id: 1, name: 'Admin', email: normalized }
         }
@@ -36,13 +33,11 @@ export const authOptions = {
           return { id: 2, name: 'Stark', email: normalized }
         }
 
-        // ❌ No match => return null (NextAuth will return 401)
-        // Throwing an Error with JSON was previously used; returning null is cleaner.
+        // ❌ No match => return null
         return null
       }
     }),
 
-    // Google login (optional, works if env vars set)
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID || '',
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || ''
@@ -55,15 +50,16 @@ export const authOptions = {
   },
 
   pages: {
-    // Use admin login as the canonical sign-in page
     signIn: '/admin/login'
   },
 
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
       if (user) {
         token.name = user.name
         token.email = user.email
+        // Add role information to token if needed
+        token.role = user.role || 'user'
       }
       return token
     },
@@ -71,8 +67,22 @@ export const authOptions = {
       if (session.user) {
         session.user.name = token.name
         session.user.email = token.email
+        // Add role information to session if needed
+        session.user.role = token.role
       }
       return session
+    },
+    async redirect({ url, baseUrl }) {
+      // Handle the redirect URL
+      if (url.startsWith(baseUrl)) {
+        // If it's an internal URL, allow it
+        return url
+      } else if (url.startsWith('/')) {
+        // If it's a relative URL, make it absolute
+        return `${baseUrl}${url}`
+      }
+      // Default redirect
+      return '/en/admin/dashboards'
     }
   }
 }

@@ -28,7 +28,7 @@ import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import { MdDelete } from 'react-icons/md'
-
+import { useTheme } from '@mui/material/styles'
 // Layout & Custom Components
 import CustomTextField from '@core/components/mui/TextField'
 
@@ -209,16 +209,23 @@ export default function TodoItemsPage() {
   const paginatedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize)
   const startIndex = rowCount === 0 ? 0 : (page - 1) * pageSize + 1
   const endIndex = Math.min(page * pageSize, rowCount)
-
+ const theme = useTheme()
   // ------------------- Render -------------------
 
   return (
     <Box>
       {/* Breadcrumb */}
       <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
-        <Link href='/' style={{ color: '#7367F0', textDecoration: 'none', fontSize: 14 }}>
-          Home
-        </Link>
+          <Link
+      href='/admin/dashboards'
+      style={{
+        textDecoration: 'none',
+        fontSize: 14,
+        color: theme.palette.primary.main // 👈 Theme primary color used
+      }}
+    >
+      Dashboard
+    </Link>
         <Typography sx={{ mx: 1, color: 'text.secondary' }}>/</Typography>
         <Typography variant='body2' sx={{ fontSize: 14 }}>
           Todo Items List
@@ -360,7 +367,7 @@ export default function TodoItemsPage() {
                       <IconButton size='small' color='error' onClick={() => handleDelete(r)}>
                         <MdDelete />
                       </IconButton>
-                  
+
                     </Box>
                   </td>
 

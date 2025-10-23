@@ -12,15 +12,20 @@ import {
   Typography,
   InputAdornment,
   IconButton,
-  TablePagination,
-  Autocomplete
+  Autocomplete,
+  FormControl, // Added for rowsPerPage Select
+  Select, // Added for rowsPerPage Select
+  MenuItem, // Used in Select and Status rendering
+  Pagination, // Added for Pagination component
+  Divider // Added for card layout
 } from '@mui/material'
-import { DataGrid } from '@mui/x-data-grid'
 
 // Icons
 import SearchIcon from '@mui/icons-material/Search'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward' // For sorting up
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward' // For sorting down
 
 // Components
 import ContentLayout from '@/components/layout/ContentLayout'
@@ -46,6 +51,7 @@ const initDB = async () => {
 const loadRequestsFromDB = async () => {
   const db = await initDB()
   if (db.objectStoreNames.contains(STORE_NAME)) {
+    // Original data load sorted by ID descending
     const allItems = await db.getAll(STORE_NAME)
     return allItems.sort((a, b) => b.id - a.id)
   }
@@ -59,14 +65,23 @@ const deleteRequestFromDB = async id => {
 }
 // ----------------------------------------------------
 
+// Helper component to render the sort icon (Copied from Page A design)
+const SortIcon = ({ field, sortField, sortDirection }) => {
+  if (sortField !== field) return null
+  return sortDirection === 'asc' ? (
+    <ArrowUpwardIcon sx={{ fontSize: 16, ml: 0.5 }} />
+  ) : (
+    <ArrowDownwardIcon sx={{ fontSize: 16, ml: 0.5 }} />
+  )
+}
+
 export default function MaterialRequestPage() {
   const router = useRouter()
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
 
+  // Filtering states (Retained from original component)
   const [searchText, setSearchText] = useState('')
-  const [page, setPage] = useState(0)
-  const [rowsPerPage, setRowsPerPage] = useState(10)
   const [dateFilter, setDateFilter] = useState(new Date())
   const [filterByDate, setFilterByDate] = useState(false)
   const [requestStatus, setRequestStatus] = useState('')
@@ -74,6 +89,15 @@ export default function MaterialRequestPage() {
   const [toLocation, setToLocation] = useState('')
   const [requestedBy, setRequestedBy] = useState('')
 
+  // Pagination states (Updated to 1-based index from Page A design)
+  const [page, setPage] = useState(1) // Changed from 0 to 1
+  const [rowsPerPage, setRowsPerPage] = useState(10)
+
+  // Sorting states (New from Page A design)
+  const [sortField, setSortField] = useState('requestDate') // Default sort field
+  const [sortDirection, setSortDirection] = useState('desc') // Default sort direction
+
+  // Refs and Autocomplete state (Retained)
   const requestStatusRef = useRef(null)
   const fromLocationRef = useRef(null)
   const toLocationRef = useRef(null)
@@ -84,12 +108,13 @@ export default function MaterialRequestPage() {
   const [toLocationOpen, setToLocationOpen] = useState(false)
   const [requestedByOpen, setRequestedByOpen] = useState(false)
 
+  // --- Handlers ---
   const handleRefreshTable = async () => {
     setLoading(true)
     const data = await loadRequestsFromDB()
     setRows(data)
     setLoading(false)
-    setPage(0)
+    setPage(1) // Reset page to 1
   }
 
   useEffect(() => {
@@ -105,44 +130,35 @@ export default function MaterialRequestPage() {
     router.push(`/admin/stock/material-request/${row.id}/edit`)
   }
 
-  const focusNextInput = (currentRef, nextRef) => {
-    if (nextRef && nextRef.current) {
-      setTimeout(() => {
-        const inputElement = nextRef.current.querySelector('input')
-        if (inputElement) {
-          inputElement.focus()
-        }
-      }, 50)
+  // --- Sorting Logic (from Page A design) ---
+  const handleSort = field => {
+    if (sortField === field) {
+      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
     }
+    setPage(1) // Reset to first page on sort change
   }
 
-  const handleRequestStatusChange = (e, newValue) => {
-    setRequestStatus(newValue || '')
-    if (newValue) focusNextInput(requestStatusRef, fromLocationRef)
+  // --- Filtering & Sorting & Pagination Logic ---
+
+  const handleSearch = e => {
+    setSearchText(e.target.value)
+    setPage(1) // Reset page on search change
   }
 
-  const handleFromLocationChange = (e, newValue) => {
-    setFromLocation(newValue || '')
-    if (newValue) focusNextInput(fromLocationRef, toLocationRef)
-  }
-
-  const handleToLocationChange = (e, newValue) => {
-    setToLocation(newValue || '')
-    if (newValue) focusNextInput(toLocationRef, requestedByRef)
-  }
-
-  const handleRequestedByChange = (e, newValue) => {
-    setRequestedBy(newValue || '')
-  }
-
+  // 1. Filtering Logic (Retained from original)
   const filteredRows = useMemo(() => {
     return rows.filter(row => {
       const rowNo = row.requestNo || `REQ-${row.id}`
       const matchesSearch = rowNo.toLowerCase().includes(searchText.toLowerCase())
+
       const matchesStatus = !requestStatus || (row.status || 'Pending') === requestStatus
       const matchesFrom = !fromLocation || row.fromLocation === fromLocation
       const matchesTo = !toLocation || row.toLocation === toLocation
       const matchesRequestedBy = !requestedBy || row.requestedBy === requestedBy
+
       let matchesDate = true
       if (filterByDate) {
         const rowDate = new Date(row.requestDate)
@@ -159,143 +175,158 @@ export default function MaterialRequestPage() {
     })
   }, [rows, searchText, requestStatus, fromLocation, toLocation, requestedBy, filterByDate, dateFilter])
 
+  // 2. Sorting Logic (New for client-side sorting)
+  const sortedFilteredRows = useMemo(() => {
+    return [...filteredRows].sort((a, b) => {
+      const aValue = a[sortField] || ''
+      const bValue = b[sortField] || ''
+
+      let comparison = 0
+      if (['id'].includes(sortField)) {
+        comparison = Number(aValue) - Number(bValue)
+      } else if (['requestDate'].includes(sortField)) {
+        // Handle date sorting
+        const aDate = new Date(aValue)
+        const bDate = new Date(bValue)
+        comparison = aDate.getTime() - bDate.getTime()
+      } else {
+        // String comparison for requestType, fromLocation, etc.
+        comparison = String(aValue).localeCompare(String(bValue), undefined, { sensitivity: 'base' })
+      }
+
+      // Apply the sort direction
+      return sortDirection === 'asc' ? comparison : comparison * -1
+    })
+  }, [filteredRows, sortField, sortDirection])
+
+  // 3. Pagination Logic (Updated for 1-based page)
+  const rowCount = sortedFilteredRows.length
+  const pageCount = Math.max(1, Math.ceil(rowCount / rowsPerPage))
   const paginatedRows = useMemo(() => {
-    return filteredRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-  }, [filteredRows, page, rowsPerPage])
+    const start = (page - 1) * rowsPerPage
+    const end = page * rowsPerPage
+    return sortedFilteredRows.slice(start, end)
+  }, [sortedFilteredRows, page, rowsPerPage])
 
-  const totalRows = filteredRows.length
-  const startIndex = totalRows === 0 ? 0 : page * rowsPerPage + 1
-  const endIndex = Math.min((page + 1) * rowsPerPage, totalRows)
-  const paginationText = `Showing ${startIndex} to ${endIndex} of ${totalRows} entries`
+  const startIndex = rowCount === 0 ? 0 : (page - 1) * rowsPerPage + 1
+  const endIndex = Math.min(page * rowsPerPage, rowCount)
+  const paginationText = `Showing ${startIndex} to ${endIndex} of ${rowCount} entries`
 
-  const handleChangePage = (event, newPage) => setPage(newPage)
+  const handleChangePage = (event, newPage) => setPage(newPage) // newPage is 1-based
   const handleChangeRowsPerPage = event => {
     setRowsPerPage(parseInt(event.target.value, 10))
-    setPage(0)
+    setPage(1) // Reset page to 1
   }
 
-  const columns = [
-    {
-      field: 'sno',
-      headerName: 'S.No',
-      width: 80,
-      renderCell: params => {
-        const index = filteredRows.findIndex(row => row.id === params.row.id)
-        return index !== -1 ? index + 1 : ''
-      }
-    },
-    {
-      field: 'actions',
-      headerName: 'Action',
-      width: 100,
-      renderCell: params => (
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <IconButton size='small' onClick={() => handleDelete(params.row)}>
-            <DeleteIcon style={{ color: 'red' }} />
-          </IconButton>
-          <IconButton size='small' onClick={() => handleEdit(params.row)}>
-            <EditIcon />
-          </IconButton>
-        </Box>
-      )
-    },
-    { field: 'requestType', headerName: 'Request Type', width: 180 },
-    {
-      field: 'requestNo',
-      headerName: 'Request No',
-      width: 160,
-      valueGetter: params => params.row.requestNo || `REQ-${params.row.id}`
-    },
-    {
-      field: 'requestDate',
-      headerName: 'Request Date',
-      width: 160,
-      valueFormatter: params => {
-        const date = new Date(params.value)
-        return !isNaN(date.getTime()) ? format(date, 'dd/MM/yyyy') : ''
-      }
-    },
-    { field: 'fromLocation', headerName: 'From Location/Supplier', width: 220 },
-    { field: 'toLocation', headerName: 'To Location/Supplier', width: 220 },
-    { field: 'requestedBy', headerName: 'Requested By', width: 150 },
-    {
-      field: 'isApproved',
-      headerName: 'Is Approved',
-      width: 150,
-      renderCell: params => {
-        const status = params.row.approvedStatus || params.row.status || 'Pending'
-        if (status === 'Approved') return 'Approved'
-        if (['Rejected', 'Declined'].includes(status)) return 'Rejected'
-        return 'Pending'
-      }
-    },
-    {
-      field: 'isIssued',
-      headerName: 'Is Issued',
-      width: 150,
-      renderCell: params => {
-        const status = params.row.issuedStatus || params.row.status || 'Pending'
-        if (status === 'Issued') return 'Issued'
-        if (status === 'Pending') return 'Pending'
-        return 'Not Issued'
-      }
-    },
-    {
-      field: 'isCompleted',
-      headerName: 'Is Completed',
-      width: 120,
-      renderCell: params => (params.row.completedStatus === 'Yes' ? 'Yes' : 'No')
-    },
-    { field: 'remarks', headerName: 'Remarks', width: 200 },
-    {
-      field: 'status',
-      headerName: 'Request Status',
-      width: 150,
-      renderCell: params => {
-        const statusValue = params.row.status || 'Waiting'
-        let bgColor
-        switch (statusValue) {
-          case 'Completed':
-            bgColor = '#4caf50'
-            break
-          case 'Pending':
-            bgColor = '#ff9800'
-            break
-          case 'Issued':
-            bgColor = '#2196f3'
-            break
-          case 'Approved':
-            bgColor = '#8bc34a'
-            break
-          case 'Declined':
-          case 'Rejected':
-            bgColor = '#f44336'
-            break
-          default:
-            bgColor = '#9e9e9e'
-            break
+  // --- Autocomplete/Ref Logic (Retained from original) ---
+  const focusNextInput = (currentRef, nextRef) => {
+    // ... existing logic ...
+    if (nextRef && nextRef.current) {
+      setTimeout(() => {
+        const inputElement = nextRef.current.querySelector('input')
+        if (inputElement) {
+          inputElement.focus()
         }
-        return (
-          <Button
-            size='small'
-            variant='contained'
-            sx={{
-              backgroundColor: bgColor,
-              color: '#fff',
-              borderRadius: '20px',
-              textTransform: 'none',
-              fontWeight: 500,
-              minWidth: 90,
-              '&:hover': { backgroundColor: bgColor }
-            }}
-          >
-            {statusValue}
-          </Button>
-        )
-      }
+      }, 50)
     }
-  ]
+  }
 
+  const handleRequestStatusChange = (e, newValue) => {
+    setRequestStatus(newValue || '')
+    setPage(1) // Filter change resets page
+    if (newValue) focusNextInput(requestStatusRef, fromLocationRef)
+  }
+
+  const handleFromLocationChange = (e, newValue) => {
+    setFromLocation(newValue || '')
+    setPage(1)
+    if (newValue) focusNextInput(fromLocationRef, toLocationRef)
+  }
+
+  const handleToLocationChange = (e, newValue) => {
+    setToLocation(newValue || '')
+    setPage(1)
+    if (newValue) focusNextInput(toLocationRef, requestedByRef)
+  }
+
+  const handleRequestedByChange = (e, newValue) => {
+    setRequestedBy(newValue || '')
+    setPage(1)
+  }
+
+  // --- Cell Value/Style Helpers (Mapped from original DataGrid columns) ---
+
+  const getStatusStyle = statusValue => {
+    let bgColor
+    switch (statusValue) {
+      case 'Completed':
+        bgColor = '#4caf50'
+        break
+      case 'Pending':
+        bgColor = '#ff9800'
+        break
+      case 'Issued':
+        bgColor = '#2196f3'
+        break
+      case 'Approved':
+        bgColor = '#8bc34a'
+        break
+      case 'Declined':
+      case 'Rejected':
+        bgColor = '#f44336'
+        break
+      default:
+        bgColor = '#9e9e9e' // Waiting
+        break
+    }
+    return bgColor
+  }
+
+  const renderStatusPill = statusValue => {
+    const bgColor = getStatusStyle(statusValue)
+    return (
+      <Button
+        size='small'
+        variant='contained'
+        sx={{
+          backgroundColor: bgColor,
+          color: '#fff',
+          borderRadius: '20px',
+          textTransform: 'none',
+          fontWeight: 500,
+          minWidth: 90,
+          '&:hover': { backgroundColor: bgColor }
+        }}
+      >
+        {statusValue}
+      </Button>
+    )
+  }
+
+  const getRequestNo = row => row.requestNo || `REQ-${row.id}`
+
+  const getFormattedDate = dateValue => {
+    const date = new Date(dateValue)
+    return !isNaN(date.getTime()) ? format(date, 'dd/MM/yyyy') : ''
+  }
+
+  const getApprovalStatus = row => {
+    const status = row.approvedStatus || row.status || 'Pending'
+    if (status === 'Approved') return 'Approved'
+    if (['Rejected', 'Declined'].includes(status)) return 'Rejected'
+    return 'Pending'
+  }
+
+  const getIssuedStatus = row => {
+    const status = row.issuedStatus || row.status || 'Pending'
+    if (status === 'Issued') return 'Issued'
+    if (status === 'Pending') return 'Pending'
+    return 'Not Issued'
+  }
+
+  const getCompletedStatus = row => (row.completedStatus === 'Yes' ? 'Yes' : 'No')
+
+  // --- Render ---
   return (
     <ContentLayout
       title='Material Request'
@@ -306,9 +337,11 @@ export default function MaterialRequestPage() {
         </Button>
       }
     >
+      {/* Filtering Card (Design Retained from original, it's already a Card design) */}
       <Card sx={{ mb: 4, boxShadow: 'none' }} elevation={0}>
         <CardContent>
           <Grid container spacing={6}>
+            {/* ... Date Filter and Autocomplete fields retained here ... */}
             <Grid item xs={12} md={4}>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 <Box display='flex' alignItems='center' gap={0.5} sx={{ pl: 0.5, position: 'relative' }}>
@@ -446,15 +479,33 @@ export default function MaterialRequestPage() {
         </CardContent>
       </Card>
 
-      <Card sx={{ mb: 4, boxShadow: 'none' }} elevation={0}>
-        <CardContent>
-          <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
+      {/* List Card (New Card layout from Page A design) */}
+      <Card sx={{ p: 6, boxShadow: 'none' }}>
+        {/* Header/Actions (Modified to include rowsPerPage Select from Page A) */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          {/* Rows Per Page Select (from Page A design) */}
+          <FormControl size='small' sx={{ minWidth: 120 }}>
+            <Select
+              value={rowsPerPage}
+              onChange={handleChangeRowsPerPage} // Already updates rowsPerPage and resets page to 1
+            >
+              {[10, 25, 50, 100].map(i => (
+                <MenuItem key={i} value={i}>
+                  {i} entries
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          {/* Search Field and Export Buttons (Retained from original component) */}
+          <Box display='flex' alignItems='center' gap={3}>
             <Box display='flex' gap={1}>
               {['Copy', 'CSV', 'Excel', 'PDF', 'Print'].map(btn => (
                 <Button
                   key={btn}
                   variant='contained'
                   size='small'
+                  // Placeholder action - replace with actual export logic if needed
+                  onClick={() => alert(`Export as ${btn}`)}
                   sx={{
                     borderRadius: '0px',
                     backgroundColor: '#6c7783',
@@ -469,12 +520,11 @@ export default function MaterialRequestPage() {
                 </Button>
               ))}
             </Box>
-
             <CustomTextField
               size='small'
-              placeholder='Search'
+              placeholder='Search by Request No...'
               value={searchText}
-              onChange={e => setSearchText(e.target.value)}
+              onChange={handleSearch}
               sx={{ width: 280 }}
               InputProps={{
                 startAdornment: (
@@ -485,49 +535,165 @@ export default function MaterialRequestPage() {
               }}
             />
           </Box>
+        </Box>
 
-          <Box sx={{ width: '100%', overflowX: 'auto' }}>
-            <DataGrid
-              rows={paginatedRows}
-              columns={columns}
-              disableRowSelectionOnClick
-              autoHeight
-              hideFooter
-              getRowId={row => row.id}
-              loading={loading}
-              getRowHeight={() => 'auto'}
-              sx={{
-                mt: 3,
-                '& .MuiDataGrid-row': { minHeight: '60px !important', padding: '12px 0' },
-                '& .MuiDataGrid-cell': {
-                  whiteSpace: 'normal',
-                  wordBreak: 'break-word',
-                  alignItems: 'flex-start',
-                  fontSize: '15px'
-                },
-                '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': { outline: 'none' },
-                '& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within': { outline: 'none' },
-                '& .MuiDataGrid-columnHeaderTitle': { fontSize: '15px', fontWeight: 500 }
+        <Divider sx={{ mb: 3 }} />
+
+        {/* Manual HTML Table (from Page A design) */}
+        <Box sx={{ overflowX: 'auto', minHeight: loading ? 100 : 'auto' }}>
+          {loading ? (
+            <Box sx={{ textAlign: 'center', py: 5 }}>
+              <Typography color='text.secondary'>Loading requests...</Typography>
+            </Box>
+          ) : (
+            <table
+              style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                tableLayout: 'auto' // Use auto for better column sizing with many columns
               }}
-            />
-          </Box>
+            >
+              <thead>
+                <tr style={{ textAlign: 'left', borderBottom: '1px solid #E5E7EB' }}>
+                  {/* S.No / ID Header */}
+                  <th
+                    onClick={() => handleSort('id')}
+                    style={{ padding: '12px', width: '60px', cursor: 'pointer', userSelect: 'none' }}
+                  >
+                    <Box display='flex' alignItems='center'>
+                      S.No <SortIcon field='id' sortField={sortField} sortDirection={sortDirection} />
+                    </Box>
+                  </th>
 
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2 }}>
+                  <th style={{ padding: '12px', width: '100px' }}>Action</th>
+
+                  {/* Column Headers with Sorting */}
+                  {[
+                    { field: 'requestType', label: 'Request Type', width: '150px' },
+                    { field: 'requestNo', label: 'Request No', width: '150px' },
+                    { field: 'requestDate', label: 'Request Date', width: '150px' },
+                    { field: 'fromLocation', label: 'From Location/Supplier', width: '200px' },
+                    { field: 'toLocation', label: 'To Location/Supplier', width: '200px' },
+                    { field: 'requestedBy', label: 'Requested By', width: '150px' },
+                    { field: 'isApproved', label: 'Is Approved', width: '120px', sortable: false },
+                    { field: 'isIssued', label: 'Is Issued', width: '120px', sortable: false },
+                    { field: 'isCompleted', label: 'Is Completed', width: '120px', sortable: false },
+                    { field: 'remarks', label: 'Remarks', width: '200px', sortable: false },
+                    { field: 'status', label: 'Request Status', width: '150px' }
+                  ].map(col => (
+                    <th
+                      key={col.field}
+                      onClick={() => col.sortable !== false && handleSort(col.field)}
+                      style={{
+                        padding: '12px',
+                        width: col.width,
+                        cursor: col.sortable !== false ? 'pointer' : 'default',
+                        userSelect: 'none'
+                      }}
+                    >
+                      <Box display='flex' alignItems='center'>
+                        {col.label}
+                        {col.sortable !== false && (
+                          <SortIcon field={col.field} sortField={sortField} sortDirection={sortDirection} />
+                        )}
+                      </Box>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+
+              <tbody>
+                {paginatedRows.map((r, i) => {
+                  // Find the index in the *sorted and filtered* list to get the correct S.No
+                  const snoIndex = sortedFilteredRows.findIndex(row => row.id === r.id)
+                  const sno = snoIndex !== -1 ? snoIndex + 1 : (page - 1) * rowsPerPage + i + 1 // Fallback to page index
+
+                  return (
+                    <tr key={r.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
+                      {/* S.No */}
+                      <td style={{ padding: '12px', wordWrap: 'break-word', whiteSpace: 'normal' }}>{sno}</td>
+                      {/* Action */}
+                      <td style={{ padding: '12px' }}>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <IconButton size='small' color='error' onClick={() => handleDelete(r)}>
+                            <DeleteIcon style={{ color: 'red' }} />
+                          </IconButton>
+                          <IconButton size='small' onClick={() => handleEdit(r)}>
+                            <EditIcon />
+                          </IconButton>
+                        </Box>
+                      </td>
+                      {/* Data Columns */}
+                      <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.requestType}</td>
+                      <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>
+                        {getRequestNo(r)}
+                      </td>
+                      <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>
+                        {getFormattedDate(r.requestDate)}
+                      </td>
+                      <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>
+                        {r.fromLocation}
+                      </td>
+                      <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.toLocation}</td>
+                      <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.requestedBy}</td>
+                      <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>
+                        {getApprovalStatus(r)}
+                      </td>
+                      <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>
+                        {getIssuedStatus(r)}
+                      </td>
+                      <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>
+                        {getCompletedStatus(r)}
+                      </td>
+                      <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.remarks}</td>
+                      <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>
+                        {renderStatusPill(r.status || 'Waiting')}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
+          {rowCount === 0 && !loading && (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <Typography color='text.secondary'>No results found</Typography>
+            </Box>
+          )}
+        </Box>
+
+        {/* Pagination (from Page A design) */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            px: 2,
+            py: 2,
+            mt: 2,
+            flexWrap: 'wrap'
+          }}
+        >
+          <Typography variant='body2' color='text.secondary'>
+            {paginationText}
+          </Typography>
+
+          <Box display='flex' alignItems='center' gap={2}>
             <Typography variant='body2' color='text.secondary'>
-              {paginationText}
+              Page {page} of {pageCount}
             </Typography>
 
-            <TablePagination
-              rowsPerPageOptions={[10, 25, 50, 100]}
-              component='div'
-              count={filteredRows.length}
-              rowsPerPage={rowsPerPage}
+            <Pagination
+              count={pageCount}
               page={page}
-              onPageChange={handleChangePage}
-              onRowsPerPageChange={handleChangeRowsPerPage}
+              onChange={handleChangePage} // Handles 1-based page change
+              shape='rounded'
+              color='primary'
+              showFirstButton
+              showLastButton
             />
           </Box>
-        </CardContent>
+        </Box>
       </Card>
     </ContentLayout>
   )

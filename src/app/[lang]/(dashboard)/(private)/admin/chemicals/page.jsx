@@ -32,7 +32,7 @@ import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 // Custom Components
 import CustomTextField from '@core/components/mui/TextField'
 import Link from 'next/link' // Added for Breadcrumb Link
-
+import { useTheme } from '@mui/material/styles'
 export default function ChemicalsPage() {
   // ---------------- State ----------------
   const [rows, setRows] = useState([])
@@ -248,15 +248,22 @@ export default function ChemicalsPage() {
       await db.put(STORE_NAME, updatedRow);
     }
   }
-
+  const theme = useTheme()
 
   return (
     <Box>
       {/* Breadcrumb (From Page A) */}
       <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
-        <Link href='/' style={{ color: '#7367F0', textDecoration: 'none', fontSize: 14 }}>
-          Dashboard
-        </Link>
+    <Link
+      href='/admin/dashboards'
+      style={{
+        textDecoration: 'none',
+        fontSize: 14,
+        color: theme.palette.primary.main // 👈 Theme primary color used
+      }}
+    >
+      Dashboard
+    </Link>
         <Typography sx={{ mx: 1, color: 'text.secondary' }}>/</Typography>
         <Typography variant='body2' sx={{ fontSize: 14 }}>
           Chemicals

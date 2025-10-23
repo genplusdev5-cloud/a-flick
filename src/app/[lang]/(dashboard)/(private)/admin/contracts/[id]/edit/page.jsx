@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback, useEffect } from 'react' // useEffect ஐ சேர்த்தல்
+import { useState, useRef, useCallback } from 'react'
 import {
   Box,
   Button,
@@ -12,15 +12,15 @@ import {
   TableRow,
   TableCell,
   TableBody,
-  IconButton
+  IconButton,
+  Dialog, // 💡 NEW: Import Dialog and related components
+  DialogContent
 } from '@mui/material'
-// useParams ஐ next/navigation லிருந்து பெறவும்
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
-import AddIcon from '@mui/icons-material/Add'
-import SaveIcon from '@mui/icons-material/Save' // Save Icon ஐ சேர்த்தல்
+import VisibilityIcon from '@mui/icons-material/Visibility' // 💡 NEW: Import VisibilityIcon
 
 // Layout + Inputs (Assuming these paths are correct)
 import ContentLayout from '@/components/layout/ContentLayout'
@@ -29,7 +29,7 @@ import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import { Autocomplete } from '@mui/material'
 
 // ----------------------------------------------------------------------
-// INDEXEDDB HELPER FUNCTIONS (Based on AddContractPage)
+// INDEXEDDB HELPER FUNCTIONS (New Implementation)
 // ----------------------------------------------------------------------
 
 const DB_NAME = 'ContractDB'
@@ -70,112 +70,122 @@ const openDB = () => {
 }
 
 /**
- * Retrieves a single contract by its unique ID from IndexedDB.
- * @param {string} id - The unique ID of the contract to retrieve.
- * @returns {Promise<object | null>} A promise that resolves to the contract object or null.
+ * Saves a new contract to the IndexedDB.
+ * @param {object} contract - The contract data to save.
  */
-const getContractWithPestItemsById = async id => {
-  try {
-    const db = await openDB()
-    const transaction = db.transaction([STORE_NAME], 'readonly')
-    const store = transaction.objectStore(STORE_NAME)
-    const request = store.get(id) // Use store.get(key) for single retrieval
-
-    return new Promise((resolve, reject) => {
-      request.onsuccess = event => {
-        resolve(event.target.result)
-      }
-      request.onerror = event => {
-        console.error('Error retrieving contract by ID from IndexedDB:', event.target.error)
-        reject(event.target.error)
-      }
-    })
-  } catch (error) {
-    console.error('Failed to open DB or get contract by ID:', error)
-    return null
-  }
-}
-
-/**
- * Updates an existing contract in the IndexedDB.
- * @param {object} contract - The contract data to update. Must contain the 'id' key.
- */
-const updateContractWithPestItems = async contract => {
+const saveContractWithPestItems = async contract => {
   try {
     const db = await openDB()
     const transaction = db.transaction([STORE_NAME], 'readwrite')
     const store = transaction.objectStore(STORE_NAME)
-    const request = store.put(contract) // Use store.put(data) for updating (or adding if key doesn't exist)
+    const request = store.add(contract)
 
     return new Promise((resolve, reject) => {
       request.onsuccess = () => {
         resolve()
       }
       request.onerror = event => {
-        console.error('Error updating contract to IndexedDB:', event.target.error)
+        console.error('Error saving contract to IndexedDB:', event.target.error)
         reject(event.target.error)
       }
     })
   } catch (error) {
-    console.error('Failed to open DB or update contract:', error)
+    console.error('Failed to open DB or save contract:', error)
   }
 }
 
-// ----------------------------------------------------------------------
-// EDIT CONTRACT PAGE COMPONENT
-// ----------------------------------------------------------------------
+/**
+ * Retrieves all contracts from IndexedDB.
+ * @returns {Promise<Array<object>>} A promise that resolves to an array of contracts.
+ */
+const getContractsWithPestItems = async () => {
+  try {
+    const db = await openDB()
+    const transaction = db.transaction([STORE_NAME], 'readonly')
+    const store = transaction.objectStore(STORE_NAME)
+    const request = store.getAll()
 
-// Initial state template for all fields (copied from AddPage)
-const initialFormData = {
-  salesMode: '',
-  customer: '',
-  contractType: '',
-  coveredLocation: '',
-  contractCode: '',
-  serviceAddress: '',
-  postalCode: '',
-  accountItemCode: '',
-  poNumber: '',
-  poExpiry: new Date(),
-  preferredTime: '',
-  reportEmail: '',
-  contactPerson: '',
-  sitePhone: '',
-  mobile: '',
-  callType: '',
-  groupCode: '',
-  startDate: new Date(),
-  endDate: new Date(),
-  reminderDate: new Date(),
-  industry: '',
-  contractValue: '',
-  technician: '',
-  paymentTerm: '',
-  salesPerson: '',
-  supervisor: '',
-  billingFrequency: '',
-  invoiceCount: '',
-  invoiceRemarks: '',
-  latitude: '',
-  longitude: '',
-  file: '',
-  billingRemarks: '',
-  agreement1: '',
-  agreement2: '',
-  technicianRemarks: '',
-  appointmentRemarks: ''
+    return new Promise((resolve, reject) => {
+      request.onsuccess = event => {
+        // Return contracts sorted by ID (latest first, similar to localStorage behavior)
+        resolve(event.target.result.reverse())
+      }
+      request.onerror = event => {
+        console.error('Error retrieving contracts from IndexedDB:', event.target.error)
+        reject(event.target.error)
+      }
+    })
+  } catch (error) {
+    console.error('Failed to open DB or get contracts:', error)
+    return []
+  }
 }
 
-export default function EditContractPage() {
+// Function to safely get contracts (NOW USES INDEXEDDB)
+const getContracts = async () => {
+  return await getContractsWithPestItems()
+}
+
+// Function to safely save contracts (NOW USES INDEXEDDB)
+const saveContracts = async contracts => {
+  // In the real application, you would typically save ONE new contract,
+  // not the entire array. The handleSubmit function below saves one.
+  // This function is kept here for reference but is not used in the final handleSubmit.
+  console.warn('saveContracts array function called - check implementation if saving entire array is intended.')
+  // For safety, this function will do nothing or be adapted if needed.
+}
+
+export default function AddContractPage() {
   const router = useRouter()
-  const params = useParams()
-  // contractId is the unique ID (e.g., 'mgjb284qlgzahfvbr8') from the URL
-  const contractId = params.id
+
+  // Helper function to generate a simple unique ID
+  const generateUniqueId = () => Date.now().toString(36) + Math.random().toString(36).substring(2)
 
   // ----------------------------------------------------------------------
-  // State and Options (Copied from AddContractPage)
+  // State and Options
   // ----------------------------------------------------------------------
-  const [formData, setFormData] = useState(initialFormData)
+  const [formData, setFormData] = useState({
+    // Initializing all fields to sensible defaults
+    salesMode: '',
+    customer: '',
+    contractType: '',
+    coveredLocation: '',
+    contractCode: '',
+    serviceAddress: '',
+    postalCode: '',
+    accountItemCode: '',
+    poNumber: '',
+    poExpiry: new Date(),
+    preferredTime: '',
+    reportEmail: '',
+    contactPerson: '',
+    sitePhone: '',
+    mobile: '',
+    callType: '',
+    groupCode: '',
+    startDate: new Date(),
+    endDate: new Date(),
+    reminderDate: new Date(),
+    industry: '',
+    contractValue: '',
+    technician: '',
+    paymentTerm: '',
+    salesPerson: '',
+    supervisor: '',
+    billingFrequency: '',
+    invoiceCount: '',
+    invoiceRemarks: '',
+    latitude: '',
+    longitude: '',
+    file: null, // Keep file for actual File object/data if needed for backend
+    uploadedFileName: '', // 💡 NEW: To display file name
+    uploadedFileURL: '', // 💡 NEW: To hold temporary URL for preview
+    billingRemarks: '',
+    agreement1: '',
+    agreement2: '',
+    technicianRemarks: '',
+    appointmentRemarks: ''
+  })
 
   // NEW STATE for the input fields for a single pest item
   const [currentPestItem, setCurrentPestItem] = useState({
@@ -198,7 +208,7 @@ export default function EditContractPage() {
   const [reportEmailError, setReportEmailError] = useState(false)
   const [selectedFile, setSelectedFile] = useState('')
   const [isDragOver, setIsDragOver] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const [openDialog, setOpenDialog] = useState(false) // 💡 NEW: For file dialog
 
   // Autocomplete Fields Definition (Unchanged)
   const autocompleteFields = [
@@ -256,7 +266,7 @@ export default function EditContractPage() {
     fileInputRef = useRef(null)
   const fileUploadButtonRef = useRef(null)
 
-  // NEW Refs for the Add Pest Item fields (Unchanged)
+  // NEW Refs for the Add Pest Item fields
   const currentPestCountRef = useRef(null),
     currentPestValueRef = useRef(null),
     currentTotalRef = useRef(null)
@@ -272,73 +282,7 @@ export default function EditContractPage() {
     closeButtonRef = useRef(null)
   const saveButtonRef = useRef(null)
 
-  // Helper function to generate a simple unique ID (Used for Pest Items only)
-  const generateUniqueId = () => Date.now().toString(36) + Math.random().toString(36).substring(2)
-
-  // ----------------------------------------------------------------------
-  // DATA LOADING LOGIC (NEW FOR EDIT PAGE)
-  // ----------------------------------------------------------------------
-  useEffect(() => {
-    const loadContractData = async () => {
-      if (!contractId) {
-        setLoading(false)
-        router.push('/admin/contracts') // ID இல்லை என்றால் திருப்பி அனுப்பவும்
-        return
-      }
-
-      const contractToEdit = await getContractWithPestItemsById(contractId)
-
-      if (contractToEdit) {
-        // Helper function to safely ensure a value is a string (or Date object)
-        const safeValue = value => {
-          if (value === null || typeof value === 'undefined') return ''
-          return value
-        }
-
-        // Prepare the data with date objects and set states
-        const loadedFormData = {
-          ...contractToEdit,
-          // Date strings ஐ Date ஆப்ஜெக்ட்களாக மாற்றவும்
-          poExpiry: contractToEdit.poExpiry ? new Date(contractToEdit.poExpiry) : new Date(),
-          startDate: contractToEdit.startDate ? new Date(contractToEdit.startDate) : new Date(),
-          endDate: contractToEdit.endDate ? new Date(contractToEdit.endDate) : new Date(),
-          reminderDate: contractToEdit.reminderDate ? new Date(contractToEdit.reminderDate) : new Date()
-        }
-
-        // Iterate over the loaded data and apply safeValue
-        const finalSafeFormData = Object.keys(initialFormData).reduce((acc, key) => {
-          const value = loadedFormData[key]
-          if (value instanceof Date) {
-            acc[key] = value
-          } else {
-            acc[key] = safeValue(value)
-          }
-          return acc
-        }, {})
-
-        // Form data மற்றும் Pest Items-ஐ அமைக்கவும்
-        setFormData(finalSafeFormData)
-        setPestItems(contractToEdit.pestItems || [])
-        setSelectedFile(contractToEdit.file instanceof File ? contractToEdit.file.name : contractToEdit.file || '')
-      } else {
-        console.error(`Contract with ID ${contractId} not found.`)
-        router.push('/admin/contracts') // காண்டிராக்ட் கிடைக்கவில்லை என்றால் திருப்பி அனுப்பவும்
-      }
-      setLoading(false)
-    }
-
-    loadContractData()
-  }, [contractId, router]) // contractId மாறும் போது தரவை மீண்டும் ஏற்றவும்
-
-  if (loading) {
-    return (
-      <ContentLayout title={<Box sx={{ m: 2 }}>{'Edit Contract'}</Box>}>
-        <Typography>Loading contract data...</Typography>
-      </ContentLayout>
-    )
-  }
-
-  // Group all focusable element refs for keyboard navigation sequence (Unchanged)
+  // Group all focusable element refs for keyboard navigation sequence (UPDATED)
   const focusableElementRefs = [
     refs.salesModeInputRef,
     refs.customerInputRef,
@@ -372,6 +316,8 @@ export default function EditContractPage() {
     latitudeRef,
     longitudeRef,
     fileUploadButtonRef,
+
+    // NEW Sequence for 'Add/Edit Pest' inputs
     refs.pestInputRef,
     refs.frequencyInputRef,
     currentPestCountRef,
@@ -381,6 +327,8 @@ export default function EditContractPage() {
     currentChemicalsRef,
     currentNoOfItemsRef,
     addPestButtonRef,
+
+    // Continue with the rest of the form
     billingRemarksRef,
     agreement1Ref,
     agreement2Ref,
@@ -391,24 +339,21 @@ export default function EditContractPage() {
   ].filter(ref => ref)
 
   // ----------------------------------------------------------------------
-  // Handlers (Mostly Copied from AddContractPage - Only handleSubmit changes)
+  // Handlers
   // ----------------------------------------------------------------------
 
   const handleChange = e => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
   }
 
-  // Handler for the current pest item input fields (Unchanged)
+  // Handler for the current pest item input fields
   const handleCurrentPestItemChange = e => {
     const { name, value } = e.target
     let updatedValue = value
 
-    if (['pestCount', 'total', 'noOfItems'].includes(name)) {
-      updatedValue = value.replace(/\D/g, '')
-    }
-
     // Auto-calculate Total (Pest Count * Pest Value)
     if (name === 'pestCount' || name === 'pestValue') {
+      // Use Number() conversion here but keep the string value for state
       const count = name === 'pestCount' ? Number(updatedValue || 0) : Number(currentPestItem.pestCount || 0)
       const val = name === 'pestValue' ? Number(updatedValue || 0) : Number(currentPestItem.pestValue || 0)
 
@@ -454,6 +399,7 @@ export default function EditContractPage() {
         saveButtonRef.current?.focus()
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [...Object.values(refs), ...Object.values(setOpenStates), focusableElementRefs]
   )
 
@@ -479,7 +425,7 @@ export default function EditContractPage() {
     focusNextElement(currentInputRef)
   }
 
-  // NEW: Autocomplete change handler for CURRENT PEST ITEM (Unchanged)
+  // NEW: Autocomplete change handler for CURRENT PEST ITEM
   const handleCurrentPestItemAutocompleteChange = (name, newValue, currentInputRef) => {
     setCurrentPestItem(prev => ({ ...prev, [name]: newValue }))
     const setStateFunc = setOpenStates[name + 'SetOpen']
@@ -508,24 +454,49 @@ export default function EditContractPage() {
     focusNextElement(currentInputRef)
   }
 
-  // File handler functions (Unchanged)
+  // 💡 FIXED/UPDATED File handler functions
   const handleNativeFileChange = e => {
     const file = e.target.files?.[0] || null
     if (file) {
       setSelectedFile(file.name)
-      setFormData(prev => ({ ...prev, file: file }))
+      // Create a temporary URL for preview, like in page A
+      const fileURL = URL.createObjectURL(file)
+      setFormData(prev => ({
+        ...prev,
+        file: file,
+        uploadedFileName: file.name,
+        uploadedFileURL: fileURL
+      }))
     } else {
       setSelectedFile('')
-      setFormData(prev => ({ ...prev, file: '' }))
+      setFormData(prev => ({
+        ...prev,
+        file: null,
+        uploadedFileName: '',
+        uploadedFileURL: ''
+      }))
     }
+    e.target.value = null // Reset file input
     focusNextElement(fileUploadButtonRef)
   }
+
   const handleFileDrop = e => {
     e.preventDefault()
     setIsDragOver(false)
     const file = e.dataTransfer.files?.[0] || null
-    handleNativeFileChange({ target: { files: [file] } })
+    if (file) {
+      // Use the logic from handleNativeFileChange
+      setSelectedFile(file.name)
+      const fileURL = URL.createObjectURL(file)
+      setFormData(prev => ({
+        ...prev,
+        file: file,
+        uploadedFileName: file.name,
+        uploadedFileURL: fileURL
+      }))
+    }
   }
+
   const handleDragOver = e => {
     e.preventDefault()
     setIsDragOver(true)
@@ -535,7 +506,17 @@ export default function EditContractPage() {
     setIsDragOver(false)
   }
 
-  // Function to load an item for editing (Unchanged)
+  // 💡 NEW: Handler for viewing the uploaded file
+  const handleViewFile = () => {
+    if (formData.uploadedFileURL) setOpenDialog(true)
+    else alert('No file available to view.')
+  }
+
+  // 💡 NEW: Handler to close the dialog
+  const handleCloseDialog = () => setOpenDialog(false)
+
+
+  // Function to load an item for editing
   const handleEditPestItem = item => {
     // Load item data into the current input state
     setCurrentPestItem({
@@ -556,7 +537,7 @@ export default function EditContractPage() {
     refs.pestInputRef.current?.focus()
   }
 
-  // Function to save (Add or Update) the current item to the list (Unchanged)
+  // Function to save (Add or Update) the current item to the list
   const handleSavePestItem = () => {
     // Basic validation (Pest and Frequency are required)
     if (!currentPestItem.pest || !currentPestItem.frequency) {
@@ -579,7 +560,7 @@ export default function EditContractPage() {
       setPestItems(prev => prev.map(item => (item.id === editingItemId ? { ...itemPayload, id: item.id } : item)))
       setEditingItemId(null) // Clear edit state
     } else {
-      // Logic for ADDING a new item (Uses the same ID logic as AddContractPage)
+      // Logic for ADDING a new item
       setPestItems(prev => [...prev, { ...itemPayload, id: generateUniqueId() }])
     }
 
@@ -599,7 +580,7 @@ export default function EditContractPage() {
     refs.pestInputRef.current?.focus()
   }
 
-  // Function to delete an item from the list (Unchanged)
+  // Function to delete an item from the list
   const handleDeletePestItem = id => {
     if (editingItemId === id) {
       setEditingItemId(null)
@@ -617,24 +598,31 @@ export default function EditContractPage() {
     setPestItems(prev => prev.filter(item => item.id !== id))
   }
 
-  // Logic to Save to IndexedDB and Redirect (UPDATED for Edit)
+  // Logic to Save to IndexedDB and Redirect
   const handleSubmit = async () => {
-    // Use the existing contractId for the update
-    const updatedContract = {
+    // Revoke the object URL after submission to free up memory
+    if (formData.uploadedFileURL) {
+        URL.revokeObjectURL(formData.uploadedFileURL);
+    }
+
+    const newContract = {
       ...formData,
-      id: contractId, // CRITICAL: Use the existing ID for update
+      id: generateUniqueId(),
       poExpiry: formData.poExpiry.toISOString(),
       startDate: formData.startDate.toISOString(),
       endDate: formData.endDate.toISOString(),
       reminderDate: formData.reminderDate.toISOString(),
-      pestItems: pestItems // Include the list of pest items
+      pestItems: pestItems, // Include the list of pest items
+      // Save only the filename and URL (if you were saving the file itself, this would change)
+      // For IndexedDB, saving the file data directly is complex. For now, we save the metadata.
+      file: null, // Don't save the large File object to DB
     }
 
     try {
-      await updateContractWithPestItems(updatedContract) // Use the new update function
+      await saveContractWithPestItems(newContract)
       router.push('/admin/contracts')
     } catch (error) {
-      alert('Failed to update contract to database. See console for details.')
+      alert('Failed to save contract to database. See console for details.')
       console.error('Submission failed:', error)
     }
   }
@@ -672,23 +660,21 @@ export default function EditContractPage() {
   }
 
   // ----------------------------------------------------------------------
-  // Form Structure (Copied from AddContractPage, Updated Title/Button)
+  // Form Structure (Updated File Upload Section)
   // ----------------------------------------------------------------------
 
   return (
     <ContentLayout
-      // Title changed to 'Edit Contract'
-      title={<Box sx={{ m: 2 }}>{'Edit Contract'}</Box>}
+      title={<Box sx={{ m: 2 }}>{'Add Contract'}</Box>}
       breadcrumbs={[
         { label: 'Dashboard', href: '/' },
         { label: 'Contracts', href: '/admin/contracts' },
-        // Breadcrumb changed to 'Edit Contract'
-        { label: 'Edit Contract' }
+        { label: 'Add Contract' }
       ]}
     >
       <Card sx={{ p: 4, boxShadow: 'none' }} elevation={0}>
         <Grid container spacing={6}>
-          {/* Row 1 to Row 9: Unchanged (uses formData state which is now pre-filled) */}
+          {/* ... (Existing form fields, rows 1-9) ... */}
           {renderAutocomplete({
             name: 'salesMode',
             label: 'Sales Mode',
@@ -759,13 +745,9 @@ export default function EditContractPage() {
               label='PO Number'
               name='poNumber'
               value={formData.poNumber || ''}
-              onChange={e => {
-                const numericValue = e.target.value.replace(/\D/g, '')
-                setFormData(prev => ({ ...prev, poNumber: numericValue }))
-              }}
+              onChange={handleChange}
               inputRef={poNumberRef}
               onKeyDown={e => handleKeyDown(e, poNumberRef)}
-              inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
             />
           </Grid>
           <Grid item xs={12} md={3}>
@@ -800,6 +782,7 @@ export default function EditContractPage() {
               onChange={e => {
                 const value = e.target.value
                 setFormData(prev => ({ ...prev, reportEmail: value }))
+                // Keep standard email validation
                 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
                 setReportEmailError(value && !emailRegex.test(value))
               }}
@@ -815,13 +798,9 @@ export default function EditContractPage() {
               label='Site Contact Person Name'
               name='contactPerson'
               value={formData.contactPerson || ''}
-              onChange={e => {
-                const onlyLetters = e.target.value.replace(/[^A-Za-z\s]/g, '')
-                setFormData(prev => ({ ...prev, contactPerson: onlyLetters }))
-              }}
+              onChange={handleChange}
               inputRef={contactPersonRef}
               onKeyDown={e => handleKeyDown(e, contactPersonRef)}
-              inputProps={{ inputMode: 'text', pattern: '[A-Za-z ]*' }}
             />
           </Grid>
           <Grid item xs={12} md={3}>
@@ -915,10 +894,7 @@ export default function EditContractPage() {
               label='Contract Value'
               name='contractValue'
               value={formData.contractValue}
-              onChange={e => {
-                const value = e.target.value.replace(/\D/g, '')
-                setFormData(prev => ({ ...prev, contractValue: value }))
-              }}
+              onChange={handleChange}
               inputRef={contractValueRef}
               onKeyDown={e => handleKeyDown(e, contractValueRef)}
             />
@@ -956,13 +932,9 @@ export default function EditContractPage() {
               label='No. of Invoice'
               name='invoiceCount'
               value={formData.invoiceCount || ''}
-              onChange={e => {
-                const numericValue = e.target.value.replace(/\D/g, '')
-                setFormData(prev => ({ ...prev, invoiceCount: numericValue }))
-              }}
+              onChange={handleChange}
               inputRef={invoiceCountRef}
               onKeyDown={e => handleKeyDown(e, invoiceCountRef)}
-              inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
             />
           </Grid>
           <Grid item xs={12} md={3}>
@@ -987,7 +959,7 @@ export default function EditContractPage() {
               onKeyDown={e => handleKeyDown(e, latitudeRef)}
             />
           </Grid>
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12} md={3}>
             <CustomTextField
               fullWidth
               label='Longitude'
@@ -998,41 +970,67 @@ export default function EditContractPage() {
               onKeyDown={e => handleKeyDown(e, longitudeRef)}
             />
           </Grid>
+
+          {/* 💡 UPDATED FILE UPLOAD SECTION - Includes View Button */}
           <Grid item xs={12} md={6}>
             <Typography variant='body2' sx={{ mb: 1, fontWeight: 500 }}>
               Upload File
             </Typography>
-            <input
-              type='file'
-              ref={fileInputRef}
-              style={{ display: 'none' }}
-              name='file'
-              onChange={handleNativeFileChange}
-            />
-            <Button
-              variant='outlined'
-              fullWidth
-              onClick={() => fileInputRef.current?.click()}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleFileDrop}
-              ref={fileUploadButtonRef}
-              onKeyDown={e => handleKeyDown(e, fileUploadButtonRef)}
-              sx={{
-                justifyContent: 'space-between',
-                borderColor: 'black',
-                borderStyle: isDragOver ? 'dashed' : 'solid',
-                borderWidth: 1,
-                '&:hover': { borderColor: 'black' }
-              }}
-            >
-              <Typography sx={{ color: selectedFile ? 'text.primary' : 'text.disabled' }}>
-                {selectedFile || 'Choose File or Drag & Drop Here'}
-              </Typography>
-            </Button>
-          </Grid>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'stretch' }}>
+              <input
+                type='file'
+                ref={fileInputRef}
+                style={{ display: 'none' }}
+                name='file'
+                onChange={handleNativeFileChange}
+              />
+              <Button
+                variant='outlined'
+                fullWidth
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleFileDrop}
+                ref={fileUploadButtonRef}
+                onKeyDown={e => handleKeyDown(e, fileUploadButtonRef)}
+                sx={{
+                  justifyContent: 'space-between',
+                  borderColor: 'black',
+                  borderStyle: isDragOver ? 'dashed' : 'solid',
+                  borderWidth: 1,
+                  py: 1.5,
+                  flexGrow: 1
+                }}
+              >
+                <Typography
+                  sx={{
+                    color: formData.uploadedFileName ? 'text.primary' : 'text.disabled',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {formData.uploadedFileName || 'Choose File or Drag & Drop Here'}
+                </Typography>
+              </Button>
 
-          {/* --- PEST ITEM INPUTS (Unchanged) --- */}
+              {/* View Button, visible if a file URL exists */}
+              {formData.uploadedFileURL && (
+                <IconButton
+                  color='primary'
+                  onClick={handleViewFile}
+                  sx={{ border: '1px solid currentColor', borderRadius: '8px', p: 1.5 }}
+                  title='View Uploaded File'
+                >
+                  <VisibilityIcon />
+                </IconButton>
+              )}
+            </Box>
+          </Grid>
+          {/* 💡 END UPDATED FILE UPLOAD SECTION */}
+
+
+          {/* --- PEST ITEM INPUTS (Updated) --- */}
           <Grid item xs={12}>
             <Typography variant='h6' sx={{ mb: 4, mt: 4 }}>
               Pest Item Details ({editingItemId ? 'Editing Mode' : 'Add Mode'})
@@ -1106,13 +1104,12 @@ export default function EditContractPage() {
               onChange={handleCurrentPestItemChange}
               inputRef={currentPestCountRef}
               onKeyDown={e => handleKeyDown(e, currentPestCountRef)}
-              inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
             />
           </Grid>
           <Grid item xs={12} md={2.4}>
             {/* Pest Value */}
             <CustomTextField
-              type='number'
+              type='text'
               fullWidth
               label='Pest Value'
               name='pestValue'
@@ -1120,14 +1117,6 @@ export default function EditContractPage() {
               onChange={handleCurrentPestItemChange}
               inputRef={currentPestValueRef}
               onKeyDown={e => handleKeyDown(e, currentPestValueRef)}
-              inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
-              sx={{
-                '& input[type=number]': { MozAppearance: 'textfield' },
-                '& input[type=number]::-webkit-outer-spin-button, & input[type=number]::-webkit-inner-spin-button': {
-                  WebkitAppearance: 'none',
-                  margin: 0
-                }
-              }}
             />
           </Grid>
           <Grid item xs={12} md={2.4}>
@@ -1140,7 +1129,6 @@ export default function EditContractPage() {
               onChange={handleCurrentPestItemChange}
               inputRef={currentTotalRef}
               onKeyDown={e => handleKeyDown(e, currentTotalRef)}
-              inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
               disabled
             />
           </Grid>
@@ -1187,7 +1175,7 @@ export default function EditContractPage() {
           <Grid item xs={12} md={3}>
             {/* No of Items */}
             <CustomTextField
-              type='number'
+              type='text'
               fullWidth
               label='No of Items'
               name='noOfItems'
@@ -1195,14 +1183,6 @@ export default function EditContractPage() {
               onChange={handleCurrentPestItemChange}
               inputRef={currentNoOfItemsRef}
               onKeyDown={e => handleKeyDown(e, currentNoOfItemsRef)}
-              inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
-              sx={{
-                '& input[type=number]': { MozAppearance: 'textfield' },
-                '& input[type=number]::-webkit-outer-spin-button, & input[type=number]::-webkit-inner-spin-button': {
-                  WebkitAppearance: 'none',
-                  margin: 0
-                }
-              }}
             />
           </Grid>
           <Grid item xs={12} md={3} sx={{ display: 'flex', alignItems: 'flex-end' }}>
@@ -1210,13 +1190,17 @@ export default function EditContractPage() {
               variant='contained'
               fullWidth
               onClick={handleSavePestItem} // Use the new save handler
+              // Change icon based on mode
               ref={addPestButtonRef}
               onKeyDown={e => handleKeyDown(e, addPestButtonRef)}
-              color={editingItemId ? 'success' : 'primary'}
+              // --- CHANGES MADE HERE ---
+              color={editingItemId ? 'success' : 'primary'} // UPDATE PEST is now 'success' (green)
+              // -------------------------
             >
-              {editingItemId ? 'UPDATE PEST' : 'ADD PEST'}
+              {editingItemId ? 'UPDATE PEST' : 'ADD PEST'} {/* Change text based on mode */}
             </Button>
           </Grid>
+
           {/* ---------------------------------------------------- */}
           {/* --- PEST ITEMS TABLE (MUI DESIGN - Left Aligned) --- */}
           {/* ---------------------------------------------------- */}
@@ -1225,10 +1209,10 @@ export default function EditContractPage() {
               <Table sx={{ minWidth: 950 }}>
                 <TableHead>
                   <TableRow>
+                    {/* All headers are left-aligned or explicitly set */}
                     <TableCell sx={{ width: '5%' }}>#</TableCell>
                     <TableCell align='center' sx={{ width: '10%' }}>
-                      {' '}
-                      Action{' '}
+                      Action
                     </TableCell>
                     <TableCell sx={{ width: '15%' }}>Pest</TableCell>
                     <TableCell sx={{ width: '12%' }}>Frequency</TableCell>
@@ -1250,10 +1234,16 @@ export default function EditContractPage() {
                     pestItems.map((item, index) => (
                       <TableRow
                         key={item.id}
-                        sx={{ backgroundColor: editingItemId === item.id ? 'action.selected' : 'inherit' }}
+                        // --- CHANGES MADE HERE ---
+                        // Removed orange highlight for editing row
+                        sx={{ backgroundColor: editingItemId === item.id ? 'inherit' : 'inherit' }}
+                        // -------------------------
                       >
+                        {/* Data cells are now left-aligned */}
                         <TableCell>{index + 1}</TableCell>
                         <TableCell align='center'>
+                          {/* Action Buttons remain centered */}
+
                           <IconButton
                             size='small'
                             color='error'
@@ -1264,7 +1254,7 @@ export default function EditContractPage() {
                           </IconButton>
                           <IconButton
                             size='small'
-                            color='primary'
+                            color=''
                             onClick={() => handleEditPestItem(item)}
                             disabled={editingItemId === item.id}
                             sx={{ p: 1 }}
@@ -1355,17 +1345,33 @@ export default function EditContractPage() {
             />
           </Grid>
 
-          {/* Actions - Button text changed to 'Update' */}
+          {/* Actions */}
           <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 4, pt: 8 }}>
             <Button variant='outlined' onClick={() => router.push('/admin/contracts')} ref={closeButtonRef}>
               Close
             </Button>
-            <Button variant='contained' onClick={handleSubmit} ref={saveButtonRef} startIcon={<SaveIcon />}>
-              Update
+            <Button variant='contained' onClick={handleSubmit} ref={saveButtonRef}>
+              Save
             </Button>
           </Grid>
         </Grid>
       </Card>
+
+      {/* 💡 NEW: Image Dialog for file preview */}
+      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth='md' fullWidth>
+      <DialogContent sx={{ p: 0, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          {formData.uploadedFileURL && (
+            <img
+              src={formData.uploadedFileURL}
+              alt='Uploaded File Preview'
+                style={{ width: '100%', height: 'auto', objectFit: 'contain' }}
+            />
+
+
+
+       )}
+        </DialogContent>
+      </Dialog>
     </ContentLayout>
   )
 }

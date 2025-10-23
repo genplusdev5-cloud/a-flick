@@ -17,7 +17,7 @@ import {
   Pagination,
   Menu
 } from '@mui/material'
-
+import { useTheme } from '@mui/material/styles'
 // Icons
 import AddIcon from '@mui/icons-material/Add'
 import DownloadIcon from '@mui/icons-material/Download'
@@ -141,7 +141,7 @@ export default function BillingFrequencyPage() {
       ...row
     })
     setOpen(true)
-    
+
   }
 
   const handleDelete = async row => {
@@ -244,14 +244,21 @@ export default function BillingFrequencyPage() {
   const startIndex = rowCount === 0 ? 0 : (page - 1) * pageSize + 1
   const endIndex = Math.min(page * pageSize, rowCount)
   const paginationText = `Showing ${startIndex} to ${endIndex} of ${rowCount} entries`
-
+  const theme = useTheme()
   return (
     <Box>
       {/* Breadcrumb */}
       <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
-        <Link href='/' style={{ color: '#7367F0', textDecoration: 'none', fontSize: 14 }}>
-          Dashboard
-        </Link>
+                <Link
+      href='/admin/dashboards'
+      style={{
+        textDecoration: 'none',
+        fontSize: 14,
+        color: theme.palette.primary.main  // 👈 Theme color used
+      }}
+    >
+      Dashboard
+    </Link>
         <Typography sx={{ mx: 1, color: 'text.secondary' }}>/</Typography>
         <Typography variant='body2' sx={{ fontSize: 14 }}>
           Billing Frequency

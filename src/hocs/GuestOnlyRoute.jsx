@@ -14,7 +14,8 @@ const GuestOnlyRoute = async ({ children, lang }) => {
   const session = await getServerSession()
 
   if (session) {
-    redirect(getLocalizedUrl(themeConfig.homePageUrl, lang))
+    // Always send authenticated users to the localized admin dashboards route
+    redirect(getLocalizedUrl('/admin/dashboards', lang))
   }
 
   return <>{children}</>

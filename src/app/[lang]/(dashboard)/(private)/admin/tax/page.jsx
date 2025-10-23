@@ -12,13 +12,14 @@ import {
   MenuItem,
   Typography,
   ListItemText,
-  FormControl, // Added for pageSize Select
-  Select, // Added for pageSize Select
-  Pagination, // Added for Pagination component
-  Card, // Added for card styling
-  Divider // Added for divider
+  FormControl,
+  Select,
+  Pagination,
+  Card,
+  Divider
 } from '@mui/material'
 
+import { useTheme } from '@mui/material/styles'
 // Icons
 import { MdDelete } from 'react-icons/md'
 import AddIcon from '@mui/icons-material/Add'
@@ -27,9 +28,9 @@ import CloseIcon from '@mui/icons-material/Close'
 import DownloadIcon from '@mui/icons-material/Download'
 import EditIcon from '@mui/icons-material/Edit'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward' // For sorting up
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward' // For sorting down
-import Link from 'next/link' // Added for breadcrumb
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
+import Link from 'next/link'
 
 // Wrapper
 import CustomTextField from '@core/components/mui/TextField'
@@ -69,6 +70,7 @@ const loadRowsFromDB = async () => {
   const db = await initDB()
   const allRows = await db.getAll(STORE_NAME)
   // Ensure 'tax' is formatted on load
+  // Note: Assuming 'tax_value' in DB is stored as 'tax' based on the rest of the component
   return allRows.map(r => ({ ...r, tax: formatTaxValue(r.tax) })).sort((a, b) => b.id - a.id)
 }
 
@@ -121,6 +123,7 @@ export default function TaxPage() {
 
   const toggleDrawer = () => setOpen(prev => !prev)
 
+  // General change handler (only used for status select now)
   const handleChange = e => setFormData({ ...formData, [e.target.name]: e.target.value })
 
   const handleAdd = () => {
@@ -134,6 +137,7 @@ export default function TaxPage() {
   const handleEdit = row => {
     setIsEdit(true)
     setEditRow(row)
+    // Note: 'tax_value' in state maps to 'tax' in the DB row object
     setFormData({ name: row.name, tax_value: row.tax, status: row.status || 'Active' })
     setOpen(true)
     setTimeout(() => nameRef.current?.focus(), 100)
@@ -141,8 +145,12 @@ export default function TaxPage() {
 
   const handleDelete = async row => {
     // In a real app, you might want a confirmation dialog
-    setRows(prev => prev.filter(r => r.id !== row.id))
     await deleteRowFromDB(row.id)
+    setRows(prev => prev.filter(r => r.id !== row.id))
+    // Reset page if necessary after deletion (e.g., last row on the page)
+    if (paginatedRows.length === 1 && page > 1) {
+      setPage(page - 1)
+    }
   }
 
   const handleSubmit = async e => {
@@ -150,33 +158,40 @@ export default function TaxPage() {
     if (!formData.name || !formData.tax_value) return
 
     const formattedTax = formatTaxValue(formData.tax_value)
-    if (formattedTax === '') return
+    if (formattedTax === '') return // Stop if tax value is invalid
 
     let rowToSave
     if (isEdit && editRow) {
+      // Update existing row
       rowToSave = {
         ...editRow,
         name: formData.name,
         tax: formattedTax,
-        status: formData.status || 'Active'
+        status: formData.status || 'Active',
+        id: editRow.id // Keep existing ID
       }
       await addOrUpdateRowToDB(rowToSave)
       setRows(prev => prev.map(r => (r.id === editRow.id ? rowToSave : r)))
     } else {
-      // IndexedDB autoIncrement handles ID, but we predict for immediate state update (Page A style)
-      // Note: This logic for ID prediction is flawed if 'rows' is not all data. Better to use the returned key from IndexedDB add or rely on a full reload.
-      // We will use the approach from Page A's implementation of ID prediction:
-      const newId = rows.length ? Math.max(...rows.map(r => r.id)) + 1 : 1
+      // Add new row (IndexedDB will assign ID, but for immediate state prediction we do this)
+      // This ID prediction is simplified; the robust way is to reload or use the returned key.
+      // We'll stick to the existing prediction logic for now.
+      const maxId = rows.length ? Math.max(...rows.map(r => r.id)) : 0
       rowToSave = {
-        id: newId,
+        // We set a temporary ID here. The IndexedDB `put` operation will use the keyPath
+        // and if it's new (which it should be if we predict the ID correctly), it will be added.
+        // For a true new insert with autoIncrement, we should use db.add and get the returned key,
+        // but for compatibility with the existing code structure, we use the prediction.
+        id: maxId + 1,
         name: formData.name,
         tax: formattedTax,
         status: formData.status || 'Active'
       }
 
-      await addOrUpdateRowToDB(rowToSave) // Use put/add as appropriate. Since keyPath is 'id' and we set a predicted ID, put is safer.
+      await addOrUpdateRowToDB(rowToSave)
+      // Add the new row and sort descending by ID
       setRows(prev => {
-        const newRows = [rowToSave, ...prev.filter(r => r.id !== newId)] // Ensure no duplicates
+        const newRows = [rowToSave, ...prev.filter(r => r.id !== rowToSave.id)]
         return newRows.sort((a, b) => b.id - a.id)
       })
     }
@@ -186,17 +201,18 @@ export default function TaxPage() {
     // Reset sort to 'id' desc to show the new/updated row easily (from Page A)
     setSortField('id')
     setSortDirection('desc')
+    setPage(1) // Go to the first page where new row will appear
   }
 
   const handleKeyDown = (e, field) => {
     if (e.key === 'Enter') {
       e.preventDefault()
       if (field === 'name') taxRef.current?.focus()
-      else if (field === 'tax') submitRef.current?.focus()
+      else if (field === 'tax') submitRef.current?.click() // Use click to trigger the submit function
     }
   }
 
-  // ------------------- Sorting Logic (from Page A) -------------------
+  // ------------------- Sorting Logic -------------------
 
   const handleSort = field => {
     if (sortField === field) {
@@ -213,11 +229,11 @@ export default function TaxPage() {
     const bValue = b[sortField] || ''
 
     let comparison = 0
-    // Check if values are numerical (for tax and id)
-    if (!isNaN(Number(aValue)) && !isNaN(Number(bValue))) {
+    // Handle numeric fields ('id', 'tax')
+    if (sortField === 'id' || sortField === 'tax') {
       comparison = Number(aValue) - Number(bValue)
     } else {
-      // Case-insensitive string comparison for name, status
+      // Case-insensitive string comparison for 'name', 'status'
       comparison = String(aValue).localeCompare(String(bValue), undefined, { sensitivity: 'base' })
     }
 
@@ -225,13 +241,13 @@ export default function TaxPage() {
     return sortDirection === 'asc' ? comparison : comparison * -1
   })
 
-  // Helper component to render the sort icon (from Page A)
+  // Helper component to render the sort icon
   const SortIcon = ({ field }) => {
     if (sortField !== field) return null
     return sortDirection === 'asc' ? <ArrowUpwardIcon sx={{ fontSize: 16, ml: 0.5 }} /> : <ArrowDownwardIcon sx={{ fontSize: 16, ml: 0.5 }} />
   }
 
-  // ------------------- Filtering and Pagination (from Page A) -------------------
+  // ------------------- Filtering and Pagination -------------------
 
   const handleSearch = e => {
     setSearchText(e.target.value)
@@ -256,12 +272,20 @@ export default function TaxPage() {
     alert(`Export as: ${type}`)
     handleExportClose()
   }
+  const theme = useTheme()
 
   return (
     <Box>
-      {/* Breadcrumb (from Page A) */}
+      {/* Breadcrumb */}
       <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
-        <Link href='/' style={{ color: '#7367F0', textDecoration: 'none', fontSize: 14 }}>
+        <Link
+          href='/admin/dashboards'
+          style={{
+            textDecoration: 'none',
+            fontSize: 14,
+            color: theme.palette.primary.main
+          }}
+        >
           Dashboard
         </Link>
         <Typography sx={{ mx: 1, color: 'text.secondary' }}>/</Typography>
@@ -271,7 +295,7 @@ export default function TaxPage() {
       </Box>
 
       <Card sx={{ p: 6 }}>
-        {/* Header + actions (from Page A) */}
+        {/* Header + actions */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
           <Typography variant='h6'>Tax List</Typography>
 
@@ -298,7 +322,7 @@ export default function TaxPage() {
 
         <Divider sx={{ mb: 3 }} />
 
-        {/* Search / entries (from Page A) */}
+        {/* Search / entries */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <FormControl size='small' sx={{ minWidth: 120 }}>
             <Select
@@ -334,7 +358,7 @@ export default function TaxPage() {
           />
         </Box>
 
-        {/* Table (Manual HTML Table - from Page A) */}
+        {/* Table (Manual HTML Table) */}
         <Box sx={{ overflowX: 'auto' }}>
           <table
             style={{
@@ -345,7 +369,7 @@ export default function TaxPage() {
           >
             <thead>
               <tr style={{ textAlign: 'left', borderBottom: '1px solid #E5E7EB' }}>
-                {/* S.No / ID Header (from Page A) */}
+                {/* S.No / ID Header */}
                 <th
                   onClick={() => handleSort('id')}
                   style={{ padding: '12px', width: '60px', cursor: 'pointer', userSelect: 'none' }}
@@ -434,7 +458,7 @@ export default function TaxPage() {
           )}
         </Box>
 
-        {/* Pagination (from Page A) */}
+        {/* Pagination */}
         <Box
           sx={{
             display: 'flex',
@@ -468,7 +492,7 @@ export default function TaxPage() {
         </Box>
       </Card>
 
-      {/* Drawer Form (Modified for Page B's fields, keeping Page A's structure) */}
+      {/* Drawer Form */}
       <Drawer anchor='right' open={open} onClose={toggleDrawer}>
         <Box sx={{ width: 360, p: 3 }}>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={2}>
@@ -485,9 +509,11 @@ export default function TaxPage() {
               margin='normal'
               inputRef={nameRef}
               onChange={e => {
-                // Allows letters and spaces, same as Page B's logic
-                const lettersOnly = e.target.value.replace(/[^a-zA-Z\s]/g, '')
-                setFormData(prev => ({ ...prev, name: lettersOnly }))
+                let value = e.target.value
+                // FIX: Replaced the error-causing line:
+                // setFormData(prev => ({ ...prev, name: validChars }))
+                // with the correct logic to update the state with the input value:
+                setFormData(prev => ({ ...prev, name: value }))
               }}
               onKeyDown={e => handleKeyDown(e, 'name')}
             />
@@ -501,11 +527,13 @@ export default function TaxPage() {
               inputRef={taxRef}
               onChange={e => {
                 const val = e.target.value
+                // Only allow numbers, optional minus sign, and one decimal point
                 const numericValue = val.match(/^-?\d*\.?\d*$/)?.[0] || ''
-                setFormData({ ...formData, tax_value: numericValue })
+                setFormData(prev => ({ ...prev, tax_value: numericValue }))
               }}
               onBlur={e => {
                 let val = e.target.value
+                // Only format on blur if it's a valid number
                 if (val !== '' && !isNaN(parseFloat(val))) {
                   const num = parseFloat(val)
                   val = num.toLocaleString('fullwide', {
@@ -514,7 +542,7 @@ export default function TaxPage() {
                     maximumFractionDigits: 2
                   })
                 } else val = ''
-                setFormData({ ...formData, tax_value: val })
+                setFormData(prev => ({ ...prev, tax_value: val }))
               }}
               onKeyDown={e => handleKeyDown(e, 'tax')}
               type='text'

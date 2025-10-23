@@ -31,7 +31,7 @@ import { MdDelete } from 'react-icons/md'
 
 // Layout & Custom Components (Assuming these are still required for the overall layout)
 import CustomTextField from '@core/components/mui/TextField'
-
+import { useTheme } from '@mui/material/styles'
 // ------------------- IndexedDB -------------------
 const DB_NAME = 'incident_db'
 const STORE_NAME = 'incidents'
@@ -224,16 +224,23 @@ export default function IncidentPage() {
   const paginatedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize)
   const startIndex = rowCount === 0 ? 0 : (page - 1) * pageSize + 1
   const endIndex = Math.min(page * pageSize, rowCount)
-
+const theme = useTheme()
   // ------------------- Render -------------------
 
   return (
     <Box>
       {/* Breadcrumb (from ContentLayout prop) */}
       <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
-        <Link href='/' style={{ color: '#7367F0', textDecoration: 'none', fontSize: 14 }}>
-          Home
-        </Link>
+        <Link
+      href='/admin/dashboards'
+      style={{
+        textDecoration: 'none',
+        fontSize: 14,
+        color: theme.palette.primary.main // 👈 Theme primary color used
+      }}
+    >
+      Dashboard
+    </Link>
         <Typography sx={{ mx: 1, color: 'text.secondary' }}>/</Typography>
         <Typography variant='body2' sx={{ fontSize: 14 }}>
           Incident List
@@ -384,7 +391,7 @@ export default function IncidentPage() {
                       <IconButton size='small' color='error' onClick={() => handleDelete(r)}>
                         <MdDelete />
                       </IconButton>
-       
+
                     </Box>
                   </td>
 

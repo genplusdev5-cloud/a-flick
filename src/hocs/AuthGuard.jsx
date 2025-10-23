@@ -9,6 +9,18 @@ import AuthRedirect from '@/components/AuthRedirect'
 
 export default async function AuthGuard({ children, locale }) {
   const session = await getServerSession()
-
-  return <>{session ? children : <AuthRedirect lang={locale} />}</>
+  // If authenticated and not on /admin/dashboards, redirect
+  if (session) {
+    if (typeof window !== 'undefined') {
+      const pathname = window.location.pathname
+      const dashboardsPath = `/${locale}/admin/dashboards`
+      if (pathname !== dashboardsPath) {
+        window.location.replace(dashboardsPath)
+        return null
+      }
+    }
+    return <>{children}</>
+  } else {
+    return <AuthRedirect lang={locale} />
+  }
 }

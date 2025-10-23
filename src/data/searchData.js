@@ -2,7 +2,7 @@ const data = [
   {
     id: '1',
     name: 'CRM Dashboard',
-    url: '/dashboards/crm',
+    url: '/admin/dashboards',
     icon: 'tabler-chart-pie-2',
     section: 'Dashboards'
   },

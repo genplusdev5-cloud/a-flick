@@ -37,7 +37,7 @@ import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import CustomTextField from '@core/components/mui/TextField'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import Link from 'next/link'
-
+import { useTheme } from '@mui/material/styles'
 // --- IndexedDB Configuration ---
 const DB_NAME = 'employee_leave_db'
 const STORE_NAME = 'leaves'
@@ -318,14 +318,21 @@ export default function EmployeeLeavePage() {
   }
 
   // --- JSX Rendering ---
-
+  const theme = useTheme()
   return (
     <Box>
       {/* Breadcrumb (Matching Page A) */}
       <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
-        <Link href='/' style={{ color: '#7367F0', textDecoration: 'none', fontSize: 14 }}>
-          Dashboard
-        </Link>
+          <Link
+      href='/admin/dashboards'
+      style={{
+        textDecoration: 'none',
+        fontSize: 14,
+        color: theme.palette.primary.main // 👈 Theme primary color used
+      }}
+    >
+      Dashboard
+    </Link>
         <Typography sx={{ mx: 1, color: 'text.secondary' }}>/</Typography>
         <Typography variant='body2' sx={{ fontSize: 14 }}>
           Employee Leaves
@@ -447,7 +454,7 @@ export default function EmployeeLeavePage() {
                       <IconButton size='small' color='error' onClick={() => handleDelete(r)}>
                         <MdDelete />
                       </IconButton>
-              
+
                     </Box>
                   </td>
                   {/* Data Cells */}

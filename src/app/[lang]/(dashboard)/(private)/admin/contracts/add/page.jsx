@@ -12,13 +12,15 @@ import {
   TableRow,
   TableCell,
   TableBody,
-  IconButton
+  IconButton,
+  Dialog, // 💡 NEW: Import Dialog and related components
+  DialogContent
 } from '@mui/material'
 import { useRouter } from 'next/navigation'
 
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
-import AddIcon from '@mui/icons-material/Add'
+import VisibilityIcon from '@mui/icons-material/Visibility' // 💡 NEW: Import VisibilityIcon
 
 // Layout + Inputs (Assuming these paths are correct)
 import ContentLayout from '@/components/layout/ContentLayout'
@@ -119,12 +121,6 @@ const getContractsWithPestItems = async () => {
   }
 }
 
-// ----------------------------------------------------------------------
-// LOCAL STORAGE FALLBACK FUNCTIONS (REPLACED BY INDEXEDDB FUNCTIONS)
-// Kept the names similar for compatibility with existing code structure,
-// but they are now just wrappers for the IndexedDB functions above.
-// ----------------------------------------------------------------------
-
 // Function to safely get contracts (NOW USES INDEXEDDB)
 const getContracts = async () => {
   return await getContractsWithPestItems()
@@ -138,7 +134,6 @@ const saveContracts = async contracts => {
   console.warn('saveContracts array function called - check implementation if saving entire array is intended.')
   // For safety, this function will do nothing or be adapted if needed.
 }
-
 
 export default function AddContractPage() {
   const router = useRouter()
@@ -182,7 +177,9 @@ export default function AddContractPage() {
     invoiceRemarks: '',
     latitude: '',
     longitude: '',
-    file: '',
+    file: null, // Keep file for actual File object/data if needed for backend
+    uploadedFileName: '', // 💡 NEW: To display file name
+    uploadedFileURL: '', // 💡 NEW: To hold temporary URL for preview
     billingRemarks: '',
     agreement1: '',
     agreement2: '',
@@ -211,6 +208,7 @@ export default function AddContractPage() {
   const [reportEmailError, setReportEmailError] = useState(false)
   const [selectedFile, setSelectedFile] = useState('')
   const [isDragOver, setIsDragOver] = useState(false)
+  const [openDialog, setOpenDialog] = useState(false) // 💡 NEW: For file dialog
 
   // Autocomplete Fields Definition (Unchanged)
   const autocompleteFields = [
@@ -286,7 +284,6 @@ export default function AddContractPage() {
 
   // Group all focusable element refs for keyboard navigation sequence (UPDATED)
   const focusableElementRefs = [
-    // ... (All existing refs up to fileUploadButtonRef)
     refs.salesModeInputRef,
     refs.customerInputRef,
     refs.contractTypeInputRef,
@@ -354,12 +351,9 @@ export default function AddContractPage() {
     const { name, value } = e.target
     let updatedValue = value
 
-    if (['pestCount', 'total', 'noOfItems'].includes(name)) {
-      updatedValue = value.replace(/\D/g, '')
-    }
-
     // Auto-calculate Total (Pest Count * Pest Value)
     if (name === 'pestCount' || name === 'pestValue') {
+      // Use Number() conversion here but keep the string value for state
       const count = name === 'pestCount' ? Number(updatedValue || 0) : Number(currentPestItem.pestCount || 0)
       const val = name === 'pestValue' ? Number(updatedValue || 0) : Number(currentPestItem.pestValue || 0)
 
@@ -405,6 +399,7 @@ export default function AddContractPage() {
         saveButtonRef.current?.focus()
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [...Object.values(refs), ...Object.values(setOpenStates), focusableElementRefs]
   )
 
@@ -459,24 +454,49 @@ export default function AddContractPage() {
     focusNextElement(currentInputRef)
   }
 
-  // File handler functions (Unchanged)
+  // 💡 FIXED/UPDATED File handler functions
   const handleNativeFileChange = e => {
     const file = e.target.files?.[0] || null
     if (file) {
       setSelectedFile(file.name)
-      setFormData(prev => ({ ...prev, file: file }))
+      // Create a temporary URL for preview, like in page A
+      const fileURL = URL.createObjectURL(file)
+      setFormData(prev => ({
+        ...prev,
+        file: file,
+        uploadedFileName: file.name,
+        uploadedFileURL: fileURL
+      }))
     } else {
       setSelectedFile('')
-      setFormData(prev => ({ ...prev, file: '' }))
+      setFormData(prev => ({
+        ...prev,
+        file: null,
+        uploadedFileName: '',
+        uploadedFileURL: ''
+      }))
     }
+    e.target.value = null // Reset file input
     focusNextElement(fileUploadButtonRef)
   }
+
   const handleFileDrop = e => {
     e.preventDefault()
     setIsDragOver(false)
     const file = e.dataTransfer.files?.[0] || null
-    handleNativeFileChange({ target: { files: [file] } })
+    if (file) {
+      // Use the logic from handleNativeFileChange
+      setSelectedFile(file.name)
+      const fileURL = URL.createObjectURL(file)
+      setFormData(prev => ({
+        ...prev,
+        file: file,
+        uploadedFileName: file.name,
+        uploadedFileURL: fileURL
+      }))
+    }
   }
+
   const handleDragOver = e => {
     e.preventDefault()
     setIsDragOver(true)
@@ -485,6 +505,16 @@ export default function AddContractPage() {
     e.preventDefault()
     setIsDragOver(false)
   }
+
+  // 💡 NEW: Handler for viewing the uploaded file
+  const handleViewFile = () => {
+    if (formData.uploadedFileURL) setOpenDialog(true)
+    else alert('No file available to view.')
+  }
+
+  // 💡 NEW: Handler to close the dialog
+  const handleCloseDialog = () => setOpenDialog(false)
+
 
   // Function to load an item for editing
   const handleEditPestItem = item => {
@@ -570,6 +600,11 @@ export default function AddContractPage() {
 
   // Logic to Save to IndexedDB and Redirect
   const handleSubmit = async () => {
+    // Revoke the object URL after submission to free up memory
+    if (formData.uploadedFileURL) {
+        URL.revokeObjectURL(formData.uploadedFileURL);
+    }
+
     const newContract = {
       ...formData,
       id: generateUniqueId(),
@@ -577,15 +612,18 @@ export default function AddContractPage() {
       startDate: formData.startDate.toISOString(),
       endDate: formData.endDate.toISOString(),
       reminderDate: formData.reminderDate.toISOString(),
-      pestItems: pestItems // Include the list of pest items
+      pestItems: pestItems, // Include the list of pest items
+      // Save only the filename and URL (if you were saving the file itself, this would change)
+      // For IndexedDB, saving the file data directly is complex. For now, we save the metadata.
+      file: null, // Don't save the large File object to DB
     }
 
     try {
-        await saveContractWithPestItems(newContract)
-        router.push('/admin/contracts')
-    } catch(error) {
-        alert('Failed to save contract to database. See console for details.')
-        console.error('Submission failed:', error)
+      await saveContractWithPestItems(newContract)
+      router.push('/admin/contracts')
+    } catch (error) {
+      alert('Failed to save contract to database. See console for details.')
+      console.error('Submission failed:', error)
     }
   }
 
@@ -594,7 +632,6 @@ export default function AddContractPage() {
   // ----------------------------------------------------------------------
 
   const renderAutocomplete = ({ name, label, options, gridProps = { xs: 12, md: 3 } }) => {
-    // ... (Autocomplete rendering logic remains the same for main form)
     const ref = refs[name + 'Ref']
     const inputRef = refs[name + 'InputRef']
     const isOpen = openStates[name + 'Open']
@@ -623,7 +660,7 @@ export default function AddContractPage() {
   }
 
   // ----------------------------------------------------------------------
-  // Form Structure (Updated Button Color and Table Highlighting)
+  // Form Structure (Updated File Upload Section)
   // ----------------------------------------------------------------------
 
   return (
@@ -637,7 +674,7 @@ export default function AddContractPage() {
     >
       <Card sx={{ p: 4, boxShadow: 'none' }} elevation={0}>
         <Grid container spacing={6}>
-          {/* Row 1 to Row 9: Unchanged */}
+          {/* ... (Existing form fields, rows 1-9) ... */}
           {renderAutocomplete({
             name: 'salesMode',
             label: 'Sales Mode',
@@ -708,13 +745,9 @@ export default function AddContractPage() {
               label='PO Number'
               name='poNumber'
               value={formData.poNumber || ''}
-              onChange={e => {
-                const numericValue = e.target.value.replace(/\D/g, '')
-                setFormData(prev => ({ ...prev, poNumber: numericValue }))
-              }}
+              onChange={handleChange}
               inputRef={poNumberRef}
               onKeyDown={e => handleKeyDown(e, poNumberRef)}
-              inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
             />
           </Grid>
           <Grid item xs={12} md={3}>
@@ -749,6 +782,7 @@ export default function AddContractPage() {
               onChange={e => {
                 const value = e.target.value
                 setFormData(prev => ({ ...prev, reportEmail: value }))
+                // Keep standard email validation
                 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
                 setReportEmailError(value && !emailRegex.test(value))
               }}
@@ -764,13 +798,9 @@ export default function AddContractPage() {
               label='Site Contact Person Name'
               name='contactPerson'
               value={formData.contactPerson || ''}
-              onChange={e => {
-                const onlyLetters = e.target.value.replace(/[^A-Za-z\s]/g, '')
-                setFormData(prev => ({ ...prev, contactPerson: onlyLetters }))
-              }}
+              onChange={handleChange}
               inputRef={contactPersonRef}
               onKeyDown={e => handleKeyDown(e, contactPersonRef)}
-              inputProps={{ inputMode: 'text', pattern: '[A-Za-z ]*' }}
             />
           </Grid>
           <Grid item xs={12} md={3}>
@@ -864,10 +894,7 @@ export default function AddContractPage() {
               label='Contract Value'
               name='contractValue'
               value={formData.contractValue}
-              onChange={e => {
-                const value = e.target.value.replace(/\D/g, '')
-                setFormData(prev => ({ ...prev, contractValue: value }))
-              }}
+              onChange={handleChange}
               inputRef={contractValueRef}
               onKeyDown={e => handleKeyDown(e, contractValueRef)}
             />
@@ -905,13 +932,9 @@ export default function AddContractPage() {
               label='No. of Invoice'
               name='invoiceCount'
               value={formData.invoiceCount || ''}
-              onChange={e => {
-                const numericValue = e.target.value.replace(/\D/g, '')
-                setFormData(prev => ({ ...prev, invoiceCount: numericValue }))
-              }}
+              onChange={handleChange}
               inputRef={invoiceCountRef}
               onKeyDown={e => handleKeyDown(e, invoiceCountRef)}
-              inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
             />
           </Grid>
           <Grid item xs={12} md={3}>
@@ -936,7 +959,7 @@ export default function AddContractPage() {
               onKeyDown={e => handleKeyDown(e, latitudeRef)}
             />
           </Grid>
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12} md={3}>
             <CustomTextField
               fullWidth
               label='Longitude'
@@ -947,41 +970,67 @@ export default function AddContractPage() {
               onKeyDown={e => handleKeyDown(e, longitudeRef)}
             />
           </Grid>
+
+          {/* 💡 UPDATED FILE UPLOAD SECTION - Includes View Button */}
           <Grid item xs={12} md={6}>
             <Typography variant='body2' sx={{ mb: 1, fontWeight: 500 }}>
               Upload File
             </Typography>
-            <input
-              type='file'
-              ref={fileInputRef}
-              style={{ display: 'none' }}
-              name='file'
-              onChange={handleNativeFileChange}
-            />
-            <Button
-              variant='outlined'
-              fullWidth
-              onClick={() => fileInputRef.current?.click()}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleFileDrop}
-              ref={fileUploadButtonRef}
-              onKeyDown={e => handleKeyDown(e, fileUploadButtonRef)}
-              sx={{
-                justifyContent: 'space-between',
-                borderColor: 'black',
-                borderStyle: isDragOver ? 'dashed' : 'solid',
-                borderWidth: 1,
-                '&:hover': { borderColor: 'black' }
-              }}
-            >
-              <Typography sx={{ color: selectedFile ? 'text.primary' : 'text.disabled' }}>
-                {selectedFile || 'Choose File or Drag & Drop Here'}
-              </Typography>
-            </Button>
-          </Grid>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'stretch' }}>
+              <input
+                type='file'
+                ref={fileInputRef}
+                style={{ display: 'none' }}
+                name='file'
+                onChange={handleNativeFileChange}
+              />
+              <Button
+                variant='outlined'
+                fullWidth
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleFileDrop}
+                ref={fileUploadButtonRef}
+                onKeyDown={e => handleKeyDown(e, fileUploadButtonRef)}
+                sx={{
+                  justifyContent: 'space-between',
+                  borderColor: 'black',
+                  borderStyle: isDragOver ? 'dashed' : 'solid',
+                  borderWidth: 1,
+                  py: 1.5,
+                  flexGrow: 1
+                }}
+              >
+                <Typography
+                  sx={{
+                    color: formData.uploadedFileName ? 'text.primary' : 'text.disabled',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {formData.uploadedFileName || 'Choose File or Drag & Drop Here'}
+                </Typography>
+              </Button>
 
-          {/* --- PEST ITEM INPUTS (Unchanged) --- */}
+              {/* View Button, visible if a file URL exists */}
+              {formData.uploadedFileURL && (
+                <IconButton
+                  color='primary'
+                  onClick={handleViewFile}
+                  sx={{ border: '1px solid currentColor', borderRadius: '8px', p: 1.5 }}
+                  title='View Uploaded File'
+                >
+                  <VisibilityIcon />
+                </IconButton>
+              )}
+            </Box>
+          </Grid>
+          {/* 💡 END UPDATED FILE UPLOAD SECTION */}
+
+
+          {/* --- PEST ITEM INPUTS (Updated) --- */}
           <Grid item xs={12}>
             <Typography variant='h6' sx={{ mb: 4, mt: 4 }}>
               Pest Item Details ({editingItemId ? 'Editing Mode' : 'Add Mode'})
@@ -1055,13 +1104,12 @@ export default function AddContractPage() {
               onChange={handleCurrentPestItemChange}
               inputRef={currentPestCountRef}
               onKeyDown={e => handleKeyDown(e, currentPestCountRef)}
-              inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
             />
           </Grid>
           <Grid item xs={12} md={2.4}>
             {/* Pest Value */}
             <CustomTextField
-              type='number'
+              type='text'
               fullWidth
               label='Pest Value'
               name='pestValue'
@@ -1069,14 +1117,6 @@ export default function AddContractPage() {
               onChange={handleCurrentPestItemChange}
               inputRef={currentPestValueRef}
               onKeyDown={e => handleKeyDown(e, currentPestValueRef)}
-              inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
-              sx={{
-                '& input[type=number]': { MozAppearance: 'textfield' },
-                '& input[type=number]::-webkit-outer-spin-button, & input[type=number]::-webkit-inner-spin-button': {
-                  WebkitAppearance: 'none',
-                  margin: 0
-                }
-              }}
             />
           </Grid>
           <Grid item xs={12} md={2.4}>
@@ -1089,7 +1129,6 @@ export default function AddContractPage() {
               onChange={handleCurrentPestItemChange}
               inputRef={currentTotalRef}
               onKeyDown={e => handleKeyDown(e, currentTotalRef)}
-              inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
               disabled
             />
           </Grid>
@@ -1136,7 +1175,7 @@ export default function AddContractPage() {
           <Grid item xs={12} md={3}>
             {/* No of Items */}
             <CustomTextField
-              type='number'
+              type='text'
               fullWidth
               label='No of Items'
               name='noOfItems'
@@ -1144,14 +1183,6 @@ export default function AddContractPage() {
               onChange={handleCurrentPestItemChange}
               inputRef={currentNoOfItemsRef}
               onKeyDown={e => handleKeyDown(e, currentNoOfItemsRef)}
-              inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
-              sx={{
-                '& input[type=number]': { MozAppearance: 'textfield' },
-                '& input[type=number]::-webkit-outer-spin-button, & input[type=number]::-webkit-inner-spin-button': {
-                  WebkitAppearance: 'none',
-                  margin: 0
-                }
-              }}
             />
           </Grid>
           <Grid item xs={12} md={3} sx={{ display: 'flex', alignItems: 'flex-end' }}>
@@ -1221,7 +1252,7 @@ export default function AddContractPage() {
                           >
                             <DeleteIcon fontSize='small' />
                           </IconButton>
-                            <IconButton
+                          <IconButton
                             size='small'
                             color=''
                             onClick={() => handleEditPestItem(item)}
@@ -1325,6 +1356,22 @@ export default function AddContractPage() {
           </Grid>
         </Grid>
       </Card>
+
+      {/* 💡 NEW: Image Dialog for file preview */}
+      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth='md' fullWidth>
+      <DialogContent sx={{ p: 0, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          {formData.uploadedFileURL && (
+            <img
+              src={formData.uploadedFileURL}
+              alt='Uploaded File Preview'
+                style={{ width: '100%', height: 'auto', objectFit: 'contain' }}
+            />
+
+
+
+       )}
+        </DialogContent>
+      </Dialog>
     </ContentLayout>
   )
 }

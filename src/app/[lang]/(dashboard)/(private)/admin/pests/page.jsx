@@ -6,28 +6,38 @@ import {
   Button,
   IconButton,
   Drawer,
-  Typography,
   InputAdornment,
-  TablePagination,
+  Typography,
+  Menu,
+  MenuItem,
+  ListItemText,
+  FormControl,
+  Select,
+  Pagination,
+  Card,
+  Divider,
   Autocomplete
 } from '@mui/material'
-import { DataGrid } from '@mui/x-data-grid'
+import Link from 'next/link'
 
 // Icons
+import { MdDelete } from 'react-icons/md'
 import AddIcon from '@mui/icons-material/Add'
-import DownloadIcon from '@mui/icons-material/Download'
-import CloseIcon from '@mui/icons-material/Close'
-import EditIcon from '@mui/icons-material/Edit'
-import DeleteIcon from '@mui/icons-material/Delete'
 import SearchIcon from '@mui/icons-material/Search'
+import CloseIcon from '@mui/icons-material/Close'
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
+import EditIcon from '@mui/icons-material/Edit'
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
+import DeleteIcon from '@mui/icons-material/Delete' // For sub-drawer delete
 
-// Layout & Custom Input
-import ContentLayout from '@/components/layout/ContentLayout'
+// Wrapper
 import CustomTextField from '@core/components/mui/TextField'
 
 // IndexedDB
 import { openDB } from 'idb'
 
+// --- IndexedDB Configuration ---
 const DB_NAME = 'PestDB'
 const STORE_NAME = 'pests'
 
@@ -48,8 +58,10 @@ async function getAllPests() {
 
 async function addPest(pest) {
   const db = await initDB()
-  const id = await db.add(STORE_NAME, pest)
-  return { ...pest, id }
+  const newId = await db.add(STORE_NAME, pest)
+  // Fetch the saved object to get its final ID and structure
+  const allRows = await db.getAll(STORE_NAME)
+  return allRows.find(r => r.id === newId) || { ...pest, id: newId }
 }
 
 async function updatePest(pest) {
@@ -82,8 +94,20 @@ const getKeyFromDrawerType = type => {
   }
 }
 
+// Helper component to render the sort icon
+const SortIcon = ({ currentSortField, currentSortDirection, field }) => {
+  if (currentSortField !== field) return null
+  return currentSortDirection === 'asc' ? (
+    <ArrowUpwardIcon sx={{ fontSize: 16, ml: 0.5 }} />
+  ) : (
+    <ArrowDownwardIcon sx={{ fontSize: 16, ml: 0.5 }} />
+  )
+}
+
+// --- Main Component ---
 export default function PestPage() {
-  // ---------------- Main Drawer ----------------
+  // ---------------- State Management ----------------
+  // Main Drawer
   const [mainDrawerOpen, setMainDrawerOpen] = useState(false)
   const [editPest, setEditPest] = useState(null)
   const [mainFormData, setMainFormData] = useState({
@@ -95,60 +119,95 @@ export default function PestPage() {
     status: 'Active',
     user_role: 'Admin'
   })
-
-  const submitRef = useRef(null)
-  const statusInputRef = useRef(null)
   const statusOptions = ['Active', 'Inactive']
 
-  // ---------------- Sub Drawer ----------------
+  // Sub Drawer
   const [subDrawerOpen, setSubDrawerOpen] = useState(false)
   const [drawerType, setDrawerType] = useState('Finding')
   const [formData, setFormData] = useState({ name: '', status: 'Active' })
   const [editRow, setEditRow] = useState(null)
   const [selectedPestId, setSelectedPestId] = useState(null)
 
-  // ---------------- Table & Search ----------------
-  const [searchText, setSearchText] = useState('')
-  const [page, setPage] = useState(0)
-  const [rowsPerPage, setRowsPerPage] = useState(5)
+  // Table & Search
   const [rows, setRows] = useState([])
+  const [searchText, setSearchText] = useState('')
+  const [sortField, setSortField] = useState('id')
+  const [sortDirection, setSortDirection] = useState('desc')
+
+  // Pagination
+  const [page, setPage] = useState(1)
+  const [rowsPerPage, setRowsPerPage] = useState(10)
+
+  // UI State
+  const [exportAnchorEl, setExportAnchorEl] = useState(null)
+  const exportOpen = Boolean(exportAnchorEl)
+
+  const submitRef = useRef(null)
+  const statusInputRef = useRef(null)
 
   // Load data from IndexedDB on mount
   useEffect(() => {
     async function fetchData() {
       const pests = await getAllPests()
-      setRows(pests.sort((a, b) => b.id - a.id)) // recent first
+      setRows(pests.sort((a, b) => b.id - a.id))
     }
     fetchData()
   }, [])
 
-  const filteredRows = rows.filter(
-    row =>
-      row.name.toLowerCase().includes(searchText.toLowerCase()) ||
-      row.pest_code.toLowerCase().includes(searchText.toLowerCase()) ||
-      row.parent_code.toLowerCase().includes(searchText.toLowerCase())
+  // ---------------- Sorting, Filtering, and Pagination Logic ----------------
+  const handleSort = field => {
+    if (sortField === field) {
+      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+    setPage(1)
+  }
+
+  const sortedRows = [...rows].sort((a, b) => {
+    const aValue = a[sortField] || ''
+    const bValue = b[sortField] || ''
+
+    let comparison = 0
+    if (['id', 'value'].includes(sortField) && !isNaN(Number(aValue)) && !isNaN(Number(bValue))) {
+      comparison = Number(aValue) - Number(bValue)
+    } else {
+      comparison = String(aValue).localeCompare(String(bValue), undefined, { sensitivity: 'base' })
+    }
+
+    return sortDirection === 'asc' ? comparison : comparison * -1
+  })
+
+  const handleSearch = e => {
+    setSearchText(e.target.value)
+    setPage(1)
+  }
+
+  const filteredRows = sortedRows.filter(
+    r =>
+      r.name.toLowerCase().includes(searchText.toLowerCase()) ||
+      r.pest_code.toLowerCase().includes(searchText.toLowerCase()) ||
+      r.parent_code.toLowerCase().includes(searchText.toLowerCase())
   )
-  const paginatedRows = filteredRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
 
-  const totalRows = filteredRows.length
-  const startIndex = totalRows === 0 ? 0 : page * rowsPerPage + 1
-  const endIndex = Math.min((page + 1) * rowsPerPage, totalRows)
-  const paginationText = `Showing ${startIndex} to ${endIndex} of ${totalRows} entries`
+  const rowCount = filteredRows.length
+  const pageCount = Math.max(1, Math.ceil(rowCount / rowsPerPage))
+  const paginatedRows = filteredRows.slice((page - 1) * rowsPerPage, page * rowsPerPage)
+  const startIndex = rowCount === 0 ? 0 : (page - 1) * rowsPerPage + 1
+  const endIndex = Math.min(page * rowsPerPage, rowCount)
 
-  // ---------------- Drawer Functions ----------------
-  const handleKeyPress = (e, currentFieldIndex) => {
+  // ---------------- Main Drawer Functions ----------------
+  const handleKeyPress = e => {
     if (e.key === 'Enter') {
       e.preventDefault()
-      if (currentFieldIndex === 4 && statusInputRef.current) {
-        statusInputRef.current.focus()
-        return
-      }
       const form = e.target.form
       const inputs = Array.from(form.querySelectorAll('input, textarea')).filter(
         el => !el.disabled && el.type !== 'hidden'
       )
       const nextIndex = inputs.findIndex(input => input === e.target) + 1
       if (nextIndex < inputs.length) inputs[nextIndex].focus()
+      else submitRef.current?.focus()
     }
   }
 
@@ -157,8 +216,8 @@ export default function PestPage() {
 
     if (editPest) {
       const updated = { ...editPest, ...mainFormData }
-      await updatePest(updated)
-      setRows(prev => prev.map(r => (r.id === updated.id ? updated : r)))
+      const updatedRow = await updatePest(updated)
+      setRows(prev => prev.map(r => (r.id === updatedRow.id ? updatedRow : r)))
     } else {
       const newPest = {
         ...mainFormData,
@@ -169,7 +228,9 @@ export default function PestPage() {
         addDesc: []
       }
       const savedPest = await addPest(newPest)
-      setRows(prev => [savedPest, ...prev])
+      setRows(prev => [savedPest, ...prev].sort((a, b) => b.id - a.id))
+      setSortField('id')
+      setSortDirection('desc')
     }
 
     setMainFormData({
@@ -185,6 +246,12 @@ export default function PestPage() {
     setMainDrawerOpen(false)
   }
 
+  const handleMainDelete = async row => {
+    setRows(prev => prev.filter(r => r.id !== row.id))
+    await deletePest(row.id)
+  }
+
+  // ---------------- Sub Drawer Functions ----------------
   const openSubDrawer = (row, type) => {
     setSelectedPestId(row.id)
     setDrawerType(type)
@@ -209,35 +276,36 @@ export default function PestPage() {
           newRow = { ...r, [key]: r[key].map(f => (f.id === editRow.id ? { ...f, ...formData } : f)) }
         } else {
           // Add new sub-item
-          const newSubId = r[key].length ? Math.max(...r[key].map(f => f.id)) + 1 : 1
-          newRow = { ...r, [key]: [...r[key], { id: newSubId, ...formData }] }
+          const newSubId = r[key]?.length ? Math.max(...r[key].map(f => f.id)) + 1 : 1
+          newRow = { ...r, [key]: [...(r[key] || []), { id: newSubId, ...formData }] }
         }
         await updatePest(newRow)
         return newRow
       })
     )
-    setRows(updatedRows)
+    setRows(updatedRows.sort((a, b) => b.id - a.id))
+
     setFormData({ name: '', status: 'Active' })
     setEditRow(null)
   }
 
-  const handleEdit = row => {
+  const handleSubEdit = row => {
     setFormData({ name: row.name, status: row.status })
     setEditRow(row)
   }
 
-  const handleDelete = async id => {
+  const handleSubDelete = async id => {
     const key = getKeyFromDrawerType(drawerType)
 
     const updatedRows = await Promise.all(
       rows.map(async r => {
         if (r.id !== selectedPestId) return r
-        const newRow = { ...r, [key]: r[key].filter(f => f.id !== id) }
+        const newRow = { ...r, [key]: (r[key] || []).filter(f => f.id !== id) }
         await updatePest(newRow)
         return newRow
       })
     )
-    setRows(updatedRows)
+    setRows(updatedRows.sort((a, b) => b.id - a.id))
   }
 
   const getDrawerRows = () => {
@@ -248,268 +316,362 @@ export default function PestPage() {
     return pest[key] || []
   }
 
-  // ---------------- Columns ----------------
-  const drawerColumns = [
-    {
-      field: 'actions',
-      headerName: 'Actions',
-      minWidth: 100,
-      renderCell: params => (
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <IconButton size='small' onClick={() => handleEdit(params.row)}>
-            <EditIcon fontSize='small' />
-          </IconButton>
-          <IconButton size='small' color='error' onClick={() => handleDelete(params.row.id)}>
-            <DeleteIcon fontSize='small' />
-          </IconButton>
-        </Box>
-      )
-    },
-    { field: 'name', headerName: `${drawerType} Name`, minWidth: 150, flex: 1 },
-    {
-      field: 'status',
-      headerName: 'Status',
-      minWidth: 100,
-      renderCell: params => (
-        <Button
-          variant='contained'
-          size='small'
-          color={params.value === 'Active' ? 'success' : 'error'}
-          sx={{ borderRadius: '999px', px: 2 }}
-        >
-          {params.value}
-        </Button>
-      )
-    }
-  ]
-
-  const columns = [
-    { field: 'pest_code', headerName: 'Pest Code', minWidth: 150, flex: 1 },
-    {
-      field: 'edit',
-      headerName: 'Actions',
-      minWidth: 100,
-      sortable: false,
-      disableColumnMenu: true,
-      renderCell: params => (
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <IconButton
-            size='small'
-            color='error'
-            onClick={async () => {
-              await deletePest(params.row.id)
-              setRows(prev => prev.filter(r => r.id !== params.row.id))
-            }}
-          >
-            <DeleteIcon />
-          </IconButton>
-          <IconButton
-            size='small'
-            onClick={() => {
-              setEditPest(params.row)
-              setMainFormData(prev => ({ ...prev, ...params.row }))
-              setMainDrawerOpen(true)
-            }}
-          >
-            <EditIcon />
-          </IconButton>
-        </Box>
-      )
-    },
-    { field: 'parent_code', headerName: 'Parent Group', minWidth: 150, flex: 1 },
-    { field: 'name', headerName: 'Display Pest Name', minWidth: 180, flex: 1 },
-    { field: 'value', headerName: 'Pest Value', minWidth: 100 },
-    { field: 'description', headerName: 'Description', minWidth: 200, flex: 1 },
-    {
-      field: 'finding',
-      headerName: 'Finding',
-      minWidth: 120,
-      renderCell: params => (
-        <Button
-          variant='outlined'
-          size='small'
-          onClick={() => openSubDrawer(params.row, 'Finding')}
-          sx={{ borderRadius: '999px', px: 2 }}
-        >
-          Finding({params.row.finding?.length || 0})
-        </Button>
-      )
-    },
-    {
-      field: 'action',
-      headerName: 'Action',
-      minWidth: 120,
-      renderCell: params => (
-        <Button
-          variant='outlined'
-          size='small'
-          onClick={() => openSubDrawer(params.row, 'Action')}
-          sx={{ borderRadius: '999px', px: 2 }}
-        >
-          Action({params.row.action?.length || 0})
-        </Button>
-      )
-    },
-    {
-      field: 'addDesc',
-      headerName: 'Add Description',
-      minWidth: 120,
-      renderCell: params => (
-        <Button
-          variant='outlined'
-          size='small'
-          onClick={() => openSubDrawer(params.row, 'Add Description')}
-          sx={{ borderRadius: '999px', px: 2 }}
-        >
-          AddDesc({params.row.addDesc?.length || 0})
-        </Button>
-      )
-    },
-    {
-      field: 'chemicals',
-      headerName: 'Chemicals',
-      minWidth: 120,
-      renderCell: params => (
-        <Button
-          variant='outlined'
-          size='small'
-          onClick={() => openSubDrawer(params.row, 'Chemicals')}
-          sx={{ borderRadius: '999px', px: 2 }}
-        >
-          Chemicals({params.row.chemicals?.length || 0})
-        </Button>
-      )
-    },
-    {
-      field: 'checklist',
-      headerName: 'Checklist',
-      minWidth: 120,
-      renderCell: params => (
-        <Button
-          variant='outlined'
-          size='small'
-          onClick={() => openSubDrawer(params.row, 'Checklist')}
-          sx={{ borderRadius: '999px', px: 2 }}
-        >
-          Checklist({params.row.checklist?.length || 0})
-        </Button>
-      )
-    },
-    {
-      field: 'status',
-      headerName: 'Status',
-      minWidth: 100,
-      renderCell: params => (
-        <Button
-          variant='contained'
-          size='small'
-          color={params.value === 'Active' ? 'success' : 'error'}
-          sx={{ borderRadius: '999px', px: 2 }}
-        >
-          {params.value}
-        </Button>
-      )
-    }
-  ]
+  // ---------------- Export Functions ----------------
+  const handleExportClick = e => setExportAnchorEl(e.currentTarget)
+  const handleExportClose = () => setExportAnchorEl(null)
+  const handleExportSelect = type => {
+    alert(`Export as: ${type}`)
+    handleExportClose()
+  }
 
   return (
-    <ContentLayout
-      title='Service Type (Pest)'
-      breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Service Type (Pest)' }]}
-      actions={
-        <Box sx={{ m: 2, display: 'flex', gap: 2 }}>
-          <Button variant='outlined' startIcon={<DownloadIcon />}>
-            Export
-          </Button>
-          <Button
-            variant='contained'
-            startIcon={<AddIcon />}
-            onClick={() => {
-              setEditPest(null)
-              setMainFormData({
-                pest_code: '',
-                parent_code: '',
-                name: '',
-                value: '',
-                description: '',
-                status: 'Active',
-                user_role: 'Admin'
-              })
-              setMainDrawerOpen(true)
-            }}
-          >
-            Add Pest
-          </Button>
-        </Box>
-      }
-    >
-      {/* Search */}
-      <Box sx={{ p: 2, mt: 5, pt: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <CustomTextField
-          size='small'
-          placeholder='Search'
-          value={searchText}
-          onChange={e => setSearchText(e.target.value)}
-          sx={{ width: 360 }}
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position='start'>
-                  <SearchIcon />
-                </InputAdornment>
-              )
+    <Box>
+      {/* Breadcrumb */}
+      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', ml: 6 }}>
+        <Typography
+          component='span' // Renders as an inline element
+          variant='body2' // Uses the theme's body2 font style
+          sx={{
+            // Use 'primary.main' to access the theme's main primary color
+            color: 'primary.main',
+            fontSize: 14,
+            '&:hover': {
+              textDecoration: 'none'
             }
           }}
-        />
-      </Box>
-
-      {/* Table */}
-      <Box sx={{ width: '100%', overflowX: 'auto', mt: 5 }}>
-        <DataGrid
-          rows={paginatedRows}
-          columns={columns}
-          disableRowSelectionOnClick
-          autoHeight
-          hideFooter
-          getRowHeight={() => 'auto'}
-          getRowId={row => row.id}
-          sx={{
-            mt: 3,
-            '& .MuiDataGrid-row': { minHeight: '60px !important', padding: '12px 0' },
-            '& .MuiDataGrid-cell': {
-              whiteSpace: 'normal',
-              wordBreak: 'break-word',
-              overflowWrap: 'break-word',
-              alignItems: 'flex-start',
-              fontSize: '15px'
-            },
-            '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': { outline: 'none' },
-            '& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within': { outline: 'none' },
-            '& .MuiDataGrid-columnHeaderTitle': { fontSize: '15px', fontWeight: 500 }
-          }}
-        />
-      </Box>
-
-      {/* Pagination */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2 }}>
-        <Typography variant='body2' sx={{ color: 'text.secondary', ml: 1 }}>
-          {paginationText}
+        >
+          Dashboard
         </Typography>
-        <TablePagination
-          rowsPerPageOptions={[5, 10, 25, 50]}
-          component='div'
-          count={filteredRows.length}
-          rowsPerPage={rowsPerPage}
-          page={page}
-          onPageChange={(e, newPage) => setPage(newPage)}
-          onRowsPerPageChange={e => {
-            setRowsPerPage(parseInt(e.target.value, 10))
-            setPage(0)
-          }}
-        />
+        <Typography sx={{ mx: 1, color: 'text.secondary' }}>/</Typography>
+        <Typography variant='body2' sx={{ fontSize: 14 }}>
+          Service Type (Pest)
+        </Typography>
       </Box>
 
-      {/* Main Drawer */}
+      <Card sx={{ p: 6 }}>
+        {/* Header + actions */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+          <Typography variant='h6'>Pest List</Typography>
+
+          <Box display='flex' gap={1}>
+            <Button variant='outlined' endIcon={<ArrowDropDownIcon />} onClick={handleExportClick}>
+              Export
+            </Button>
+            <Menu anchorEl={exportAnchorEl} open={exportOpen} onClose={handleExportClose}>
+              <MenuItem onClick={() => handleExportSelect('print')}>
+                <ListItemText>Print</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => handleExportSelect('csv')}>
+                <ListItemText>CSV</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => handleExportSelect('excel')}>
+                <ListItemText>Excel</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => handleExportSelect('pdf')}>
+                <ListItemText>PDF</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => handleExportSelect('copy')}>
+                <ListItemText>Copy</ListItemText>
+              </MenuItem>
+            </Menu>
+            <Button
+              variant='contained'
+              startIcon={<AddIcon />}
+              onClick={() => {
+                setEditPest(null)
+                setMainFormData({
+                  pest_code: '',
+                  parent_code: '',
+                  name: '',
+                  value: '',
+                  description: '',
+                  status: 'Active',
+                  user_role: 'Admin'
+                })
+                setMainDrawerOpen(true)
+              }}
+            >
+              Add Pest
+            </Button>
+          </Box>
+        </Box>
+
+        <Divider sx={{ mb: 3 }} />
+
+        {/* Search / entries */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <FormControl size='small' sx={{ minWidth: 120 }}>
+            <Select
+              value={rowsPerPage}
+              onChange={e => {
+                setRowsPerPage(Number(e.target.value))
+                setPage(1)
+              }}
+            >
+              {[5, 10, 25, 50, 100].map(i => (
+                <MenuItem key={i} value={i}>
+                  {i} entries
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <CustomTextField
+            size='small'
+            placeholder='Search by Code or Name...'
+            value={searchText}
+            onChange={handleSearch}
+            sx={{ width: 420 }}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position='start'>
+                    <SearchIcon />
+                  </InputAdornment>
+                )
+              }
+            }}
+          />
+        </Box>
+
+        {/* --- Table (Manual HTML Table) --- */}
+        <Box sx={{ overflowX: 'auto' }}>
+          <table
+            style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              tableLayout: 'auto'
+            }}
+          >
+            <thead>
+              <tr style={{ textAlign: 'left', borderBottom: '1px solid #E5E7EB' }}>
+                <th
+                  onClick={() => handleSort('id')}
+                  style={{ padding: '12px', width: '60px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box display='flex' alignItems='center'>
+                    S.No <SortIcon currentSortField={sortField} currentSortDirection={sortDirection} field='id' />
+                  </Box>
+                </th>
+
+                <th style={{ padding: '12px', width: '100px' }}>Action</th>
+
+                <th
+                  onClick={() => handleSort('pest_code')}
+                  style={{ padding: '12px', minWidth: '150px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box display='flex' alignItems='center'>
+                    Pest Code{' '}
+                    <SortIcon currentSortField={sortField} currentSortDirection={sortDirection} field='pest_code' />
+                  </Box>
+                </th>
+
+                <th
+                  onClick={() => handleSort('parent_code')}
+                  style={{ padding: '12px', minWidth: '400px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box display='flex' alignItems='center'>
+                    Parent Group{' '}
+                    <SortIcon currentSortField={sortField} currentSortDirection={sortDirection} field='parent_code' />
+                  </Box>
+                </th>
+
+                <th
+                  onClick={() => handleSort('name')}
+                  style={{ padding: '12px', minWidth: '180px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box display='flex' alignItems='center'>
+                    Display Pest Name{' '}
+                    <SortIcon currentSortField={sortField} currentSortDirection={sortDirection} field='name' />
+                  </Box>
+                </th>
+
+                <th
+                  onClick={() => handleSort('value')}
+                  style={{ padding: '12px', minWidth: '100px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box display='flex' alignItems='center'>
+                    Value <SortIcon currentSortField={sortField} currentSortDirection={sortDirection} field='value' />
+                  </Box>
+                </th>
+
+                <th style={{ padding: '12px', minWidth: '120px' }}>Finding</th>
+                <th style={{ padding: '12px', minWidth: '120px' }}>Action</th>
+                <th style={{ padding: '12px', minWidth: '120px' }}>Chemicals</th>
+                <th style={{ padding: '12px', minWidth: '120px' }}>Checklist</th>
+                <th style={{ padding: '12px', minWidth: '150px' }}>Add Description</th>
+
+                <th
+                  onClick={() => handleSort('status')}
+                  style={{ padding: '12px', minWidth: '100px', cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box display='flex' alignItems='center'>
+                    Status <SortIcon currentSortField={sortField} currentSortDirection={sortDirection} field='status' />
+                  </Box>
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {paginatedRows.map((r, i) => (
+                <tr key={r.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
+                  <td
+                    style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word', wordBreak: 'break-word' }}
+                  >
+                    {(page - 1) * rowsPerPage + i + 1}
+                  </td>
+                  <td style={{ padding: '12px' }}>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <IconButton
+                        size='small'
+                        onClick={() => {
+                          setEditPest(r)
+                          setMainFormData(prev => ({ ...prev, ...r }))
+                          setMainDrawerOpen(true)
+                        }}
+                      >
+                        <EditIcon />
+                      </IconButton>
+                      <IconButton size='small' color='error' onClick={() => handleMainDelete(r)}>
+                        <MdDelete />
+                      </IconButton>
+                    </Box>
+                  </td>
+                  {/* Text wrapping applied here */}
+                  <td
+                    style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word', wordBreak: 'break-word' }}
+                  >
+                    {r.pest_code}
+                  </td>
+                  <td
+                    style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word', wordBreak: 'break-word' }}
+                  >
+                    {r.parent_code}
+                  </td>
+                  <td
+                    style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word', wordBreak: 'break-word' }}
+                  >
+                    {r.name}
+                  </td>
+                  <td
+                    style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word', wordBreak: 'break-word' }}
+                  >
+                    {r.value}
+                  </td>
+                  {/* Button columns */}
+                  <td style={{ padding: '12px', whiteSpace: 'normal' }}>
+                    <Button
+                      variant='outlined'
+                      size='small'
+                      onClick={() => openSubDrawer(r, 'Finding')}
+                      sx={{ borderRadius: '999px', px: 2, textWrap: 'nowrap' }}
+                    >
+                      Finding({r.finding?.length || 0})
+                    </Button>
+                  </td>
+                  <td style={{ padding: '12px', whiteSpace: 'normal' }}>
+                    <Button
+                      variant='outlined'
+                      size='small'
+                      onClick={() => openSubDrawer(r, 'Action')}
+                      sx={{ borderRadius: '999px', px: 2, textWrap: 'nowrap' }}
+                    >
+                      Action({r.action?.length || 0})
+                    </Button>
+                  </td>
+                  <td style={{ padding: '12px', whiteSpace: 'normal' }}>
+                    <Button
+                      variant='outlined'
+                      size='small'
+                      onClick={() => openSubDrawer(r, 'Chemicals')}
+                      sx={{ borderRadius: '999px', px: 2, textWrap: 'nowrap' }}
+                    >
+                      Chemicals({r.chemicals?.length || 0})
+                    </Button>
+                  </td>
+                  <td style={{ padding: '12px', whiteSpace: 'normal' }}>
+                    <Button
+                      variant='outlined'
+                      size='small'
+                      onClick={() => openSubDrawer(r, 'Checklist')}
+                      sx={{ borderRadius: '999px', px: 2, textWrap: 'nowrap' }}
+                    >
+                      Checklist({r.checklist?.length || 0})
+                    </Button>
+                  </td>
+                  <td style={{ padding: '12px', whiteSpace: 'normal' }}>
+                    <Button
+                      variant='outlined'
+                      size='small'
+                      onClick={() => openSubDrawer(r, 'Add Description')}
+                      sx={{ borderRadius: '999px', px: 2, textWrap: 'nowrap' }}
+                    >
+                      AddDesc({r.addDesc?.length || 0})
+                    </Button>
+                  </td>
+                  <td style={{ padding: '12px' }}>
+                    <Box
+                      component='span'
+                          sx={{
+                        fontWeight: 600,
+                        color: '#fff',
+                        backgroundColor: r.status === 'Active' ? 'success.main' : 'error.main',
+                        px: 1.5,
+                        py: 0.5,
+                        borderRadius: '6px',
+                        display: 'inline-block'
+                      }}
+                    >
+                      {r.status}
+                    </Box>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {rowCount === 0 && (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <Typography color='text.secondary'>No results found</Typography>
+            </Box>
+          )}
+        </Box>
+        {/* --- End Table --- */}
+
+        {/* Pagination */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            px: 2,
+            py: 2,
+            mt: 2,
+            flexWrap: 'wrap'
+          }}
+        >
+          <Typography variant='body2' color='text.secondary'>
+            Showing {startIndex} to {endIndex} of {rowCount} entries
+          </Typography>
+
+          <Box display='flex' alignItems='center' gap={2}>
+            <Typography variant='body2' color='text.secondary'>
+              Page {page} of {pageCount}
+            </Typography>
+
+            <Pagination
+              count={pageCount}
+              page={page}
+              onChange={(e, value) => setPage(value)}
+              shape='rounded'
+              color='primary'
+              showFirstButton
+              showLastButton
+            />
+          </Box>
+        </Box>
+      </Card>
+
+      {/* --- Main Drawer --- */}
       <Drawer anchor='right' open={mainDrawerOpen} onClose={() => setMainDrawerOpen(false)}>
         <Box sx={{ width: 400, p: 3 }}>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={2}>
@@ -526,7 +688,7 @@ export default function PestPage() {
               name='pest_code'
               value={mainFormData.pest_code}
               onChange={e => setMainFormData({ ...mainFormData, pest_code: e.target.value })}
-              onKeyDown={e => handleKeyPress(e, 0)}
+              onKeyDown={handleKeyPress}
             />
             <CustomTextField
               fullWidth
@@ -535,7 +697,7 @@ export default function PestPage() {
               name='parent_code'
               value={mainFormData.parent_code}
               onChange={e => setMainFormData({ ...mainFormData, parent_code: e.target.value })}
-              onKeyDown={e => handleKeyPress(e, 1)}
+              onKeyDown={handleKeyPress}
             />
             <CustomTextField
               fullWidth
@@ -544,29 +706,21 @@ export default function PestPage() {
               name='name'
               value={mainFormData.name}
               onChange={e => setMainFormData({ ...mainFormData, name: e.target.value })}
-              onKeyDown={e => handleKeyPress(e, 2)}
+              onKeyDown={handleKeyPress}
             />
             <CustomTextField
               fullWidth
               margin='normal'
               label='Pest Value'
               name='value'
-              type='number'
+              type='text'
+              inputProps={{ inputMode: 'decimal' }}
               value={mainFormData.value}
-              onChange={e => setMainFormData({ ...mainFormData, value: e.target.value })}
-              onKeyDown={e => {
-                handleKeyPress(e, 3)
-                if (['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault()
+              onChange={e => {
+                const numericValue = e.target.value.match(/^-?\d*\.?\d*$/)?.[0] || ''
+                setMainFormData({ ...mainFormData, value: numericValue })
               }}
-              InputProps={{
-                sx: {
-                  '& input[type=number]': { MozAppearance: 'textfield' },
-                  '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button': {
-                    WebkitAppearance: 'none',
-                    margin: 0
-                  }
-                }
-              }}
+              onKeyDown={handleKeyPress}
             />
             <CustomTextField
               fullWidth
@@ -577,10 +731,10 @@ export default function PestPage() {
               rows={3}
               value={mainFormData.description}
               onChange={e => setMainFormData({ ...mainFormData, description: e.target.value })}
-              onKeyDown={e => handleKeyPress(e, 4)}
+              onKeyDown={handleKeyPress}
             />
 
-            {/* ✅ Status only in Edit mode */}
+            {/* Status only visible in Edit mode */}
             {editPest && (
               <Autocomplete
                 freeSolo={false}
@@ -589,8 +743,6 @@ export default function PestPage() {
                 openOnFocus
                 onChange={(e, val) => {
                   setMainFormData(prev => ({ ...prev, status: val }))
-                  // Update table immediately
-                  setRows(prev => prev.map(r => (r.id === editPest.id ? { ...r, status: val } : r)))
                 }}
                 renderInput={params => (
                   <CustomTextField
@@ -607,7 +759,7 @@ export default function PestPage() {
             )}
 
             <Box mt={3} display='flex' gap={2}>
-              <Button variant='contained' fullWidth ref={submitRef} onClick={handleMainSubmit}>
+              <Button type='button' variant='contained' fullWidth ref={submitRef} onClick={handleMainSubmit}>
                 {editPest ? 'Update' : 'Submit'}
               </Button>
               <Button variant='outlined' fullWidth onClick={() => setMainDrawerOpen(false)}>
@@ -618,7 +770,7 @@ export default function PestPage() {
         </Box>
       </Drawer>
 
-      {/* Sub Drawer */}
+      {/* --- Sub Drawer (For Finding/Action/Chemicals etc.) --- */}
       <Drawer anchor='right' open={subDrawerOpen} onClose={() => setSubDrawerOpen(false)}>
         <Box sx={{ width: 550, p: 4 }}>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={2}>
@@ -635,6 +787,18 @@ export default function PestPage() {
             onChange={handleChange}
             margin='normal'
           />
+          <CustomTextField
+            fullWidth
+            margin='normal'
+            label='Status'
+            name='status'
+            select
+            value={formData.status}
+            onChange={e => setFormData(prev => ({ ...prev, status: e.target.value }))}
+          >
+            <MenuItem value='Active'>Active</MenuItem>
+            <MenuItem value='Inactive'>Inactive</MenuItem>
+          </CustomTextField>
           <Button variant='contained' fullWidth sx={{ mt: 2 }} onClick={handleAddItem}>
             {editRow ? 'Update' : 'Add'} {drawerType}
           </Button>
@@ -642,30 +806,61 @@ export default function PestPage() {
             <Typography variant='subtitle1' mb={1}>
               {drawerType} List
             </Typography>
-            <DataGrid
-              rows={getDrawerRows()}
-              columns={drawerColumns}
-              autoHeight
-              getRowId={row => row.id}
-              disableRowSelectionOnClick
-              hideFooter
-              getRowHeight={() => 'auto'}
-              sx={{
-                '& .MuiDataGrid-row': { minHeight: '50px !important', padding: '10px 0' },
-                '& .MuiDataGrid-cell': {
-                  whiteSpace: 'normal',
-                  wordBreak: 'break-word',
-                  overflowWrap: 'break-word',
-                  alignItems: 'flex-start',
-                  display: 'flex'
-                },
-                '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': { outline: 'none' },
-                '& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within': { outline: 'none' }
+            {/* Manual table for sub-drawer list */}
+            <table
+              style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                tableLayout: 'fixed'
               }}
-            />
+            >
+              <thead>
+                <tr style={{ textAlign: 'left', borderBottom: '1px solid #E5E7EB' }}>
+                  <th style={{ padding: '12px', width: '100px' }}>Actions</th>
+                  <th style={{ padding: '12px', width: '300px' }}>{drawerType} Name</th>
+                  <th style={{ padding: '12px', width: '100px' }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {getDrawerRows().map(row => (
+                  <tr key={row.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
+                    <td style={{ padding: '12px' }}>
+                      <IconButton size='small' onClick={() => handleSubEdit(row)}>
+                        <EditIcon fontSize='small' />
+                      </IconButton>
+                      <IconButton size='small' color='error' onClick={() => handleSubDelete(row.id)}>
+                        <DeleteIcon fontSize='small' />
+                      </IconButton>
+                    </td>
+                    {/* Text wrapping applied here */}
+                    <td
+                      style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word', wordBreak: 'break-word' }}
+                    >
+                      {row.name}
+                    </td>
+                    <td style={{ padding: '12px' }}>
+                      <Box
+                        component='span'
+                        sx={{
+                          fontWeight: 600,
+                          color: '#fff',
+                          backgroundColor: row.status === 'Active' ? 'success.main' : 'error.main',
+                          px: 1.5,
+                          py: 0.5,
+                          borderRadius: '6px',
+                          display: 'inline-block'
+                        }}
+                      >
+                        {row.status}
+                      </Box>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </Box>
         </Box>
       </Drawer>
-    </ContentLayout>
+    </Box>
   )
 }

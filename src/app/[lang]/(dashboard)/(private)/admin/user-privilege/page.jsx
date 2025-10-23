@@ -20,7 +20,7 @@ import {
   Menu, // 💡 ADDED
   Checkbox // KEPT
 } from '@mui/material'
-
+import { useTheme } from '@mui/material/styles'
 // Icons
 import AddIcon from '@mui/icons-material/Add'
 import DownloadIcon from '@mui/icons-material/Download'
@@ -218,15 +218,22 @@ export default function UserPrivilegePage() {
   ];
   // Calculate minimum width dynamically
   const totalMinWidth = 60 + 100 + tableColumns.reduce((sum, col) => sum + parseInt(col.minWidth), 0) + 'px';
-
+  const theme = useTheme()
 
   return (
     <Box>
       {/* Breadcrumb (from page A) */}
       <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
-        <Link href='/' style={{ color: '#7367F0', textDecoration: 'none', fontSize: 14 }}>
-          Dashboard
-        </Link>
+          <Link
+      href='/admin/dashboards'
+      style={{
+        textDecoration: 'none',
+        fontSize: 14,
+        color: theme.palette.primary.main // 👈 Theme primary color used
+      }}
+    >
+      Dashboard
+    </Link>
         <Typography sx={{ mx: 1, color: 'text.secondary' }}>/</Typography>
         <Typography variant='body2' sx={{ fontSize: 14 }}>
           User Privilege

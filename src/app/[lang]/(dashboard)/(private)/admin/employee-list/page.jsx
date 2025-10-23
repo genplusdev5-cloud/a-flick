@@ -31,6 +31,7 @@ import { MdDelete } from 'react-icons/md'
 // Wrapper & Custom Components
 import CustomTextField from '@core/components/mui/TextField'
 import Link from 'next/link'
+import { useTheme } from '@mui/material/styles'
 
 // IndexedDB Config
 const dbName = 'EmployeeDB'
@@ -117,7 +118,11 @@ export default function EmployeePage() {
   const focusNext = ref => {
     if (!ref.current) return
     // Focus the actual input element within the CustomTextField component
-    const input = ref.current.querySelector('input') || ref.current.querySelector('textarea') || ref.current.querySelector('button') || ref.current
+    const input =
+      ref.current.querySelector('input') ||
+      ref.current.querySelector('textarea') ||
+      ref.current.querySelector('button') ||
+      ref.current
     input.focus()
   }
 
@@ -267,7 +272,8 @@ export default function EmployeePage() {
       e.preventDefault()
       // Special case for multiline text areas (address1/address2)
       if (e.target.name === 'address1' || e.target.name === 'address2') {
-        if (!e.shiftKey) { // Allows Shift+Enter for new line
+        if (!e.shiftKey) {
+          // Allows Shift+Enter for new line
           focusNext(nextRef)
         }
       } else {
@@ -275,7 +281,6 @@ export default function EmployeePage() {
       }
     }
   }
-
 
   // ------------------- File Upload Handlers -------------------
 
@@ -296,9 +301,33 @@ export default function EmployeePage() {
   const handleExport = () => {
     if (!rows.length) return
     // Export all fields from the data model, including file name, even if not shown in table
-    const headers = ['ID', 'Name', 'Phone', 'Email', 'City', 'State', 'Pin Code', 'Address 1', 'Address 2', 'File Name', 'Status']
+    const headers = [
+      'ID',
+      'Name',
+      'Phone',
+      'Email',
+      'City',
+      'State',
+      'Pin Code',
+      'Address 1',
+      'Address 2',
+      'File Name',
+      'Status'
+    ]
     const csvRows = rows.map(r =>
-      [r.id, `"${r.name}"`, r.phone, r.email, `"${r.city}"`, `"${r.state}"`, r.pincode, `"${r.address1 || ''}"`, `"${r.address2 || ''}"`, r.fileName || '', r.status].join(',')
+      [
+        r.id,
+        `"${r.name}"`,
+        r.phone,
+        r.email,
+        `"${r.city}"`,
+        `"${r.state}"`,
+        r.pincode,
+        `"${r.address1 || ''}"`,
+        `"${r.address2 || ''}"`,
+        r.fileName || '',
+        r.status
+      ].join(',')
     )
     const csv = [headers.join(','), ...csvRows].join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -317,6 +346,7 @@ export default function EmployeePage() {
     if (sortField === field) {
       setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'))
     } else {
+      // Note: Changed default sort for text fields to 'asc'
       setSortField(field)
       setSortDirection(['id', 'phone', 'pincode'].includes(field) ? 'desc' : 'asc')
     }
@@ -366,33 +396,41 @@ export default function EmployeePage() {
   // Helper component to render the sort icon
   const SortIcon = ({ field }) => {
     if (sortField !== field) return null
-    return sortDirection === 'asc' ? <ArrowUpwardIcon sx={{ fontSize: 16, ml: 0.5 }} /> : <ArrowDownwardIcon sx={{ fontSize: 16, ml: 0.5 }} />
+    return sortDirection === 'asc' ? (
+      <ArrowUpwardIcon sx={{ fontSize: 16, ml: 0.5 }} />
+    ) : (
+      <ArrowDownwardIcon sx={{ fontSize: 16, ml: 0.5 }} />
+    )
   }
 
-  // Define ALL columns for the table EXCEPT 'File Name'
+  // Define ALL columns for the table with new labels, mapping to existing fields
   const tableColumns = [
-    { label: 'Name', field: 'name', minWidth: '150px' },
-    { label: 'Phone', field: 'phone', minWidth: '120px' },
+    { label: 'Full Name', field: 'name', minWidth: '150px' },
     { label: 'Email', field: 'email', minWidth: '220px' },
-    { label: 'City', field: 'city', minWidth: '120px' },
-    { label: 'State', field: 'state', minWidth: '120px' },
-    { label: 'Pin Code', field: 'pincode', minWidth: '100px' },
-    { label: 'Address 1', field: 'address1', minWidth: '180px' },
-    { label: 'Address 2', field: 'address2', minWidth: '180px' },
+    { label: 'Phone', field: 'phone', minWidth: '120px' },
+    { label: 'Department', field: 'city', minWidth: '120px' }, // Mapped to existing 'city' data
+    { label: 'Supervisor', field: 'state', minWidth: '120px' }, // Mapped to existing 'state' data
     { label: 'Status', field: 'status', minWidth: '100px' }
-  ];
+  ]
 
   // Total minimum width needed for the table (S.No + Action + all data columns)
-  const totalMinWidth = 60 + 100 + tableColumns.reduce((sum, col) => sum + parseInt(col.minWidth), 0) + 'px';
+  const totalMinWidth = 60 + 100 + tableColumns.reduce((sum, col) => sum + parseInt(col.minWidth), 0) + 'px'
 
-
+  const theme = useTheme()
   // ------------------- Render -------------------
 
   return (
     <Box>
       {/* Breadcrumb (Modified for Employee page) */}
       <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
-        <Link href='/' style={{ color: '#7367F0', textDecoration: 'none', fontSize: 14 }}>
+        <Link
+          href='/admin/dashboards'
+          style={{
+            textDecoration: 'none',
+            fontSize: 14,
+            color: theme.palette.primary.main // 👈 Theme primary color used
+          }}
+        >
           Dashboard
         </Link>
         <Typography sx={{ mx: 1, color: 'text.secondary' }}>/</Typography>
@@ -414,13 +452,16 @@ export default function EmployeePage() {
             >
               Export
             </Button>
-            <Button variant='contained' startIcon={<AddIcon />} onClick={handleAdd}>
-              Add Employee
-            </Button>
+            {/* Note: Modified Link to use existing handleAdd logic if no separate add page exists, otherwise leave as is. */}
+            <Link href='/admin/employee-list/add' style={{ textDecoration: 'none' }}>
+              <Button variant='contained' startIcon={<AddIcon />}>
+                Add Employee
+              </Button>
+            </Link>
             {/* Export Menu (Like Page A) */}
-             <Menu anchorEl={exportAnchorEl} open={exportOpen} onClose={() => setExportAnchorEl(null)}>
-                <MenuItem onClick={handleExport}>Download CSV</MenuItem>
-              </Menu>
+            <Menu anchorEl={exportAnchorEl} open={exportOpen} onClose={() => setExportAnchorEl(null)}>
+              <MenuItem onClick={handleExport}>Download CSV</MenuItem>
+            </Menu>
           </Box>
         </Box>
 
@@ -429,7 +470,13 @@ export default function EmployeePage() {
         {/* Search / entries (From Page A) */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <FormControl size='small' sx={{ minWidth: 120 }}>
-            <Select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }}>
+            <Select
+              value={pageSize}
+              onChange={e => {
+                setPageSize(Number(e.target.value))
+                setPage(1)
+              }}
+            >
               {[10, 25, 50, 100].map(i => (
                 <MenuItem key={i} value={i}>
                   {i} entries
@@ -456,7 +503,7 @@ export default function EmployeePage() {
           />
         </Box>
 
-        {/* Table (Manual HTML Table from Page A, adjusted to exclude File Name) */}
+        {/* Table (Manual HTML Table with updated columns) */}
         <Box sx={{ overflowX: 'auto' }}>
           <table
             style={{
@@ -480,10 +527,10 @@ export default function EmployeePage() {
 
                 <th style={{ padding: '12px', width: '100px' }}>Action</th>
 
-                {/* Dynamic Data Columns (9 fields) */}
+                {/* Dynamic Data Columns (6 fields) */}
                 {tableColumns.map(col => (
                   <th
-                    key={col.field}
+                    key={col.field + col.label}
                     onClick={() => handleSort(col.field)}
                     style={{ padding: '12px', width: col.minWidth, cursor: 'pointer', userSelect: 'none' }}
                   >
@@ -512,15 +559,14 @@ export default function EmployeePage() {
                       </IconButton>
                     </Box>
                   </td>
-                  {/* Data Cells (9 fields) */}
+                  {/* Data Cells (6 fields: Full Name, Email, Phone, Department, Supervisor, Status) */}
                   <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.name}</td>
-                  <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.phone}</td>
                   <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.email}</td>
-                  <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.city}</td>
-                  <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.state}</td>
-                  <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.pincode}</td>
-                  <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.address1}</td>
-                  <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.address2}</td>
+                  <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.phone}</td>
+                  <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.city}</td>{' '}
+                  {/* Department using City data */}
+                  <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.state}</td>{' '}
+                  {/* Supervisor using State data */}
                   {/* Status Badge (From Page A) */}
                   <td style={{ padding: '12px' }}>
                     <Box
@@ -582,134 +628,6 @@ export default function EmployeePage() {
           </Box>
         </Box>
       </Card>
-
-      {/* Drawer Form (Page A width and flow applied) */}
-      <Drawer anchor='right' open={open} onClose={toggleDrawer}>
-        <Box sx={{ width: 360, p: 3 }}> {/* Width 360px from Page A */}
-          <Box display='flex' justifyContent='space-between' alignItems='center' mb={2}>
-            <Typography variant='h6'>{isEdit ? 'Edit Employee' : 'Add Employee'}</Typography>
-            <IconButton onClick={toggleDrawer}>
-              <CloseIcon />
-            </IconButton>
-          </Box>
-
-          <form onSubmit={handleSubmit}>
-            {/* Name, Phone, Email (Mandatory fields with validation) */}
-            <CustomTextField
-              fullWidth margin='normal' label={<span>Name <span style={{ color: 'red' }}>*</span></span>}
-              name='name' value={formData.name} onChange={handleNameChange} inputRef={nameRef}
-              inputProps={{ onKeyDown: e => handleKeyDown(e, phoneRef) }}
-              error={!!errors.name} helperText={errors.name}
-            />
-            <CustomTextField
-              fullWidth margin='normal' label={<span>Phone <span style={{ color: 'red' }}>*</span></span>}
-              name='phone' value={formData.phone} onChange={handlePhoneChange} inputRef={phoneRef}
-              inputProps={{ onKeyDown: e => handleKeyDown(e, emailRef) }}
-              error={!!errors.phone} helperText={errors.phone}
-            />
-            <CustomTextField
-              fullWidth margin='normal' label={<span>Email <span style={{ color: 'red' }}>*</span></span>}
-              name='email' value={formData.email} onChange={handleEmailChange} inputRef={emailRef}
-              inputProps={{ onKeyDown: e => handleKeyDown(e, cityRef) }}
-              error={!!errors.email} helperText={errors.email}
-            />
-
-            {/* City, State, Pin Code */}
-            <CustomTextField
-              fullWidth margin='normal' label='City' name='city' value={formData.city} onChange={handleGenericChange} inputRef={cityRef}
-              inputProps={{ onKeyDown: e => handleKeyDown(e, stateRef) }}
-            />
-            <CustomTextField
-              fullWidth margin='normal' label='State' name='state' value={formData.state} onChange={handleGenericChange} inputRef={stateRef}
-              inputProps={{ onKeyDown: e => handleKeyDown(e, pincodeRef) }}
-            />
-            <CustomTextField
-              fullWidth margin='normal' label='Pin Code' name='pincode' value={formData.pincode} onChange={handleGenericChange} inputRef={pincodeRef}
-              inputProps={{ onKeyDown: e => handleKeyDown(e, address1Ref) }}
-            />
-
-            {/* Address (using multiline/rows from Page A's description field) */}
-            <CustomTextField
-              fullWidth margin='normal' label='Address 1' name='address1' multiline rows={3} value={formData.address1} onChange={handleGenericChange} inputRef={address1Ref}
-              inputProps={{ onKeyDown: e => handleKeyDown(e, address2Ref) }}
-            />
-            <CustomTextField
-              fullWidth margin='normal' label='Address 2' name='address2' multiline rows={3} value={formData.address2} onChange={handleGenericChange} inputRef={address2Ref}
-              inputProps={{ onKeyDown: e => {
-                 if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); isEdit ? focusNext(statusRef) : focusNext(submitRef) }
-              }}}
-            />
-
-            {/* File Upload (Retained as is, but not shown in table) */}
-            <Box mt={2} mb={isEdit ? 0 : 3}>
-              {/* Hidden input to trigger file selection */}
-              <input type='file' ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileChange} />
-              <Typography variant="caption" display="block" color="text.secondary" mb={0.5}>Upload File</Typography>
-
-              <Button
-                variant='outlined'
-                fullWidth
-                onClick={() => fileInputRef.current?.click()}
-                onDragOver={e => { e.preventDefault(); setIsDragOver(true) }}
-                onDragLeave={() => setIsDragOver(false)}
-                onDrop={handleFileDrop}
-                sx={{
-                  borderColor: isDragOver ? 'primary.main' : 'divider',
-                  borderStyle: 'solid',
-                  borderWidth: 1,
-                  justifyContent: 'space-between',
-                  py: 1.5,
-                  textTransform: 'none',
-                  backgroundColor: isDragOver ? 'action.hover' : 'transparent',
-                }}
-              >
-                <Typography sx={{ color: selectedFile ? 'text.primary' : 'text.disabled', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '80%' }}>
-                  {selectedFile || 'Choose File or Drag & Drop Here'}
-                </Typography>
-                <Typography variant='body2' color='primary' sx={{ whiteSpace: 'nowrap' }}>
-                  Browse
-                </Typography>
-              </Button>
-            </Box>
-
-
-            {/* Status (Only in edit mode, using CustomTextField select like Page A) */}
-            {isEdit && (
-              <CustomTextField
-                select
-                fullWidth
-                margin='normal'
-                label='Status'
-                name='status'
-                value={formData.status}
-                onChange={handleGenericChange}
-                inputRef={statusRef}
-                inputProps={{
-                  onKeyDown: e => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      focusNext(submitRef)
-                    }
-                  }
-                }}
-              >
-                <MenuItem value='Active'>Active</MenuItem>
-                <MenuItem value='Inactive'>Inactive</MenuItem>
-              </CustomTextField>
-            )}
-
-            {/* Submit Buttons */}
-            <Box mt={3} display='flex' gap={2}>
-              <Button type='submit' variant='contained' fullWidth ref={submitRef}>
-                {isEdit ? 'Update' : 'Submit'}
-              </Button>
-              <Button variant='outlined' fullWidth onClick={toggleDrawer}>
-                Cancel
-              </Button>
-            </Box>
-          </form>
-        </Box>
-      </Drawer>
     </Box>
   )
 }

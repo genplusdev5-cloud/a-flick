@@ -17,7 +17,7 @@
  */
 const themeConfig = {
   templateName: 'A-Flick',
-  homePageUrl: '/dashboards/crm',
+  homePageUrl: '/admin/dashboards',
   settingsCookieName: 'vuexy-mui-next-demo-1',
   mode: 'system', // 'system', 'light', 'dark'
   skin: 'default', // 'default', 'bordered'
