@@ -1,32 +1,28 @@
-// MUI Imports
+// src/app/layout.jsx
+// SERVER COMPONENT – NO 'use client'
+
 import InitColorSchemeScript from '@mui/material/InitColorSchemeScript'
-
-// Third-party Imports
 import 'react-perfect-scrollbar/dist/css/styles.css'
-
-// Style Imports
+import 'react-toastify/dist/ReactToastify.css'
 import '@/app/globals.css'
-
-// Generated Icon CSS Imports
 import '@assets/iconify-icons/generated-icons.css'
 
-// Util Imports
-import { getSystemMode } from '@core/utils/serverHelpers'
+import ClientWrapper from './ClientWrapper'
 
 export const metadata = {
-  title: 'A-flick Pest Control Management',
+  title: 'A-Flick Pest Control Management',
   description: 'A-Flick - Admin Dashboard',
   viewport: 'initial-scale=1, width=device-width'
 }
 
-export default async function RootLayout({ children }) {
-  const systemMode = await getSystemMode()
-
+export default function RootLayout({ children }) {
   return (
-    <html id='__next' lang='en' suppressHydrationWarning>
-      <body className='flex is-full min-bs-full flex-auto flex-col'>
-        <InitColorSchemeScript attribute='data' defaultMode={systemMode} />
-        {children}
+    <html lang="en" suppressHydrationWarning>
+      <body className="flex is-full min-bs-full flex-auto flex-col">
+        <InitColorSchemeScript attribute="data" />
+
+        {/* Wrap children + toast in client component */}
+        <ClientWrapper>{children}</ClientWrapper>
       </body>
     </html>
   )

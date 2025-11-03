@@ -60,6 +60,8 @@
     "fs-extra": "11.2.0",
     "idb": "^8.0.3",
     "input-otp": "1.4.1",
+    "jspdf": "^3.0.3",
+    "jspdf-autotable": "^5.0.2",
     "keen-slider": "6.8.6",
     "mapbox-gl": "3.9.0",
     "negotiator": "1.0.0",
@@ -77,11 +79,12 @@
     "react-perfect-scrollbar": "1.5.8",
     "react-player": "2.16.0",
     "react-redux": "9.2.0",
-    "react-toastify": "10.0.6",
+    "react-toastify": "^10.0.6",
     "react-use": "17.6.0",
     "recharts": "2.15.0",
     "server-only": "0.0.1",
-    "valibot": "0.42.1"
+    "valibot": "0.42.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@iconify/json": "2.2.286",
