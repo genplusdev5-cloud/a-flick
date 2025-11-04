@@ -1,51 +1,65 @@
-// MODIFIED page B
-
 'use client'
-
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
+import { openDB } from 'idb'
 import {
   Box,
   Button,
-  IconButton,
-  InputAdornment,
   Card,
+  CardHeader,
   CardContent,
-  Grid,
   Typography,
-  Menu, // Added from Page A
-  MenuItem, // Added from Page A
-  ListItemText, // Added from Page A
-  FormControl, // Added from Page A
-  Select, // Added from Page A
-  Pagination, // Added from Page A
-  Divider // Added from Page A
+  Menu,
+  MenuItem,
+  IconButton,
+  Divider,
+  Grid,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Breadcrumbs,
+  Chip,
+  Select,
+  TextField,
+  FormControl,
+  CircularProgress,
+  InputAdornment
 } from '@mui/material'
-import { useTheme } from '@mui/material/styles' // Added from Page A
-import { useRouter } from 'next/navigation'
-import { openDB } from 'idb'
-import Link from 'next/link' // Added from Page A
-
-// Icons
 import AddIcon from '@mui/icons-material/Add'
-// import DownloadIcon from '@mui/icons-material/Download' // Replaced by ArrowDropDownIcon
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
+import PrintIcon from '@mui/icons-material/Print'
+import FileDownloadIcon from '@mui/icons-material/FileDownload'
+import WarningAmberIcon from '@mui/icons-material/WarningAmber'
+import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart'
 import MonetizationOnIcon from '@mui/icons-material/MonetizationOn'
 import GroupIcon from '@mui/icons-material/Group'
 import BarChartIcon from '@mui/icons-material/BarChart'
-import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown' // Added from Page A
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward' // Added from Page A
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward' // Added from Page A
+import { useRouter } from 'next/navigation'
+import { toast } from 'react-toastify'
+import TablePaginationComponent from '@/components/TablePaginationComponent'
+import classnames from 'classnames'
+import { rankItem } from '@tanstack/match-sorter-utils'
+import {
+  useReactTable,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getSortedRowModel,
+  flexRender,
+  createColumnHelper
+} from '@tanstack/react-table'
+import styles from '@core/styles/table.module.css'
+import ChevronRight from '@menu/svg/ChevronRight'
 
-// Wrapper (Removed ContentLayout)
-// import ContentLayout from '@/components/layout/ContentLayout'
-import CustomTextField from '@core/components/mui/TextField'
-
-// IndexedDB helper
-async function getCustomerDB() {
-  return openDB('mainCustomerDB', 1, {
+// ───────────────────────────────────────────
+// IndexedDB
+// ───────────────────────────────────────────
+const getCustomerDB = async () => {
+  return await openDB('mainCustomerDB', 1, {
     upgrade(db) {
       if (!db.objectStoreNames.contains('customers')) {
         db.createObjectStore('customers', { keyPath: 'id', autoIncrement: true })
@@ -54,213 +68,237 @@ async function getCustomerDB() {
   })
 }
 
-// Cell style (Added from Page A)
-const tableCellStyle = {
-  padding: '12px',
-  wordWrap: 'break-word',
-  whiteSpace: 'normal',
-  wordBreak: 'break-word',
-  overflowWrap: 'break-word'
+// Toast helper
+const showToast = (type, message) => {
+  const content = <Typography variant='body2' sx={{ fontWeight: 500 }}>{message}</Typography>
+  if (type === 'success') toast.success(content)
+  else if (type === 'error' || type === 'delete') toast.error(content)
+  else if (type === 'warning') toast.warn(content)
+  else toast.info(content)
 }
 
+// Debounced Input
+const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
+  const [value, setValue] = useState(initialValue)
+  useEffect(() => setValue(initialValue), [initialValue])
+  useEffect(() => {
+    const t = setTimeout(() => onChange(value), debounce)
+    return () => clearTimeout(t)
+  }, [value])
+  return <TextField {...props} value={value} onChange={e => setValue(e.target.value)} />
+}
 
+// ───────────────────────────────────────────
+// Component
+// ───────────────────────────────────────────
 export default function CustomersPage() {
   const router = useRouter()
-  const theme = useTheme() // Added from Page A
-
-  const [searchText, setSearchText] = useState('')
-  const [page, setPage] = useState(1) // Changed from 0 to 1 for Pagination component logic
-  const [rowsPerPage, setRowsPerPage] = useState(10)
   const [rows, setRows] = useState([])
-  const [sortField, setSortField] = useState('id') // Added from Page A
-  const [sortDirection, setSortDirection] = useState('desc') // Added from Page A
-  const [exportAnchorEl, setExportAnchorEl] = useState(null) // Added from Page A
-  const exportOpen = Boolean(exportAnchorEl) // Added from Page A
+  const [rowCount, setRowCount] = useState(0)
+  const [searchText, setSearchText] = useState('')
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
+  const [loading, setLoading] = useState(false)
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
+  const [exportAnchorEl, setExportAnchorEl] = useState(null)
 
-  const loadCustomers = async () => {
+  // Load data
+  const loadData = async () => {
+    setLoading(true)
     try {
       const db = await getCustomerDB()
-      const allCustomers = await db.getAll('customers')
-      const validCustomers = (allCustomers || []) // Added check for safety
-        .filter(c => typeof c === 'object' && c !== null)
+      const all = await db.getAll('customers')
+      const valid = (all || [])
+        .filter(c => c && typeof c === 'object')
         .map(c => ({
-          ...c,
-          // Consolidating property mapping for table display
+          id: c.id,
           name: c.customerName || c.name || '',
-          email: c.loginEmail || c.email || '', // Added for Page B's original columns
+          email: c.loginEmail || c.email || '',
           phone: c.picPhone || c.billingPhone || '',
           address: c.billingAddress || '',
           commenceDate: c.commenceDate || '',
-          origin: c.origin || '', // Added for Page B's original columns
-          projectStatus: c.projectStatus || 'Active' // Added for Page A's column
+          origin: c.origin || '',
+          projectStatus: c.projectStatus || 'Active'
         }))
         .reverse()
-      setRows(validCustomers || [])
-    } catch (error) {
-      console.error('Failed to load customers from DB:', error)
+
+      const filtered = searchText
+        ? valid.filter(r =>
+            ['name', 'email', 'phone', 'address', 'origin'].some(key =>
+              (r[key] || '').toString().toLowerCase().includes(searchText.toLowerCase())
+            )
+          )
+        : valid
+
+      const start = pagination.pageIndex * pagination.pageSize
+      const pageSlice = filtered.slice(start, start + pagination.pageSize)
+      const normalized = pageSlice.map((item, i) => ({
+        ...item,
+        sno: start + i + 1
+      }))
+      setRows(normalized)
+      setRowCount(filtered.length)
+    } catch (err) {
+      showToast('error', 'Failed to load customers')
+    } finally {
+      setLoading(false)
     }
   }
 
   useEffect(() => {
-    loadCustomers()
-  }, [])
+    loadData()
+  }, [pagination.pageIndex, pagination.pageSize, searchText])
 
-  const handleEditClick = id => router.push(`/admin/customers/${id}/edit`)
-
-  const handleDelete = async id => {
-    if (!window.confirm(`Are you sure you want to delete customer ID: ${id}?`)) {
-      return
-    }
-    try {
+  const handleEdit = id => router.push(`/admin/customers/${id}/edit`)
+  const confirmDelete = async () => {
+    if (deleteDialog.row) {
       const db = await getCustomerDB()
-      await db.delete('customers', id)
-      setRows(prev => prev.filter(r => r.id !== id))
-    } catch (error) {
-      console.error('Failed to delete customer:', error)
+      await db.delete('customers', deleteDialog.row.id)
+      showToast('delete', `${deleteDialog.row.name} deleted`)
+      loadData()
     }
+    setDeleteDialog({ open: false, row: null })
   }
 
-  // Export handlers (Copied from Page A)
-  const handleExportClick = e => setExportAnchorEl(e.currentTarget)
-  const handleExportClose = () => setExportAnchorEl(null)
-  const handleExportSelect = type => {
-    alert(`Export as: ${type} - (Feature not implemented)`)
-    handleExportClose()
-  }
-
-  const handlePageChange = (e, newPage) => setPage(newPage)
-
-  const handleRowsPerPageChange = e => {
-    setRowsPerPage(Number(e.target.value))
-    setPage(1) // Reset page to 1
-  }
-
-  // Sorting handlers (Copied from Page A)
-  const handleSort = field => {
-    if (sortField === field) {
-      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'))
-    } else {
-      setSortField(field)
-      setSortDirection('asc')
-    }
-    setPage(1)
-  }
-
-  const SortIcon = ({ field }) => {
-    if (sortField !== field) return null
-    return sortDirection === 'asc'
-      ? <ArrowUpwardIcon sx={{ fontSize: 16, ml: 0.5 }} />
-      : <ArrowDownwardIcon sx={{ fontSize: 16, ml: 0.5 }} />
-  }
-
-  // Sorting logic (Copied from Page A)
-  const sortedRows = [...rows].sort((a, b) => {
-    const field = sortField
-    let aValue = a[field]
-    let bValue = b[field]
-
-    aValue = (aValue || '').toString().toLowerCase()
-    bValue = (bValue || '').toString().toLowerCase()
-
-    let comparison = 0
-    if (field === 'id') {
-      comparison = (Number(a.id) || 0) - (Number(b.id) || 0)
-    } else {
-      comparison = aValue.localeCompare(bValue)
-    }
-    return sortDirection === 'asc' ? comparison : comparison * -1
-  })
-
-
-  // Filtering logic from Page B, expanded to include all searchable fields from both pages
-  const filteredRows = sortedRows.filter(
-    row =>
-      (row.name?.toLowerCase() || '').includes(searchText.toLowerCase()) ||
-      (row.phone?.toLowerCase() || '').includes(searchText.toLowerCase()) ||
-      (row.address?.toLowerCase() || '').includes(searchText.toLowerCase()) ||
-      (row.email?.toLowerCase() || '').includes(searchText.toLowerCase()) ||
-      (row.origin?.toLowerCase() || '').includes(searchText.toLowerCase())
+  // --- Table ---
+  const columnHelper = createColumnHelper()
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor('sno', { header: 'S.No' }),
+      columnHelper.display({
+        id: 'actions',
+        header: 'Action',
+        cell: info => (
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original.id)}>
+              <EditIcon />
+            </IconButton>
+            <IconButton
+              size='small'
+              color='error'
+              onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
+            >
+              <DeleteIcon />
+            </IconButton>
+          </Box>
+        )
+      }),
+      columnHelper.accessor('origin', { header: 'Origin' }),
+      columnHelper.accessor('email', { header: 'Contact Email' }),
+      columnHelper.accessor('address', { header: 'Billing Address' }),
+      columnHelper.accessor('name', { header: 'Customer Name' }),
+      columnHelper.accessor('commenceDate', {
+        header: 'Commence Date',
+        cell: info => {
+          const date = info.getValue()
+          return date ? new Date(date).toLocaleDateString('en-GB') : '-'
+        }
+      }),
+      columnHelper.accessor('phone', { header: 'Contact Phone' }),
+      columnHelper.display({
+        id: 'contracts',
+        header: 'Contract',
+        cell: () => (
+          <Button
+            size='small'
+            variant='outlined'
+            color='success'
+            sx={{ borderRadius: '5px', textTransform: 'none', fontWeight: 500, py: 0.5 }}
+            onClick={() => router.push('/en/admin/contracts')}
+          >
+            Contracts
+          </Button>
+        )
+      })
+    ],
+    []
   )
 
-  // Pagination logic (Copied and adapted from Page A)
-  const rowCount = filteredRows.length
-  const pageCount = Math.max(1, Math.ceil(rowCount / rowsPerPage))
-  const paginatedRows = filteredRows.slice((page - 1) * rowsPerPage, page * rowsPerPage)
-  const startIndex = rowCount === 0 ? 0 : (page - 1) * rowsPerPage + 1
-  const endIndex = Math.min(page * rowsPerPage, rowCount)
-  const paginationText = `Showing ${startIndex} to ${endIndex} of ${rowCount} entries`
+  const fuzzyFilter = (row, columnId, value, addMeta) => {
+    const itemRank = rankItem(row.getValue(columnId), value)
+    addMeta({ itemRank })
+    return itemRank.passed
+  }
 
+  const table = useReactTable({
+    data: rows,
+    columns,
+    manualPagination: true,
+    pageCount: Math.ceil(rowCount / pagination.pageSize),
+    state: { globalFilter: searchText, pagination },
+    onGlobalFilterChange: setSearchText,
+    onPaginationChange: setPagination,
+    globalFilterFn: fuzzyFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getSortedRowModel: getSortedRowModel()
+  })
 
-  // Columns Configuration: Using Page B's columns but adapted for Page A's manual table format
-  const manualColumns = [
-    { key: 'sno', header: 'S.No', sortable: false, width: '60px', render: (r, i) => (page - 1) * rowsPerPage + i + 1 },
-    {
-      key: 'actions', header: 'Action', sortable: false, width: '100px', render: r => (
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <IconButton size='small' onClick={() => handleEditClick(r.id)}>
-            <EditIcon fontSize='small' />
-          </IconButton>
-          <IconButton size='small' onClick={() => handleDelete(r.id)}>
-            <DeleteIcon sx={{ color: 'red' }} fontSize='small' />
-          </IconButton>
-        </Box>
-      )
-    },
-    { key: 'origin', header: 'Origin', sortable: true, minWidth: '100px', render: r => r.origin || '-' },
-    { key: 'email', header: 'Contact Email', sortable: true, minWidth: '150px', render: r => r.email || '-' },
-    { key: 'address', header: 'Billing Address', sortable: true, minWidth: '200px', render: r => r.address || '-' },
-    { key: 'name', header: 'Customer Name', sortable: true, minWidth: '150px', render: r => r.name || '-' },
-    {
-      key: 'commenceDate', header: 'Commence Date', sortable: true, minWidth: '130px',
-      render: r => r.commenceDate ? new Date(r.commenceDate).toLocaleDateString('en-GB') : '-'
-    },
-    { key: 'phone', header: 'Contact Phone', sortable: false, minWidth: '120px', render: r => r.phone || '-' },
-    {
-        key: 'contracts',
-        header: 'Contract',
-        sortable: false,
-        minWidth: '120px',
-        render: r => (
-            <Button
-              size='small'
-              variant='outlined'
-              color='success'
-              sx={{
-                borderRadius: '5px',
-                textTransform: 'none',
-                fontWeight: 500,
-                py: 0.5
-              }}
-              onClick={() => router.push('/en/admin/contracts')}
-            >
-              Contracts
-            </Button>
-          )
-    }
-    // Note: Project Status column from Page A is not included to keep Page B's original columns, but it can be added if needed.
-  ]
+  // --- Export ---
+  const exportOpen = Boolean(exportAnchorEl)
+  const exportCSV = () => {
+    const headers = ['S.No', 'Origin', 'Email', 'Address', 'Name', 'Commence Date', 'Phone']
+    const csv = [
+      headers.join(','),
+      ...rows.map(r => [
+        r.sno,
+        `"${r.origin}"`,
+        `"${r.email}"`,
+        `"${r.address}"`,
+        `"${r.name}"`,
+        r.commenceDate ? new Date(r.commenceDate).toLocaleDateString('en-GB') : '',
+        r.phone
+      ].join(','))
+    ].join('\n')
+    const link = document.createElement('a')
+    link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
+    link.download = 'customers.csv'
+    link.click()
+    showToast('success', 'CSV downloaded')
+  }
 
+  const exportPrint = () => {
+    const w = window.open('', '_blank')
+    const html = `
+      <html><head><title>Customer List</title><style>
+      body{font-family:Arial;padding:24px;}
+      table{width:100%;border-collapse:collapse;}
+      th,td{border:1px solid #ccc;padding:8px;text-align:left;}
+      th{background:#f4f4f4;}
+      </style></head><body>
+      <h2>Customer List</h2>
+      <table><thead><tr>
+      <th>S.No</th><th>Origin</th><th>Email</th><th>Address</th><th>Name</th><th>Commence Date</th><th>Phone</th>
+      </tr></thead><tbody>
+      ${rows
+        .map(r => `<tr>
+          <td>${r.sno}</td>
+          <td>${r.origin}</td>
+          <td>${r.email}</td>
+          <td>${r.address}</td>
+          <td>${r.name}</td>
+          <td>${r.commenceDate ? new Date(r.commenceDate).toLocaleDateString('en-GB') : ''}</td>
+          <td>${r.phone}</td>
+        </tr>`)
+        .join('')}
+      </tbody></table></body></html>`
+    w.document.write(html)
+    w.document.close()
+    w.print()
+  }
+
+  // ───────────────────────────────────────────
+  // Render
+  // ───────────────────────────────────────────
   return (
     <Box>
-      {/* Breadcrumb (Copied from Page A) */}
-      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
-        <Link
-          href='/'
-          style={{
-            color: theme.palette.primary.main,
-            textDecoration: 'none',
-            fontSize: 14
-          }}
-        >
+      <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
+        <Link underline='hover' color='inherit' href='/'>
           Dashboard
         </Link>
-        <Typography sx={{ mx: 1, color: 'text.secondary' }}>/</Typography>
-        <Typography variant='body2' sx={{ fontSize: 14 }}>
-          Customer List
-        </Typography>
-      </Box>
+        <Typography color='text.primary'>Customer List</Typography>
+      </Breadcrumbs>
 
-      {/* Stats (Copied from Page A) */}
+      {/* Stats Cards */}
       <Card elevation={0} sx={{ mb: 4, boxShadow: 'none' }} variant='outlined'>
         <CardContent>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
@@ -310,44 +348,114 @@ export default function CustomersPage() {
         </CardContent>
       </Card>
 
-      {/* Main Table Card (Copied from Page A) */}
-      <Card sx={{ p: 6 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant='h6'>Customer List</Typography>
-          <Box display='flex' gap={1}>
-            <Button variant='outlined' endIcon={<ArrowDropDownIcon />} onClick={handleExportClick}>
-              Export
-            </Button>
-            <Menu anchorEl={exportAnchorEl} open={exportOpen} onClose={handleExportClose}>
-              <MenuItem onClick={() => handleExportSelect('print')}><ListItemText>Print</ListItemText></MenuItem>
-              <MenuItem onClick={() => handleExportSelect('csv')}><ListItemText>CSV</ListItemText></MenuItem>
-              <MenuItem onClick={() => handleExportSelect('excel')}><ListItemText>Excel</ListItemText></MenuItem>
-              <MenuItem onClick={() => handleExportSelect('pdf')}><ListItemText>PDF</ListItemText></MenuItem>
-              <MenuItem onClick={() => handleExportSelect('copy')}><ListItemText>Copy</ListItemText></MenuItem>
-            </Menu>
-            <Button variant='contained' startIcon={<AddIcon />} onClick={() => router.push('/admin/customers/add')}>
-              Add Customer
-            </Button>
+      <Card sx={{ p: 3 }}>
+        <CardHeader
+          sx={{
+            pb: 1.5,
+            pt: 1.5,
+            '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
+            '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
+          }}
+          title={
+            <Box display='flex' alignItems='center' gap={2}>
+              <Typography variant='h5' sx={{ fontWeight: 600 }}>
+                Customer List
+              </Typography>
+              <Button
+                variant='contained'
+                color='primary'
+                startIcon={
+                  <RefreshIcon
+                    sx={{
+                      animation: loading ? 'spin 1s linear infinite' : 'none',
+                      '@keyframes spin': {
+                        '0%': { transform: 'rotate(0deg)' },
+                        '100%': { transform: 'rotate(360deg)' }
+                      }
+                    }}
+                  />
+                }
+                disabled={loading}
+                onClick={async () => {
+                  setLoading(true)
+                  await loadData()
+                  setTimeout(() => setLoading(false), 600)
+                }}
+                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+              >
+                {loading ? 'Refreshing...' : 'Refresh'}
+              </Button>
+            </Box>
+          }
+          action={
+            <Box display='flex' alignItems='center' gap={2}>
+              <Button
+                variant='outlined'
+                color='secondary'
+                endIcon={<ArrowDropDownIcon />}
+                onClick={e => setExportAnchorEl(e.currentTarget)}
+                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+              >
+                Export
+              </Button>
+              <Menu anchorEl={exportAnchorEl} open={exportOpen} onClose={() => setExportAnchorEl(null)}>
+                <MenuItem onClick={exportPrint}>
+                  <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
+                </MenuItem>
+                <MenuItem onClick={exportCSV}>
+                  <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
+                </MenuItem>
+              </Menu>
+              <Button
+                variant='contained'
+                startIcon={<AddIcon />}
+                onClick={() => router.push('/admin/customers/add')}
+                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+              >
+                Add Customer
+              </Button>
+            </Box>
+          }
+        />
+        {loading && (
+          <Box
+            sx={{
+              position: 'fixed',
+              inset: 0,
+              bgcolor: 'rgba(255,255,255,0.7)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 2000
+            }}
+          >
+            <CircularProgress />
           </Box>
-        </Box>
-
-        <Divider sx={{ mb: 3 }} />
-
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <FormControl size='small' sx={{ minWidth: 120 }}>
-            <Select value={rowsPerPage} onChange={handleRowsPerPageChange}>
-              {[10, 25, 50, 100].map(i => (
-                <MenuItem key={i} value={i}>{i} entries</MenuItem>
+        )}
+        <Divider sx={{ mb: 2 }} />
+        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+          <FormControl size='small' sx={{ width: 140 }}>
+            <Select
+              value={pagination.pageSize}
+              onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
+            >
+              {[10, 25, 50, 100].map(s => (
+                <MenuItem key={s} value={s}>
+                  {s} entries
+                </MenuItem>
               ))}
             </Select>
           </FormControl>
-
-          <CustomTextField
-            size='small'
-            placeholder='Search by Name, Email, Address, Origin...'
+          <DebouncedInput
             value={searchText}
-            onChange={e => setSearchText(e.target.value)}
+            onChange={v => {
+              setSearchText(String(v))
+              setPagination(p => ({ ...p, pageIndex: 0 }))
+            }}
+            placeholder='Search by Name, Email, Address, Origin...'
             sx={{ width: 420 }}
+            variant='outlined'
+            size='small'
             slotProps={{
               input: {
                 startAdornment: (
@@ -359,71 +467,70 @@ export default function CustomersPage() {
             }}
           />
         </Box>
-
-        <Box sx={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'auto' }}>
+        <div className='overflow-x-auto'>
+          <table className={styles.table}>
             <thead>
-              <tr style={{ textAlign: 'left', borderBottom: '1px solid #E5E7EB' }}>
-                {manualColumns.map(col => (
-                  <th
-                    key={col.key}
-                    onClick={() => col.sortable && handleSort(col.key)}
-                    style={{
-                      padding: '12px',
-                      width: col.width || 'auto',
-                      minWidth: col.minWidth || '100px',
-                      cursor: col.sortable ? 'pointer' : 'default',
-                      userSelect: 'none'
-                    }}
-                  >
-                    <Box display='flex' alignItems='center'>
-                      {col.header} {col.sortable && col.key !== 'sno' && <SortIcon field={col.key} />}
-                    </Box>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {paginatedRows.map((r, i) => (
-                <tr key={r.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
-                  {manualColumns.map(col => (
-                    <td key={col.key} style={tableCellStyle}>
-                      {col.render(r, i)}
-                    </td>
+              {table.getHeaderGroups().map(hg => (
+                <tr key={hg.id}>
+                  {hg.headers.map(h => (
+                    <th key={h.id}>
+                      <div
+                        className={classnames({
+                          'flex items-center': h.column.getIsSorted(),
+                          'cursor-pointer select-none': h.column.getCanSort()
+                        })}
+                        onClick={h.column.getToggleSortingHandler()}
+                      >
+                        {flexRender(h.column.columnDef.header, h.getContext())}
+                        {{
+                          asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
+                          desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
+                        }[h.column.getIsSorted()] ?? null}
+                      </div>
+                    </th>
                   ))}
                 </tr>
               ))}
+            </thead>
+            <tbody>
+              {rows.length ? (
+                table.getRowModel().rows.map(row => (
+                  <tr key={row.id}>
+                    {row.getVisibleCells().map(cell => (
+                      <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                    ))}
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={columns.length} className='text-center py-4'>
+                    No results found
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
-          {rowCount === 0 && (
-            <Box sx={{ textAlign: 'center', py: 4 }}>
-              <Typography color='text.secondary'>No results found</Typography>
-            </Box>
-          )}
-        </Box>
-
-        {/* Pagination Footer (Copied from Page A) */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 2, py: 2, mt: 2, flexWrap: 'wrap' }}>
-          <Typography variant='body2' color='text.secondary'>
-            {paginationText}
-          </Typography>
-
-          <Box display='flex' alignItems='center' gap={2}>
-            <Typography variant='body2' color='text.secondary'>
-              Page {page} of {pageCount}
-            </Typography>
-            <Pagination
-              count={pageCount}
-              page={page}
-              onChange={handlePageChange}
-              shape='rounded'
-              color='primary'
-              showFirstButton
-              showLastButton
-            />
-          </Box>
-        </Box>
+        </div>
+        <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
       </Card>
+
+      {/* Delete Dialog */}
+      <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false })}>
+        <DialogTitle sx={{ textAlign: 'center', color: 'error.main', fontWeight: 600 }}>
+          <WarningAmberIcon sx={{ verticalAlign: 'middle', mr: 1 }} /> Confirm Delete
+        </DialogTitle>
+        <DialogContent>
+          <Typography textAlign='center'>
+            Delete customer "<strong>{deleteDialog.row?.name}</strong>"?
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center', pb: 3 }}>
+          <Button onClick={() => setDeleteDialog({ open: false })}>Cancel</Button>
+          <Button color='error' variant='contained' onClick={confirmDelete}>
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   )
 }

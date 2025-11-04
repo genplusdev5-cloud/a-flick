@@ -1,387 +1,558 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
+import { format } from 'date-fns'
+
+// MUI
 import {
   Box,
-  Button,
   Card,
-  CardContent,
-  Grid,
-  Typography, // Added Typography
+  CardHeader,
+  Typography,
+  Divider,
+  Breadcrumbs,
+  MenuItem,
+  Checkbox,
+  CircularProgress,
+  Pagination,
   InputAdornment,
-  TablePagination, // Changed from Pagination to TablePagination
-  Autocomplete // Added Autocomplete
+  Button // ✅ Added here
 } from '@mui/material'
-import { DataGrid } from '@mui/x-data-grid'
-import { format } from 'date-fns' // Added date-fns for consistency
 
-// Icons
-import SearchIcon from '@mui/icons-material/Search'
 import RefreshIcon from '@mui/icons-material/Refresh'
-import FileDownloadIcon from '@mui/icons-material/FileDownload'
-import PrintIcon from '@mui/icons-material/Print'
-import FileCopyIcon from '@mui/icons-material/FileCopy'
-import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
-import TableChartIcon from '@mui/icons-material/TableChart'
+import SearchIcon from '@mui/icons-material/Search'
 
-// Layout
-import ContentLayout from '@/components/layout/ContentLayout'
+// Components
+import CustomContainedButton from '@/components/CustomContainedButton'
 import CustomTextField from '@core/components/mui/TextField'
+import CustomAutocomplete from '@core/components/mui/Autocomplete'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 
-// Extracted Filter Options
-const EMPLOYEE_OPTIONS = ['Admin', 'Tech', 'User A']
-const CUSTOMER_OPTIONS = ['GP Industries Pvt Ltd', 'ABC Pvt Ltd', 'Tech Solutions']
-const SUPPLIER_OPTIONS = ['Stock-TECH STOCK 1', 'Supplier-B', 'Vendor-C']
-const CHEMICAL_OPTIONS = ['Abate', 'Advion Ant Gel', 'Aquabac', 'Falcon', 'Able Max']
+// Toastify
+import { toast, ToastContainer } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
 
+// Table
+import {
+  useReactTable,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getSortedRowModel,
+  getPaginationRowModel,
+  createColumnHelper,
+  flexRender
+} from '@tanstack/react-table'
+
+import classnames from 'classnames'
+import styles from '@core/styles/table.module.css'
+import ChevronRight from '@menu/svg/ChevronRight'
+
+// ─────────────────────────────────────────────
+// Dummy Data
+// ─────────────────────────────────────────────
+const dummyData = [
+  {
+    id: 1,
+    employee: 'Admin',
+    customer: 'GP Industries Pvt Ltd',
+    supplier: 'Stock-TECH STOCK 1',
+    material: 'Abate',
+    usage: 20,
+    dosageRemarks: 'Applied for pest control',
+    reportDate: '10/10/2025'
+  },
+  {
+    id: 2,
+    employee: 'Tech',
+    customer: 'ABC Pvt Ltd',
+    supplier: 'Stock-TECH STOCK 1',
+    material: 'Advion Ant Gel',
+    usage: 10,
+    dosageRemarks: 'Test usage remarks',
+    reportDate: '10/10/2025'
+  },
+  {
+    id: 3,
+    employee: 'User A',
+    customer: 'Tech Solutions',
+    supplier: 'Supplier-B',
+    material: 'Aquabac',
+    usage: 5,
+    dosageRemarks: 'Routine check',
+    reportDate: '11/10/2025'
+  }
+]
+
+// ─────────────────────────────────────────────
+// Toast Helper
+// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// Toast Helper (Fixed)
+// ─────────────────────────────────────────────
+const showToast = (type, message) => {
+  const icons = {
+    success: 'tabler-circle-check',
+    error: 'tabler-alert-triangle',
+    warning: 'tabler-info-circle',
+    info: 'tabler-refresh'
+  }
+
+  toast(
+    <div className='flex items-center gap-2'>
+      <i
+        className={icons[type] || 'tabler-info-circle'}
+        style={{
+          color:
+            type === 'success' ? '#16a34a' : type === 'error' ? '#dc2626' : type === 'warning' ? '#f59e0b' : '#2563eb',
+          fontSize: '22px'
+        }}
+      />
+      <Typography variant='body2' sx={{ fontSize: '0.9rem', color: '#111' }}>
+        {message}
+      </Typography>
+    </div>,
+    {
+      position: 'top-right',
+      autoClose: 2200,
+      hideProgressBar: true,
+      pauseOnHover: false,
+      closeOnClick: true,
+      draggable: false,
+      theme: 'light',
+      style: {
+        borderRadius: '10px',
+        padding: '8px 14px',
+        boxShadow: '0 4px 10px rgba(0,0,0,0.06)'
+      }
+    }
+  )
+}
+
+// ─────────────────────────────────────────────
+// Component
+// ─────────────────────────────────────────────
 export default function UsageReportPage() {
-  const [searchText, setSearchText] = useState('')
-  const [page, setPage] = useState(0) // State for external pagination
-  const [rowsPerPage, setRowsPerPage] = useState(10) // State for external pagination (renamed from pageSize)
-  const [dateFilter, setDateFilter] = useState(new Date()) // Renamed 'date' to 'dateFilter'
-  const [filterByDate, setFilterByDate] = useState(false) // Custom date filter state
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(false)
 
-  // Autocomplete filter states
+  const [enableDateFilter, setEnableDateFilter] = useState(false)
+  const [startDate, setStartDate] = useState(new Date())
+  const [endDate, setEndDate] = useState(new Date())
+
   const [employeeFilter, setEmployeeFilter] = useState('')
   const [customerFilter, setCustomerFilter] = useState('')
   const [supplierFilter, setSupplierFilter] = useState('')
   const [chemicalFilter, setChemicalFilter] = useState('')
+  const [searchText, setSearchText] = useState('')
 
-  // Dummy Data (added reportDate for filter test)
-  const [rows] = useState([
-    {
-      id: 1,
-      employee: 'Admin',
-      customer: 'GP Industries Pvt Ltd',
-      supplier: 'Stock-TECH STOCK 1',
-      material: 'Abate',
-      usage: 20,
-      dosageRemarks: 'Applied for pest control',
-      reportDate: new Date(2025, 9, 10)
-    },
-    {
-      id: 2,
-      employee: 'Tech',
-      customer: 'ABC Pvt Ltd',
-      supplier: 'Stock-TECH STOCK 1',
-      material: 'Advion Ant Gel',
-      usage: 10,
-      dosageRemarks: 'Test usage remarks',
-      reportDate: new Date(2025, 9, 10)
-    },
-    {
-      id: 3,
-      employee: 'User A',
-      customer: 'Tech Solutions',
-      supplier: 'Supplier-B',
-      material: 'Aquabac',
-      usage: 5,
-      dosageRemarks: 'Routine check',
-      reportDate: new Date(2025, 9, 11)
+  // ===== Table Columns =====
+  const columnHelper = createColumnHelper()
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor('sno', { header: 'S.No', cell: info => info.getValue() }),
+      columnHelper.accessor('employee', { header: 'Employee', cell: info => info.getValue() }),
+      columnHelper.accessor('customer', { header: 'Customer', cell: info => info.getValue() }),
+      columnHelper.accessor('supplier', { header: 'Supplier', cell: info => info.getValue() }),
+      columnHelper.accessor('material', { header: 'Chemical', cell: info => info.getValue() }),
+      columnHelper.accessor('usage', { header: 'Usage', cell: info => info.getValue() }),
+      columnHelper.accessor('dosageRemarks', { header: 'Dosage Remarks', cell: info => info.getValue() }),
+      columnHelper.accessor('reportDate', { header: 'Report Date', cell: info => info.getValue() })
+    ],
+    []
+  )
+
+  const loadData = async (showToastMsg = false) => {
+    setLoading(true)
+    try {
+      const filtered = dummyData.filter(r => {
+        const matchSearch =
+          !searchText ||
+          `${r.employee} ${r.customer} ${r.supplier} ${r.material} ${r.dosageRemarks}`
+            .toLowerCase()
+            .includes(searchText.toLowerCase())
+
+        const matchDate = (() => {
+          if (!enableDateFilter) return true
+          const [day, month, year] = r.reportDate.split('/')
+          const rowDate = new Date(year + '-' + month + '-' + day)
+          return rowDate >= startDate && rowDate <= endDate
+        })()
+
+        const matchEmployee = !employeeFilter || r.employee === employeeFilter
+        const matchCustomer = !customerFilter || r.customer === customerFilter
+        const matchSupplier = !supplierFilter || r.supplier === supplierFilter
+        const matchChemical = !chemicalFilter || r.material === chemicalFilter
+
+        return matchSearch && matchDate && matchEmployee && matchCustomer && matchSupplier && matchChemical
+      })
+
+      const withSno = filtered.map((r, i) => ({ ...r, sno: i + 1 }))
+      setRows(withSno)
+
+      // ✅ only show toast if manually triggered
+      if (showToastMsg) {
+        showToast('info', 'Usage report refreshed')
+      }
+    } catch {
+      showToast('error', 'Failed to load data')
+    } finally {
+      setLoading(false)
     }
-  ])
-
-  const handleRefreshTable = () => {
-    // In a real application, this would re-fetch data based on the current filters
-    console.log('Refreshing Usage Report data...')
-    setPage(0)
   }
 
-  // Filter rows using useMemo to apply all filters
-  const filteredRows = useMemo(() => {
-    return rows.filter(row => {
-      // Search text filter
-      const matchesSearch =
-        row.employee.toLowerCase().includes(searchText.toLowerCase()) ||
-        row.customer.toLowerCase().includes(searchText.toLowerCase()) ||
-        row.material.toLowerCase().includes(searchText.toLowerCase())
+  // ✅ Correct useEffect — no stray characters
+  useEffect(() => {
+    loadData(false) // no toast
+  }, [searchText, enableDateFilter, startDate, endDate, employeeFilter, customerFilter, supplierFilter, chemicalFilter])
 
-      // Autocomplete filters
-      const matchesEmployee = !employeeFilter || row.employee === employeeFilter
-      const matchesCustomer = !customerFilter || row.customer === customerFilter
-      const matchesSupplier = !supplierFilter || row.supplier === supplierFilter
-      const matchesChemical = !chemicalFilter || row.material === chemicalFilter
+  // ===== React Table =====
+  const table = useReactTable({
+    data: rows,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel()
+  })
 
-      // Date filter logic (copied from Page B)
-      let matchesDate = true
-      if (filterByDate && row.reportDate) {
-        const rowDate = new Date(row.reportDate)
-        if (!isNaN(rowDate.getTime())) {
-          matchesDate =
-            rowDate.getFullYear() === dateFilter.getFullYear() &&
-            rowDate.getMonth() === dateFilter.getMonth() &&
-            rowDate.getDate() === dateFilter.getDate()
-        } else {
-          matchesDate = false
-        }
-      }
-
-      return matchesSearch && matchesEmployee && matchesCustomer && matchesSupplier && matchesChemical && matchesDate
-    })
-  }, [rows, searchText, employeeFilter, customerFilter, supplierFilter, chemicalFilter, filterByDate, dateFilter])
-
-  // Pagination logic from Page B
-  const paginatedRows = useMemo(() => {
-    return filteredRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-  }, [filteredRows, page, rowsPerPage])
-
-  const totalRows = filteredRows.length
-  const startIndex = totalRows === 0 ? 0 : page * rowsPerPage + 1
-  const endIndex = Math.min((page + 1) * rowsPerPage, totalRows)
-  const paginationText = `Showing ${startIndex} to ${endIndex} of ${totalRows} entries`
-
-  const handleChangePage = (event, newPage) => setPage(newPage)
-  const handleChangeRowsPerPage = event => {
-    setRowsPerPage(parseInt(event.target.value, 10))
-    setPage(0)
-  }
-
-  // Table columns
-  const columns = [
-    { field: 'id', headerName: 'ID', width: 80 }, // Adjusted width
-    { field: 'employee', headerName: 'Employee', flex: 1, minWidth: 150 },
-    { field: 'customer', headerName: 'Customer', flex: 1.2, minWidth: 200 },
-    { field: 'supplier', headerName: 'Supplier', flex: 1.2, minWidth: 200 },
-    { field: 'material', headerName: 'Material', flex: 1, minWidth: 150 },
-    { field: 'usage', headerName: 'Usage', flex: 1, minWidth: 120 },
-    {
-      field: 'reportDate',
-      headerName: 'Report Date',
-      width: 150,
-      valueFormatter: params => {
-        const date = new Date(params.value)
-        return !isNaN(date.getTime()) ? format(date, 'dd/MM/yyyy') : 'N/A'
-      }
-    },
-    { field: 'dosageRemarks', headerName: 'Dosage Remarks', flex: 1.5, minWidth: 200 }
-  ]
+  const filteredRows = table.getFilteredRowModel().rows
+  const total = filteredRows.length
+  const pageSize = table.getState().pagination.pageSize || 10
+  const pageIndex = table.getState().pagination.pageIndex || 0
 
   return (
-    <ContentLayout title='Usage Report' breadcrumbs={[{ label: 'Home', href: '/' }, { label: 'Usage Report' }]}>
-      {/* Filters Section: Styled like Page B */}
-      <Card sx={{ mb: 4, boxShadow: 'none' }} elevation={0}>
-        <CardContent>
-          <Grid container spacing={6}>
-            {' '}
-            {/* Increased spacing to match Page B */}
-            {/* Date Filter with Checkbox */}
-            <Grid item xs={12} md={3}>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <Box display='flex' alignItems='center' gap={0.5} sx={{ pl: 0.5, position: 'relative' }}>
-                  {/* Custom Checkbox from Page B */}
-                  <input
-                    type='checkbox'
-                    checked={filterByDate}
-                    onChange={e => setFilterByDate(e.target.checked)}
-                    id='dateFilterCheck'
-                    style={{
-                      width: '18px',
-                      height: '18px',
-                      appearance: 'none',
-                      border: `1px solid ${filterByDate ? '#7D70F7' : '#999'}`,
-                      borderRadius: '1px',
-                      cursor: 'pointer',
-                      outline: 'none',
-                      backgroundColor: filterByDate ? '#7D70F7' : 'white'
-                    }}
-                  />
-                  {filterByDate && (
-                    <Box
-                      component='span'
-                      sx={{
-                        position: 'absolute',
-                        width: '18px',
-                        height: '18px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        pointerEvents: 'none'
-                      }}
-                    >
-                      <Typography component='span' sx={{ color: 'white', fontSize: '12px', top: '-1px' }}>
-                        &#10003;
-                      </Typography>
-                    </Box>
-                  )}
-                  <label
-                    htmlFor='dateFilterCheck'
-                    style={{ cursor: 'pointer', fontWeight: 500, color: filterByDate ? '#7D70F7' : '#666' }}
-                  >
-                    Date Filter
-                  </label>
-                </Box>
+    <Box>
+      {/* Breadcrumb */}
+      <Box role='presentation' sx={{ mb: 2 }}>
+        {' '}
+        <Breadcrumbs aria-label='breadcrumb'>
+          {' '}
+          <Link underline='hover' color='inherit' href='/'>
+            Home{' '}
+          </Link>{' '}
+          <Typography color='text.primary'>Usage Report</Typography>{' '}
+        </Breadcrumbs>{' '}
+      </Box>
+      <Card sx={{ p: 3, mt: 2 }}>
+        {/* Header */}
+        <CardHeader
+          title={
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 2
+              }}
+            >
+              {/* Left Section — Title + Refresh Button */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Typography variant='h5' sx={{ fontWeight: 600 }}>
+                  Usage Report
+                </Typography>
 
-                <AppReactDatepicker
-                  selected={dateFilter}
-                  id='date-filter'
-                  onChange={d => setDateFilter(d)}
-                  placeholderText='Select Date'
-                  dateFormat='dd/MM/yyyy'
-                  customInput={
-                    <CustomTextField
-                      fullWidth
-                      inputProps={{
-                        disabled: !filterByDate,
-                        sx: { backgroundColor: !filterByDate ? '#f3f4f6' : 'white' }
+                <Button
+                  variant='contained'
+                  color='primary'
+                  startIcon={
+                    <RefreshIcon
+                      sx={{
+                        animation: loading ? 'spin 1s linear infinite' : 'none',
+                        '@keyframes spin': {
+                          '0%': { transform: 'rotate(0deg)' },
+                          '100%': { transform: 'rotate(360deg)' }
+                        }
                       }}
                     />
                   }
-                />
+                  disabled={loading}
+                  onClick={async () => {
+                    setLoading(true)
+                    await loadData(true) // show toast only when manually refreshed
+                    setTimeout(() => setLoading(false), 600)
+                  }}
+                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                >
+                  {loading ? 'Refreshing...' : 'Refresh'}
+                </Button>
               </Box>
-            </Grid>
-            {/* Employee Filter: Changed to Autocomplete */}
-            <Grid item xs={12} md={3}>
-              <Autocomplete
-                freeSolo={false}
-                options={EMPLOYEE_OPTIONS}
-                value={employeeFilter}
-                onChange={(event, newValue) => setEmployeeFilter(newValue || '')}
-                renderInput={params => <CustomTextField {...params} fullWidth label='Employee' />}
-              />
-            </Grid>
-            {/* Customer Filter: Changed to Autocomplete */}
-            <Grid item xs={12} md={3}>
-              <Autocomplete
-                freeSolo={false}
-                options={CUSTOMER_OPTIONS}
-                value={customerFilter}
-                onChange={(event, newValue) => setCustomerFilter(newValue || '')}
-                renderInput={params => <CustomTextField {...params} fullWidth label='Customer' />}
-              />
-            </Grid>
-            {/* Stock Supplier Filter: Changed to Autocomplete */}
-            <Grid item xs={12} md={3}>
-              <Autocomplete
-                freeSolo={false}
-                options={SUPPLIER_OPTIONS}
-                value={supplierFilter}
-                onChange={(event, newValue) => setSupplierFilter(newValue || '')}
-                renderInput={params => <CustomTextField {...params} fullWidth label='Stock Supplier' />}
-              />
-            </Grid>
-            {/* Chemical Filter: Changed to Autocomplete */}
-            <Grid item xs={12} md={4}>
-              <Autocomplete
-                freeSolo={false}
-                options={CHEMICAL_OPTIONS}
-                value={chemicalFilter}
-                onChange={(event, newValue) => setChemicalFilter(newValue || '')}
-                renderInput={params => <CustomTextField {...params} fullWidth label='Chemical' />}
-              />
-            </Grid>
-            {/* Refresh Button: Styled like Page B */}
-            <Grid item xs={12} md={4} display='flex' gap={2} sx={{ mt: 5 }}>
-              <Button
-                size='small'
-                variant='contained'
-                onClick={handleRefreshTable}
-                sx={{
-                  backgroundColor: '#7D70F7',
-                  '&:hover': { backgroundColor: '#5D4CEF' },
-                  paddingY: '10px'
-                }}
-              >
-                Refresh
-              </Button>
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
 
-      {/* Table Section: Styled like Page B */}
-      <Card sx={{ mb: 4, boxShadow: 'none' }} elevation={0}>
-        <CardContent>
-          {/* Export + Search: Styled like Page B */}
-          <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
-            <Box display='flex' gap={1}>
-              {[{ label: 'Copy' }, { label: 'CSV' }, { label: 'Excel' }, { label: 'PDF' }, { label: 'Print' }].map(
-                btn => (
+              {/* Right Section — Export Buttons */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                {['Copy', 'CSV', 'Excel', 'PDF', 'Print'].map(label => (
                   <Button
-                    key={btn.label}
+                    key={label}
                     variant='contained'
-                    size='small'
-                    startIcon={btn.icon}
                     sx={{
-                      borderRadius: '0px', // Square corners
-                      backgroundColor: '#6c7783',
-                      color: '#ffffff',
+                      backgroundColor: '#5A5A5A',
+                      color: 'white',
                       textTransform: 'none',
-                      '&:hover': { backgroundColor: '#5a626a' },
-                      paddingY: '10px',
-                      lineHeight: 1
+                      fontWeight: 500,
+                      fontSize: '0.8rem',
+                      px: 2,
+                      py: 2,
+                      borderRadius: 1,
+                      minWidth: 68,
+                      boxShadow: 'none',
+                      '&:hover': { backgroundColor: '#4b4b4b' }
                     }}
                   >
-                    {btn.label}
+                    {label}
                   </Button>
-                )
-              )}
+                ))}
+              </Box>
+            </Box>
+          }
+          sx={{
+            pb: 1.5,
+            pt: 1.5,
+            '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
+          }}
+        />
+
+        {/* Full-screen Loader */}
+        {loading && (
+          <Box
+            sx={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100vw',
+              height: '100vh',
+              backgroundColor: 'rgba(255,255,255,0.7)',
+              backdropFilter: 'blur(2px)',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              zIndex: 2000
+            }}
+          >
+            <Box sx={{ textAlign: 'center' }}>
+              <CircularProgress size={70} thickness={5} color='primary' />
+              <Typography sx={{ mt: 2, fontWeight: 600 }}>Refreshing Usage Report...</Typography>
+            </Box>
+          </Box>
+        )}
+
+        <Divider sx={{ mb: 2 }} />
+
+        {/* Filters */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, mb: 3, flexWrap: 'wrap' }}>
+          <Box>
+            <Box display='flex' alignItems='center' gap={1} sx={{ mb: 0.5 }}>
+              <Typography variant='body2' sx={{ fontWeight: 500, color: 'text.primary' }}>
+                Date Range
+              </Typography>
+              <Checkbox
+                size='small'
+                checked={enableDateFilter}
+                onChange={e => setEnableDateFilter(e.target.checked)}
+                sx={{
+                  color: '#9c27b0',
+                  '&.Mui-checked': { color: '#7367f0' }
+                }}
+              />
             </Box>
 
+            <AppReactDatepicker
+              selectsRange
+              startDate={startDate}
+              endDate={endDate}
+              onChange={dates => enableDateFilter && dates && setStartDate(dates[0]) && setEndDate(dates[1])}
+              shouldCloseOnSelect={false}
+              disabled={!enableDateFilter}
+              readOnly={!enableDateFilter}
+              customInput={
+                <CustomTextField
+                  size='small'
+                  fullWidth
+                  value={`${format(startDate, 'dd/MM/yyyy')} - ${format(endDate, 'dd/MM/yyyy')}`}
+                  sx={{
+                    minWidth: 260,
+                    backgroundColor: 'white',
+                    '& .MuiInputBase-input.Mui-disabled': {
+                      WebkitTextFillColor: '#555'
+                    },
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': {
+                        borderColor: enableDateFilter ? '#7367f0' : '#d0d0d0'
+                      }
+                    }
+                  }}
+                />
+              }
+            />
+          </Box>
+
+          <CustomAutocomplete
+            className='is-[220px]'
+            options={['Admin', 'Tech', 'User A']}
+            value={employeeFilter || null}
+            onChange={(e, val) => setEmployeeFilter(val || '')}
+            renderInput={params => <CustomTextField {...params} label='Employee' size='small' />}
+          />
+
+          <CustomAutocomplete
+            className='is-[220px]'
+            options={['GP Industries Pvt Ltd', 'ABC Pvt Ltd', 'Tech Solutions']}
+            value={customerFilter || null}
+            onChange={(e, val) => setCustomerFilter(val || '')}
+            renderInput={params => <CustomTextField {...params} label='Customer' size='small' />}
+          />
+
+          <CustomAutocomplete
+            className='is-[220px]'
+            options={['Stock-TECH STOCK 1', 'Supplier-B']}
+            value={supplierFilter || null}
+            onChange={(e, val) => setSupplierFilter(val || '')}
+            renderInput={params => <CustomTextField {...params} label='Supplier' size='small' />}
+          />
+
+          <CustomAutocomplete
+            className='is-[220px]'
+            options={['Abate', 'Advion Ant Gel', 'Aquabac']}
+            value={chemicalFilter || null}
+            onChange={(e, val) => setChemicalFilter(val || '')}
+            renderInput={params => <CustomTextField {...params} label='Chemical' size='small' />}
+          />
+        </Box>
+
+        <Divider sx={{ mb: 4 }} />
+
+        {/* Search + Entries control */}
+        <Box sx={{ p: 2, pt: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant='body2' color='text.secondary'>
+              Show
+            </Typography>
             <CustomTextField
+              select
               size='small'
-              placeholder='Search' // Simplified placeholder
-              value={searchText}
-              onChange={e => setSearchText(e.target.value)}
-              sx={{ width: 280 }} // Adjusted width
-              InputProps={{
-                // Use InputProps for startAdornment
+              sx={{ width: 140 }}
+              value={table.getState().pagination.pageSize}
+              onChange={e => {
+                table.setPageSize(Number(e.target.value))
+                table.setPageIndex(0)
+              }}
+            >
+              {[5, 10, 25, 50, 100].map(size => (
+                <MenuItem key={size} value={size}>
+                  {size} entries
+                </MenuItem>
+              ))}
+            </CustomTextField>
+          </Box>
+
+          <CustomTextField
+            size='small'
+            placeholder='Search by employee, customer, or chemical...'
+            value={searchText}
+            onChange={e => setSearchText(e.target.value)}
+            sx={{ width: 360 }}
+            slotProps={{
+              input: {
                 startAdornment: (
                   <InputAdornment position='start'>
                     <SearchIcon />
                   </InputAdornment>
                 )
-              }}
-            />
-          </Box>
+              }
+            }}
+          />
+        </Box>
 
-          {/* DataGrid */}
-          <Box sx={{ width: '100%', overflowX: 'auto' }}>
-            <DataGrid
-              rows={paginatedRows} // Use paginated rows
-              columns={columns}
-              disableRowSelectionOnClick
-              autoHeight
-              hideFooter // Hide internal footer
-              getRowId={row => row.id} // Added getRowId
-              getRowHeight={() => 'auto'}
-              sx={{
-                mt: 3,
-                minWidth: 1000,
-                border: '1px solid #e0e0e0',
-                borderRadius: 2,
-                '& .MuiDataGrid-row': { minHeight: '60px !important', padding: '12px 0' }, // Custom row height
-                '& .MuiDataGrid-cell': {
-                  whiteSpace: 'normal',
-                  wordBreak: 'break-word',
-                  alignItems: 'flex-start',
-                  fontSize: '15px'
-                },
-                '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': { outline: 'none' },
-                '& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within': { outline: 'none' },
-                '& .MuiDataGrid-columnHeaderTitle': { fontSize: '15px', fontWeight: 500 }
-              }}
-            />
-          </Box>
+        {/* Table */}
+        <Box sx={{ overflowX: 'auto' }}>
+          <table className={styles.table}>
+            <thead>
+              {table.getHeaderGroups().map(hg => (
+                <tr key={hg.id}>
+                  {hg.headers.map(header => (
+                    <th key={header.id}>
+                      <div
+                        className={classnames({
+                          'flex items-center': header.column.getIsSorted(),
+                          'cursor-pointer select-none': header.column.getCanSort()
+                        })}
+                        onClick={header.column.getToggleSortingHandler()}
+                      >
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                        {header.column.getIsSorted() === 'asc' && (
+                          <ChevronRight className='-rotate-90' fontSize='small' />
+                        )}
+                        {header.column.getIsSorted() === 'desc' && (
+                          <ChevronRight className='rotate-90' fontSize='small' />
+                        )}
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              ))}
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={columns.length} className='text-center'>
+                    Loading...
+                  </td>
+                </tr>
+              ) : table.getRowModel().rows.length === 0 ? (
+                <tr>
+                  <td colSpan={columns.length} className='text-center'>
+                    No data available
+                  </td>
+                </tr>
+              ) : (
+                table.getRowModel().rows.map(row => (
+                  <tr key={row.id}>
+                    {row.getVisibleCells().map(cell => (
+                      <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                    ))}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
 
-          {/* Custom Pagination Footer from Page B */}
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2 }}>
-            <Typography variant='body2' color='text.secondary'>
-              {paginationText}
+          {/* Pagination Footer */}
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              borderTop: '1px solid #e0e0e0',
+              px: 3,
+              py: 1.5,
+              mt: 1,
+              gap: 2
+            }}
+          >
+            <Typography color='text.disabled'>
+              {`Showing ${total === 0 ? 0 : pageIndex * pageSize + 1} to ${Math.min(
+                (pageIndex + 1) * pageSize,
+                total
+              )} of ${total} entries`}
             </Typography>
 
-            <TablePagination
-              rowsPerPageOptions={[10, 25, 50, 100]}
-              component='div'
-              count={filteredRows.length}
-              rowsPerPage={rowsPerPage}
-              page={page}
-              onPageChange={handleChangePage}
-              onRowsPerPageChange={handleChangeRowsPerPage}
+            <Pagination
+              shape='rounded'
+              color='primary'
+              variant='tonal'
+              count={Math.ceil(total / pageSize) || 1}
+              page={pageIndex + 1}
+              onChange={(_, page) => {
+                table.setPageIndex(page - 1)
+              }}
+              showFirstButton
+              showLastButton
             />
           </Box>
-        </CardContent>
+        </Box>
       </Card>
-    </ContentLayout>
+      <ToastContainer />
+    </Box>
   )
 }

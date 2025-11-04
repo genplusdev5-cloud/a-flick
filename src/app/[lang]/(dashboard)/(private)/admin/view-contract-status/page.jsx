@@ -1,552 +1,599 @@
-// page B (Refactored Table Section with Export Button)
-
 'use client'
-
-import { useState, useMemo, useRef, useCallback } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
+import Link from 'next/link'
 import {
   Box,
   Button,
   Card,
+  CardHeader,
   CardContent,
-  Grid,
-  InputAdornment,
-  IconButton,
   Typography,
-  Autocomplete,
+  IconButton,
+  Divider,
+  Grid,
+  Breadcrumbs,
+  Chip,
+  TextField,
   FormControl,
   Select,
   MenuItem,
-  Pagination,
-  Divider,
-  Menu, // 🆕 Added for export menu
-  ListItemText // 🆕 Added for export menu
+  CircularProgress,
+  InputAdornment,
+  Checkbox,
+  FormControlLabel
 } from '@mui/material'
-
-// Icons
+import AddIcon from '@mui/icons-material/Add'
+import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
 import MoreVertIcon from '@mui/icons-material/MoreVert'
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
-import Link from 'next/link'
-import AddIcon from '@mui/icons-material/Add'
-import DownloadIcon from '@mui/icons-material/Download' // 🆕 Added for export button
-import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown' // 🆕 Added for export button dropdown
-
-// Wrapper
-import CustomTextField from '@core/components/mui/TextField'
-
-// Layout + Custom Input (Assuming these imports are correct for Page B's context)
-import ContentLayout from '@/components/layout/ContentLayout'
+import { useRouter } from 'next/navigation'
+import { toast } from 'react-toastify'
+import TablePaginationComponent from '@/components/TablePaginationComponent'
+import classnames from 'classnames'
+import { rankItem } from '@tanstack/match-sorter-utils'
+import Autocomplete from '@mui/material/Autocomplete'
+import CloseIcon from '@mui/icons-material/Close'
+import {
+  useReactTable,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getSortedRowModel,
+  flexRender,
+  createColumnHelper
+} from '@tanstack/react-table'
+import styles from '@core/styles/table.module.css'
+import ChevronRight from '@menu/svg/ChevronRight'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 
-
-// New: Utility function for robust comparison (from Page A's core logic)
-const compareValues = (aValue, bValue, isNumeric) => {
-  if (isNumeric) {
-    // Treat null/undefined/empty string as 0 for sorting numbers
-    const numA = Number(String(aValue || '0').replace(/[^0-9.-]+/g, "")) // Remove currency symbols for comparison
-    const numB = Number(String(bValue || '0').replace(/[^0-9.-]+/g, "")) // Remove currency symbols for comparison
-    return numA - numB
+// ───────────────────────────────────────────
+// Mock Data (Replace with IndexedDB later)
+// ───────────────────────────────────────────
+const mockData = [
+  {
+    id: 1,
+    customer: 'GP Industries Pvt Ltd',
+    services: 'Pest Control',
+    contractCode: 'CON-2025-001',
+    type: 'Annual Contract',
+    serviceAddress: '123 Industrial Area, Delhi',
+    postalCode: '110020',
+    startDate: '2025-01-01',
+    endDate: '2025-12-31',
+    pest: 'Rodent',
+    contractValue: 120000,
+    prodValue: 15000,
+    contactPerson: 'Mr. Rajesh Kumar',
+    contactPhone: '+91 9876543210',
+    renewalPending: 'No',
+    renewalOn: null,
+    holdedOn: null,
+    terminatedOn: null,
+    expiredOn: null,
+    status: 'Current',
+    origin: 'Genplus Innovations',
+    reportEmail: 'report@gpindustries.com',
+    picEmail: 'rajesh@gpindustries.com',
+    billingEmail: 'billing@gpindustries.com'
+  },
+  {
+    id: 2,
+    customer: 'Acme Corp',
+    services: 'Termite Treatment',
+    contractCode: 'CON-2024-045',
+    type: 'Limited Contract',
+    serviceAddress: '456 MG Road, Mumbai',
+    postalCode: '400001',
+    startDate: '2024-06-01',
+    endDate: '2024-11-30',
+    pest: 'Termite',
+    contractValue: 85000,
+    prodValue: 12000,
+    contactPerson: 'Ms. Priya Sharma',
+    contactPhone: '+91 9123456789',
+    renewalPending: 'Yes',
+    renewalOn: '2024-11-01',
+    holdedOn: null,
+    terminatedOn: null,
+    expiredOn: null,
+    status: 'Current',
+    origin: 'Pest Masters',
+    reportEmail: 'reports@acmecorp.com',
+    picEmail: 'priya@acmecorp.com',
+    billingEmail: 'billing@acmecorp.com'
   }
-  // Case-insensitive string comparison
-  return String(aValue || '').localeCompare(String(bValue || ''), undefined, { sensitivity: 'base' })
-}
-
-// New: Array of column fields for easy mapping and sorting
-const COLUMN_FIELDS = [
-  { id: 'id', header: 'S.No', width: '60px', isNumeric: true, displayIndex: true },
-
-  { id: 'customer', header: 'Customer', width: '150px' },
-  { id: 'services', header: 'Services', width: '160px' },
-  { id: 'contractCode', header: 'Contract Code', width: '120px' },
-  { id: 'type', header: 'Type', width: '120px' },
-  { id: 'serviceAddress', header: 'Service Address', width: '200px' },
-  { id: 'postalCode', header: 'Postal Code', width: '100px' },
-  { id: 'startDate', header: 'Start Date', width: '120px' },
-  { id: 'endDate', header: 'End Date', width: '120px' },
-  { id: 'pest', header: 'Pest', width: '120px' },
-  { id: 'contractValue', header: 'Contract Value', width: '120px', isNumeric: true },
-  { id: 'prodValue', header: 'Prod Value', width: '100px', isNumeric: true },
-  { id: 'contactPerson', header: 'Contact Person Name', width: '150px' },
-  { id: 'contactPhone', header: 'Contact Phone', width: '150px' },
-  { id: 'renewalPending', header: 'Renewal Pending', width: '120px' },
-  { id: 'renewalOn', header: 'Renewal On', width: '100px' },
-  { id: 'holdedOn', header: 'Holded On', width: '100px' },
-  { id: 'terminatedOn', header: 'Terminated On', width: '120px' },
-  { id: 'expiredOn', header: 'Expired On', width: '100px' },
-  { id: 'status', header: 'Status', width: '100px' },
-  { id: 'origin', header: 'Origin', width: '150px' },
-  { id: 'reportEmail', header: 'Report Email', width: '150px' },
-  { id: 'picEmail', header: 'PIC Email', width: '150px' },
-  { id: 'billingEmail', header: 'Billing Email', width: '150px' },
 ]
 
+const getContracts = async () => {
+  return new Promise(resolve => setTimeout(() => resolve(mockData), 300))
+}
+
+// ───────────────────────────────────────────
+// Toast helper – 100% JavaScript (no TypeScript)
+// ───────────────────────────────────────────
+const showToast = (type, message) => {
+  // react-toastify gives us a `closeToast` function when we use a render-prop
+  const content = ({ closeToast }) => (
+    <div className='flex items-center justify-between gap-2'>
+      <Typography variant='body2' sx={{ fontWeight: 500 }}>
+        {message}
+      </Typography>
+      <IconButton size='small' onClick={closeToast}>
+        <CloseIcon fontSize='small' />
+      </IconButton>
+    </div>
+  )
+
+  const options = { closeButton: false } // we draw our own X button
+
+  if (type === 'success') toast.success(content, options)
+  else if (type === 'error' || type === 'delete') toast.error(content, options)
+  else if (type === 'warning') toast.warn(content, options)
+  else toast.info(content, options)
+}
+
+// Debounced Input
+const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
+  const [value, setValue] = useState(initialValue)
+  useEffect(() => setValue(initialValue), [initialValue])
+  useEffect(() => {
+    const t = setTimeout(() => onChange(value), debounce)
+    return () => clearTimeout(t)
+  }, [value])
+  return <TextField {...props} value={value} onChange={e => setValue(e.target.value)} />
+}
+
+// ───────────────────────────────────────────
+// Main Component
+// ───────────────────────────────────────────
 export default function ContractStatusPage() {
+  const router = useRouter()
+  const [rows, setRows] = useState([])
+  const [rowCount, setRowCount] = useState(0)
   const [searchText, setSearchText] = useState('')
   const [dateFilter, setDateFilter] = useState(new Date())
-
+  const [filterByDate, setFilterByDate] = useState(false)
   const [originFilter, setOriginFilter] = useState('')
   const [customerFilter, setCustomerFilter] = useState('')
   const [contractTypeFilter, setContractTypeFilter] = useState('')
   const [invoiceFrequencyFilter, setInvoiceFrequencyFilter] = useState('')
   const [contractStatusFilter, setContractStatusFilter] = useState('')
   const [renewalFilter, setRenewalFilter] = useState('')
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 })
+  const [loading, setLoading] = useState(false)
 
-  // Open states for each autocomplete
-  const [originOpen, setOriginOpen] = useState(false)
-  const [customerOpen, setCustomerOpen] = useState(false)
-  const [contractTypeOpen, setContractTypeOpen] = useState(false)
-  const [invoiceFrequencyOpen, setInvoiceFrequencyOpen] = useState(false)
-  const [contractStatusOpen, setContractStatusOpen] = useState(false)
-  const [renewalOpen, setRenewalOpen] = useState(false)
-
-  // Refs for each autocomplete input
   const originRef = useRef()
   const customerRef = useRef()
   const contractTypeRef = useRef()
   const invoiceFrequencyRef = useRef()
   const contractStatusRef = useRef()
   const renewalRef = useRef()
-  const submitRef = useRef()
 
-  // Pagination states (from Page A)
-  const [page, setPage] = useState(1) // 1-based indexing
-  const [rowsPerPage, setRowsPerPage] = useState(10)
+  // Load & Filter Data
+  const loadData = async () => {
+    setLoading(true)
+    try {
+      const all = await getContracts()
+      const filtered = all.filter(r => {
+        const matchesSearch =
+          !searchText ||
+          Object.values(r).some(v =>
+            String(v || '')
+              .toLowerCase()
+              .includes(searchText.toLowerCase())
+          )
+        const matchesDate = !filterByDate || new Date(r.startDate).toDateString() === dateFilter.toDateString()
+        const matchesOrigin = !originFilter || r.origin === originFilter
+        const matchesCustomer = !customerFilter || r.customer === customerFilter
+        const matchesType = !contractTypeFilter || r.type === contractTypeFilter
+        const matchesStatus = !contractStatusFilter || r.status === contractStatusFilter
+        const matchesRenewal = !renewalFilter || r.renewalPending === (renewalFilter === 'Renewed' ? 'No' : 'Yes')
 
-  // State for the date filter checkbox
-  const [filterByDate, setFilterByDate] = useState(false)
+        return (
+          matchesSearch &&
+          matchesDate &&
+          matchesOrigin &&
+          matchesCustomer &&
+          matchesType &&
+          matchesStatus &&
+          matchesRenewal
+        )
+      })
 
-  // State for Sorting (from Page A)
-  const [sortField, setSortField] = useState('id')
-  const [sortDirection, setSortDirection] = useState('asc')
+      const start = pagination.pageIndex * pagination.pageSize
+      const pageSlice = filtered.slice(start, start + pagination.pageSize)
+      const normalized = pageSlice.map((item, i) => ({ ...item, sno: start + i + 1 }))
+      setRows(normalized)
+      setRowCount(filtered.length)
+    } catch {
+      showToast('error', 'Failed to load contracts')
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  // 🆕 State for Export Menu (from Page A)
-  const [exportAnchorEl, setExportAnchorEl] = useState(null)
-  const exportOpen = Boolean(exportAnchorEl)
-
-  // 🆕 Handlers for Export Menu (from Page A)
-  const handleExportClick = event => setExportAnchorEl(event.currentTarget)
-  const handleExportClose = () => setExportAnchorEl(null)
-
-
-  // Dummy rows
-  const [rows] = useState([
-
-
-  ])
-
-  // Apply filter logic (Unchanged)
-  const filteredRows = useMemo(() => {
-    return rows.filter(row => {
-      // 1. Text search filter
-      const matchesSearch =
-        row.customer.toLowerCase().includes(searchText.toLowerCase()) ||
-        row.contractCode.toLowerCase().includes(searchText.toLowerCase()) ||
-        row.serviceAddress.toLowerCase().includes(searchText.toLowerCase()) ||
-        row.contactPerson.toLowerCase().includes(searchText.toLowerCase()) ||
-        row.contactPhone.toLowerCase().includes(searchText.toLowerCase())
-
-      // 2. Date filter only if checkbox is checked
-      const matchesDate = filterByDate ? new Date(row.startDate).toDateString() === dateFilter.toDateString() : true
-
-      // 3. Autocomplete filters
-      const matchesOrigin = !originFilter || row.origin === originFilter
-      const matchesCustomer = !customerFilter || row.customer === customerFilter
-      const matchesContractType = !contractTypeFilter || row.type === contractTypeFilter
-      const matchesStatus = !contractStatusFilter || row.status === contractStatusFilter
-      const matchesRenewal = !renewalFilter || row.renewalPending === (renewalFilter === 'Renewed' ? 'Yes' : 'No')
-      const matchesInvoiceFreq = !invoiceFrequencyFilter
-
-      return matchesSearch && matchesDate && matchesOrigin && matchesCustomer && matchesContractType && matchesStatus && matchesRenewal
-    })
+  useEffect(() => {
+    loadData()
   }, [
-    rows,
+    pagination.pageIndex,
+    pagination.pageSize,
     searchText,
-    dateFilter,
     filterByDate,
+    dateFilter,
     originFilter,
     customerFilter,
     contractTypeFilter,
     contractStatusFilter,
-    renewalFilter,
-    invoiceFrequencyFilter
+    renewalFilter
   ])
 
-
-  // Sorting Logic (Unchanged)
-  const handleSort = useCallback(
-    field => {
-      if (sortField === field) {
-        setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'))
-      } else {
-        setSortField(field)
-        setSortDirection(field === 'id' ? 'desc' : 'asc')
-      }
-      setPage(1)
-    },
-    [sortField]
+  // Table Columns
+  const columnHelper = createColumnHelper()
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor('sno', {
+        header: 'S.No',
+        meta: { width: '60px', align: 'center' },
+        enableSorting: false
+      }),
+      columnHelper.display({
+        id: 'actions',
+        header: 'Actions',
+        cell: () => (
+          <IconButton size='small'>
+            <MoreVertIcon />
+          </IconButton>
+        ),
+        meta: { width: '80px', align: 'center' }
+      }),
+      columnHelper.accessor('customer', { header: 'Customer', meta: { width: '150px' } }),
+      columnHelper.accessor('services', { header: 'Services', meta: { width: '160px' } }),
+      columnHelper.accessor('contractCode', { header: 'Contract Code', meta: { width: '120px' } }),
+      columnHelper.accessor('type', { header: 'Type', meta: { width: '120px' } }),
+      columnHelper.accessor('serviceAddress', { header: 'Service Address', meta: { width: '200px' } }),
+      columnHelper.accessor('postalCode', { header: 'Postal Code', meta: { width: '100px' } }),
+      columnHelper.accessor('startDate', {
+        header: 'Start Date',
+        cell: i => (i.getValue() ? new Date(i.getValue()).toLocaleDateString('en-GB') : ''),
+        meta: { width: '120px' }
+      }),
+      columnHelper.accessor('endDate', {
+        header: 'End Date',
+        cell: i => (i.getValue() ? new Date(i.getValue()).toLocaleDateString('en-GB') : ''),
+        meta: { width: '120px' }
+      }),
+      columnHelper.accessor('pest', { header: 'Pest', meta: { width: '120px' } }),
+      columnHelper.accessor('contractValue', {
+        header: 'Contract Value',
+        cell: i => `$${Number(i.getValue() || 0).toLocaleString()}`,
+        meta: { width: '120px', align: 'right' }
+      }),
+      columnHelper.accessor('prodValue', {
+        header: 'Prod Value',
+        cell: i => `$${Number(i.getValue() || 0).toLocaleString()}`,
+        meta: { width: '100px', align: 'right' }
+      }),
+      columnHelper.accessor('contactPerson', { header: 'Contact Person Name', meta: { width: '150px' } }),
+      columnHelper.accessor('contactPhone', { header: 'Contact Phone', meta: { width: '150px' } }),
+      columnHelper.accessor('renewalPending', { header: 'Renewal Pending', meta: { width: '120px' } }),
+      columnHelper.accessor('renewalOn', {
+        header: 'Renewal On',
+        cell: i => (i.getValue() ? new Date(i.getValue()).toLocaleDateString('en-GB') : ''),
+        meta: { width: '100px' }
+      }),
+      columnHelper.accessor('holdedOn', {
+        header: 'Holded On',
+        cell: i => (i.getValue() ? new Date(i.getValue()).toLocaleDateString('en-GB') : ''),
+        meta: { width: '100px' }
+      }),
+      columnHelper.accessor('terminatedOn', {
+        header: 'Terminated On',
+        cell: i => (i.getValue() ? new Date(i.getValue()).toLocaleDateString('en-GB') : ''),
+        meta: { width: '120px' }
+      }),
+      columnHelper.accessor('expiredOn', {
+        header: 'Expired On',
+        cell: i => (i.getValue() ? new Date(i.getValue()).toLocaleDateString('en-GB') : ''),
+        meta: { width: '100px' }
+      }),
+      columnHelper.accessor('status', {
+        header: 'Status',
+        cell: info => {
+          const s = info.getValue() || 'Current'
+          const bg =
+            s === 'Current'
+              ? 'success.main'
+              : s === 'Expired'
+                ? 'error.main'
+                : s === 'Hold'
+                  ? 'warning.main'
+                  : s === 'Terminated'
+                    ? 'error.main'
+                    : 'info.main'
+          return (
+            <Chip
+              label={s}
+              size='small'
+              sx={{ color: '#fff', bgcolor: bg, fontWeight: 600, borderRadius: '6px', px: 1.5 }}
+            />
+          )
+        },
+        meta: { width: '100px' }
+      }),
+      columnHelper.accessor('origin', { header: 'Origin', meta: { width: '150px' } }),
+      columnHelper.accessor('reportEmail', { header: 'Report Email', meta: { width: '150px' } }),
+      columnHelper.accessor('picEmail', { header: 'PIC Email', meta: { width: '150px' } }),
+      columnHelper.accessor('billingEmail', { header: 'Billing Email', meta: { width: '150px' } })
+    ],
+    []
   )
 
-  const sortedRows = useMemo(() => {
-    if (!sortField) return filteredRows
-
-    const sortConfig = COLUMN_FIELDS.find(c => c.id === sortField)
-    if (!sortConfig) return filteredRows
-
-    return [...filteredRows].sort((a, b) => {
-      const aValue = a[sortField]
-      const bValue = b[sortField]
-      const isNumeric = sortConfig.isNumeric
-
-      let comparison = compareValues(aValue, bValue, isNumeric)
-
-      return sortDirection === 'asc' ? comparison : comparison * -1
-    })
-  }, [filteredRows, sortField, sortDirection])
-
-
-  // Helper component to render the sort icon (Unchanged)
-  const SortIcon = useCallback(
-    ({ field }) => {
-      if (sortField !== field) return null
-      return sortDirection === 'asc' ? (
-        <ArrowUpwardIcon sx={{ fontSize: 16, ml: 0.5 }} />
-      ) : (
-        <ArrowDownwardIcon sx={{ fontSize: 16, ml: 0.5 }} />
-      )
-    },
-    [sortField, sortDirection]
-  )
-
-  // Pagination calculations (Unchanged)
-  const rowCount = sortedRows.length
-  const pageCount = Math.max(1, Math.ceil(rowCount / rowsPerPage))
-  const paginatedRows = sortedRows.slice((page - 1) * rowsPerPage, page * rowsPerPage)
-  const startIndex = rowCount === 0 ? 0 : (page - 1) * rowsPerPage + 1
-  const endIndex = Math.min(page * rowsPerPage, rowCount)
-  const paginationText = `Showing ${startIndex} to ${endIndex} of ${rowCount} entries`
-
-  // Pagination handlers (Unchanged)
-  const handleChangePage = (event, value) => setPage(value)
-  const handleChangeRowsPerPage = event => {
-    setRowsPerPage(Number(event.target.value))
-    setPage(1)
+  const fuzzyFilter = (row, columnId, value, addMeta) => {
+    const itemRank = rankItem(row.getValue(columnId), value)
+    addMeta({ itemRank })
+    return itemRank.passed
   }
 
-  // Helper to get status color (Unchanged)
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'Current':
-        return 'success.main'
-      case 'Expired':
-        return 'error.main'
-      default:
-        return 'warning.main'
-    }
+  const table = useReactTable({
+    data: rows,
+    columns,
+    manualPagination: true,
+    pageCount: Math.ceil(rowCount / pagination.pageSize),
+    state: { globalFilter: searchText, pagination },
+    onGlobalFilterChange: setSearchText,
+    onPaginationChange: setPagination,
+    globalFilterFn: fuzzyFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getSortedRowModel: getSortedRowModel()
+  })
+
+  // Export
+  const exportCSV = () => {
+    const headers = columns.map(c => c.header).filter(Boolean)
+    const csv = [headers.join(','), ...rows.map(r => columns.map(c => `"${r[c.accessorKey] ?? ''}"`).join(','))].join(
+      '\n'
+    )
+    const link = document.createElement('a')
+    link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
+    link.download = 'contracts.csv'
+    link.click()
+    showToast('success', 'CSV downloaded')
   }
 
+  const exportPrint = () => {
+    const w = window.open('', '_blank')
+    const html = `
+      <html><head><title>Contract Status</title><style>
+      body{font-family:Arial;padding:24px;}
+      table{border-collapse:collapse;width:100%;font-size:11px;}
+      th,td{border:1px solid #ccc;padding:6px;text-align:left;}
+      th{background:#f4f4f4;}
+      .text-right{text-align:right;}
+      </style></head><body>
+      <h2>Contract List</h2>
+      <table><thead><tr>
+      ${columns.map(c => `<th style="width:${c.meta?.width}">${c.header}</th>`).join('')}
+      </tr></thead><tbody>
+      ${rows
+        .map(
+          r =>
+            `<tr>${columns
+              .map(c => {
+                const val = r[c.accessorKey]
+                const formatted = c.accessorKey.includes('Value')
+                  ? `$${Number(val || 0).toLocaleString()}`
+                  : c.accessorKey.includes('Date') && val
+                    ? new Date(val).toLocaleDateString('en-GB')
+                    : val || ''
+                return `<td class="${c.meta?.align === 'right' ? 'text-right' : ''}">${formatted}</td>`
+              })
+              .join('')}</tr>`
+        )
+        .join('')}
+      </tbody></table></body></html>`
+    w.document.write(html)
+    w.document.close()
+    w.print()
+  }
 
+  // ───────────────────────────────────────────
+  // Render
+  // ───────────────────────────────────────────
   return (
-    <ContentLayout
-      title='View Contract Status'
-      breadcrumbs={[{ label: 'Dashboard', href: '/admin/dashboard' }, { label: 'View Contract Status' }]}
-      actions={
-        <Button variant='contained' href='/admin/contracts/add' startIcon={<AddIcon />} sx={{ m: 2 }}>
-          Add Contract
-        </Button>
-      }
-    >
-      {/* Filters Section (Unchanged) */}
+    <Box>
+      <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
+        <Link underline='hover' color='inherit' href='/admin/dashboard'>
+          Dashboard
+        </Link>
+        <Typography color='text.primary'>View Contract Status</Typography>
+      </Breadcrumbs>
+
+      {/* Filters */}
       <Card sx={{ mb: 4, boxShadow: 'none' }} elevation={0}>
         <CardContent>
           <Grid container spacing={3}>
-            {/* Date Picker with Checkbox */}
             <Grid item xs={12} md={4}>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                {/* Checkbox and Label */}
-                <Box display='flex' alignItems='center' gap={0.5} sx={{ pl: 0.5 }}>
-                  <input
-                    type='checkbox'
-                    checked={filterByDate}
-                    onChange={e => setFilterByDate(e.target.checked)}
-                    id='dateFilterCheck'
-                    style={{
-                      width: '18px',
-                      height: '18px',
-                      appearance: 'none',
-                      border: `1px solid ${filterByDate ? '#7D70F7' : '#999'}`,
-                      borderRadius: '1px',
-                      cursor: 'pointer',
-                      outline: 'none',
-                      position: 'relative',
-                      backgroundColor: filterByDate ? '#7D70F7' : 'white',
-                      transition: 'background-color 0.2s, border-color 0.2s'
-                    }}
-                  />
-                  {/* Checkmark styling for the custom checkbox */}
-                  {filterByDate && (
-                    <Box
-                      component='span'
-                      sx={{
-                        position: 'absolute',
-                        width: '18px',
-                        height: '18px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        pointerEvents: 'none'
-                      }}
-                    >
-                      <Typography
-                        component='span'
-                        sx={{
-                          color: 'white',
-                          fontSize: '12px',
-                          position: 'relative',
-                          top: '-1px'
-                        }}
-                      >
-                        &#10003;
-                      </Typography>
-                    </Box>
-                  )}
-
-                  <label
-                    htmlFor='dateFilterCheck'
-                    style={{ cursor: 'pointer', fontWeight: 500, color: filterByDate ? 'black' : '#666' }}
-                  >
-                    Date Filter
-                  </label>
-                </Box>
-
-                {/* Datepicker Input (Disabled when checkbox is unchecked) */}
+                <FormControlLabel
+                  control={<Checkbox checked={filterByDate} onChange={e => setFilterByDate(e.target.checked)} />}
+                  label='Date Filter'
+                  sx={{ ml: 0.5, '& .MuiFormControlLabel-label': { fontWeight: 500 } }}
+                />
                 <AppReactDatepicker
                   selected={dateFilter}
-                  onChange={date => setDateFilter(date)}
-                  placeholderText='Select Start Date'
+                  onChange={setDateFilter}
                   dateFormat='dd/MM/yyyy'
-                  customInput={
-                    <CustomTextField
-                      fullWidth
-                      inputProps={{
-                        disabled: !filterByDate,
-                        sx: { backgroundColor: !filterByDate ? '#f3f4f6' : 'white' }
-                      }}
-                    />
-                  }
+                  customInput={<TextField fullWidth size='small' disabled={!filterByDate} />}
                 />
               </Box>
             </Grid>
-            {/* Origin */}
             <Grid item xs={12} md={4}>
               <Autocomplete
-                freeSolo={false}
                 options={['Genplus Innovations', 'Pest Masters']}
                 value={originFilter}
-                open={originOpen}
-                onOpen={() => setOriginOpen(true)}
-                onClose={() => setOriginOpen(false)}
-                onFocus={() => setOriginOpen(true)}
-                onChange={(e, newValue) => {
-                  setOriginFilter(newValue)
-                  customerRef.current?.focus()
-                  setCustomerOpen(true)
-                }}
-                renderInput={params => <CustomTextField {...params} label='Origin' inputRef={originRef} fullWidth />}
+                onChange={(_, v) => setOriginFilter(v)}
+                renderInput={p => <TextField {...p} label='Origin' inputRef={originRef} size='small' />}
               />
             </Grid>
-
-            {/* Customer */}
             <Grid item xs={12} md={4}>
               <Autocomplete
-                freeSolo={false}
-                options={['GP Industries Pvt Ltd', 'Acme Corp', 'Zeta Solutions']}
+                options={['GP Industries Pvt Ltd', 'Acme Corp']}
                 value={customerFilter}
-                open={customerOpen}
-                onOpen={() => setCustomerOpen(true)}
-                onClose={() => setCustomerOpen(false)}
-                onFocus={() => setCustomerOpen(true)}
-                onChange={(e, newValue) => {
-                  setCustomerFilter(newValue)
-                  contractTypeRef.current?.focus()
-                  setContractTypeOpen(true)
-                }}
-                renderInput={params => (
-                  <CustomTextField {...params} label='Customer' inputRef={customerRef} fullWidth />
-                )}
+                onChange={(_, v) => setCustomerFilter(v)}
+                renderInput={p => <TextField {...p} label='Customer' inputRef={customerRef} size='small' />}
               />
             </Grid>
-
-            {/* Contract Type */}
             <Grid item xs={12} md={4}>
               <Autocomplete
-                freeSolo={false}
                 options={['Limited Contract', 'Annual Contract']}
                 value={contractTypeFilter}
-                open={contractTypeOpen}
-                onOpen={() => setContractTypeOpen(true)}
-                onClose={() => setContractTypeOpen(false)}
-                onFocus={() => setContractTypeOpen(true)}
-                onChange={(e, newValue) => {
-                  setContractTypeFilter(newValue)
-                  invoiceFrequencyRef.current?.focus()
-                  setInvoiceFrequencyOpen(true)
-                }}
-                renderInput={params => (
-                  <CustomTextField {...params} label='Contract Type' inputRef={contractTypeRef} fullWidth />
-                )}
+                onChange={(_, v) => setContractTypeFilter(v)}
+                renderInput={p => <TextField {...p} label='Contract Type' inputRef={contractTypeRef} size='small' />}
               />
             </Grid>
-
-            {/* Invoice Frequency */}
             <Grid item xs={12} md={4}>
               <Autocomplete
-                freeSolo={false}
                 options={['Monthly', 'Yearly']}
                 value={invoiceFrequencyFilter}
-                open={invoiceFrequencyOpen}
-                onOpen={() => setInvoiceFrequencyOpen(true)}
-                onClose={() => setInvoiceFrequencyOpen(false)}
-                onFocus={() => setInvoiceFrequencyOpen(true)}
-                onChange={(e, newValue) => {
-                  setInvoiceFrequencyFilter(newValue)
-                  contractStatusRef.current?.focus()
-                  setContractStatusOpen(true)
-                }}
-                renderInput={params => (
-                  <CustomTextField {...params} label='Invoice Frequency' inputRef={invoiceFrequencyRef} fullWidth />
+                onChange={(_, v) => setInvoiceFrequencyFilter(v)}
+                renderInput={p => (
+                  <TextField {...p} label='Invoice Frequency' inputRef={invoiceFrequencyRef} size='small' />
                 )}
               />
             </Grid>
-
-            {/* Contract Status */}
             <Grid item xs={12} md={4}>
               <Autocomplete
-                freeSolo={false}
-                options={['Current', 'Expired']}
+                options={['Current', 'Expired', 'Hold', 'Terminated']}
                 value={contractStatusFilter}
-                open={contractStatusOpen}
-                onOpen={() => setContractStatusOpen(true)}
-                onClose={() => setContractStatusOpen(false)}
-                onFocus={() => setContractStatusOpen(true)}
-                onChange={(e, newValue) => {
-                  setContractStatusFilter(newValue)
-                  renewalRef.current?.focus()
-                  setRenewalOpen(true)
-                }}
-                renderInput={params => (
-                  <CustomTextField {...params} label='Contract Status' inputRef={contractStatusRef} fullWidth />
+                onChange={(_, v) => setContractStatusFilter(v)}
+                renderInput={p => (
+                  <TextField {...p} label='Contract Status' inputRef={contractStatusRef} size='small' />
                 )}
               />
             </Grid>
-
-            {/* New / Renewed */}
             <Grid item xs={12} md={4}>
               <Autocomplete
-                freeSolo={false}
                 options={['New', 'Renewed']}
                 value={renewalFilter}
-                open={renewalOpen}
-                onOpen={() => setRenewalOpen(true)}
-                onClose={() => setRenewalOpen(false)}
-                onFocus={() => setRenewalOpen(true)}
-                onChange={(e, newValue) => {
-                  setRenewalFilter(newValue)
-                  submitRef.current?.focus()
-                }}
-                renderInput={params => (
-                  <CustomTextField {...params} label='New / Renewed' inputRef={renewalRef} fullWidth />
-                )}
+                onChange={(_, v) => setRenewalFilter(v)}
+                renderInput={p => <TextField {...p} label='New / Renewed' inputRef={renewalRef} size='small' />}
               />
             </Grid>
           </Grid>
-
-          {/* Buttons */}
-          <Grid item xs={12} md={8} display='flex' gap={2} sx={{ mt: 3 }}>
-            <Button
-              size='small'
-              variant='contained'
-              sx={{ paddingY: '10px' }}
-            >
-              Refresh
-            </Button>
-            <Button
-              size='small'
-              variant='contained'
-              sx={{  paddingY: '10px' }}
-            >
-              Print Agreement
-            </Button>
-            <Button
-              size='small'
-              variant='contained'
-              sx={{  paddingY: '10px' }}
-            >
-              Auto Review
-            </Button>
+          <Grid container spacing={2} sx={{ mt: 2 }}>
+            <Grid item>
+              <Button variant='contained' size='small' onClick={loadData}>
+                Refresh
+              </Button>
+            </Grid>
+            <Grid item>
+              <Button variant='contained' size='small' onClick={exportPrint}>
+                Print Agreement
+              </Button>
+            </Grid>
+            <Grid item>
+              <Button variant='contained' size='small'>
+                Auto Review
+              </Button>
+            </Grid>
           </Grid>
         </CardContent>
       </Card>
 
-      {/* 🛠️ REFACTORED: Table Section */}
-      <Card sx={{ p: 6 ,"boxShadow": "none"}}>
-        <Typography variant='h6' sx={{ mb: 3 }}>
-          Contract List
-        </Typography>
-        <Divider sx={{ mb: 3 }} />
-
-        {/* 🛠️ MODIFIED: Search / entries / Export Button */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-
-          {/* Entries per page AND Export Button */}
-          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-            {/* Entries per page (from Page A) */}
-            <FormControl size='small' sx={{ minWidth: 120 }}>
-              <Select
-                value={rowsPerPage}
-                onChange={handleChangeRowsPerPage}
-              >
-                {[10, 25, 50, 100].map(i => (
-                  <MenuItem key={i} value={i}>
-                    {i} entries
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            {/* Export Button (Added back from Page A) */}
-              <Box display='flex' gap={1}>
+      {/* Table */}
+      <Card sx={{ p: 3 }}>
+        <CardHeader
+          sx={{ pb: 1.5, pt: 1.5, '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' } }}
+          title={
+            <Box display='flex' alignItems='center' gap={2}>
+              <Typography variant='h5' sx={{ fontWeight: 600 }}>
+                Contract List
+              </Typography>
+              <Button variant='contained' startIcon={<RefreshIcon />} disabled={loading} onClick={loadData}>
+                {loading ? 'Refreshing...' : 'Refresh'}
+              </Button>
+            </Box>
+          }
+          action={
+            <Box display='flex' alignItems='center' gap={1}>
               {['Copy', 'CSV', 'Excel', 'PDF', 'Print'].map(btn => (
                 <Button
                   key={btn}
                   variant='contained'
                   size='small'
-                  // Placeholder action - replace with actual export logic if needed
-                  onClick={() => alert(`Export as ${btn}`)}
+                  onClick={
+                    btn === 'CSV'
+                      ? exportCSV
+                      : btn === 'Print'
+                        ? exportPrint
+                        : () => showToast('info', `${btn} coming soon`)
+                  }
                   sx={{
-                    borderRadius: '0px',
-                    backgroundColor: '#6c7783',
-                    color: '#ffffff',
+                    bgcolor: '#6c757d', // Gray background
+                    color: '#fff',
+                    fontWeight: 500,
                     textTransform: 'none',
-                    '&:hover': { backgroundColor: '#5a626a' },
-                    paddingY: '10px',
-                    lineHeight: 1
+                    borderRadius: '8px', // Rounded corners
+                    px: 2,
+                    py: 1.25,
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.15)', // Subtle shadow
+                    '&:hover': {
+                      bgcolor: '#5a6268', // Darker on hover
+                      boxShadow: '0 3px 6px rgba(0,0,0,0.2)'
+                    },
+                    '&:active': {
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
+                      transform: 'translateY(1px)'
+                    }
                   }}
                 >
                   {btn}
                 </Button>
               ))}
+              <Button variant='contained' startIcon={<AddIcon />} onClick={() => router.push('/admin/contracts/add')}>
+                Add Contract
+              </Button>
             </Box>
+          }
+        />
+        {loading && (
+          <Box
+            sx={{
+              position: 'fixed',
+              inset: 0,
+              bgcolor: 'rgba(255,255,255,0.7)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 2000
+            }}
+          >
+            <CircularProgress />
           </Box>
-
-
-          {/* Search (from Page A) */}
-          <CustomTextField
-            size='small'
-            placeholder='Search by Customer, Code, Address, etc...'
+        )}
+        <Divider sx={{ mb: 2 }} />
+        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+          <FormControl size='small' sx={{ width: 140 }}>
+            <Select
+              value={pagination.pageSize}
+              onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
+            >
+              {[10, 25, 50, 100].map(s => (
+                <MenuItem key={s} value={s}>
+                  {s} entries
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <DebouncedInput
             value={searchText}
-            onChange={e => {setSearchText(e.target.value); setPage(1)}}
+            onChange={v => {
+              setSearchText(String(v))
+              setPagination(p => ({ ...p, pageIndex: 0 }))
+            }}
+            placeholder='Search any field...'
             sx={{ width: 420 }}
+            size='small'
             slotProps={{
               input: {
                 startAdornment: (
@@ -559,125 +606,78 @@ export default function ContractStatusPage() {
           />
         </Box>
 
-        {/* Table (Manual HTML Table - Unchanged) */}
-        <Box sx={{ overflowX: 'auto', width: '100%' }}>
-          <table
-            style={{
-              width: '100%',
-              borderCollapse: 'collapse',
-              minWidth: '3500px'
-            }}
-          >
-            <thead>
-              <tr style={{ textAlign: 'left', borderBottom: '1px solid #E5E7EB' }}>
-                {COLUMN_FIELDS.map(col => (
-                  <th
-                    key={col.id}
-                    onClick={() => col.sortable !== false && handleSort(col.id)}
-                    style={{
-                      padding: '12px',
-                      width: col.width,
-                      cursor: col.sortable !== false ? 'pointer' : 'default',
-                      userSelect: 'none',
-                      textAlign: col.isNumeric || col.displayIndex ? 'right' : 'left'
-                    }}
-                  >
-                    <Box
-                      display='flex'
-                      alignItems='center'
-                      justifyContent={col.isNumeric || col.displayIndex ? 'flex-end' : 'flex-start'}
-                    >
-                      {col.header} {col.sortable !== false && <SortIcon field={col.id} />}
-                    </Box>
-                  </th>
+        {/* Scrollable Table */}
+        <div className='overflow-x-auto'>
+          <div style={{ minWidth: '4200px' }}>
+            <table className={styles.table}>
+              <thead>
+                {table.getHeaderGroups().map(hg => (
+                  <tr key={hg.id}>
+                    {hg.headers.map((h, idx) => (
+                      <th
+                        key={h.id}
+                        style={{
+                          width: h.column.columnDef.meta?.width,
+                          position: idx < 2 ? 'sticky' : 'relative',
+                          left: idx === 0 ? 0 : idx === 1 ? '60px' : 'auto',
+                          background: '#fff',
+                          zIndex: idx < 2 ? 10 : 1,
+                          boxShadow: idx === 1 ? '2px 0 4px -2px rgba(0,0,0,0.1)' : 'none'
+                        }}
+                      >
+                        <div
+                          className={classnames({
+                            'flex items-center': h.column.getIsSorted(),
+                            'cursor-pointer select-none': h.column.getCanSort()
+                          })}
+                          onClick={h.column.getToggleSortingHandler()}
+                        >
+                          {flexRender(h.column.columnDef.header, h.getContext())}
+                          {{
+                            asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
+                            desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
+                          }[h.column.getIsSorted()] ?? null}
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
                 ))}
-              </tr>
-            </thead>
-
-            <tbody>
-              {paginatedRows.map((r, i) => (
-                <tr key={r.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
-                  {COLUMN_FIELDS.map(col => (
-                    <td
-                      key={col.id}
-                      style={{
-                        padding: '12px',
-                        wordWrap: 'break-word',
-                        whiteSpace: 'normal',
-                        textAlign: col.isNumeric || col.displayIndex ? 'right' : 'left'
-                      }}
-                    >
-                      {col.id === 'actions' ? (
-                        <IconButton size='small'>
-                          <MoreVertIcon />
-                        </IconButton>
-                      ) : col.displayIndex ? (
-                        (page - 1) * rowsPerPage + i + 1
-                      ) : col.id === 'status' ? (
-                        <Box
-                          component='span'
-                          sx={{
-                            fontWeight: 600,
-                            color: '#fff',
-                            backgroundColor: getStatusColor(r.status),
-                            px: 1.5,
-                            py: 0.5,
-                            borderRadius: '6px',
-                            display: 'inline-block'
+              </thead>
+              <tbody>
+                {rows.length ? (
+                  table.getRowModel().rows.map(row => (
+                    <tr key={row.id}>
+                      {row.getVisibleCells().map((cell, idx) => (
+                        <td
+                          key={cell.id}
+                          style={{
+                            textAlign: cell.column.columnDef.meta?.align || 'left',
+                            position: idx < 2 ? 'sticky' : 'relative',
+                            left: idx === 0 ? 0 : idx === 1 ? '60px' : 'auto',
+                            background: '#fff',
+                            zIndex: idx < 2 ? 9 : 1,
+                            boxShadow: idx === 1 ? '2px 0 4px -2px rgba(0,0,0,0.1)' : 'none'
                           }}
                         >
-                          {r.status}
-                        </Box>
-                      ) : (
-                        r[col.id]
-                      )}
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={columns.length} className='text-center py-4'>
+                      {loading ? 'Loading...' : 'No results found'}
                     </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {rowCount === 0 && (
-            <Box sx={{ textAlign: 'center', py: 4 }}>
-              <Typography color='text.secondary'>No results found</Typography>
-            </Box>
-          )}
-        </Box>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
-        {/* Pagination (Unchanged) */}
-        <Box
-          sx={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            px: 2,
-            py: 2,
-            mt: 2,
-            flexWrap: 'wrap'
-          }}
-        >
-          <Typography variant='body2' color='text.secondary'>
-            {paginationText}
-          </Typography>
-
-          <Box display='flex' alignItems='center' gap={2}>
-            <Typography variant='body2' color='text.secondary'>
-              Page {page} of {pageCount}
-            </Typography>
-
-            <Pagination
-              count={pageCount}
-              page={page}
-              onChange={handleChangePage}
-              shape='rounded'
-              color='primary'
-              showFirstButton
-              showLastButton
-            />
-          </Box>
-        </Box>
+        <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
       </Card>
-      {/* 🔚 END OF REFACTORED: Table Section */}
-    </ContentLayout>
+    </Box>
   )
 }

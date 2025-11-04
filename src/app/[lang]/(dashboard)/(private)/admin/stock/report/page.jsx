@@ -1,369 +1,505 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react' // Added useMemo and useEffect
+import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
+import { format } from 'date-fns'
 import {
   Box,
-  Button,
   Card,
-  CardContent,
-  Grid,
-  Typography, // Added Typography
+  CardHeader,
+  Typography,
+  Divider,
+  Breadcrumbs,
+  MenuItem,
+  Checkbox,
+  CircularProgress,
+  Pagination,
   InputAdornment,
-  TablePagination, // Changed from Pagination to TablePagination
-  Autocomplete // Added Autocomplete
+  FormControl,        // ← Required
+  Select,
+  Button
 } from '@mui/material'
-import { DataGrid } from '@mui/x-data-grid'
-import { format } from 'date-fns' // Added date-fns
 
-// Icons
-import SearchIcon from '@mui/icons-material/Search'
 import RefreshIcon from '@mui/icons-material/Refresh'
-import FileDownloadIcon from '@mui/icons-material/FileDownload'
-import PrintIcon from '@mui/icons-material/Print'
-import FileCopyIcon from '@mui/icons-material/FileCopy'
-import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
-import TableChartIcon from '@mui/icons-material/TableChart'
+import SearchIcon from '@mui/icons-material/Search'
 
-// Layout
-import ContentLayout from '@/components/layout/ContentLayout'
+// Components
 import CustomTextField from '@core/components/mui/TextField'
+import CustomAutocomplete from '@core/components/mui/Autocomplete'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 
-// Dummy Data Options (Extracted from Page A's MenuItem/filter structure)
-const SUPPLIER_OPTIONS = ['Stock-TECH STOCK 1', 'Supplier-ABC', 'Vendor-XYZ']
-const CHEMICAL_OPTIONS = ['Abate', 'Able Max', 'Advion Ant Gel', 'Aquabac', 'Falcon']
+// Toastify
+import { toast, ToastContainer } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
+
+// Table
+import {
+  useReactTable,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getSortedRowModel,
+  getPaginationRowModel,
+  createColumnHelper,
+  flexRender
+} from '@tanstack/react-table'
+
+import classnames from 'classnames'
+import styles from '@core/styles/table.module.css'
+import ChevronRight from '@menu/svg/ChevronRight'
+
+// Dummy Data
+const dummyData = [
+  {
+    id: 1,
+    supplier: 'Stock-TECH STOCK 1',
+    material: 'Abate',
+    openingStock: 200,
+    totalReceived: 150,
+    totalSupplied: 100,
+    totalConsumed: 50,
+    available: 200,
+    reportDate: '10/10/2025'
+  },
+  {
+    id: 2,
+    supplier: 'Supplier-ABC',
+    material: 'Falcon',
+    openingStock: 500,
+    totalReceived: 200,
+    totalSupplied: 150,
+    totalConsumed: 50,
+    available: 550,
+    reportDate: '10/10/2025'
+  },
+  {
+    id: 3,
+    supplier: 'Stock-TECH STOCK 1',
+    material: 'Aquabac',
+    openingStock: 100,
+    totalReceived: 50,
+    totalSupplied: 50,
+    totalConsumed: 0,
+    available: 100,
+    reportDate: '11/10/2025'
+  }
+]
+
+// Toast helper
+const showToast = (type, message) => {
+  toast(
+    <div className='flex items-center gap-2'>
+      <i
+        className='tabler-info-circle'
+        style={{
+          color:
+            type === 'success' ? '#16a34a' : type === 'error' ? '#dc2626' : type === 'warning' ? '#f59e0b' : '#2563eb',
+          fontSize: '22px'
+        }}
+      />
+      <Typography variant='body2' sx={{ fontSize: '0.9rem', color: '#111' }}>
+        {message}
+      </Typography>
+    </div>,
+    {
+      position: 'top-right',
+      autoClose: 2200,
+      hideProgressBar: true,
+      pauseOnHover: false,
+      closeOnClick: true,
+      draggable: false,
+      theme: 'light',
+      style: {
+        borderRadius: '10px',
+        padding: '8px 14px',
+        boxShadow: '0 4px 10px rgba(0,0,0,0.06)'
+      }
+    }
+  )
+}
 
 export default function StockReportPage() {
-  const [searchText, setSearchText] = useState('')
-  const [page, setPage] = useState(0) // Added for external pagination
-  const [rowsPerPage, setRowsPerPage] = useState(10) // Changed from pageSize to rowsPerPage
-  const [dateFilter, setDateFilter] = useState(new Date()) // Renamed 'date' to 'dateFilter' for consistency
-  const [filterByDate, setFilterByDate] = useState(false) // Added custom date filter state
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [enableDateFilter, setEnableDateFilter] = useState(false)
+  const [startDate, setStartDate] = useState(new Date())
+  const [endDate, setEndDate] = useState(new Date())
   const [supplierFilter, setSupplierFilter] = useState('')
   const [chemicalFilter, setChemicalFilter] = useState('')
+  const [searchText, setSearchText] = useState('')
 
-  // Dummy data (expanded for filtering demonstration)
-  const [rows] = useState([
-    {
-      id: 1,
-      supplier: 'Stock-TECH STOCK 1',
-      material: 'Abate',
-      openingStock: 200,
-      totalReceived: 150,
-      totalSupplied: 100,
-      totalConsumed: 50,
-      received: 50,
-      supplied: 20,
-      consumed: 30,
-      available: 200,
-      reportDate: new Date(2025, 9, 10) // Oct 10, 2025
-    },
-    {
-      id: 2,
-      supplier: 'Supplier-ABC',
-      material: 'Falcon',
-      openingStock: 500,
-      totalReceived: 200,
-      totalSupplied: 150,
-      totalConsumed: 50,
-      received: 50,
-      supplied: 20,
-      consumed: 30,
-      available: 550,
-      reportDate: new Date(2025, 9, 10) // Oct 10, 2025
-    },
-    {
-      id: 3,
-      supplier: 'Stock-TECH STOCK 1',
-      material: 'Aquabac',
-      openingStock: 100,
-      totalReceived: 50,
-      totalSupplied: 50,
-      totalConsumed: 0,
-      received: 25,
-      supplied: 15,
-      consumed: 10,
-      available: 100,
-      reportDate: new Date(2025, 9, 11) // Oct 11, 2025
+  const columnHelper = createColumnHelper()
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor('id', { header: 'ID', size: 80 }),
+      columnHelper.accessor('supplier', { header: 'Supplier', size: 200 }),
+      columnHelper.accessor('material', { header: 'Material', size: 200 }),
+      columnHelper.accessor('openingStock', { header: 'Opening Stock', size: 160 }),
+      columnHelper.accessor('totalReceived', { header: 'Total Received', size: 160 }),
+      columnHelper.accessor('totalSupplied', { header: 'Total Supplied', size: 160 }),
+      columnHelper.accessor('totalConsumed', { header: 'Total Consumed', size: 160 }),
+      columnHelper.accessor('received', { header: 'Received', size: 140 }),
+      columnHelper.accessor('supplied', { header: 'Supplied', size: 140 }),
+      columnHelper.accessor('consumed', { header: 'Consumed', size: 140 }),
+      columnHelper.accessor('available', { header: 'Available Stock', size: 160 })
+    ],
+    []
+  )
+
+  const loadData = async (showToastMsg = false) => {
+    setLoading(true)
+    try {
+      const filtered = dummyData.filter(r => {
+        const matchSearch =
+          !searchText || `${r.supplier} ${r.material}`.toLowerCase().includes(searchText.toLowerCase())
+
+        const matchDate = (() => {
+          if (!enableDateFilter) return true
+          const [day, month, year] = r.reportDate.split('/')
+          const rowDate = new Date(year + '-' + month + '-' + day)
+          return rowDate >= startDate && rowDate <= endDate
+        })()
+
+        const matchSupplier = !supplierFilter || r.supplier === supplierFilter
+        const matchChemical = !chemicalFilter || r.material === chemicalFilter
+
+        return matchSearch && matchDate && matchSupplier && matchChemical
+      })
+
+      const withSno = filtered.map((r, i) => ({ ...r, sno: i + 1 }))
+      setRows(withSno)
+
+      if (showToastMsg) showToast('info', 'Stock report refreshed')
+    } catch {
+      showToast('error', 'Failed to load stock report')
+    } finally {
+      setLoading(false)
     }
-  ])
-
-  const handleRefreshTable = () => {
-    // In a real app, this would re-fetch data from an API
-    console.log('Refreshing Stock Report data...')
-    setPage(0)
   }
 
-  // Refactored to use useMemo for all filters
-  const filteredRows = useMemo(() => {
-    return rows.filter(row => {
-      const matchesSearch =
-        row.supplier.toLowerCase().includes(searchText.toLowerCase()) ||
-        row.material.toLowerCase().includes(searchText.toLowerCase())
+  useEffect(() => {
+    loadData(false)
+  }, [searchText, enableDateFilter, startDate, endDate, supplierFilter, chemicalFilter])
 
-      const matchesSupplier = !supplierFilter || row.supplier === supplierFilter
-      const matchesChemical = !chemicalFilter || row.material === chemicalFilter
+  const table = useReactTable({
+    data: rows,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel()
+  })
 
-      let matchesDate = true
-      if (filterByDate && row.reportDate) {
-        const rowDate = new Date(row.reportDate)
-        if (!isNaN(rowDate.getTime())) {
-          matchesDate =
-            rowDate.getFullYear() === dateFilter.getFullYear() &&
-            rowDate.getMonth() === dateFilter.getMonth() &&
-            rowDate.getDate() === dateFilter.getDate()
-        } else {
-          matchesDate = false
-        }
-      }
-
-      return matchesSearch && matchesSupplier && matchesChemical && matchesDate
-    })
-  }, [rows, searchText, supplierFilter, chemicalFilter, filterByDate, dateFilter])
-
-  // Pagination logic from Page B
-  const paginatedRows = useMemo(() => {
-    return filteredRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-  }, [filteredRows, page, rowsPerPage])
-
-  const totalRows = filteredRows.length
-  const startIndex = totalRows === 0 ? 0 : page * rowsPerPage + 1
-  const endIndex = Math.min((page + 1) * rowsPerPage, totalRows)
-  const paginationText = `Showing ${startIndex} to ${endIndex} of ${totalRows} entries`
-
-  const handleChangePage = (event, newPage) => setPage(newPage)
-  const handleChangeRowsPerPage = event => {
-    setRowsPerPage(parseInt(event.target.value, 10))
-    setPage(0)
-  }
-
-  // Table columns
-  const columns = [
-    { field: 'id', headerName: 'ID', width: 80 }, // Adjusted width for cleaner look
-    { field: 'supplier', headerName: 'Supplier', flex: 1, minWidth: 200 },
-    { field: 'material', headerName: 'Material', flex: 1, minWidth: 200 },
-    { field: 'openingStock', headerName: 'Opening Stock', flex: 1, minWidth: 160 },
-    { field: 'totalReceived', headerName: 'Total Received', flex: 1, minWidth: 160 },
-    { field: 'totalSupplied', headerName: 'Total Supplied', flex: 1, minWidth: 160 },
-    { field: 'totalConsumed', headerName: 'Total Consumed', flex: 1, minWidth: 160 },
-    { field: 'received', headerName: 'Received', flex: 1, minWidth: 140 },
-    { field: 'supplied', headerName: 'Supplied', flex: 1, minWidth: 140 },
-    { field: 'consumed', headerName: 'Consumed', flex: 1, minWidth: 140 },
-    { field: 'available', headerName: 'Available Stock', flex: 1, minWidth: 160 }
-  ]
+  const filteredRows = table.getFilteredRowModel().rows
+  const total = filteredRows.length
+  const pageSize = table.getState().pagination.pageSize || 10
+  const pageIndex = table.getState().pagination.pageIndex || 0
 
   return (
-    <ContentLayout
-      title='Stock Report'
-      breadcrumbs={[{ label: 'Home', href: '/' }, { label: 'Stock Report' }]}
-    >
-      {/* Filters: Styled like Page B's filter card */}
-      <Card sx={{ mb: 4, boxShadow: 'none' }} elevation={0}>
-        <CardContent>
-          <Grid container spacing={6}> {/* Increased spacing to match Page B */}
-            <Grid item xs={12} md={3}>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <Box display='flex' alignItems='center' gap={0.5} sx={{ pl: 0.5, position: 'relative' }}>
-                  {/* Custom Checkbox from Page B */}
-                  <input
-                    type='checkbox'
-                    checked={filterByDate}
-                    onChange={e => setFilterByDate(e.target.checked)}
-                    id='dateFilterCheck'
-                    style={{
-                      width: '18px',
-                      height: '18px',
-                      appearance: 'none',
-                      border: `1px solid ${filterByDate ? '#7D70F7' : '#999'}`,
-                      borderRadius: '1px',
-                      cursor: 'pointer',
-                      outline: 'none',
-                      backgroundColor: filterByDate ? '#7D70F7' : 'white'
+    <Box>
+      {/* Breadcrumb */}
+      <Box role='presentation' sx={{ mb: 2 }}>
+        <Breadcrumbs aria-label='breadcrumb'>
+          <Link underline='hover' color='inherit' href='/'>
+            Home
+          </Link>
+          <Typography color='text.primary'>Stock Report</Typography>
+        </Breadcrumbs>
+      </Box>
+
+      {/* Main Card */}
+      <Card sx={{ p: 3, mt: 2 }}>
+        {/* Header with Refresh + Export */}
+        <CardHeader
+          sx={{
+            pb: 1.5,
+            pt: 1.5,
+            '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
+            '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
+          }}
+          title={
+            <Box display='flex' alignItems='center' gap={2}>
+              <Typography variant='h5' sx={{ fontWeight: 600 }}>
+                Stock Report
+              </Typography>
+              <Button
+                variant='contained'
+                color='primary'
+                startIcon={
+                  <RefreshIcon
+                    sx={{
+                      animation: loading ? 'spin 1s linear infinite' : 'none',
+                      '@keyframes spin': {
+                        '0%': { transform: 'rotate(0deg)' },
+                        '100%': { transform: 'rotate(360deg)' }
+                      }
                     }}
                   />
-                  {filterByDate && (
-                    <Box
-                      component='span'
-                      sx={{
-                        position: 'absolute',
-                        width: '18px',
-                        height: '18px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        pointerEvents: 'none'
-                      }}
-                    >
-                      <Typography component='span' sx={{ color: 'white', fontSize: '12px', top: '-1px' }}>
-                        &#10003;
-                      </Typography>
-                    </Box>
-                  )}
-                  <label
-                    htmlFor='dateFilterCheck'
-                    style={{ cursor: 'pointer', fontWeight: 500, color: filterByDate ? '#7D70F7' : '#666' }}
-                  >
-                    Date Filter
-                  </label>
-                </Box>
-
-                <AppReactDatepicker
-                  selected={dateFilter}
-                  id='date-filter'
-                  onChange={d => setDateFilter(d)}
-                  placeholderText='Select Date'
-                  dateFormat='dd/MM/yyyy' // Added date format
-                  customInput={
-                    <CustomTextField
-                      fullWidth
-                      inputProps={{
-                        disabled: !filterByDate, // Disable if checkbox is unchecked
-                        sx: { backgroundColor: !filterByDate ? '#f3f4f6' : 'white' }
-                      }}
-                    />
-                  }
-                />
-              </Box>
-            </Grid>
-
-            {/* Stock Supplier: Changed to Autocomplete like Page B */}
-            <Grid item xs={12} md={3}>
-              <Autocomplete
-                freeSolo={false}
-                options={SUPPLIER_OPTIONS}
-                value={supplierFilter}
-                onChange={(event, newValue) => setSupplierFilter(newValue || '')}
-                renderInput={params => <CustomTextField {...params} fullWidth label='Stock Supplier' />}
-              />
-            </Grid>
-
-            {/* Chemical: Changed to Autocomplete like Page B */}
-            <Grid item xs={12} md={3}>
-              <Autocomplete
-                freeSolo={false}
-                options={CHEMICAL_OPTIONS}
-                value={chemicalFilter}
-                onChange={(event, newValue) => setChemicalFilter(newValue || '')}
-                renderInput={params => <CustomTextField {...params} fullWidth label='Chemical' />}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={3} display='flex' gap={2} sx={{ mt: 5 }}>
-              <Button
-                size='small'
-                variant='contained'
-
-                onClick={handleRefreshTable}
-                sx={{
-                  backgroundColor: '#7D70F7',
-                  '&:hover': { backgroundColor: '#5D4CEF' },
-                  paddingY: '10px' // Style from Page B's refresh button
+                }
+                disabled={loading}
+                onClick={async () => {
+                  setLoading(true)
+                  await loadData(true) // show toast on refresh
+                  setTimeout(() => setLoading(false), 600)
                 }}
+                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
-                Refresh
+                {loading ? 'Refreshing...' : 'Refresh'}
               </Button>
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
-
-      {/* Table Card: Styled like Page B's table card */}
-      <Card sx={{ mb: 4, boxShadow: 'none' }} elevation={0}>
-        <CardContent>
-          {/* Export + Search: Styled like Page B */}
-          <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
-            <Box display='flex' gap={1}>
-              {[
-                { label: 'Copy'  },
-                { label: 'CSV' },
-                { label: 'Excel' },
-                { label: 'PDF'},
-                { label: 'Print' }
-              ].map(btn => (
+            </Box>
+          }
+          action={
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              {['Copy', 'CSV', 'Excel', 'PDF', 'Print'].map(label => (
                 <Button
-                  key={btn.label}
+                  key={label}
                   variant='contained'
-                  size='small'
-                  startIcon={btn.icon} // Retained icons as they were in Page A
                   sx={{
-                    borderRadius: '0px', // Changed to square corners (Page B style)
-                    backgroundColor: '#6c7783', // Changed color (Page B style)
-                    color: '#ffffff',
+                    backgroundColor: '#5A5A5A',
+                    color: 'white',
                     textTransform: 'none',
-                    '&:hover': { backgroundColor: '#5a626a' },
-                    paddingY: '10px', // Page B style
-                    lineHeight: 1 // Page B style
+                    fontWeight: 500,
+                    fontSize: '0.8rem',
+                    px: 2,
+                    py: 0.7,
+                    borderRadius: 2,
+                    minWidth: 68,
+                    boxShadow: 'none',
+                    '&:hover': { backgroundColor: '#4b4b4b' }
                   }}
+                  onClick={() => showToast('info', `${label} export coming soon`)}
                 >
-                  {btn.label}
+                  {label}
                 </Button>
               ))}
             </Box>
+          }
+        />
+        {/* Loader */}
+        {loading && (
+          <Box
+            sx={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100vw',
+              height: '100vh',
+              backgroundColor: 'rgba(255,255,255,0.7)',
+              backdropFilter: 'blur(2px)',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              zIndex: 2000
+            }}
+          >
+            <CircularProgress size={70} thickness={5} color='primary' />
+          </Box>
+        )}
 
-            <CustomTextField
-              size='small'
-              placeholder='Search' // Changed placeholder to match Page B
-              value={searchText}
-              onChange={e => setSearchText(e.target.value)}
-              sx={{ width: 280 }} // Adjusted width to match Page B
-              InputProps={{ // Changed slotProps to InputProps
+        <Divider sx={{ mb: 2 }} />
+
+        {/* Filters */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, mb: 3, flexWrap: 'wrap' }}>
+          <Box>
+            <Box display='flex' alignItems='center' gap={1} sx={{ mb: 0.5 }}>
+              <Typography variant='body2' sx={{ fontWeight: 500, color: 'text.primary' }}>
+                Date Range
+              </Typography>
+              <Checkbox size='small' checked={enableDateFilter} onChange={e => setEnableDateFilter(e.target.checked)} />
+            </Box>
+
+            <AppReactDatepicker
+              selectsRange
+              startDate={startDate}
+              endDate={endDate}
+              onChange={dates => enableDateFilter && dates && setStartDate(dates[0]) && setEndDate(dates[1])}
+              shouldCloseOnSelect={false}
+              disabled={!enableDateFilter}
+              readOnly={!enableDateFilter}
+              customInput={
+                <CustomTextField
+                  size='small'
+                  fullWidth
+                  value={`${format(startDate, 'dd/MM/yyyy')} - ${format(endDate, 'dd/MM/yyyy')}`}
+                  sx={{ minWidth: 260, backgroundColor: 'white' }}
+                />
+              }
+            />
+          </Box>
+
+          <CustomAutocomplete
+            className='is-[220px]'
+            options={['Stock-TECH STOCK 1', 'Supplier-ABC']}
+            value={supplierFilter || null}
+            onChange={(e, val) => setSupplierFilter(val || '')}
+            renderInput={p => <CustomTextField {...p} label='Supplier' size='small' />}
+          />
+
+          <CustomAutocomplete
+            className='is-[220px]'
+            options={['Abate', 'Falcon', 'Aquabac']}
+            value={chemicalFilter || null}
+            onChange={(e, val) => setChemicalFilter(val || '')}
+            renderInput={p => <CustomTextField {...p} label='Chemical' size='small' />}
+          />
+        </Box>
+
+        <Divider sx={{ mb: 4 }} />
+
+        {/* Search + Page Size */}
+        {/* Search + Page Size */}
+        <Box
+          sx={{
+            p: 2,
+            pt: 0,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 2
+          }}
+        >
+          {/* Page Size Dropdown (EXACTLY like Material Request) */}
+          <FormControl size='small' sx={{ width: 140 }}>
+            <Select value={pageSize} onChange={e => table.setPageSize(Number(e.target.value))}>
+              {[10, 25, 50, 100].map(s => (
+                <MenuItem key={s} value={s}>
+                  {s} entries
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {/* Search */}
+          <CustomTextField
+            size='small'
+            placeholder='Search supplier or chemical...'
+            value={searchText}
+            onChange={e => setSearchText(e.target.value)}
+            sx={{ width: 360 }}
+            slotProps={{
+              input: {
                 startAdornment: (
                   <InputAdornment position='start'>
                     <SearchIcon />
                   </InputAdornment>
                 )
-              }}
-            />
-          </Box>
+              }
+            }}
+          />
+        </Box>
+        {/* Table */}
+        <Box sx={{ overflowX: 'auto' }}>
+          <table
+            className={styles.table}
+            style={{
+              width: 'max-content',
+              minWidth: '100%',
+              tableLayout: 'fixed' // Ensures column sizes are respected
+            }}
+          >
+            <colgroup>
+              <col style={{ width: 80 }} />
+              <col style={{ width: 200 }} />
+              <col style={{ width: 200 }} />
+              <col style={{ width: 160 }} />
+              <col style={{ width: 160 }} />
+              <col style={{ width: 160 }} />
+              <col style={{ width: 160 }} />
+              <col style={{ width: 140 }} />
+              <col style={{ width: 140 }} />
+              <col style={{ width: 140 }} />
+              <col style={{ width: 160 }} />
+            </colgroup>
+            <thead>
+              {table.getHeaderGroups().map(hg => (
+                <tr key={hg.id}>
+                  {hg.headers.map(header => (
+                    <th
+                      key={header.id}
+                      style={{
+                        width: header.getSize(),
+                        minWidth: header.getSize(),
+                        maxWidth: header.getSize()
+                      }}
+                    >
+                      <div
+                        className={classnames({
+                          'flex items-center': header.column.getIsSorted(),
+                          'cursor-pointer select-none': header.column.getCanSort()
+                        })}
+                        onClick={header.column.getToggleSortingHandler()}
+                      >
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                        {header.column.getIsSorted() === 'asc' && (
+                          <ChevronRight className='-rotate-90' fontSize='small' />
+                        )}
+                        {header.column.getIsSorted() === 'desc' && (
+                          <ChevronRight className='rotate-90' fontSize='small' />
+                        )}
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              ))}
+            </thead>
+            <tbody>
+              {table.getRowModel().rows.length === 0 ? (
+                <tr>
+                  <td colSpan={columns.length} className='text-center'>
+                    No data available
+                  </td>
+                </tr>
+              ) : (
+                table.getRowModel().rows.map(row => (
+                  <tr key={row.id}>
+                    {row.getVisibleCells().map(cell => (
+                      <td key={cell.id} style={{ width: cell.column.getSize() }}>
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </Box>
 
-          {/* DataGrid */}
-          <Box sx={{ width: '100%', overflowX: 'auto' }}>
-            <DataGrid
-              rows={paginatedRows} // Using paginatedRows
-              columns={columns}
-              disableRowSelectionOnClick
-              autoHeight
-              hideFooter // Hide internal footer for external pagination
-              getRowId={row => row.id} // Added getRowId
-              getRowHeight={() => 'auto'} // Style from Page B
-              sx={{
-                mt: 3,
-                minWidth: 1000,
-                border: '1px solid #e0e0e0', // Retained border
-                borderRadius: 2, // Retained borderRadius
-                '& .MuiDataGrid-row': { minHeight: '60px !important', padding: '12px 0' }, // Style from Page B
-                '& .MuiDataGrid-cell': {
-                  whiteSpace: 'normal',
-                  wordBreak: 'break-word',
-                  alignItems: 'flex-start',
-                  fontSize: '15px' // Style from Page B
-                },
-                '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': { outline: 'none' }, // Style from Page B
-                '& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within': { outline: 'none' }, // Style from Page B
-                '& .MuiDataGrid-columnHeaderTitle': { fontSize: '15px', fontWeight: 500 } // Style from Page B
-                // Removed redundant background color from Page A
-              }}
-            />
-          </Box>
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            borderTop: '1px solid #e0e0e0',
+            px: 3,
+            py: 1.5,
+            mt: 1,
+            gap: 2
+          }}
+        >
+          <Typography color='text.disabled'>
+            {`Showing ${total === 0 ? 0 : pageIndex * pageSize + 1} to ${Math.min(
+              (pageIndex + 1) * pageSize,
+              total
+            )} of ${total} entries`}
+          </Typography>
 
-          {/* Custom Pagination Footer from Page B */}
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2 }}>
-            <Typography variant='body2' color='text.secondary'>
-              {paginationText}
-            </Typography>
-
-            <TablePagination
-              rowsPerPageOptions={[10, 25, 50, 100]} // Using Page B's options
-              component='div'
-              count={filteredRows.length}
-              rowsPerPage={rowsPerPage}
-              page={page}
-              onPageChange={handleChangePage}
-              onRowsPerPageChange={handleChangeRowsPerPage}
-            />
-          </Box>
-        </CardContent>
+          <Pagination
+            shape='rounded'
+            color='primary'
+            variant='tonal'
+            count={Math.ceil(total / pageSize) || 1}
+            page={pageIndex + 1}
+            onChange={(_, page) => {
+              table.setPageIndex(page - 1)
+            }}
+            showFirstButton
+            showLastButton
+          />
+        </Box>
       </Card>
-    </ContentLayout>
+
+      <ToastContainer />
+    </Box>
   )
 }

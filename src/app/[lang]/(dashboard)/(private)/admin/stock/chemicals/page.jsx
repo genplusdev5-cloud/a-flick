@@ -1,45 +1,114 @@
 'use client'
-
-import { useState, useRef, useEffect } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
 import { openDB } from 'idb'
 import {
   Box,
-  Typography,
   Button,
-  IconButton,
-  Drawer,
-  InputAdornment,
-  Autocomplete,
+  Card,
+  CardHeader,
+  Typography,
+  Menu,
   MenuItem,
-  Card, // Added for Card layout
-  Divider, // Added for Divider
-  FormControl, // Added for Select
-  Select, // Added for Select
-  Pagination // Added for Pagination
+  IconButton,
+  Divider,
+  Drawer,
+  Grid,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Breadcrumbs,
+  Chip,
+  TextField,
+  Autocomplete,
+  FormControl,
+  Select,
+  CircularProgress,
+  InputAdornment
 } from '@mui/material'
-
-// Icons (Updated to include sorting icons)
-import { MdDelete } from 'react-icons/md'
 import AddIcon from '@mui/icons-material/Add'
-import CloseIcon from '@mui/icons-material/Close'
-import SearchIcon from '@mui/icons-material/Search'
-import EditIcon from '@mui/icons-material/Edit'
-import DownloadIcon from '@mui/icons-material/Download'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
-
-// Custom Components
+import EditIcon from '@mui/icons-material/Edit'
+import DeleteIcon from '@mui/icons-material/Delete'
+import CloseIcon from '@mui/icons-material/Close'
+import PrintIcon from '@mui/icons-material/Print'
+import FileDownloadIcon from '@mui/icons-material/FileDownload'
+import WarningAmberIcon from '@mui/icons-material/WarningAmber'
+import RefreshIcon from '@mui/icons-material/Refresh'
+import SearchIcon from '@mui/icons-material/Search'
 import CustomTextField from '@core/components/mui/TextField'
-import Link from 'next/link' // Added for Breadcrumb Link
+import { toast } from 'react-toastify'
+import TablePaginationComponent from '@/components/TablePaginationComponent'
+import classnames from 'classnames'
+import { rankItem } from '@tanstack/match-sorter-utils'
+import {
+  useReactTable,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getSortedRowModel,
+  flexRender,
+  createColumnHelper
+} from '@tanstack/react-table'
+import styles from '@core/styles/table.module.css'
+import ChevronRight from '@menu/svg/ChevronRight'
 
+// ───────────────────────────────────────────
+// IndexedDB
+// ───────────────────────────────────────────
+const DB_NAME = 'chemicals_db'
+const STORE_NAME = 'chemicals'
+const initDB = async () => {
+  return await openDB(DB_NAME, 1, {
+    upgrade(db) {
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true })
+      }
+    }
+  })
+}
+
+// Toast helper
+const showToast = (type, message) => {
+  const content = (
+    <div className='flex items-center gap-2'>
+      <Typography variant='body2' sx={{ fontWeight: 500 }}>
+        {message}
+      </Typography>
+    </div>
+  )
+  if (type === 'success') toast.success(content)
+  else if (type === 'error' || type === 'delete') toast.error(content)
+  else if (type === 'warning') toast.warn(content)
+  else toast.info(content)
+}
+
+// Debounced Input
+const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
+  const [value, setValue] = useState(initialValue)
+  useEffect(() => setValue(initialValue), [initialValue])
+  useEffect(() => {
+    const t = setTimeout(() => onChange(value), debounce)
+    return () => clearTimeout(t)
+  }, [value])
+  return <TextField {...props} value={value} onChange={e => setValue(e.target.value)} />
+}
+
+// ───────────────────────────────────────────
+// Component
+// ───────────────────────────────────────────
 export default function ChemicalsPage() {
-  // ---------------- State ----------------
   const [rows, setRows] = useState([])
+  const [rowCount, setRowCount] = useState(0)
   const [searchText, setSearchText] = useState('')
-  const [open, setOpen] = useState(false)
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
+  const [drawerOpen, setDrawerOpen] = useState(false)
   const [isEdit, setIsEdit] = useState(false)
   const [editRow, setEditRow] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
+  const [exportAnchorEl, setExportAnchorEl] = useState(null)
+
   const [formData, setFormData] = useState({
     name: '',
     unit: '',
@@ -48,112 +117,122 @@ export default function ChemicalsPage() {
     status: 'Active',
     file: ''
   })
-  const [unitOpen, setUnitOpen] = useState(false) // Used for Autocomplete control
 
-  // State for Sorting (From Page A)
-  const [sortField, setSortField] = useState('id')
-  const [sortDirection, setSortDirection] = useState('desc')
-
-  // State for Pagination (From Page A)
-  const [page, setPage] = useState(1) // 1-based indexing
-  const [pageSize, setPageSize] = useState(10) // Equivalent to rowsPerPage
+  const [selectedFile, setSelectedFile] = useState('')
+  const [unitOpen, setUnitOpen] = useState(false)
 
   const unitOptions = ['kg', 'litre', 'bottle', 'pkt', 'box']
 
-  // File Upload
   const fileInputRef = useRef(null)
-  const [selectedFile, setSelectedFile] = useState('')
-
-  // Keyboard Refs
   const nameRef = useRef(null)
   const unitRef = useRef(null)
   const dosageRef = useRef(null)
   const ingredientsRef = useRef(null)
   const statusRef = useRef(null)
-  const submitRef = useRef(null)
 
-  // ---------------- IndexedDB ----------------
-  const DB_NAME = 'chemicals_db'
-  const STORE_NAME = 'chemicals'
-
-  const initDB = async () => {
-    const db = await openDB(DB_NAME, 1, {
-      upgrade(db) {
-        if (!db.objectStoreNames.contains(STORE_NAME)) {
-          db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true })
-        }
-      }
-    })
-    return db
-  }
-
-  const loadRows = async () => {
-    const db = await initDB()
-    const all = await db.getAll(STORE_NAME)
-    // Initial load: sort by ID descending (latest first)
-    setRows(all.sort((a, b) => b.id - a.id))
+  // Load data
+  const loadData = async () => {
+    setLoading(true)
+    try {
+      const db = await initDB()
+      const all = await db.getAll(STORE_NAME)
+      const filtered = searchText
+        ? all.filter(r =>
+            ['name', 'unit', 'ingredients'].some(key =>
+              (r[key] || '').toString().toLowerCase().includes(searchText.toLowerCase())
+            )
+          )
+        : all
+      const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
+      const start = pagination.pageIndex * pagination.pageSize
+      const pageSlice = sorted.slice(start, start + pagination.pageSize)
+      const normalized = pageSlice.map((item, i) => ({
+        ...item,
+        sno: start + i + 1
+      }))
+      setRows(normalized)
+      setRowCount(filtered.length)
+    } catch (err) {
+      showToast('error', 'Failed to load data')
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
-    loadRows()
-  }, [])
+    loadData()
+  }, [pagination.pageIndex, pagination.pageSize, searchText])
 
-  // ---------------- CRUD ----------------
-  const toggleDrawer = () => setOpen(prev => !prev)
-
-  const handleChange = e => setFormData({ ...formData, [e.target.name]: e.target.value })
-
+  // --- Drawer ---
+  const toggleDrawer = () => setDrawerOpen(p => !p)
   const handleAdd = () => {
     setIsEdit(false)
+    setEditRow(null)
     setFormData({ name: '', unit: '', dosage: '', ingredients: '', status: 'Active', file: '' })
     setSelectedFile('')
-    setEditRow(null)
-    setOpen(true)
+    setDrawerOpen(true)
     setTimeout(() => nameRef.current?.focus(), 100)
   }
-
   const handleEdit = row => {
     setIsEdit(true)
     setEditRow(row)
     setFormData(row)
     setSelectedFile(row.file || '')
-    setOpen(true)
+    setDrawerOpen(true)
     setTimeout(() => nameRef.current?.focus(), 100)
-  }
-
-  const handleDelete = async row => {
-    const db = await initDB()
-    await db.delete(STORE_NAME, row.id)
-    setRows(prev => prev.filter(r => r.id !== row.id))
   }
 
   const handleSubmit = async e => {
     e.preventDefault()
-    const db = await initDB()
-    const dataToSave = { ...formData, file: selectedFile }
-
-    if (isEdit && editRow) {
-      const rowToSave = { ...editRow, ...dataToSave }
-      await db.put(STORE_NAME, rowToSave)
-      setRows(prev => prev.map(r => (r.id === editRow.id ? rowToSave : r)))
-    } else {
-      // IndexedDB auto-increments, so we just use the ID returned by db.add
-      const id = await db.add(STORE_NAME, dataToSave)
-      const newRow = { id, ...dataToSave }
-
-      // Add new row to the front and sort by 'id' descending to see it immediately
-      setRows(prev => {
-        const newRows = [newRow, ...prev.filter(r => r.id !== newRow.id)]
-        return newRows.sort((a, b) => b.id - a.id)
-      })
+    if (!formData.name.trim()) {
+      showToast('warning', 'Chemical name is required')
+      return
     }
-    toggleDrawer()
-    // Reset sort to 'id' desc to show the new/updated row easily
-    setSortField('id')
-    setSortDirection('desc')
+    setLoading(true)
+    try {
+      const db = await initDB()
+      const payload = { ...formData, file: selectedFile }
+      if (isEdit && editRow?.id) {
+        await db.put(STORE_NAME, { ...payload, id: editRow.id })
+        showToast('success', 'Chemical updated')
+      } else {
+        const id = await db.add(STORE_NAME, payload)
+        payload.id = id
+        showToast('success', 'Chemical added')
+      }
+      toggleDrawer()
+      loadData()
+    } catch {
+      showToast('error', 'Failed to save')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  // ---------------- File Upload ----------------
+  const handleStatusChange = async (e) => {
+    const newStatus = e.target.value
+    setFormData(prev => ({ ...prev, status: newStatus }))
+
+    if (isEdit && editRow) {
+      const updatedRow = { ...editRow, status: newStatus }
+      setRows(prev => prev.map(r => (r.id === editRow.id ? updatedRow : r)))
+      const db = await initDB()
+      await db.put(STORE_NAME, updatedRow)
+      showToast('success', 'Status updated')
+    }
+  }
+
+  const confirmDelete = async () => {
+    if (deleteDialog.row) {
+      const db = await initDB()
+      await db.delete(STORE_NAME, deleteDialog.row.id)
+      showToast('delete', `${deleteDialog.row.name} deleted`)
+      loadData()
+    }
+    setDeleteDialog({ open: false, row: null })
+  }
+
+  // --- File Upload ---
   const handleFileChange = e => {
     const file = e.target.files[0]
     if (file) {
@@ -171,139 +250,246 @@ export default function ChemicalsPage() {
     }
   }
 
-  // ---------------- Sorting Logic (From Page A) ----------------
-  const handleSort = field => {
-    // If clicking the current sort field, toggle direction
-    if (sortField === field) {
-      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'))
-    } else {
-      // If clicking a new field, set it as the sort field and default to 'asc'
-      setSortField(field)
-      setSortDirection('asc')
-    }
-    setPage(1) // Reset to first page on sort change
-  }
-
-  const sortedRows = [...rows].sort((a, b) => {
-    const aValue = a[sortField] || ''
-    const bValue = b[sortField] || ''
-
-    let comparison = 0
-    // Check if values are numerical (for dosage and id)
-    if (sortField === 'id' || sortField === 'dosage') {
-      comparison = Number(a[sortField] || 0) - Number(b[sortField] || 0)
-    } else {
-      // Case-insensitive string comparison
-      comparison = String(aValue).localeCompare(String(bValue), undefined, { sensitivity: 'base' })
-    }
-
-    // Apply the sort direction
-    return sortDirection === 'asc' ? comparison : comparison * -1
-  })
-
-  // Helper component to render the sort icon
-  const SortIcon = ({ field }) => {
-    if (sortField !== field) return null
-    return sortDirection === 'asc' ? (
-      <ArrowUpwardIcon sx={{ fontSize: 16, ml: 0.5 }} />
-    ) : (
-      <ArrowDownwardIcon sx={{ fontSize: 16, ml: 0.5 }} />
-    )
-  }
-
-  // ---------------- Filtering and Pagination (From Page A) ----------------
-  const handleSearch = e => {
-    setSearchText(e.target.value)
-    setPage(1) // Reset page on search
-  }
-
-  // Client-side filtering based on search text (uses sortedRows)
-  const filteredRows = sortedRows.filter(
-    row =>
-      row.name?.toLowerCase().includes(searchText.toLowerCase()) ||
-      row.unit?.toLowerCase().includes(searchText.toLowerCase()) ||
-      row.ingredients?.toLowerCase().includes(searchText.toLowerCase())
+  // --- Table ---
+  const columnHelper = createColumnHelper()
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor('sno', { header: 'S.No' }),
+      columnHelper.display({
+        id: 'actions',
+        header: 'Actions',
+        cell: info => (
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
+              <EditIcon />
+            </IconButton>
+            <IconButton
+              size='small'
+              color='error'
+              onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
+            >
+              <DeleteIcon />
+            </IconButton>
+          </Box>
+        )
+      }),
+      columnHelper.accessor('name', { header: 'Chemical Name' }),
+      columnHelper.accessor('unit', { header: 'Unit' }),
+      columnHelper.accessor('dosage', { header: 'Dosage' }),
+      columnHelper.accessor('ingredients', { header: 'Ingredients' }),
+      columnHelper.accessor('status', {
+        header: 'Status',
+        cell: info => {
+          const status = info.getValue()
+          return (
+            <Chip
+              label={status}
+              size='small'
+              sx={{
+                color: '#fff',
+                bgcolor: status === 'Active' ? 'success.main' : 'error.main',
+                fontWeight: 600,
+                borderRadius: '6px',
+                px: 1.5
+              }}
+            />
+          )
+        }
+      })
+    ],
+    []
   )
 
-  // Client-side pagination logic
-  const rowCount = filteredRows.length
-  const pageCount = Math.max(1, Math.ceil(rowCount / pageSize))
-  const paginatedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize)
-  const startIndex = rowCount === 0 ? 0 : (page - 1) * pageSize + 1
-  const endIndex = Math.min(page * pageSize, rowCount)
-
-  // ---------------- Keyboard Navigation ----------------
-  const focusNext = ref => ref?.current?.focus()
-
-  // This handles the status update logic which was immediate in Page B original
-  const handleStatusChange = async (e) => {
-    const newStatus = e.target.value;
-    setFormData(prev => ({ ...prev, status: newStatus }));
-
-    // Only update DB/State immediately if we are in Edit mode
-    if (isEdit && editRow) {
-      const updatedRow = { ...editRow, status: newStatus };
-      setRows(prev => prev.map(r => (r.id === editRow.id ? updatedRow : r)));
-      const db = await initDB();
-      await db.put(STORE_NAME, updatedRow);
-    }
+  const fuzzyFilter = (row, columnId, value, addMeta) => {
+    const itemRank = rankItem(row.getValue(columnId), value)
+    addMeta({ itemRank })
+    return itemRank.passed
   }
 
+  const table = useReactTable({
+    data: rows,
+    columns,
+    manualPagination: true,
+    pageCount: Math.ceil(rowCount / pagination.pageSize),
+    state: { globalFilter: searchText, pagination },
+    onGlobalFilterChange: setSearchText,
+    onPaginationChange: setPagination,
+    globalFilterFn: fuzzyFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getSortedRowModel: getSortedRowModel()
+  })
 
+  // --- Export ---
+  const exportOpen = Boolean(exportAnchorEl)
+  const exportCSV = () => {
+    const headers = ['S.No', 'Chemical Name', 'Unit', 'Dosage', 'Ingredients', 'Status']
+    const csv = [
+      headers.join(','),
+      ...rows.map(r => [
+        r.sno,
+        `"${r.name}"`,
+        r.unit,
+        r.dosage,
+        `"${r.ingredients}"`,
+        r.status
+      ].join(','))
+    ].join('\n')
+    const link = document.createElement('a')
+    link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
+    link.download = 'chemicals.csv'
+    link.click()
+    showToast('success', 'CSV downloaded')
+  }
+
+  const exportPrint = () => {
+    const w = window.open('', '_blank')
+    const html = `
+      <html><head><title>Chemicals List</title><style>
+      body{font-family:Arial;padding:24px;}
+      table{width:100%;border-collapse:collapse;}
+      th,td{border:1px solid #ccc;padding:8px;text-align:left;}
+      th{background:#f4f4f4;}
+      </style></head><body>
+      <h2>Chemicals List</h2>
+      <table><thead><tr>
+      <th>S.No</th><th>Chemical Name</th><th>Unit</th><th>Dosage</th><th>Ingredients</th><th>Status</th>
+      </tr></thead><tbody>
+      ${rows
+        .map(r => `<tr>
+          <td>${r.sno}</td>
+          <td>${r.name}</td>
+          <td>${r.unit}</td>
+          <td>${r.dosage}</td>
+          <td>${r.ingredients}</td>
+          <td>${r.status}</td>
+        </tr>`)
+        .join('')}
+      </tbody></table></body></html>`
+    w.document.write(html)
+    w.document.close()
+    w.print()
+  }
+
+  // ───────────────────────────────────────────
+  // Render
+  // ───────────────────────────────────────────
   return (
     <Box>
-      {/* Breadcrumb (From Page A) */}
-      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
-        <Link href='/' style={{ color: '#7367F0', textDecoration: 'none', fontSize: 14 }}>
-          Dashboard
+      <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
+        <Link underline='hover' color='inherit' href='/'>
+          Home
         </Link>
-        <Typography sx={{ mx: 1, color: 'text.secondary' }}>/</Typography>
-        <Typography variant='body2' sx={{ fontSize: 14 }}>
-          Chemicals
-        </Typography>
-      </Box>
-
-      <Card sx={{ p: 6 }}>
-        {/* Header + actions (From Page A's structure) */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-          <Typography variant='h6'>Chemicals List</Typography>
-
-          <Box display='flex' gap={1}>
-            <Button variant='outlined' endIcon={<ArrowDropDownIcon />}>
-              Export
-            </Button>
-            <Button variant='contained' startIcon={<AddIcon />} onClick={handleAdd}>
-              Add Chemical
-            </Button>
+        <Typography color='text.primary'>Chemicals</Typography>
+      </Breadcrumbs>
+      <Card sx={{ p: 3 }}>
+        <CardHeader
+          sx={{
+            pb: 1.5,
+            pt: 1.5,
+            '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
+            '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
+          }}
+          title={
+            <Box display='flex' alignItems='center' gap={2}>
+              <Typography variant='h5' sx={{ fontWeight: 600 }}>
+                Chemicals Management
+              </Typography>
+              <Button
+                variant='contained'
+                color='primary'
+                startIcon={
+                  <RefreshIcon
+                    sx={{
+                      animation: loading ? 'spin 1s linear infinite' : 'none',
+                      '@keyframes spin': {
+                        '0%': { transform: 'rotate(0deg)' },
+                        '100%': { transform: 'rotate(360deg)' }
+                      }
+                    }}
+                  />
+                }
+                disabled={loading}
+                onClick={async () => {
+                  setLoading(true)
+                  await loadData()
+                  setTimeout(() => setLoading(false), 600)
+                }}
+                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+              >
+                {loading ? 'Refreshing...' : 'Refresh'}
+              </Button>
+            </Box>
+          }
+          action={
+            <Box display='flex' alignItems='center' gap={2}>
+              <Button
+                variant='outlined'
+                color='secondary'
+                endIcon={<ArrowDropDownIcon />}
+                onClick={e => setExportAnchorEl(e.currentTarget)}
+                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+              >
+                Export
+              </Button>
+              <Menu anchorEl={exportAnchorEl} open={exportOpen} onClose={() => setExportAnchorEl(null)}>
+                <MenuItem onClick={exportPrint}>
+                  <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
+                </MenuItem>
+                <MenuItem onClick={exportCSV}>
+                  <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
+                </MenuItem>
+              </Menu>
+              <Button
+                variant='contained'
+                startIcon={<AddIcon />}
+                onClick={handleAdd}
+                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+              >
+                Add Chemical
+              </Button>
+            </Box>
+          }
+        />
+        {loading && (
+          <Box
+            sx={{
+              position: 'fixed',
+              inset: 0,
+              bgcolor: 'rgba(255,255,255,0.7)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 2000
+            }}
+          >
+            <CircularProgress />
           </Box>
-        </Box>
-
-        <Divider sx={{ mb: 3 }} />
-
-        {/* Search / entries (From Page A) */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <FormControl size='small' sx={{ minWidth: 120 }}>
+        )}
+        <Divider sx={{ mb: 2 }} />
+        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+          <FormControl size='small' sx={{ width: 140 }}>
             <Select
-              value={pageSize}
-              onChange={e => {
-                setPageSize(Number(e.target.value))
-                setPage(1)
-              }}
+              value={pagination.pageSize}
+              onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
             >
-              {[10, 25, 50, 100].map(i => (
-                <MenuItem key={i} value={i}>
-                  {i} entries
+              {[5, 10, 25, 50].map(s => (
+                <MenuItem key={s} value={s}>
+                  {s} entries
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
-
-          <CustomTextField
-            size='small'
-            placeholder='Search by Name, Unit, or Ingredients...'
+          <DebouncedInput
             value={searchText}
-            onChange={handleSearch}
-            sx={{ width: 420 }}
+            onChange={v => {
+              setSearchText(String(v))
+              setPagination(p => ({ ...p, pageIndex: 0 }))
+            }}
+            placeholder='Search name, unit, ingredients...'
+            sx={{ width: 360 }}
+            variant='outlined'
+            size='small'
             slotProps={{
               input: {
                 startAdornment: (
@@ -315,343 +501,185 @@ export default function ChemicalsPage() {
             }}
           />
         </Box>
-
-        {/* Table (Manual HTML Table - From Page A) */}
-        <Box sx={{ overflowX: 'auto' }}>
-          <table
-            style={{
-              width: '100%',
-              borderCollapse: 'collapse',
-              tableLayout: 'fixed'
-            }}
-          >
+        <div className='overflow-x-auto'>
+          <table className={styles.table}>
             <thead>
-              <tr style={{ textAlign: 'left', borderBottom: '1px solid #E5E7EB' }}>
-                {/* S.No Header */}
-                <th
-                  onClick={() => handleSort('id')}
-                  style={{ padding: '12px', width: '60px', cursor: 'pointer', userSelect: 'none' }}
-                >
-                  <Box display='flex' alignItems='center'>
-                    S.No <SortIcon field='id' />
-                  </Box>
-                </th>
-
-                <th style={{ padding: '12px', width: '100px' }}>Action</th>
-
-                {/* Chemical Name Header */}
-                <th
-                  onClick={() => handleSort('name')}
-                  style={{ padding: '12px', width: '150px', cursor: 'pointer', userSelect: 'none' }}
-                >
-                  <Box display='flex' alignItems='center'>
-                    Chemical Name <SortIcon field='name' />
-                  </Box>
-                </th>
-
-                {/* Unit Header */}
-                <th
-                  onClick={() => handleSort('unit')}
-                  style={{ padding: '12px', width: '100px', cursor: 'pointer', userSelect: 'none' }}
-                >
-                  <Box display='flex' alignItems='center'>
-                    Unit <SortIcon field='unit' />
-                  </Box>
-                </th>
-
-                {/* Dosage Header */}
-                <th
-                  onClick={() => handleSort('dosage')}
-                  style={{ padding: '12px', width: '100px', cursor: 'pointer', userSelect: 'none' }}
-                >
-                  <Box display='flex' alignItems='center'>
-                    Dosage <SortIcon field='dosage' />
-                  </Box>
-                </th>
-
-                {/* Ingredients Header */}
-                <th
-                  onClick={() => handleSort('ingredients')}
-                  style={{ padding: '12px', width: '300px', cursor: 'pointer', userSelect: 'none' }}
-                >
-                  <Box display='flex' alignItems='center'>
-                    Ingredients <SortIcon field='ingredients' />
-                  </Box>
-                </th>
-
-                {/* Status Header */}
-                <th
-                  onClick={() => handleSort('status')}
-                  style={{ padding: '12px', width: '100px', cursor: 'pointer', userSelect: 'none' }}
-                >
-                  <Box display='flex' alignItems='center'>
-                    Status <SortIcon field='status' />
-                  </Box>
-                </th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {paginatedRows.map((r, i) => (
-                <tr key={r.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
-                  <td style={{ padding: '12px', wordWrap: 'break-word', whiteSpace: 'normal' }}>
-                    {(page - 1) * pageSize + i + 1}
-                  </td>
-                  <td style={{ padding: '12px' }}>
-                    <Box sx={{ display: 'flex', gap: 1 }}>
-                      <IconButton size='small' onClick={() => handleEdit(r)}>
-                        <EditIcon />
-                      </IconButton>
-                      <IconButton size='small' color='error' onClick={() => handleDelete(r)}>
-                        <MdDelete />
-                      </IconButton>
-                    </Box>
-                  </td>
-                  <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.name}</td>
-                  <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.unit}</td>
-                  <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.dosage}</td>
-                  <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.ingredients}</td>
-                  <td style={{ padding: '12px' }}>
-                    <Box
-                      component='span'
-                      sx={{
-                        fontWeight: 600,
-                        color: '#fff',
-                        backgroundColor: r.status === 'Active' ? 'success.main' : 'error.main',
-                        px: 1.5,
-                        py: 0.5,
-                        borderRadius: '6px',
-                        display: 'inline-block'
-                      }}
-                    >
-                      {r.status}
-                    </Box>
-                  </td>
+              {table.getHeaderGroups().map(hg => (
+                <tr key={hg.id}>
+                  {hg.headers.map(h => (
+                    <th key={h.id}>
+                      <div
+                        className={classnames({
+                          'flex items-center': h.column.getIsSorted(),
+                          'cursor-pointer select-none': h.column.getCanSort()
+                        })}
+                        onClick={h.column.getToggleSortingHandler()}
+                      >
+                        {flexRender(h.column.columnDef.header, h.getContext())}
+                        {{
+                          asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
+                          desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
+                        }[h.column.getIsSorted()] ?? null}
+                      </div>
+                    </th>
+                  ))}
                 </tr>
               ))}
+            </thead>
+            <tbody>
+              {rows.length ? (
+                table.getRowModel().rows.map(row => (
+                  <tr key={row.id}>
+                    {row.getVisibleCells().map(cell => (
+                      <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                    ))}
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={columns.length} className='text-center py-4'>
+                    No results found
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
-          {rowCount === 0 && (
-            <Box sx={{ textAlign: 'center', py: 4 }}>
-              <Typography color='text.secondary'>No results found</Typography>
-            </Box>
-          )}
-        </Box>
-
-        {/* Pagination Footer (From Page A) */}
-        <Box
-          sx={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            px: 2,
-            py: 2,
-            mt: 2,
-            flexWrap: 'wrap'
-          }}
-        >
-          <Typography variant='body2' color='text.secondary'>
-            Showing {startIndex} to {endIndex} of {rowCount} entries
-          </Typography>
-
-          <Box display='flex' alignItems='center' gap={2}>
-            <Typography variant='body2' color='text.secondary'>
-              Page {page} of {pageCount}
-            </Typography>
-
-            <Pagination
-              count={pageCount}
-              page={page}
-              onChange={(e, value) => setPage(value)}
-              shape='rounded'
-              color='primary'
-              showFirstButton
-              showLastButton
-            />
-          </Box>
-        </Box>
+        </div>
+        <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
       </Card>
 
-      {/* Drawer Form (Retains original logic and fields) */}
-      <Drawer anchor='right' open={open} onClose={toggleDrawer}>
-        <Box sx={{ width: 360, p: 3 }}>
-          <Box display='flex' justifyContent='space-between' alignItems='center' mb={2}>
-            <Typography variant='h6'>{isEdit ? 'Edit Chemical' : 'Add New Chemical'}</Typography>
+      {/* Drawer */}
+      <Drawer anchor='right' open={drawerOpen} onClose={toggleDrawer}>
+        <Box sx={{ p: 5, width: 420 }}>
+          <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
+            <Typography variant='h5' fontWeight={600}>
+              {isEdit ? 'Edit Chemical' : 'Add New Chemical'}
+            </Typography>
             <IconButton onClick={toggleDrawer}>
               <CloseIcon />
             </IconButton>
           </Box>
-
           <form onSubmit={handleSubmit}>
-            <CustomTextField
-              inputRef={nameRef}
-              fullWidth
-              margin='normal'
-              label='Chemical Name'
-              name='name'
-              value={formData.name}
-              sx={{ mt: 2 }}
-              onChange={handleChange}
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  // Move focus to Unit field & open dropdown
-                  setTimeout(() => {
-                    unitRef.current?.querySelector('input')?.focus()
-                    setUnitOpen(true)
-                  }, 100)
-                }
-              }}
-            />
-
-            {/* Unit (Autocomplete retained from Page B) */}
-            <Autocomplete
-              ref={unitRef}
-              freeSolo={false}
-              options={unitOptions}
-              value={formData.unit}
-              open={unitOpen}
-              onOpen={() => setUnitOpen(true)}
-              onClose={() => setUnitOpen(false)}
-              onFocus={() => setUnitOpen(true)}
-              sx={{ mt: 5 }}
-              onInputChange={(e, newValue) => {
-                setFormData(prev => ({ ...prev, unit: newValue }))
-              }}
-              onChange={(e, newValue) => setFormData(prev => ({ ...prev, unit: newValue }))}
-              noOptionsText='No options'
-              renderInput={params => (
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
                 <CustomTextField
-                  {...params}
-                  label='Unit'
-                  inputProps={{
-                    ...params.inputProps,
-                    onKeyDown: e => {
-                      if (e.key === 'Enter' && unitOptions.includes(formData.unit)) {
-                        e.preventDefault()
-                        focusNext(dosageRef)
-                      } else if (e.key === 'Enter') {
-                        e.preventDefault()
-                      }
+                  fullWidth
+                  label='Chemical Name'
+                  value={formData.name}
+                  onChange={e => setFormData({ ...formData, name: e.target.value })}
+                  inputRef={nameRef}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      setTimeout(() => {
+                        unitRef.current?.querySelector('input')?.focus()
+                        setUnitOpen(true)
+                      }, 100)
                     }
                   }}
                 />
-              )}
-            />
-
-            {/* File Upload (Retained from Page B) */}
-            <Box sx={{ mt: 4 }}>
-              <CustomTextField
-                label='Upload File'
-                fullWidth
-                margin='normal'
-                InputProps={{ readOnly: true }}
-                value=''
-                sx={{
-                  '& .MuiInputBase-root': {
-                    display: 'none'
-                  }
-                }}
-              />
-              <input type='file' ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileChange} />
-              <Button
-                variant='outlined'
-                fullWidth
-                onClick={() => fileInputRef.current?.click()}
-                onDragOver={e => e.preventDefault()}
-                onDragLeave={e => e.preventDefault()}
-                onDrop={handleFileDrop}
-                sx={{
-                  borderColor: 'black',
-                  borderStyle: 'solid',
-                  borderWidth: 1,
-                  justifyContent: 'space-between',
-                  py: 1.5
-                }}
-              >
-                <Typography sx={{ color: selectedFile ? 'text.primary' : 'text.disabled' }}>
-                  {selectedFile || 'Choose File or Drag & Drop Here'}
-                </Typography>
-                <Typography variant='body2' color='primary'>
-                  Browse
-                </Typography>
-              </Button>
-            </Box>
-
-            {/* Dosage (Retained from Page B - numeric only) */}
-            <CustomTextField
-              inputRef={dosageRef}
-              fullWidth
-              margin='normal'
-              label='Dosage'
-              name='dosage'
-              value={formData.dosage}
-              sx={{ mt: 5 }}
-              onChange={e => /^\d*$/.test(e.target.value) && handleChange(e)}
-              inputProps={{
-                inputMode: 'numeric',
-                pattern: '[0-9]*',
-                onKeyDown: e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    focusNext(ingredientsRef)
-                  }
-                }
-              }}
-            />
-
-            {/* Ingredients */}
-            <CustomTextField
-              inputRef={ingredientsRef}
-              fullWidth
-              margin='normal'
-              multiline
-              rows={3}
-              sx={{ mt: 5 }}
-              label='Ingredients'
-              name='ingredients'
-              value={formData.ingredients}
-              onChange={handleChange}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  setTimeout(() => {
-                    if (isEdit) focusNext(statusRef)
-                    else focusNext(submitRef)
-                  }, 100)
-                }
-              }}
-            />
-
-            {/* Status - Only show when editing (Logic retained from Page B) */}
-            {isEdit && (
-              <CustomTextField
-                select
-                fullWidth
-                margin='normal'
-                label='Status'
-                value={formData.status}
-                inputRef={statusRef}
-                // Uses the dedicated handler to update status immediately on change
-                onChange={handleStatusChange}
-                inputProps={{
-                  onKeyDown: e => {
+              </Grid>
+              <Grid item xs={12}>
+                <Autocomplete
+                  ref={unitRef}
+                  freeSolo={false}
+                  options={unitOptions}
+                  value={formData.unit}
+                  open={unitOpen}
+                  onOpen={() => setUnitOpen(true)}
+                  onClose={() => setUnitOpen(false)}
+ onFocus={() => setUnitOpen(true)}
+                  onChange={(e, v) => setFormData({ ...formData, unit: v })}
+                  renderInput={params => (
+                    <CustomTextField
+                      {...params}
+                      label='Unit'
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && unitOptions.includes(formData.unit)) {
+                          e.preventDefault()
+                          dosageRef.current?.focus()
+                        }
+                      }}
+                    />
+                  )}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <Box sx={{ mt: 2 }}>
+                  <input type='file' ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileChange} />
+                  <Button
+                    variant='outlined'
+                    fullWidth
+                    onClick={() => fileInputRef.current?.click()}
+                    onDragOver={e => e.preventDefault()}
+                    onDrop={handleFileDrop}
+                    sx={{
+                      borderColor: 'divider',
+                      justifyContent: 'space-between',
+                      py: 1.5
+                    }}
+                  >
+                    <Typography sx={{ color: selectedFile ? 'text.primary' : 'text.disabled' }}>
+                      {selectedFile || 'Choose File or Drag & Drop'}
+                    </Typography>
+                    <Typography variant='body2' color='primary'>
+                      Browse
+                    </Typography>
+                  </Button>
+                </Box>
+              </Grid>
+              <Grid item xs={12}>
+                <CustomTextField
+                  fullWidth
+                  label='Dosage'
+                  value={formData.dosage}
+                  onChange={e => /^\d*$/.test(e.target.value) && setFormData({ ...formData, dosage: e.target.value })}
+                  inputRef={dosageRef}
+                  inputProps={{ inputMode: 'numeric' }}
+                  onKeyDown={e => {
                     if (e.key === 'Enter') {
                       e.preventDefault()
-                      focusNext(submitRef)
+                      ingredientsRef.current?.focus()
                     }
-                  }
-                }}
-              >
-                <MenuItem value='Active'>Active</MenuItem>
-                <MenuItem value='Inactive'>Inactive</MenuItem>
-              </CustomTextField>
-            )}
-
-            {/* Submit / Cancel */}
-            <Box mt={3} display='flex' gap={2}>
-              <Button type='submit' variant='contained' fullWidth ref={submitRef}>
-                {isEdit ? 'Update' : 'Submit'}
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <CustomTextField
+                  fullWidth
+                  label='Ingredients'
+                  multiline
+                  rows={3}
+                  value={formData.ingredients}
+                  onChange={e => setFormData({ ...formData, ingredients: e.target.value })}
+                  inputRef={ingredientsRef}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      if (isEdit) statusRef.current?.focus()
+                    }
+                  }}
+                />
+              </Grid>
+              {isEdit && (
+                <Grid item xs={12}>
+                  <CustomTextField
+                    select
+                    fullWidth
+                    label='Status'
+                    value={formData.status}
+                    onChange={handleStatusChange}
+                    inputRef={statusRef}
+                  >
+                    <MenuItem value='Active'>Active</MenuItem>
+                    <MenuItem value='Inactive'>Inactive</MenuItem>
+                  </CustomTextField>
+                </Grid>
+              )}
+            </Grid>
+            <Box mt={4} display='flex' gap={2}>
+              <Button type='submit' variant='contained' fullWidth disabled={loading}>
+                {loading ? 'Saving...' : isEdit ? 'Update' : 'Save'}
               </Button>
               <Button variant='outlined' fullWidth onClick={toggleDrawer}>
                 Cancel
@@ -660,6 +688,24 @@ export default function ChemicalsPage() {
           </form>
         </Box>
       </Drawer>
+
+      {/* Delete Dialog */}
+      <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false })}>
+        <DialogTitle sx={{ textAlign: 'center', color: 'error.main', fontWeight: 600 }}>
+          <WarningAmberIcon sx={{ verticalAlign: 'middle', mr: 1 }} /> Confirm Delete
+        </DialogTitle>
+        <DialogContent>
+          <Typography textAlign='center'>
+            Delete chemical "<strong>{deleteDialog.row?.name}</strong>"?
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center', pb: 3 }}>
+          <Button onClick={() => setDeleteDialog({ open: false })}>Cancel</Button>
+          <Button color='error' variant='contained' onClick={confirmDelete}>
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   )
 }
