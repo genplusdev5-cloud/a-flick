@@ -25,13 +25,13 @@ import {
   FormControlLabel
 } from '@mui/material'
 
+import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
 import StatusChip from '@/components/common/StatusChip'
-
 
 import CustomTextField from '@core/components/mui/TextField'
 import CustomAutocomplete from '@core/components/mui/Autocomplete'
@@ -77,7 +77,7 @@ const loadRequests = async () => {
   return all.sort((a, b) => b.id - a.id)
 }
 
-const deleteRequest = async (id) => {
+const deleteRequest = async id => {
   const db = await initDB()
   await db.delete(STORE_NAME, Number(id))
 }
@@ -193,26 +193,23 @@ export default function MaterialRequestPage() {
   const loadData = async (showToastMsg = false) => {
     setLoading(true)
     try {
-      let data = dummyRequests
-      // let data = await loadRequests() // Uncomment when using IndexedDB
+      let data = dummyRequests // Replace later with IndexedDB data: await loadRequests()
 
+      // 🔍 Apply all filters
       const filtered = data.filter(r => {
         const reqNo = r.requestNo || `REQ-${r.id}`
-
-        // Search
         const matchesSearch =
           !searchText ||
-          Object.values({ ...r, reqNo }).join(' ').toLowerCase().includes(searchText.toLowerCase())
+          Object.values({ ...r, reqNo })
+            .join(' ')
+            .toLowerCase()
+            .includes(searchText.toLowerCase())
 
-        // Date Range
-        const matchesDate = (() => {
-          if (!enableDateFilter) return true
-          const rowDate = new Date(r.requestDate)
-          return rowDate >= startDate && rowDate <= endDate
-        })()
+        const matchesDate = !enableDateFilter
+          ? true
+          : new Date(r.requestDate) >= startDate && new Date(r.requestDate) <= endDate
 
-        // Other filters
-        const matchesStatus = !requestStatus || (r.status || 'Waiting') === requestStatus
+        const matchesStatus = !requestStatus || r.status === requestStatus
         const matchesFrom = !fromLocation || r.fromLocation === fromLocation
         const matchesTo = !toLocation || r.toLocation === toLocation
         const matchesBy = !requestedBy || r.requestedBy === requestedBy
@@ -220,11 +217,13 @@ export default function MaterialRequestPage() {
         return matchesSearch && matchesDate && matchesStatus && matchesFrom && matchesTo && matchesBy
       })
 
+      // 🧾 Normalize with serial number
       const withSno = filtered.map((r, i) => ({ ...r, sno: i + 1 }))
       setRows(withSno)
 
-      if (showToastMsg) showToast('info', 'Material request refreshed')
+      if (showToastMsg) showToast('info', 'Material requests refreshed')
     } catch (err) {
+      console.error(err)
       showToast('error', 'Failed to load requests')
     } finally {
       setLoading(false)
@@ -233,37 +232,34 @@ export default function MaterialRequestPage() {
 
   useEffect(() => {
     loadData(false)
-  }, [
-    searchText,
-    enableDateFilter,
-    startDate,
-    endDate,
-    requestStatus,
-    fromLocation,
-    toLocation,
-    requestedBy
-  ])
+  }, [searchText, enableDateFilter, startDate, endDate, requestStatus, fromLocation, toLocation, requestedBy])
 
   // Actions
-  const handleDelete = async (row) => {
+  const handleDelete = async row => {
     await deleteRequest(row.id)
     showToast('delete', 'Request deleted')
     loadData()
   }
 
-  const handleEdit = (row) => {
+  const handleEdit = row => {
     router.push(`/admin/stock/material-request/${row.id}/edit`)
   }
 
-  const getStatusColor = (status) => {
+  const getStatusColor = status => {
     switch (status) {
-      case 'Completed': return '#4caf50'
-      case 'Pending': return '#ff9800'
-      case 'Issued': return '#2196f3'
-      case 'Approved': return '#8bc34a'
+      case 'Completed':
+        return '#4caf50'
+      case 'Pending':
+        return '#ff9800'
+      case 'Issued':
+        return '#2196f3'
+      case 'Approved':
+        return '#8bc34a'
       case 'Declined':
-      case 'Rejected': return '#f44336'
-      default: return '#9e9e9e'
+      case 'Rejected':
+        return '#f44336'
+      default:
+        return '#9e9e9e'
     }
   }
 
@@ -273,9 +269,7 @@ export default function MaterialRequestPage() {
     const csv = [
       headers.join(','),
       ...rows.map(r =>
-        columns
-          .map(col => `"${(r[col.accessorKey ?? col.id] ?? '').toString().replace(/"/g, '""')}"`)
-          .join(',')
+        columns.map(col => `"${(r[col.accessorKey ?? col.id] ?? '').toString().replace(/"/g, '""')}"`).join(',')
       )
     ].join('\n')
     const link = document.createElement('a')
@@ -300,13 +294,21 @@ export default function MaterialRequestPage() {
       <table><thead><tr>
       ${columns.map(c => `<th>${c.header}</th>`).join('')}
       </tr></thead><tbody>
-      ${rows.map(r => `<tr>${columns.map(col => {
-        const raw = r[col.accessorKey ?? col.id] ?? ''
-        let val = raw
-        if (col.accessorKey?.includes('Date') && raw) val = new Date(raw).toLocaleDateString('en-GB')
-        else if (col.id === 'status') val = `<span class="pill" style="background:${getStatusColor(raw)}">${raw}</span>`
-        return `<td>${val}</td>`
-      }).join('')}</tr>`).join('')}
+      ${rows
+        .map(
+          r =>
+            `<tr>${columns
+              .map(col => {
+                const raw = r[col.accessorKey ?? col.id] ?? ''
+                let val = raw
+                if (col.accessorKey?.includes('Date') && raw) val = new Date(raw).toLocaleDateString('en-GB')
+                else if (col.id === 'status')
+                  val = `<span class="pill" style="background:${getStatusColor(raw)}">${raw}</span>`
+                return `<td>${val}</td>`
+              })
+              .join('')}</tr>`
+        )
+        .join('')}
       </tbody></table></body></html>`
     w?.document.write(html)
     w?.document.close()
@@ -315,76 +317,77 @@ export default function MaterialRequestPage() {
 
   // Columns
   const columnHelper = createColumnHelper()
-const columns = useMemo(() => [
-  columnHelper.accessor('sno', {
-    header: 'S.No',
-    size: 60,
-    meta: { align: 'center' },
-    enableSorting: false
-  }),
-  columnHelper.display({
-    id: 'actions',
-    header: 'Actions',
-    size: 100,
-    meta: { align: 'center' },
-    cell: ({ row }) => (
-      <Box sx={{ display: 'flex', gap: 0.5 }}>
-        <IconButton size='small' color='error' onClick={() => handleDelete(row.original)}>
-          <DeleteIcon fontSize='small' />
-        </IconButton>
-        <IconButton size='small' onClick={() => handleEdit(row.original)}>
-          <EditIcon fontSize='small' />
-        </IconButton>
-      </Box>
-    )
-  }),
-  columnHelper.accessor('requestType', { header: 'Request Type', size: 150 }),
-  columnHelper.accessor(row => row.requestNo || `REQ-${row.id}`, {
-    id: 'requestNo',
-    header: 'Request No',
-    size: 150
-  }),
-  columnHelper.accessor('requestDate', {
-    header: 'Request Date',
-    size: 130,
-    cell: info => {
-      const d = info.getValue()
-      return d ? format(new Date(d), 'dd/MM/yyyy') : ''
-    }
-  }),
-  columnHelper.accessor('fromLocation', { header: 'From Location/Supplier', size: 200 }),
-  columnHelper.accessor('toLocation', { header: 'To Location/Supplier', size: 200 }),
-  columnHelper.accessor('requestedBy', { header: 'Requested By', size: 140 }),
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor('sno', {
+        header: 'S.No',
+        size: 60,
+        meta: { align: 'center' },
+        enableSorting: false
+      }),
+      columnHelper.display({
+        id: 'actions',
+        header: 'Actions',
+        size: 100,
+        meta: { align: 'center' },
+        cell: ({ row }) => (
+          <Box sx={{ display: 'flex', gap: 0.5 }}>
+            <IconButton size='small' color='error' onClick={() => handleDelete(row.original)}>
+              <DeleteIcon fontSize='small' />
+            </IconButton>
+            <IconButton size='small' onClick={() => handleEdit(row.original)}>
+              <EditIcon fontSize='small' />
+            </IconButton>
+          </Box>
+        )
+      }),
+      columnHelper.accessor('requestType', { header: 'Request Type', size: 150 }),
+      columnHelper.accessor(row => row.requestNo || `REQ-${row.id}`, {
+        id: 'requestNo',
+        header: 'Request No',
+        size: 150
+      }),
+      columnHelper.accessor('requestDate', {
+        header: 'Request Date',
+        size: 130,
+        cell: info => {
+          const d = info.getValue()
+          return d ? format(new Date(d), 'dd/MM/yyyy') : ''
+        }
+      }),
+      columnHelper.accessor('fromLocation', { header: 'From Location/Supplier', size: 200 }),
+      columnHelper.accessor('toLocation', { header: 'To Location/Supplier', size: 200 }),
+      columnHelper.accessor('requestedBy', { header: 'Requested By', size: 140 }),
 
-  // ✅ Use StatusChip globally
-  columnHelper.display({
-    id: 'isApproved',
-    header: 'Is Approved',
-    size: 120,
-    cell: ({ row }) => <StatusChip status={row.original.approvedStatus} />
-  }),
-  columnHelper.display({
-    id: 'isIssued',
-    header: 'Is Issued',
-    size: 120,
-    cell: ({ row }) => <StatusChip status={row.original.issuedStatus} />
-  }),
-  columnHelper.display({
-    id: 'isCompleted',
-    header: 'Is Completed',
-    size: 120,
-    cell: ({ row }) => (
-      <StatusChip status={row.original.completedStatus === 'Yes' ? 'Yes' : 'No'} />
-    )
-  }),
-  columnHelper.accessor('remarks', { header: 'Remarks', size: 200 }),
-  columnHelper.accessor(row => row.status || 'Waiting', {
-    id: 'status',
-    header: 'Request Status',
-    size: 150,
-    cell: info => <StatusChip status={info.getValue()} />
-  })
-], [])
+      // ✅ Use StatusChip globally
+      columnHelper.display({
+        id: 'isApproved',
+        header: 'Is Approved',
+        size: 120,
+        cell: ({ row }) => <StatusChip status={row.original.approvedStatus} />
+      }),
+      columnHelper.display({
+        id: 'isIssued',
+        header: 'Is Issued',
+        size: 120,
+        cell: ({ row }) => <StatusChip status={row.original.issuedStatus} />
+      }),
+      columnHelper.display({
+        id: 'isCompleted',
+        header: 'Is Completed',
+        size: 120,
+        cell: ({ row }) => <StatusChip status={row.original.completedStatus === 'Yes' ? 'Yes' : 'No'} />
+      }),
+      columnHelper.accessor('remarks', { header: 'Remarks', size: 200 }),
+      columnHelper.accessor(row => row.status || 'Waiting', {
+        id: 'status',
+        header: 'Request Status',
+        size: 150,
+        cell: info => <StatusChip status={info.getValue()} />
+      })
+    ],
+    []
+  )
 
   const table = useReactTable({
     data: rows,
@@ -490,19 +493,33 @@ const columns = useMemo(() => [
           <Box
             sx={{
               position: 'fixed',
-              top: 0,
-              left: 0,
-              width: '100vw',
-              height: '100vh',
-              backgroundColor: 'rgba(255,255,255,0.7)',
-              backdropFilter: 'blur(2px)',
+              inset: 0,
+              bgcolor: 'rgba(255,255,255,0.65)',
+              backdropFilter: 'blur(3px)',
               display: 'flex',
-              justifyContent: 'center',
               alignItems: 'center',
-              zIndex: 2000
+              justifyContent: 'center',
+              flexDirection: 'column',
+              zIndex: 2000,
+              animation: 'fadeIn 0.3s ease-in-out',
+              '@keyframes fadeIn': {
+                from: { opacity: 0 },
+                to: { opacity: 1 }
+              }
             }}
           >
-            <CircularProgress size={70} thickness={5} color='primary' />
+            <ProgressCircularCustomization size={70} thickness={5} />
+            <Typography
+              mt={2}
+              sx={{
+                color: 'primary.main',
+                fontWeight: 600,
+                fontSize: '1.05rem',
+                letterSpacing: 0.3
+              }}
+            >
+              Loading Material Requests...
+            </Typography>
           </Box>
         )}
 
@@ -513,7 +530,9 @@ const columns = useMemo(() => [
           {/* Date Range */}
           <Box>
             <Box display='flex' alignItems='center' gap={1} sx={{ mb: 0.5 }}>
-              <Typography variant='body2' sx={{ fontWeight: 500 }}>Date Range</Typography>
+              <Typography variant='body2' sx={{ fontWeight: 500 }}>
+                Date Range
+              </Typography>
               <Checkbox size='small' checked={enableDateFilter} onChange={e => setEnableDateFilter(e.target.checked)} />
             </Box>
             <AppReactDatepicker
@@ -587,12 +606,11 @@ const columns = useMemo(() => [
           }}
         >
           <FormControl size='small' sx={{ width: 140 }}>
-            <Select
-              value={pageSize}
-              onChange={e => table.setPageSize(Number(e.target.value))}
-            >
+            <Select value={pageSize} onChange={e => table.setPageSize(Number(e.target.value))}>
               {[10, 25, 50, 100].map(s => (
-                <MenuItem key={s} value={s}>{s} entries</MenuItem>
+                <MenuItem key={s} value={s}>
+                  {s} entries
+                </MenuItem>
               ))}
             </Select>
           </FormControl>

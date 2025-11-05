@@ -28,6 +28,7 @@ import {
   CircularProgress
 } from '@mui/material'
 
+import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import EditIcon from '@mui/icons-material/Edit'
@@ -41,6 +42,10 @@ import FileCopyIcon from '@mui/icons-material/FileCopy'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import Autocomplete from '@mui/material/Autocomplete'
+
+import CustomTextFieldWrapper from '@/components/common/CustomTextField'
+import CustomTextarea from '@/components/common/CustomTextarea'
+import CustomSelectField from '@/components/common/CustomSelectField'
 
 import CustomTextField from '@core/components/mui/TextField'
 import CustomAutocomplete from '@core/components/mui/Autocomplete'
@@ -114,6 +119,7 @@ export default function ServiceFrequencyPage() {
   const [loading, setLoading] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
+  const [unsavedAddData, setUnsavedAddData] = useState(null)
 
   const [formData, setFormData] = useState({
     id: null,
@@ -129,12 +135,38 @@ export default function ServiceFrequencyPage() {
 
   const incrementTypeRef = useRef(null)
 
+  const handleFieldChange = (field, value) => {
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value }
+      if (!isEdit) setUnsavedAddData(updated) // cache unsaved Add Drawer data
+      return updated
+    })
+  }
+
+  const handleCancel = () => {
+    setFormData({
+      id: null,
+      incrementType: '',
+      noOfIncrements: '',
+      backlogAge: '',
+      frequencyCode: '',
+      displayFrequency: '',
+      sortOrder: '',
+      description: '',
+      status: 'Active'
+    })
+    setUnsavedAddData(null)
+    setDrawerOpen(false)
+  }
+
   // Load rows
   const loadData = async () => {
     setLoading(true)
     try {
       const db = await initDB()
       const all = await db.getAll(STORE_NAME)
+
+      // 🔍 Apply search filter
       const filtered = searchText
         ? all.filter(r =>
             ['displayFrequency', 'frequencyCode', 'description'].some(key =>
@@ -142,16 +174,25 @@ export default function ServiceFrequencyPage() {
             )
           )
         : all
+
+      // 🔢 Sort newest first
       const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
+
+      // 🧮 Apply pagination
       const start = pagination.pageIndex * pagination.pageSize
-      const pageSlice = sorted.slice(start, start + pagination.pageSize)
-      const normalized = pageSlice.map((item, i) => ({
+      const end = start + pagination.pageSize
+      const paginated = sorted.slice(start, end)
+
+      // 🧾 Add serial numbers
+      const normalized = paginated.map((item, idx) => ({
         ...item,
-        sno: start + i + 1
+        sno: start + idx + 1
       }))
+
       setRows(normalized)
       setRowCount(filtered.length)
     } catch (err) {
+      console.error(err)
       showToast('error', 'Failed to load data')
     } finally {
       setLoading(false)
@@ -167,17 +208,21 @@ export default function ServiceFrequencyPage() {
 
   const handleAdd = () => {
     setIsEdit(false)
-    setFormData({
-      id: null,
-      incrementType: '',
-      noOfIncrements: '',
-      backlogAge: '',
-      frequencyCode: '',
-      displayFrequency: '',
-      sortOrder: '',
-      description: '',
-      status: 'Active'
-    })
+    if (unsavedAddData) {
+      setFormData(unsavedAddData)
+    } else {
+      setFormData({
+        id: null,
+        incrementType: '',
+        noOfIncrements: '',
+        backlogAge: '',
+        frequencyCode: '',
+        displayFrequency: '',
+        sortOrder: '',
+        description: '',
+        status: 'Active'
+      })
+    }
     setDrawerOpen(true)
     setTimeout(() => incrementTypeRef.current?.focus(), 100)
   }
@@ -210,6 +255,7 @@ export default function ServiceFrequencyPage() {
     try {
       const db = await initDB()
       const payload = { ...formData }
+
       if (isEdit && formData.id) {
         await db.put(STORE_NAME, payload)
         showToast('success', 'Frequency updated')
@@ -218,7 +264,25 @@ export default function ServiceFrequencyPage() {
         await db.add(STORE_NAME, payload)
         showToast('success', 'Frequency added')
       }
-      toggleDrawer()
+
+      // 🧹 Clear unsaved draft data + reset form
+      setUnsavedAddData(null)
+      setFormData({
+        id: null,
+        incrementType: '',
+        noOfIncrements: '',
+        backlogAge: '',
+        frequencyCode: '',
+        displayFrequency: '',
+        sortOrder: '',
+        description: '',
+        status: 'Active'
+      })
+
+      // ✅ Close drawer after save
+      setDrawerOpen(false)
+
+      // 🔄 Refresh the table
       loadData()
     } catch {
       showToast('error', 'Failed to save')
@@ -451,13 +515,19 @@ export default function ServiceFrequencyPage() {
               position: 'fixed',
               inset: 0,
               bgcolor: 'rgba(255,255,255,0.7)',
+              backdropFilter: 'blur(2px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               zIndex: 2000
             }}
           >
-            <CircularProgress />
+            <Box textAlign='center'>
+              <ProgressCircularCustomization size={60} thickness={5} />
+              <Typography mt={2} fontWeight={600} color='primary'>
+                Loading...
+              </Typography>
+            </Box>
           </Box>
         )}
 
@@ -539,118 +609,123 @@ export default function ServiceFrequencyPage() {
       </Card>
 
       {/* Drawer */}
-      <Drawer anchor='right' open={drawerOpen} onClose={toggleDrawer}>
-        <Box sx={{ p: 5, width: 420 }}>
+      <Drawer
+        anchor='right'
+        open={drawerOpen}
+        onClose={toggleDrawer}
+        PaperProps={{ sx: { width: 420, boxShadow: '0px 0px 15px rgba(0,0,0,0.08)' } }}
+      >
+        <Box sx={{ p: 5, display: 'flex', flexDirection: 'column', height: '100%' }}>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
             <Typography variant='h5' fontWeight={600}>
               {isEdit ? 'Edit Frequency' : 'Add Frequency'}
             </Typography>
-            <IconButton onClick={toggleDrawer}>
+            <IconButton onClick={toggleDrawer} size='small'>
               <CloseIcon />
             </IconButton>
           </Box>
 
-          <form onSubmit={handleSubmit}>
-            <Grid container spacing={2}>
-              {/* Increment Type */}
+          <Divider sx={{ mb: 3 }} />
+
+          <form onSubmit={handleSubmit} style={{ flexGrow: 1 }}>
+            <Grid container spacing={3}>
               <Grid item xs={12}>
-                <CustomTextField
-                  select
-                  fullWidth
+                <CustomSelectField
                   label='Increment Type'
                   value={formData.incrementType}
-                  onChange={e => setFormData({ ...formData, incrementType: e.target.value })}
-                >
-                  <MenuItem value='Year'>Year</MenuItem>
-                  <MenuItem value='Month'>Month</MenuItem>
-                  <MenuItem value='Week'>Week</MenuItem>
-                  <MenuItem value='Day'>Day</MenuItem>
-                  <MenuItem value='Others'>Others</MenuItem>
-                </CustomTextField>
+                  onChange={e => handleFieldChange('incrementType', e.target.value)}
+                  options={[
+                    { value: 'Year', label: 'Year' },
+                    { value: 'Month', label: 'Month' },
+                    { value: 'Week', label: 'Week' },
+                    { value: 'Day', label: 'Day' },
+                    { value: 'Others', label: 'Others' }
+                  ]}
+                />
               </Grid>
 
-              {/* No of Increments */}
               <Grid item xs={12}>
-                <CustomTextField
+                <CustomTextFieldWrapper
                   fullWidth
                   label='No of Increments'
+                  placeholder='Enter number of increments'
                   value={formData.noOfIncrements}
-                  onChange={e => setFormData({ ...formData, noOfIncrements: e.target.value })}
+                  onChange={e => handleFieldChange('noOfIncrements', e.target.value)}
                 />
               </Grid>
 
-              {/* Backlog Age */}
               <Grid item xs={12}>
-                <CustomTextField
+                <CustomTextFieldWrapper
                   fullWidth
                   label='Backlog Age'
+                  placeholder='Enter backlog age'
                   value={formData.backlogAge}
-                  onChange={e => setFormData({ ...formData, backlogAge: e.target.value })}
+                  onChange={e => handleFieldChange('backlogAge', e.target.value)}
                 />
               </Grid>
 
-              {/* Frequency Code */}
               <Grid item xs={12}>
-                <CustomTextField
+                <CustomTextFieldWrapper
                   fullWidth
+                  required
                   label='Frequency Code'
+                  placeholder='Enter frequency code'
                   value={formData.frequencyCode}
-                  onChange={e => setFormData({ ...formData, frequencyCode: e.target.value })}
+                  onChange={e => handleFieldChange('frequencyCode', e.target.value)}
                 />
               </Grid>
 
-              {/* Display Frequency */}
               <Grid item xs={12}>
-                <CustomTextField
+                <CustomTextFieldWrapper
                   fullWidth
+                  required
                   label='Display Frequency'
+                  placeholder='Enter display frequency'
                   value={formData.displayFrequency}
-                  onChange={e => setFormData({ ...formData, displayFrequency: e.target.value })}
+                  onChange={e => handleFieldChange('displayFrequency', e.target.value)}
                 />
               </Grid>
 
-              {/* Sort Order */}
               <Grid item xs={12}>
-                <CustomTextField
+                <CustomTextFieldWrapper
                   fullWidth
                   label='Sort Order'
+                  placeholder='Enter sort order'
                   value={formData.sortOrder}
-                  onChange={e => setFormData({ ...formData, sortOrder: e.target.value })}
+                  onChange={e => handleFieldChange('sortOrder', e.target.value)}
                 />
               </Grid>
 
-              {/* Description */}
               <Grid item xs={12}>
-                <CustomTextField
-                  fullWidth
-                  multiline
-                  rows={3}
+                <CustomTextarea
                   label='Description'
+                  placeholder='Enter description...'
                   value={formData.description}
-                  onChange={e => setFormData({ ...formData, description: e.target.value })}
+                  onChange={e => handleFieldChange('description', e.target.value)}
+                  rows={3}
                 />
               </Grid>
 
-              {/* Status */}
-              <Grid item xs={12}>
-                <CustomTextField
-                  select
-                  fullWidth
-                  label='Status'
-                  value={formData.is_active ?? 1}
-                  onChange={e => setFormData({ ...formData, is_active: e.target.value })}
-                >
-                  <MenuItem value={1}>Active</MenuItem>
-                  <MenuItem value={0}>Inactive</MenuItem>
-                </CustomTextField>
-              </Grid>
+              {isEdit && (
+                <Grid item xs={12}>
+                  <CustomSelectField
+                    label='Status'
+                    value={formData.status}
+                    onChange={e => handleFieldChange('status', e.target.value)}
+                    options={[
+                      { value: 'Active', label: 'Active' },
+                      { value: 'Inactive', label: 'Inactive' }
+                    ]}
+                  />
+                </Grid>
+              )}
             </Grid>
 
             <Box mt={4} display='flex' gap={2}>
               <Button type='submit' variant='contained' fullWidth disabled={loading}>
-                {loading ? 'Saving...' : isEdit ? 'Update' : 'Save'}
+                {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
               </Button>
-              <Button variant='outlined' fullWidth onClick={toggleDrawer}>
+              <Button variant='outlined' color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
                 Cancel
               </Button>
             </Box>

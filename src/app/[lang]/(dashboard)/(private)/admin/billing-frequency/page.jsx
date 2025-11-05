@@ -26,6 +26,8 @@ import {
   InputLabel,
   CircularProgress
 } from '@mui/material'
+
+import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import EditIcon from '@mui/icons-material/Edit'
@@ -40,6 +42,11 @@ import { toast } from 'react-toastify'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 import classnames from 'classnames'
 import { rankItem } from '@tanstack/match-sorter-utils'
+
+import CustomTextFieldWrapper from '@/components/common/CustomTextField'
+import CustomTextarea from '@/components/common/CustomTextarea'
+import CustomSelectField from '@/components/common/CustomSelectField'
+
 import {
   useReactTable,
   getCoreRowModel,
@@ -105,6 +112,7 @@ export default function BillingFrequencyPage() {
   const [loading, setLoading] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
+  const [unsavedAddData, setUnsavedAddData] = useState(null)
   const [formData, setFormData] = useState({
     id: null,
     incrementType: '',
@@ -124,6 +132,8 @@ export default function BillingFrequencyPage() {
     try {
       const db = await initDB()
       const all = await db.getAll(STORE_NAME)
+
+      // 🔍 Apply search filter
       const filtered = searchText
         ? all.filter(r =>
             ['displayFrequency', 'frequencyCode', 'description', 'incrementType'].some(key =>
@@ -131,30 +141,40 @@ export default function BillingFrequencyPage() {
             )
           )
         : all
+
+      // 🔢 Sort newest first
       const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
+
+      // 📄 Paginate
       const start = pagination.pageIndex * pagination.pageSize
-      const pageSlice = sorted.slice(start, start + pagination.pageSize)
-      const normalized = pageSlice.map((item, i) => ({
+      const end = start + pagination.pageSize
+      const paginated = sorted.slice(start, end)
+
+      // 🧾 Add S.No numbering
+      const normalized = paginated.map((item, idx) => ({
         ...item,
-        sno: start + i + 1
+        sno: start + idx + 1
       }))
+
       setRows(normalized)
       setRowCount(filtered.length)
     } catch (err) {
+      console.error(err)
       showToast('error', 'Failed to load data')
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => {
-    loadData()
-  }, [pagination.pageIndex, pagination.pageSize, searchText])
+  const handleFieldChange = (field, value) => {
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value }
+      if (!isEdit) setUnsavedAddData(updated)
+      return updated
+    })
+  }
 
-  // Drawer
-  const toggleDrawer = () => setDrawerOpen(p => !p)
-  const handleAdd = () => {
-    setIsEdit(false)
+  const handleCancel = () => {
     setFormData({
       id: null,
       incrementType: '',
@@ -166,9 +186,37 @@ export default function BillingFrequencyPage() {
       description: '',
       status: 'Active'
     })
+    setUnsavedAddData(null)
+    setDrawerOpen(false)
+  }
+
+  useEffect(() => {
+    loadData()
+  }, [pagination.pageIndex, pagination.pageSize, searchText])
+
+  // Drawer
+  const toggleDrawer = () => setDrawerOpen(p => !p)
+  const handleAdd = () => {
+    setIsEdit(false)
+    if (unsavedAddData) {
+      setFormData(unsavedAddData)
+    } else {
+      setFormData({
+        id: null,
+        incrementType: '',
+        noOfIncrements: '',
+        backlogAge: '',
+        frequencyCode: '',
+        displayFrequency: '',
+        sortOrder: '',
+        description: '',
+        status: 'Active'
+      })
+    }
     setDrawerOpen(true)
     setTimeout(() => incrementTypeRef.current?.focus(), 100)
   }
+
   const handleEdit = row => {
     setIsEdit(true)
     setFormData(row)
@@ -184,32 +232,51 @@ export default function BillingFrequencyPage() {
     if (deleteDialog.row) await handleDelete(deleteDialog.row)
     setDeleteDialog({ open: false, row: null })
   }
-  const handleSubmit = async e => {
-    e.preventDefault()
-    if (!formData.displayFrequency || !formData.frequencyCode) {
-      showToast('warning', 'Please fill all required fields')
-      return
-    }
-    setLoading(true)
-    try {
-      const db = await initDB()
-      const payload = { ...formData }
-      if (isEdit && formData.id) {
-        await db.put(STORE_NAME, payload)
-        showToast('success', 'Frequency updated')
-      } else {
-        delete payload.id
-        await db.add(STORE_NAME, payload)
-        showToast('success', 'Frequency added')
-      }
-      toggleDrawer()
-      loadData()
-    } catch {
-      showToast('error', 'Failed to save')
-    } finally {
-      setLoading(false)
-    }
+const handleSubmit = async e => {
+  e.preventDefault()
+  if (!formData.displayFrequency || !formData.frequencyCode) {
+    showToast('warning', 'Please fill all required fields')
+    return
   }
+  setLoading(true)
+  try {
+    const db = await initDB()
+    const payload = { ...formData }
+
+    if (isEdit && formData.id) {
+      await db.put(STORE_NAME, payload)
+      showToast('success', 'Frequency updated')
+    } else {
+      delete payload.id
+      await db.add(STORE_NAME, payload)
+      showToast('success', 'Frequency added')
+    }
+
+    // 🧹 Clear unsaved data + reset form
+    setUnsavedAddData(null)
+    setFormData({
+      id: null,
+      incrementType: '',
+      noOfIncrements: '',
+      backlogAge: '',
+      frequencyCode: '',
+      displayFrequency: '',
+      sortOrder: '',
+      description: '',
+      status: 'Active'
+    })
+
+    // ✅ Close drawer after save
+    setDrawerOpen(false)
+
+    // 🔄 Refresh table data
+    loadData()
+  } catch {
+    showToast('error', 'Failed to save')
+  } finally {
+    setLoading(false)
+  }
+}
 
   // Table setup
   const columnHelper = createColumnHelper()
@@ -281,26 +348,10 @@ export default function BillingFrequencyPage() {
   // Export Functions
   const exportOpen = Boolean(exportAnchorEl)
   const exportCSV = () => {
-    const headers = [
-      'S.No',
-      'Display Frequency',
-      'Frequency Code',
-      'Description',
-      'Sort Order',
-      'Status'
-    ]
+    const headers = ['S.No', 'Display Frequency', 'Frequency Code', 'Description', 'Sort Order', 'Status']
     const csv = [
       headers.join(','),
-      ...rows.map(r =>
-        [
-          r.sno,
-          r.displayFrequency,
-          r.frequencyCode,
-          r.description,
-          r.sortOrder,
-          r.status
-        ].join(',')
-      )
+      ...rows.map(r => [r.sno, r.displayFrequency, r.frequencyCode, r.description, r.sortOrder, r.status].join(','))
     ].join('\n')
     const link = document.createElement('a')
     link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
@@ -420,15 +471,22 @@ export default function BillingFrequencyPage() {
               position: 'fixed',
               inset: 0,
               bgcolor: 'rgba(255,255,255,0.7)',
+              backdropFilter: 'blur(2px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               zIndex: 2000
             }}
           >
-            <CircularProgress />
+            <Box textAlign='center'>
+              <ProgressCircularCustomization size={60} thickness={5} />
+              <Typography mt={2} fontWeight={600} color='primary'>
+                Loading...
+              </Typography>
+            </Box>
           </Box>
         )}
+
         <Divider sx={{ mb: 2 }} />
         <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
           <FormControl size='small' sx={{ width: 140 }}>
@@ -503,102 +561,123 @@ export default function BillingFrequencyPage() {
       </Card>
 
       {/* Drawer */}
-      <Drawer anchor='right' open={drawerOpen} onClose={toggleDrawer}>
-        <Box sx={{ p: 5, width: 420 }}>
+      <Drawer
+        anchor='right'
+        open={drawerOpen}
+        onClose={toggleDrawer}
+        PaperProps={{ sx: { width: 420, boxShadow: '0px 0px 15px rgba(0,0,0,0.08)' } }}
+      >
+        <Box sx={{ p: 5, display: 'flex', flexDirection: 'column', height: '100%' }}>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
             <Typography variant='h5' fontWeight={600}>
               {isEdit ? 'Edit Frequency' : 'Add Frequency'}
             </Typography>
-            <IconButton onClick={toggleDrawer}>
+            <IconButton onClick={toggleDrawer} size='small'>
               <CloseIcon />
             </IconButton>
           </Box>
-          <form onSubmit={handleSubmit}>
-            <Grid container spacing={2}>
+
+          <Divider sx={{ mb: 3 }} />
+
+          <form onSubmit={handleSubmit} style={{ flexGrow: 1 }}>
+            <Grid container spacing={3}>
               <Grid item xs={12}>
-                <CustomTextField
-                  select
-                  fullWidth
+                <CustomSelectField
                   label='Increment Type'
                   value={formData.incrementType}
-                  onChange={e => setFormData({ ...formData, incrementType: e.target.value })}
-                  inputRef={incrementTypeRef}
-                >
-                  <MenuItem value='Year'>Year</MenuItem>
-                  <MenuItem value='Month'>Month</MenuItem>
-                  <MenuItem value='Week'>Week</MenuItem>
-                  <MenuItem value='Day'>Day</MenuItem>
-                  <MenuItem value='Others'>Others</MenuItem>
-                </CustomTextField>
+                  onChange={e => handleFieldChange('incrementType', e.target.value)}
+                  options={[
+                    { value: 'Year', label: 'Year' },
+                    { value: 'Month', label: 'Month' },
+                    { value: 'Week', label: 'Week' },
+                    { value: 'Day', label: 'Day' },
+                    { value: 'Others', label: 'Others' }
+                  ]}
+                />
               </Grid>
+
               <Grid item xs={12}>
-                <CustomTextField
+                <CustomTextFieldWrapper
                   fullWidth
                   label='No of Increments'
+                  placeholder='Enter number of increments'
                   value={formData.noOfIncrements}
-                  onChange={e => /^\d*$/.test(e.target.value) && setFormData({ ...formData, noOfIncrements: e.target.value })}
+                  onChange={e => handleFieldChange('noOfIncrements', e.target.value.replace(/[^0-9]/g, ''))}
                 />
               </Grid>
+
               <Grid item xs={12}>
-                <CustomTextField
+                <CustomTextFieldWrapper
                   fullWidth
                   label='Backlog Age'
+                  placeholder='Enter backlog age'
                   value={formData.backlogAge}
-                  onChange={e => /^\d*$/.test(e.target.value) && setFormData({ ...formData, backlogAge: e.target.value })}
+                  onChange={e => handleFieldChange('backlogAge', e.target.value.replace(/[^0-9]/g, ''))}
                 />
               </Grid>
+
               <Grid item xs={12}>
-                <CustomTextField
+                <CustomTextFieldWrapper
                   fullWidth
+                  required
                   label='Frequency Code'
+                  placeholder='Enter frequency code'
                   value={formData.frequencyCode}
-                  onChange={e => setFormData({ ...formData, frequencyCode: e.target.value })}
+                  onChange={e => handleFieldChange('frequencyCode', e.target.value)}
                 />
               </Grid>
+
               <Grid item xs={12}>
-                <CustomTextField
+                <CustomTextFieldWrapper
                   fullWidth
+                  required
                   label='Display Frequency'
+                  placeholder='Enter display frequency'
                   value={formData.displayFrequency}
-                  onChange={e => setFormData({ ...formData, displayFrequency: e.target.value })}
+                  onChange={e => handleFieldChange('displayFrequency', e.target.value)}
                 />
               </Grid>
+
               <Grid item xs={12}>
-                <CustomTextField
+                <CustomTextFieldWrapper
                   fullWidth
                   label='Sort Order'
+                  placeholder='Enter sort order'
                   value={formData.sortOrder}
-                  onChange={e => /^\d*$/.test(e.target.value) && setFormData({ ...formData, sortOrder: e.target.value })}
+                  onChange={e => handleFieldChange('sortOrder', e.target.value.replace(/[^0-9]/g, ''))}
                 />
               </Grid>
+
               <Grid item xs={12}>
-                <CustomTextField
-                  fullWidth
-                  multiline
-                  rows={3}
+                <CustomTextarea
                   label='Description'
+                  placeholder='Enter description...'
                   value={formData.description}
-                  onChange={e => setFormData({ ...formData, description: e.target.value })}
+                  onChange={e => handleFieldChange('description', e.target.value)}
+                  rows={3}
                 />
               </Grid>
-              <Grid item xs={12}>
-                <CustomTextField
-                  select
-                  fullWidth
-                  label='Status'
-                  value={formData.status}
-                  onChange={e => setFormData({ ...formData, status: e.target.value })}
-                >
-                  <MenuItem value='Active'>Active</MenuItem>
-                  <MenuItem value='Inactive'>Inactive</MenuItem>
-                </CustomTextField>
-              </Grid>
+
+              {isEdit && (
+                <Grid item xs={12}>
+                  <CustomSelectField
+                    label='Status'
+                    value={formData.status}
+                    onChange={e => handleFieldChange('status', e.target.value)}
+                    options={[
+                      { value: 'Active', label: 'Active' },
+                      { value: 'Inactive', label: 'Inactive' }
+                    ]}
+                  />
+                </Grid>
+              )}
             </Grid>
+
             <Box mt={4} display='flex' gap={2}>
               <Button type='submit' variant='contained' fullWidth disabled={loading}>
-                {loading ? 'Saving...' : isEdit ? 'Update' : 'Save'}
+                {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
               </Button>
-              <Button variant='outlined' fullWidth onClick={toggleDrawer}>
+              <Button variant='outlined' color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
                 Cancel
               </Button>
             </Box>

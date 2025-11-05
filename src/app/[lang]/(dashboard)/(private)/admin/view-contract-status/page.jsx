@@ -22,6 +22,8 @@ import {
   Checkbox,
   FormControlLabel
 } from '@mui/material'
+
+import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
@@ -173,6 +175,7 @@ export default function ContractStatusPage() {
     setLoading(true)
     try {
       const all = await getContracts()
+
       const filtered = all.filter(r => {
         const matchesSearch =
           !searchText ||
@@ -181,6 +184,7 @@ export default function ContractStatusPage() {
               .toLowerCase()
               .includes(searchText.toLowerCase())
           )
+
         const matchesDate = !filterByDate || new Date(r.startDate).toDateString() === dateFilter.toDateString()
         const matchesOrigin = !originFilter || r.origin === originFilter
         const matchesCustomer = !customerFilter || r.customer === customerFilter
@@ -199,12 +203,24 @@ export default function ContractStatusPage() {
         )
       })
 
+      // 🔢 Sort latest first
+      const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
+
+      // 📄 Pagination
       const start = pagination.pageIndex * pagination.pageSize
-      const pageSlice = filtered.slice(start, start + pagination.pageSize)
-      const normalized = pageSlice.map((item, i) => ({ ...item, sno: start + i + 1 }))
+      const end = start + pagination.pageSize
+      const paginated = sorted.slice(start, end)
+
+      // 🧾 Normalize + S.No
+      const normalized = paginated.map((item, idx) => ({
+        ...item,
+        sno: start + idx + 1
+      }))
+
       setRows(normalized)
       setRowCount(filtered.length)
-    } catch {
+    } catch (err) {
+      console.error(err)
       showToast('error', 'Failed to load contracts')
     } finally {
       setLoading(false)
@@ -562,15 +578,22 @@ export default function ContractStatusPage() {
               position: 'fixed',
               inset: 0,
               bgcolor: 'rgba(255,255,255,0.7)',
+              backdropFilter: 'blur(2px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               zIndex: 2000
             }}
           >
-            <CircularProgress />
+            <Box textAlign='center'>
+              <ProgressCircularCustomization size={60} thickness={5} />
+              <Typography mt={2} fontWeight={600} color='primary'>
+                Loading Contracts...
+              </Typography>
+            </Box>
           </Box>
         )}
+
         <Divider sx={{ mb: 2 }} />
         <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
           <FormControl size='small' sx={{ width: 140 }}>

@@ -28,6 +28,7 @@ import {
   CircularProgress
 } from '@mui/material'
 
+import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import EditIcon from '@mui/icons-material/Edit'
@@ -41,6 +42,10 @@ import FileCopyIcon from '@mui/icons-material/FileCopy'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import RefreshIcon from '@mui/icons-material/Refresh'
 
+//import custom
+import CustomTextFieldWrapper from '@/components/common/CustomTextField'
+import CustomTextarea from '@/components/common/CustomTextarea'
+import CustomSelectField from '@/components/common/CustomSelectField'
 
 // Component Imports
 import CustomTextField from '@core/components/mui/TextField'
@@ -126,6 +131,7 @@ export default function TaxPage() {
   const [loading, setLoading] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
+  const [unsavedAddData, setUnsavedAddData] = useState(null)
 
   const [formData, setFormData] = useState({
     id: null,
@@ -142,19 +148,41 @@ export default function TaxPage() {
     try {
       const db = await initDB()
       const all = await db.getAll(STORE_NAME)
+
+      // Sort newest first
       const sorted = all.sort((a, b) => (b.id || 0) - (a.id || 0))
-      const normalized = sorted.map((item, idx) => ({
+
+      // Apply search filter (by name or tax value)
+      const filtered = sorted.filter(
+        item =>
+          item.name.toLowerCase().includes(searchText.toLowerCase()) || String(item.tax || '').includes(searchText)
+      )
+
+      // Pagination slice
+      const start = pagination.pageIndex * pagination.pageSize
+      const end = start + pagination.pageSize
+      const paginated = filtered.slice(start, end)
+
+      // Format and map S.No
+      const normalized = paginated.map((item, idx) => ({
         ...item,
-        sno: pagination.pageIndex * pagination.pageSize + idx + 1,
+        sno: start + idx + 1,
         tax: formatTax(item.tax || '0')
       }))
+
       setRows(normalized)
-      setRowCount(normalized.length)
+      setRowCount(filtered.length)
     } catch (e) {
       showToast('error', 'Failed to load taxes')
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleCancel = () => {
+    setFormData({ id: null, name: '', tax_value: '', description: '', status: 1 })
+    setUnsavedAddData(null) // clear cached data
+    setDrawerOpen(false)
   }
 
   useEffect(() => {
@@ -166,9 +194,22 @@ export default function TaxPage() {
 
   const handleAdd = () => {
     setIsEdit(false)
-    setFormData({ id: null, name: '', tax_value: '', status: 1 })
+    if (unsavedAddData) {
+      setFormData(unsavedAddData)
+    } else {
+      setFormData({ id: null, name: '', tax_value: '', description: '', status: 1 })
+    }
     setDrawerOpen(true)
     setTimeout(() => nameRef.current?.focus(), 100)
+  }
+
+  const handleFieldChange = (field, value) => {
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value }
+      // only cache for Add Drawer (not Edit)
+      if (!isEdit) setUnsavedAddData(updated)
+      return updated
+    })
   }
 
   const handleEdit = row => {
@@ -218,10 +259,18 @@ export default function TaxPage() {
         await db.put(STORE_NAME, { id: formData.id, ...payload })
         showToast('success', 'Tax updated')
       } else {
-        await db.put(STORE_NAME, payload)
+        await db.add(STORE_NAME, payload)
         showToast('success', 'Tax added')
       }
-      toggleDrawer()
+
+      // 🧹 Clear unsaved draft + reset form after successful save
+      setUnsavedAddData(null)
+      setFormData({ id: null, name: '', tax_value: '', description: '', status: 1 })
+
+      // ✅ Close the drawer after save
+      setDrawerOpen(false)
+
+      // 🔄 Reload updated data
       await loadTaxes()
     } catch {
       showToast('error', 'Failed to save')
@@ -502,8 +551,8 @@ export default function TaxPage() {
             }}
           >
             <Box textAlign='center'>
-              <CircularProgress />
-              <Typography mt={2} fontWeight={600}>
+              <ProgressCircularCustomization size={60} thickness={5} />
+              <Typography mt={2} fontWeight={600} color='primary'>
                 Loading...
               </Typography>
             </Box>
@@ -620,41 +669,50 @@ export default function TaxPage() {
           <form onSubmit={handleSubmit} style={{ flexGrow: 1 }}>
             <Grid container spacing={4}>
               <Grid item xs={12}>
-                <CustomTextField
+                <CustomTextFieldWrapper
                   fullWidth
                   required
                   label='Tax Name'
                   placeholder='Enter tax name'
                   value={formData.name}
                   inputRef={nameRef}
-                  onChange={e => setFormData(p => ({ ...p, name: e.target.value }))}
+                  onChange={e => handleFieldChange('name', e.target.value)}
                 />
               </Grid>
+
               <Grid item xs={12}>
-                <CustomTextField
+                <CustomTextFieldWrapper
                   fullWidth
                   required
                   label='Tax Value (%)'
                   placeholder='e.g. 5.00'
                   value={formData.tax_value}
-                  onChange={e => {
-                    const val = e.target.value.replace(/[^0-9.]/g, '')
-                    setFormData(p => ({ ...p, tax_value: val }))
-                  }}
+                  onChange={e => handleFieldChange('tax_value', e.target.value.replace(/[^0-9.]/g, ''))}
                 />
               </Grid>
+
+              {/* Optional: Add a remarks/description field */}
+              <Grid item xs={12}>
+                <CustomTextarea
+                  label='Description'
+                  placeholder='Enter additional details...'
+                  value={formData.description || ''}
+                  onChange={e => handleFieldChange('description', e.target.value)}
+                  rows={3}
+                />
+              </Grid>
+
               {isEdit && (
                 <Grid item xs={12}>
-                  <FormControl fullWidth>
-                    <InputLabel>Status</InputLabel>
-                    <Select
-                      value={formData.status}
-                      onChange={e => setFormData(p => ({ ...p, status: Number(e.target.value) }))}
-                    >
-                      <MenuItem value={1}>Active</MenuItem>
-                      <MenuItem value={0}>Inactive</MenuItem>
-                    </Select>
-                  </FormControl>
+                  <CustomSelectField
+                    label='Status'
+                    value={formData.status}
+                    onChange={e => setFormData(p => ({ ...p, status: Number(e.target.value) }))}
+                    options={[
+                      { value: 1, label: 'Active' },
+                      { value: 0, label: 'Inactive' }
+                    ]}
+                  />
                 </Grid>
               )}
             </Grid>
@@ -663,7 +721,7 @@ export default function TaxPage() {
               <Button type='submit' variant='contained' fullWidth disabled={loading}>
                 {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
               </Button>
-              <Button variant='outlined' color='secondary' fullWidth onClick={toggleDrawer} disabled={loading}>
+              <Button variant='outlined' color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
                 Cancel
               </Button>
             </Box>

@@ -26,6 +26,8 @@ import {
   CircularProgress,
   InputAdornment
 } from '@mui/material'
+
+import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import EditIcon from '@mui/icons-material/Edit'
@@ -70,7 +72,11 @@ const getCustomerDB = async () => {
 
 // Toast helper
 const showToast = (type, message) => {
-  const content = <Typography variant='body2' sx={{ fontWeight: 500 }}>{message}</Typography>
+  const content = (
+    <Typography variant='body2' sx={{ fontWeight: 500 }}>
+      {message}
+    </Typography>
+  )
   if (type === 'success') toast.success(content)
   else if (type === 'error' || type === 'delete') toast.error(content)
   else if (type === 'warning') toast.warn(content)
@@ -107,6 +113,7 @@ export default function CustomersPage() {
     try {
       const db = await getCustomerDB()
       const all = await db.getAll('customers')
+
       const valid = (all || [])
         .filter(c => c && typeof c === 'object')
         .map(c => ({
@@ -119,8 +126,8 @@ export default function CustomersPage() {
           origin: c.origin || '',
           projectStatus: c.projectStatus || 'Active'
         }))
-        .reverse()
 
+      // 🔍 Search Filter
       const filtered = searchText
         ? valid.filter(r =>
             ['name', 'email', 'phone', 'address', 'origin'].some(key =>
@@ -129,15 +136,24 @@ export default function CustomersPage() {
           )
         : valid
 
+      // 🔢 Sort newest first
+      const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
+
+      // 📄 Pagination
       const start = pagination.pageIndex * pagination.pageSize
-      const pageSlice = filtered.slice(start, start + pagination.pageSize)
-      const normalized = pageSlice.map((item, i) => ({
+      const end = start + pagination.pageSize
+      const paginated = sorted.slice(start, end)
+
+      // 🧾 Add serial numbers
+      const normalized = paginated.map((item, idx) => ({
         ...item,
-        sno: start + i + 1
+        sno: start + idx + 1
       }))
+
       setRows(normalized)
       setRowCount(filtered.length)
     } catch (err) {
+      console.error(err)
       showToast('error', 'Failed to load customers')
     } finally {
       setLoading(false)
@@ -239,15 +255,17 @@ export default function CustomersPage() {
     const headers = ['S.No', 'Origin', 'Email', 'Address', 'Name', 'Commence Date', 'Phone']
     const csv = [
       headers.join(','),
-      ...rows.map(r => [
-        r.sno,
-        `"${r.origin}"`,
-        `"${r.email}"`,
-        `"${r.address}"`,
-        `"${r.name}"`,
-        r.commenceDate ? new Date(r.commenceDate).toLocaleDateString('en-GB') : '',
-        r.phone
-      ].join(','))
+      ...rows.map(r =>
+        [
+          r.sno,
+          `"${r.origin}"`,
+          `"${r.email}"`,
+          `"${r.address}"`,
+          `"${r.name}"`,
+          r.commenceDate ? new Date(r.commenceDate).toLocaleDateString('en-GB') : '',
+          r.phone
+        ].join(',')
+      )
     ].join('\n')
     const link = document.createElement('a')
     link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
@@ -270,7 +288,8 @@ export default function CustomersPage() {
       <th>S.No</th><th>Origin</th><th>Email</th><th>Address</th><th>Name</th><th>Commence Date</th><th>Phone</th>
       </tr></thead><tbody>
       ${rows
-        .map(r => `<tr>
+        .map(
+          r => `<tr>
           <td>${r.sno}</td>
           <td>${r.origin}</td>
           <td>${r.email}</td>
@@ -278,7 +297,8 @@ export default function CustomersPage() {
           <td>${r.name}</td>
           <td>${r.commenceDate ? new Date(r.commenceDate).toLocaleDateString('en-GB') : ''}</td>
           <td>${r.phone}</td>
-        </tr>`)
+        </tr>`
+        )
         .join('')}
       </tbody></table></body></html>`
     w.document.write(html)
@@ -423,15 +443,22 @@ export default function CustomersPage() {
               position: 'fixed',
               inset: 0,
               bgcolor: 'rgba(255,255,255,0.7)',
+              backdropFilter: 'blur(2px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               zIndex: 2000
             }}
           >
-            <CircularProgress />
+            <Box textAlign='center'>
+              <ProgressCircularCustomization size={60} thickness={5} />
+              <Typography mt={2} fontWeight={600} color='primary'>
+                Loading...
+              </Typography>
+            </Box>
           </Box>
         )}
+
         <Divider sx={{ mb: 2 }} />
         <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
           <FormControl size='small' sx={{ width: 140 }}>

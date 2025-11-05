@@ -25,6 +25,8 @@ import {
   FormControl,
   CircularProgress
 } from '@mui/material'
+
+import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import EditIcon from '@mui/icons-material/Edit'
@@ -39,6 +41,11 @@ import { toast } from 'react-toastify'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 import classnames from 'classnames'
 import { rankItem } from '@tanstack/match-sorter-utils'
+
+import CustomTextFieldWrapper from '@/components/common/CustomTextField'
+import CustomTextarea from '@/components/common/CustomTextarea'
+import CustomSelectField from '@/components/common/CustomSelectField'
+
 import {
   useReactTable,
   getCoreRowModel,
@@ -104,6 +111,7 @@ export default function CallTypePage() {
   const [loading, setLoading] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
+  const [unsavedAddData, setUnsavedAddData] = useState(null)
   const [formData, setFormData] = useState({
     id: null,
     name: '',
@@ -113,12 +121,35 @@ export default function CallTypePage() {
   })
   const nameRef = useRef(null)
 
+  const handleFieldChange = (field, value) => {
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value }
+      if (!isEdit) setUnsavedAddData(updated)
+      return updated
+    })
+  }
+
+  // 🧩 Reset handler
+  const handleCancel = () => {
+    setFormData({
+      id: null,
+      name: '',
+      sortOrder: '',
+      description: '',
+      status: 'Active'
+    })
+    setUnsavedAddData(null)
+    setDrawerOpen(false)
+  }
+
   // Load rows
   const loadData = async () => {
     setLoading(true)
     try {
       const db = await initDB()
       const all = await db.getAll(STORE_NAME)
+
+      // 🔍 Apply search filter
       const filtered = searchText
         ? all.filter(r =>
             ['name', 'sortOrder', 'description'].some(key =>
@@ -126,16 +157,25 @@ export default function CallTypePage() {
             )
           )
         : all
+
+      // 🔢 Sort by newest ID
       const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
+
+      // 📄 Apply pagination
       const start = pagination.pageIndex * pagination.pageSize
-      const pageSlice = sorted.slice(start, start + pagination.pageSize)
-      const normalized = pageSlice.map((item, i) => ({
+      const end = start + pagination.pageSize
+      const paginated = sorted.slice(start, end)
+
+      // 🧾 Add serial numbering
+      const normalized = paginated.map((item, idx) => ({
         ...item,
-        sno: start + i + 1
+        sno: start + idx + 1
       }))
+
       setRows(normalized)
       setRowCount(filtered.length)
     } catch (err) {
+      console.error(err)
       showToast('error', 'Failed to load data')
     } finally {
       setLoading(false)
@@ -150,16 +190,24 @@ export default function CallTypePage() {
   const toggleDrawer = () => setDrawerOpen(p => !p)
   const handleAdd = () => {
     setIsEdit(false)
-    setFormData({
-      id: null,
-      name: '',
-      sortOrder: '',
-      description: '',
-      status: 'Active'
-    })
+
+    // ✅ Only load unsavedAddData if it exists and the drawer is NOT in edit mode
+    if (unsavedAddData) {
+      setFormData(unsavedAddData)
+    } else {
+      setFormData({
+        id: null,
+        name: '',
+        sortOrder: '',
+        description: '',
+        status: 'Active'
+      })
+    }
+
     setDrawerOpen(true)
     setTimeout(() => nameRef.current?.focus(), 100)
   }
+
   const handleEdit = row => {
     setIsEdit(true)
     setFormData({ ...row, sortOrder: String(row.sortOrder) })
@@ -193,6 +241,9 @@ export default function CallTypePage() {
         await db.add(STORE_NAME, payload)
         showToast('success', 'Call Type added')
       }
+
+      setUnsavedAddData(null) // ✅ Clears the drawer memory
+
       toggleDrawer()
       loadData()
     } catch {
@@ -411,15 +462,22 @@ export default function CallTypePage() {
               position: 'fixed',
               inset: 0,
               bgcolor: 'rgba(255,255,255,0.7)',
+              backdropFilter: 'blur(2px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               zIndex: 2000
             }}
           >
-            <CircularProgress />
+            <Box textAlign='center'>
+              <ProgressCircularCustomization size={60} thickness={5} />
+              <Typography mt={2} fontWeight={600} color='primary'>
+                Loading...
+              </Typography>
+            </Box>
           </Box>
         )}
+
         <Divider sx={{ mb: 2 }} />
         <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
           <FormControl size='small' sx={{ width: 140 }}>
@@ -494,69 +552,80 @@ export default function CallTypePage() {
       </Card>
 
       {/* Drawer */}
-      <Drawer anchor='right' open={drawerOpen} onClose={toggleDrawer}>
-        <Box sx={{ p: 5, width: 420 }}>
+      <Drawer
+        anchor='right'
+        open={drawerOpen}
+        onClose={toggleDrawer}
+        PaperProps={{ sx: { width: 420, boxShadow: '0px 0px 15px rgba(0,0,0,0.08)' } }}
+      >
+        <Box sx={{ p: 5, display: 'flex', flexDirection: 'column', height: '100%' }}>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
             <Typography variant='h5' fontWeight={600}>
               {isEdit ? 'Edit Call Type' : 'Add Call Type'}
             </Typography>
-            <IconButton onClick={toggleDrawer}>
+            <IconButton onClick={toggleDrawer} size='small'>
               <CloseIcon />
             </IconButton>
           </Box>
-          <form onSubmit={handleSubmit}>
-            <Grid container spacing={2}>
+
+          <Divider sx={{ mb: 3 }} />
+
+          <form onSubmit={handleSubmit} style={{ flexGrow: 1 }}>
+            <Grid container spacing={3}>
               <Grid item xs={12}>
-                <CustomTextField
+                <CustomTextFieldWrapper
                   fullWidth
-                  label='Call Type Name *'
+                  required
+                  label='Call Type Name'
+                  placeholder='Enter call type name'
                   value={formData.name}
-                  onChange={e => setFormData({ ...formData, name: e.target.value })}
                   inputRef={nameRef}
+                  onChange={e => handleFieldChange('name', e.target.value)}
                 />
               </Grid>
+
               <Grid item xs={12}>
-                <CustomTextField
+                <CustomTextFieldWrapper
                   fullWidth
-                  label='Sort Order *'
+                  required
+                  label='Sort Order'
+                  placeholder='Enter sort order'
+                  type='number'
                   value={formData.sortOrder}
-                  onChange={e => {
-                    const val = e.target.value
-                    if (/^\d*$/.test(val)) {
-                      setFormData({ ...formData, sortOrder: val })
-                    }
-                  }}
-                  inputProps={{ inputMode: 'numeric' }}
+                  onChange={e => handleFieldChange('sortOrder', e.target.value.replace(/\D/g, ''))}
                 />
               </Grid>
+
               <Grid item xs={12}>
-                <CustomTextField
-                  fullWidth
-                  multiline
-                  rows={3}
+                <CustomTextarea
                   label='Description'
+                  placeholder='Enter description...'
+                  rows={3}
                   value={formData.description}
-                  onChange={e => setFormData({ ...formData, description: e.target.value })}
+                  onChange={e => handleFieldChange('description', e.target.value)}
                 />
               </Grid>
-              <Grid item xs={12}>
-                <CustomTextField
-                  select
-                  fullWidth
-                  label='Status'
-                  value={formData.status}
-                  onChange={e => setFormData({ ...formData, status: e.target.value })}
-                >
-                  <MenuItem value='Active'>Active</MenuItem>
-                  <MenuItem value='Inactive'>Inactive</MenuItem>
-                </CustomTextField>
-              </Grid>
+
+              {isEdit && (
+                <Grid item xs={12}>
+                  <CustomSelectField
+                    label='Status'
+                    value={formData.status}
+                    onChange={e => handleFieldChange('status', e.target.value)}
+                    options={[
+                      { value: 'Active', label: 'Active' },
+                      { value: 'Inactive', label: 'Inactive' }
+                    ]}
+                  />
+                </Grid>
+              )}
             </Grid>
+
             <Box mt={4} display='flex' gap={2}>
               <Button type='submit' variant='contained' fullWidth disabled={loading}>
-                {loading ? 'Saving...' : isEdit ? 'Update' : 'Save'}
+                {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
               </Button>
-              <Button variant='outlined' fullWidth onClick={toggleDrawer}>
+              <Button variant='outlined' color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
                 Cancel
               </Button>
             </Box>
@@ -571,8 +640,7 @@ export default function CallTypePage() {
         </DialogTitle>
         <DialogContent>
           <Typography textAlign='center'>
-            Are you sure you want to delete{' '}
-            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name}</strong>?
+            Are you sure you want to delete <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name}</strong>?
           </Typography>
         </DialogContent>
         <DialogActions sx={{ justifyContent: 'center', pb: 3 }}>

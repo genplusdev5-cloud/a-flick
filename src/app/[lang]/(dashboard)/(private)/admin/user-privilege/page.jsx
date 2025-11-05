@@ -28,6 +28,7 @@ import {
   CircularProgress,
   InputAdornment
 } from '@mui/material'
+import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import EditIcon from '@mui/icons-material/Edit'
@@ -126,17 +127,28 @@ export default function UserPrivilegePage() {
     try {
       const db = await initDB()
       const all = await db.getAll(STORE_NAME)
+
+      // 🔍 Search Filter
       const filtered = searchText ? all.filter(r => r.module.toLowerCase().includes(searchText.toLowerCase())) : all
+
+      // 🔢 Sort latest first
       const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
+
+      // 📄 Pagination
       const start = pagination.pageIndex * pagination.pageSize
-      const pageSlice = sorted.slice(start, start + pagination.pageSize)
-      const normalized = pageSlice.map((item, i) => ({
+      const end = start + pagination.pageSize
+      const paginated = sorted.slice(start, end)
+
+      // 🧾 Normalize data with serial number
+      const normalized = paginated.map((item, idx) => ({
         ...item,
-        sno: start + i + 1
+        sno: start + idx + 1
       }))
+
       setRows(normalized)
       setRowCount(filtered.length)
     } catch (err) {
+      console.error(err)
       showToast('error', 'Failed to load data')
     } finally {
       setLoading(false)
@@ -412,15 +424,22 @@ export default function UserPrivilegePage() {
               position: 'fixed',
               inset: 0,
               bgcolor: 'rgba(255,255,255,0.7)',
+              backdropFilter: 'blur(2px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               zIndex: 2000
             }}
           >
-            <CircularProgress />
+            <Box textAlign='center'>
+              <ProgressCircularCustomization size={60} thickness={5} />
+              <Typography mt={2} fontWeight={600} color='primary'>
+                Loading...
+              </Typography>
+            </Box>
           </Box>
         )}
+
         <Divider sx={{ mb: 2 }} />
         <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
           <FormControl size='small' sx={{ width: 140 }}>

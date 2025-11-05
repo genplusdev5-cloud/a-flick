@@ -22,6 +22,8 @@ import {
 
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
+import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
+
 
 // Components
 import CustomTextField from '@core/components/mui/TextField'
@@ -275,25 +277,40 @@ export default function StockReportPage() {
           }
         />
         {/* Loader */}
-        {loading && (
-          <Box
-            sx={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              width: '100vw',
-              height: '100vh',
-              backgroundColor: 'rgba(255,255,255,0.7)',
-              backdropFilter: 'blur(2px)',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              zIndex: 2000
-            }}
-          >
-            <CircularProgress size={70} thickness={5} color='primary' />
-          </Box>
-        )}
+       {loading && (
+  <Box
+    sx={{
+      position: 'fixed',
+      inset: 0,
+      bgcolor: 'rgba(255,255,255,0.65)',
+      backdropFilter: 'blur(3px)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'column',
+      zIndex: 2000,
+      animation: 'fadeIn 0.3s ease-in-out',
+      '@keyframes fadeIn': {
+        from: { opacity: 0 },
+        to: { opacity: 1 }
+      }
+    }}
+  >
+    <ProgressCircularCustomization size={70} thickness={5} />
+    <Typography
+      mt={2}
+      sx={{
+        color: 'primary.main',
+        fontWeight: 600,
+        fontSize: '1.05rem',
+        letterSpacing: 0.3
+      }}
+    >
+      Loading Stock Report...
+    </Typography>
+  </Box>
+)}
+
 
         <Divider sx={{ mb: 2 }} />
 

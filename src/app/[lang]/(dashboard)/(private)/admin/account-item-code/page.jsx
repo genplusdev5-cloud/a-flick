@@ -28,6 +28,7 @@ import {
   CircularProgress
 } from '@mui/material'
 
+import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import EditIcon from '@mui/icons-material/Edit'
@@ -40,6 +41,10 @@ import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
 import FileCopyIcon from '@mui/icons-material/FileCopy'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import RefreshIcon from '@mui/icons-material/Refresh'
+
+import CustomTextFieldWrapper from '@/components/common/CustomTextField'
+import CustomTextarea from '@/components/common/CustomTextarea'
+import CustomSelectField from '@/components/common/CustomSelectField'
 
 import CustomTextField from '@core/components/mui/TextField'
 import { toast } from 'react-toastify'
@@ -117,6 +122,7 @@ export default function AccountItemCodePage() {
   const [loading, setLoading] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
+  const [unsavedAddData, setUnsavedAddData] = useState(null)
 
   const [formData, setFormData] = useState({
     id: null,
@@ -129,14 +135,13 @@ export default function AccountItemCodePage() {
   const nameRef = useRef(null)
 
   // ──────────────────────────────────────────────────────────────
-  // Load Items (IndexedDB)
-  // ──────────────────────────────────────────────────────────────
   const loadItems = async () => {
     setLoading(true)
     try {
       const db = await initDB()
       const all = await db.getAll(STORE_NAME)
-      // apply search filter locally
+
+      // 🔍 Apply search filter
       const filtered = searchText
         ? all.filter(
             r =>
@@ -146,13 +151,18 @@ export default function AccountItemCodePage() {
           )
         : all
 
+      // 🔢 Sort & Paginate
       const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
       const start = pagination.pageIndex * pagination.pageSize
-      const pageSlice = sorted.slice(start, start + pagination.pageSize)
-      const normalized = pageSlice.map((item, idx) => ({
+      const end = start + pagination.pageSize
+      const paginated = sorted.slice(start, end)
+
+      // 🧮 Add serial numbers
+      const normalized = paginated.map((item, idx) => ({
         ...item,
         sno: start + idx + 1
       }))
+
       setRows(normalized)
       setRowCount(filtered.length)
     } catch (e) {
@@ -161,6 +171,14 @@ export default function AccountItemCodePage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleFieldChange = (field, value) => {
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value }
+      if (!isEdit) setUnsavedAddData(updated) // ✅ only for Add mode
+      return updated
+    })
   }
 
   useEffect(() => {
@@ -176,9 +194,19 @@ export default function AccountItemCodePage() {
 
   const handleAdd = () => {
     setIsEdit(false)
-    setFormData({ id: null, name: '', itemNumber: '', description: '', status: 'Active' })
+    if (unsavedAddData) {
+      setFormData(unsavedAddData)
+    } else {
+      setFormData({ id: null, name: '', itemNumber: '', description: '', status: 'Active' })
+    }
     setDrawerOpen(true)
     setTimeout(() => nameRef.current?.focus(), 100)
+  }
+
+  const handleCancel = () => {
+    setFormData({ id: null, name: '', itemNumber: '', description: '', status: 'Active' })
+    setUnsavedAddData(null) // ✅ clear saved draft
+    setDrawerOpen(false)
   }
 
   const handleEdit = row => {
@@ -246,13 +274,18 @@ export default function AccountItemCodePage() {
         await db.put(STORE_NAME, { id: formData.id, ...payload })
         showToast('success', 'Item updated')
       } else {
-        await db.put(STORE_NAME, payload)
+        await db.add(STORE_NAME, payload)
         showToast('success', 'Item added')
       }
 
-      // reset to first page so newly added item appears (consistent with Tax page)
-      setPagination(p => ({ ...p, pageIndex: 0 }))
-      toggleDrawer()
+      // 🧹 Clear unsaved draft + reset form after successful save
+      setUnsavedAddData(null)
+      setFormData({ id: null, name: '', itemNumber: '', description: '', status: 'Active' })
+
+      // ✅ Close the drawer after save
+      setDrawerOpen(false)
+
+      // 🔄 Reload updated table data
       await loadItems()
     } catch (err) {
       console.error(err)
@@ -370,9 +403,7 @@ export default function AccountItemCodePage() {
     const headers = ['S.No', 'Name', 'Item Number', 'Description', 'Status']
     const csv = [
       headers.join(','),
-      ...rows.map(r =>
-        [r.sno, r.name, r.itemNumber, (r.description || '').replace(/,/g, ' '), r.status].join(',')
-      )
+      ...rows.map(r => [r.sno, r.name, r.itemNumber, (r.description || '').replace(/,/g, ' '), r.status].join(','))
     ].join('\n')
     const link = document.createElement('a')
     link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
@@ -552,8 +583,8 @@ export default function AccountItemCodePage() {
             }}
           >
             <Box textAlign='center'>
-              <CircularProgress />
-              <Typography mt={2} fontWeight={600}>
+              <ProgressCircularCustomization size={60} thickness={5} />
+              <Typography mt={2} fontWeight={600} color='primary'>
                 Loading...
               </Typography>
             </Box>
@@ -618,10 +649,10 @@ export default function AccountItemCodePage() {
                         onClick={h.column.getToggleSortingHandler()}
                       >
                         {flexRender(h.column.columnDef.header, h.getContext())}
-                        {({
+                        {{
                           asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
                           desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
-                        }[h.column.getIsSorted()] ?? null)}
+                        }[h.column.getIsSorted()] ?? null}
                       </div>
                     </th>
                   ))}
@@ -674,52 +705,49 @@ export default function AccountItemCodePage() {
           <form onSubmit={handleSubmit} style={{ flexGrow: 1 }}>
             <Grid container spacing={4}>
               <Grid item xs={12}>
-                <CustomTextField
+                <CustomTextFieldWrapper
                   fullWidth
                   required
                   label='Name'
                   placeholder='Enter name'
                   value={formData.name}
                   inputRef={nameRef}
-                  onChange={e => setFormData(p => ({ ...p, name: e.target.value }))}
+                  onChange={e => handleFieldChange('name', e.target.value)}
                 />
               </Grid>
 
               <Grid item xs={12}>
-                <CustomTextField
+                <CustomTextFieldWrapper
                   fullWidth
                   required
                   label='Item Number'
                   placeholder='Enter item number'
                   value={formData.itemNumber}
-                  onChange={e => setFormData(p => ({ ...p, itemNumber: e.target.value }))}
+                  onChange={e => handleFieldChange('itemNumber', e.target.value)}
                 />
               </Grid>
 
               <Grid item xs={12}>
-                <CustomTextField
-                  fullWidth
-                  label='Description'
-                  placeholder='Description'
-                  multiline
+                <CustomTextarea
+                  label='Description '
+                  placeholder='Enter item details or remarks...'
+                  value={formData.description || ''}
+                  onChange={e => handleFieldChange('description', e.target.value)}
                   rows={3}
-                  value={formData.description}
-                  onChange={e => setFormData(p => ({ ...p, description: e.target.value }))}
                 />
               </Grid>
 
               {isEdit && (
                 <Grid item xs={12}>
-                  <FormControl fullWidth>
-                    <InputLabel>Status</InputLabel>
-                    <Select
-                      value={formData.status}
-                      onChange={e => setFormData(p => ({ ...p, status: e.target.value }))}
-                    >
-                      <MenuItem value={'Active'}>Active</MenuItem>
-                      <MenuItem value={'Inactive'}>Inactive</MenuItem>
-                    </Select>
-                  </FormControl>
+                  <CustomSelectField
+                    label='Status'
+                    value={formData.status}
+                    onChange={e => setFormData(p => ({ ...p, status: e.target.value }))}
+                    options={[
+                      { value: 'Active', label: 'Active' },
+                      { value: 'Inactive', label: 'Inactive' }
+                    ]}
+                  />
                 </Grid>
               )}
             </Grid>
@@ -728,7 +756,7 @@ export default function AccountItemCodePage() {
               <Button type='submit' variant='contained' fullWidth disabled={loading}>
                 {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
               </Button>
-              <Button variant='outlined' color='secondary' fullWidth onClick={toggleDrawer} disabled={loading}>
+              <Button variant='outlined' color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
                 Cancel
               </Button>
             </Box>
@@ -763,7 +791,8 @@ export default function AccountItemCodePage() {
         </DialogTitle>
         <DialogContent sx={{ textAlign: 'center', pt: 2 }}>
           <Typography sx={{ color: 'text.secondary', fontSize: 14 }}>
-            Are you sure you want to delete <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name || 'this item'}</strong>?
+            Are you sure you want to delete{' '}
+            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name || 'this item'}</strong>?
             <br />
             This action cannot be undone.
           </Typography>

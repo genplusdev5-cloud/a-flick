@@ -26,6 +26,8 @@ import {
   CircularProgress,
   InputAdornment
 } from '@mui/material'
+
+import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import EditIcon from '@mui/icons-material/Edit'
@@ -40,6 +42,12 @@ import CustomTextField from '@core/components/mui/TextField'
 import { toast } from 'react-toastify'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 import classnames from 'classnames'
+
+// ✅ Custom reusable form components
+import CustomTextFieldWrapper from '@/components/common/CustomTextField'
+import CustomTextarea from '@/components/common/CustomTextarea'
+import CustomSelectField from '@/components/common/CustomSelectField'
+
 import { rankItem } from '@tanstack/match-sorter-utils'
 import {
   useReactTable,
@@ -106,6 +114,7 @@ export default function TodoItemsPage() {
   const [loading, setLoading] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
+  const [unsavedAddData, setUnsavedAddData] = useState(null)
   const [formData, setFormData] = useState({
     id: null,
     title: '',
@@ -120,23 +129,32 @@ export default function TodoItemsPage() {
     try {
       const db = await initDB()
       const all = await db.getAll(STORE_NAME)
+
+      // 🔍 Apply search filter
       const filtered = searchText
         ? all.filter(r =>
-            ['title', 'status'].some(key =>
-              (r[key] || '').toString().toLowerCase().includes(searchText.toLowerCase())
-            )
+            ['title', 'status'].some(key => (r[key] || '').toString().toLowerCase().includes(searchText.toLowerCase()))
           )
         : all
+
+      // 🔢 Sort newest first
       const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
+
+      // 📄 Apply pagination
       const start = pagination.pageIndex * pagination.pageSize
-      const pageSlice = sorted.slice(start, start + pagination.pageSize)
-      const normalized = pageSlice.map((item, i) => ({
+      const end = start + pagination.pageSize
+      const paginated = sorted.slice(start, end)
+
+      // 🧾 Add serial numbers
+      const normalized = paginated.map((item, idx) => ({
         ...item,
-        sno: start + i + 1
+        sno: start + idx + 1
       }))
+
       setRows(normalized)
       setRowCount(filtered.length)
     } catch (err) {
+      console.error(err)
       showToast('error', 'Failed to load data')
     } finally {
       setLoading(false)
@@ -151,14 +169,39 @@ export default function TodoItemsPage() {
   const toggleDrawer = () => setDrawerOpen(p => !p)
   const handleAdd = () => {
     setIsEdit(false)
+    if (unsavedAddData) {
+      setFormData(unsavedAddData)
+    } else {
+      setFormData({
+        id: null,
+        title: '',
+        status: 'Active'
+      })
+    }
+    setDrawerOpen(true)
+    setTimeout(() => titleRef.current?.focus(), 100)
+  }
+
+  // 🔹 Cancel drawer + reset form
+  const handleCancel = () => {
     setFormData({
       id: null,
       title: '',
       status: 'Active'
     })
-    setDrawerOpen(true)
-    setTimeout(() => titleRef.current?.focus(), 100)
+    setUnsavedAddData(null)
+    setDrawerOpen(false)
   }
+
+  // 🔹 Handle field change + cache unsaved draft
+  const handleFieldChange = (field, value) => {
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value }
+      if (!isEdit) setUnsavedAddData(updated)
+      return updated
+    })
+  }
+
   const handleEdit = row => {
     setIsEdit(true)
     setFormData(row)
@@ -182,10 +225,12 @@ export default function TodoItemsPage() {
       showToast('warning', 'Todo title is required')
       return
     }
+
     setLoading(true)
     try {
       const db = await initDB()
       const payload = { ...formData }
+
       if (isEdit && formData.id) {
         await db.put(STORE_NAME, payload)
         showToast('success', 'Todo updated')
@@ -194,8 +239,12 @@ export default function TodoItemsPage() {
         await db.add(STORE_NAME, payload)
         showToast('success', 'Todo added')
       }
-      toggleDrawer()
-      loadData()
+
+      // ✅ Reset form and unsaved data after save
+      setUnsavedAddData(null)
+      setFormData({ id: null, title: '', status: 'Active' })
+      setDrawerOpen(false)
+      await loadData()
     } catch {
       showToast('error', 'Failed to save')
     } finally {
@@ -307,9 +356,7 @@ export default function TodoItemsPage() {
       <table><thead><tr>
       <th>S.No</th><th>Title</th><th>Status</th>
       </tr></thead><tbody>
-      ${rows
-        .map(r => `<tr><td>${r.sno}</td><td>${r.title}</td><td>${r.status}</td></tr>`)
-        .join('')}
+      ${rows.map(r => `<tr><td>${r.sno}</td><td>${r.title}</td><td>${r.status}</td></tr>`).join('')}
       </tbody></table></body></html>`
     w.document.write(html)
     w.document.close()
@@ -402,15 +449,22 @@ export default function TodoItemsPage() {
               position: 'fixed',
               inset: 0,
               bgcolor: 'rgba(255,255,255,0.7)',
+              backdropFilter: 'blur(2px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               zIndex: 2000
             }}
           >
-            <CircularProgress />
+            <Box textAlign='center'>
+              <ProgressCircularCustomization size={60} thickness={5} />
+              <Typography mt={2} fontWeight={600} color='primary'>
+                Loading...
+              </Typography>
+            </Box>
           </Box>
         )}
+
         <Divider sx={{ mb: 2 }} />
         <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
           <FormControl size='small' sx={{ width: 140 }}>
@@ -494,62 +548,61 @@ export default function TodoItemsPage() {
       </Card>
 
       {/* Drawer */}
-      <Drawer anchor='right' open={drawerOpen} onClose={toggleDrawer}>
-        <Box sx={{ p: 5, width: 420 }}>
+      <Drawer
+        anchor='right'
+        open={drawerOpen}
+        onClose={toggleDrawer}
+        PaperProps={{ sx: { width: 420, boxShadow: '0px 0px 15px rgba(0,0,0,0.08)' } }}
+      >
+        <Box sx={{ p: 5, display: 'flex', flexDirection: 'column', height: '100%' }}>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
             <Typography variant='h5' fontWeight={600}>
               {isEdit ? 'Edit Todo' : 'Add Todo'}
             </Typography>
-            <IconButton onClick={toggleDrawer}>
+            <IconButton onClick={toggleDrawer} size='small'>
               <CloseIcon />
             </IconButton>
           </Box>
-          <form onSubmit={handleSubmit}>
-            <Grid container spacing={2}>
+
+          <Divider sx={{ mb: 3 }} />
+
+          <form onSubmit={handleSubmit} style={{ flexGrow: 1 }}>
+            <Grid container spacing={3}>
+              {/* Todo Title */}
               <Grid item xs={12}>
-                <CustomTextField
+                <CustomTextFieldWrapper
                   fullWidth
-                  label='Todo Title *'
+                  required
+                  label='Todo Title'
+                  placeholder='Enter todo title'
                   value={formData.title}
-                  onChange={e => {
-                    const filtered = e.target.value.replace(/[^a-zA-Z\s]/g, '')
-                    setFormData({ ...formData, title: filtered })
-                  }}
                   inputRef={titleRef}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' || e.key === 'Tab') {
-                      e.preventDefault()
-                      if (isEdit) statusRef.current?.focus()
-                    }
-                  }}
+                  onChange={e => handleFieldChange('title', e.target.value.replace(/[^a-zA-Z\s]/g, ''))}
                 />
               </Grid>
+
+              {/* Status — only in edit mode */}
               {isEdit && (
                 <Grid item xs={12}>
-                  <CustomTextField
-                    select
-                    fullWidth
+                  <CustomSelectField
                     label='Status'
                     value={formData.status}
-                    onChange={handleStatusChange}
-                    inputRef={statusRef}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                      }
-                    }}
-                  >
-                    <MenuItem value='Active'>Active</MenuItem>
-                    <MenuItem value='Inactive'>Inactive</MenuItem>
-                  </CustomTextField>
+                    onChange={e => handleFieldChange('status', e.target.value)}
+                    options={[
+                      { value: 'Active', label: 'Active' },
+                      { value: 'Inactive', label: 'Inactive' }
+                    ]}
+                  />
                 </Grid>
               )}
             </Grid>
+
+            {/* Footer buttons */}
             <Box mt={4} display='flex' gap={2}>
               <Button type='submit' variant='contained' fullWidth disabled={loading}>
-                {loading ? 'Saving...' : isEdit ? 'Update' : 'Save'}
+                {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
               </Button>
-              <Button variant='outlined' fullWidth onClick={toggleDrawer}>
+              <Button variant='outlined' color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
                 Cancel
               </Button>
             </Box>
@@ -564,8 +617,7 @@ export default function TodoItemsPage() {
         </DialogTitle>
         <DialogContent>
           <Typography textAlign='center'>
-            Are you sure you want to delete{' '}
-            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.title}</strong>?
+            Are you sure you want to delete <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.title}</strong>?
           </Typography>
         </DialogContent>
         <DialogActions sx={{ justifyContent: 'center', pb: 3 }}>

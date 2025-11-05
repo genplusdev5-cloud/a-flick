@@ -26,6 +26,8 @@ import {
   CircularProgress,
   Autocomplete
 } from '@mui/material'
+
+import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import EditIcon from '@mui/icons-material/Edit'
@@ -51,6 +53,11 @@ import {
 } from '@tanstack/react-table'
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
+
+// ✅ Custom common form components
+import CustomTextFieldWrapper from '@/components/common/CustomTextField'
+import CustomTextarea from '@/components/common/CustomTextarea'
+import CustomSelectField from '@/components/common/CustomSelectField'
 
 // ───────────────────────────────────────────
 // IndexedDB
@@ -106,6 +113,7 @@ export default function ChemicalsPage() {
   const [loading, setLoading] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
+  const [unsavedAddData, setUnsavedAddData] = useState(null)
   const [formData, setFormData] = useState({
     id: null,
     name: '',
@@ -132,6 +140,8 @@ export default function ChemicalsPage() {
     try {
       const db = await initDB()
       const all = await db.getAll(STORE_NAME)
+
+      // 🔍 Apply search filter
       const filtered = searchText
         ? all.filter(r =>
             ['name', 'unit', 'ingredients'].some(key =>
@@ -139,16 +149,25 @@ export default function ChemicalsPage() {
             )
           )
         : all
+
+      // 🔢 Sort newest first
       const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
+
+      // 📄 Apply pagination
       const start = pagination.pageIndex * pagination.pageSize
-      const pageSlice = sorted.slice(start, start + pagination.pageSize)
-      const normalized = pageSlice.map((item, i) => ({
+      const end = start + pagination.pageSize
+      const paginated = sorted.slice(start, end)
+
+      // 🧾 Add serial numbers
+      const normalized = paginated.map((item, idx) => ({
         ...item,
-        sno: start + i + 1
+        sno: start + idx + 1
       }))
+
       setRows(normalized)
       setRowCount(filtered.length)
     } catch (err) {
+      console.error(err)
       showToast('error', 'Failed to load data')
     } finally {
       setLoading(false)
@@ -163,6 +182,25 @@ export default function ChemicalsPage() {
   const toggleDrawer = () => setDrawerOpen(p => !p)
   const handleAdd = () => {
     setIsEdit(false)
+    if (unsavedAddData) {
+      setFormData(unsavedAddData)
+    } else {
+      setFormData({
+        id: null,
+        name: '',
+        unit: '',
+        dosage: '',
+        ingredients: '',
+        status: 'Active',
+        file: ''
+      })
+    }
+    setSelectedFile('')
+    setDrawerOpen(true)
+    setTimeout(() => nameRef.current?.focus(), 100)
+  }
+
+  const handleCancel = () => {
     setFormData({
       id: null,
       name: '',
@@ -173,9 +211,18 @@ export default function ChemicalsPage() {
       file: ''
     })
     setSelectedFile('')
-    setDrawerOpen(true)
-    setTimeout(() => nameRef.current?.focus(), 100)
+    setUnsavedAddData(null)
+    setDrawerOpen(false)
   }
+
+  const handleFieldChange = (field, value) => {
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value }
+      if (!isEdit) setUnsavedAddData(updated)
+      return updated
+    })
+  }
+
   const handleEdit = row => {
     setIsEdit(true)
     setFormData(row)
@@ -200,10 +247,12 @@ export default function ChemicalsPage() {
       showToast('warning', 'Please fill name, unit, and dosage')
       return
     }
+
     setLoading(true)
     try {
       const db = await initDB()
       const payload = { ...formData, file: selectedFile }
+
       if (isEdit && formData.id) {
         await db.put(STORE_NAME, payload)
         showToast('success', 'Chemical updated')
@@ -212,8 +261,25 @@ export default function ChemicalsPage() {
         await db.add(STORE_NAME, payload)
         showToast('success', 'Chemical added')
       }
-      toggleDrawer()
-      loadData()
+
+      // ✅ Clear unsaved cache and reset
+      setUnsavedAddData(null)
+      setFormData({
+        id: null,
+        name: '',
+        unit: '',
+        dosage: '',
+        ingredients: '',
+        status: 'Active',
+        file: ''
+      })
+      setSelectedFile('')
+
+      // ✅ Close drawer after save
+      setDrawerOpen(false)
+
+      // 🔄 Reload data
+      await loadData()
     } catch {
       showToast('error', 'Failed to save')
     } finally {
@@ -454,15 +520,22 @@ export default function ChemicalsPage() {
               position: 'fixed',
               inset: 0,
               bgcolor: 'rgba(255,255,255,0.7)',
+              backdropFilter: 'blur(2px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               zIndex: 2000
             }}
           >
-            <CircularProgress />
+            <Box textAlign='center'>
+              <ProgressCircularCustomization size={60} thickness={5} />
+              <Typography mt={2} fontWeight={600} color='primary'>
+                Loading...
+              </Typography>
+            </Box>
           </Box>
         )}
+
         <Divider sx={{ mb: 2 }} />
         <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
           <FormControl size='small' sx={{ width: 140 }}>
@@ -537,151 +610,155 @@ export default function ChemicalsPage() {
       </Card>
 
       {/* Drawer */}
-      <Drawer anchor='right' open={drawerOpen} onClose={toggleDrawer}>
-        <Box sx={{ p: 5, width: 420 }}>
-          <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
-            <Typography variant='h5' fontWeight={600}>
-              {isEdit ? 'Edit Chemical' : 'Add Chemical'}
+    <Drawer
+  anchor='right'
+  open={drawerOpen}
+  onClose={toggleDrawer}
+  PaperProps={{ sx: { width: 420, boxShadow: '0px 0px 15px rgba(0,0,0,0.08)' } }}
+>
+  <Box sx={{ p: 5, display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
+      <Typography variant='h5' fontWeight={600}>
+        {isEdit ? 'Edit Chemical' : 'Add Chemical'}
+      </Typography>
+      <IconButton onClick={toggleDrawer} size='small'>
+        <CloseIcon />
+      </IconButton>
+    </Box>
+
+    <Divider sx={{ mb: 3 }} />
+
+    <form onSubmit={handleSubmit} style={{ flexGrow: 1 }}>
+      <Grid container spacing={3}>
+        {/* Chemical Name */}
+        <Grid item xs={12}>
+          <CustomTextFieldWrapper
+            fullWidth
+            required
+            label='Chemical Name'
+            placeholder='Enter chemical name'
+            value={formData.name}
+            inputRef={nameRef}
+            onChange={e => handleFieldChange('name', e.target.value)}
+          />
+        </Grid>
+
+        {/* Unit */}
+        <Grid item xs={12}>
+          <CustomSelectField
+            label='Unit'
+            value={formData.unit}
+            onChange={e => handleFieldChange('unit', e.target.value)}
+            options={[
+              { value: 'kg', label: 'Kg' },
+              { value: 'litre', label: 'Litre' },
+              { value: 'bottle', label: 'Bottle' },
+              { value: 'pkt', label: 'Packet' },
+              { value: 'box', label: 'Box' }
+            ]}
+          />
+        </Grid>
+
+        {/* Dosage */}
+        <Grid item xs={12}>
+          <CustomTextFieldWrapper
+            fullWidth
+            required
+            label='Dosage'
+            placeholder='Enter dosage value'
+            value={formData.dosage}
+            onChange={e =>
+              handleFieldChange('dosage', e.target.value.replace(/[^0-9.]/g, ''))
+            }
+          />
+        </Grid>
+
+        {/* Ingredients */}
+        <Grid item xs={12}>
+          <CustomTextarea
+            label='Ingredients'
+            placeholder='Enter ingredients or remarks...'
+            rows={3}
+            value={formData.ingredients}
+            onChange={e => handleFieldChange('ingredients', e.target.value)}
+          />
+        </Grid>
+
+        {/* File Upload */}
+        <Grid item xs={12}>
+          <Box
+            sx={{
+              border: '1px dashed',
+              borderColor: 'divider',
+              borderRadius: 1,
+              p: 2,
+              textAlign: 'center',
+              cursor: 'pointer',
+              bgcolor: 'background.paper',
+              '&:hover': { bgcolor: 'action.hover' }
+            }}
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={e => e.preventDefault()}
+            onDrop={e => {
+              e.preventDefault()
+              const file = e.dataTransfer.files[0]
+              if (file) {
+                setSelectedFile(file.name)
+                handleFieldChange('file', file.name)
+              }
+            }}
+          >
+            <UploadFileIcon sx={{ fontSize: 40, color: 'text.secondary', mb: 1 }} />
+            <Typography variant='body2' color={selectedFile ? 'text.primary' : 'text.disabled'}>
+              {selectedFile || 'Choose File or Drag & Drop Here'}
             </Typography>
-            <IconButton onClick={toggleDrawer}>
-              <CloseIcon />
-            </IconButton>
+            <Typography variant='caption' color='primary'>
+              Browse
+            </Typography>
           </Box>
-          <form onSubmit={handleSubmit}>
-            <Grid container spacing={2}>
-              <Grid item xs={12}>
-                <CustomTextField
-                  fullWidth
-                  label='Chemical Name *'
-                  value={formData.name}
-                  onChange={e => setFormData({ ...formData, name: e.target.value })}
-                  inputRef={nameRef}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      setTimeout(() => {
-                        unitRef.current?.querySelector('input')?.focus()
-                        setUnitOpen(true)
-                      }, 100)
-                    }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <Autocomplete
-                  ref={unitRef}
-                  freeSolo={false}
-                  options={unitOptions}
-                  value={formData.unit}
-                  open={unitOpen}
-                  onOpen={() => setUnitOpen(true)}
-                  onClose={() => setUnitOpen(false)}
-                  onFocus={() => setUnitOpen(true)}
-                  onInputChange={(e, newValue) => setFormData(prev => ({ ...prev, unit: newValue }))}
-                  onChange={(e, newValue) => setFormData(prev => ({ ...prev, unit: newValue }))}
-                  renderInput={params => (
-                    <CustomTextField
-                      {...params}
-                      label='Unit *'
-                      inputProps={{
-                        ...params.inputProps,
-                        onKeyDown: e => {
-                          if (e.key === 'Enter' && unitOptions.includes(formData.unit)) {
-                            e.preventDefault()
-                            dosageRef.current?.focus()
-                          }
-                        }
-                      }}
-                    />
-                  )}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <Box
-                  sx={{
-                    border: '1px dashed',
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                    p: 2,
-                    textAlign: 'center',
-                    cursor: 'pointer',
-                    bgcolor: 'background.paper',
-                    '&:hover': { bgcolor: 'action.hover' }
-                  }}
-                  onClick={() => fileInputRef.current?.click()}
-                  onDragOver={e => e.preventDefault()}
-                  onDrop={handleFileDrop}
-                >
-                  <UploadFileIcon sx={{ fontSize: 40, color: 'text.secondary', mb: 1 }} />
-                  <Typography variant='body2' color={selectedFile ? 'text.primary' : 'text.disabled'}>
-                    {selectedFile || 'Choose File or Drag & Drop Here'}
-                  </Typography>
-                  <Typography variant='caption' color='primary'>
-                    Browse
-                  </Typography>
-                </Box>
-                <input type='file' ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileChange} />
-              </Grid>
-              <Grid item xs={12}>
-                <CustomTextField
-                  fullWidth
-                  label='Dosage *'
-                  value={formData.dosage}
-                  onChange={e => /^\d*$/.test(e.target.value) && setFormData({ ...formData, dosage: e.target.value })}
-                  inputProps={{ inputMode: 'numeric' }}
-                  inputRef={dosageRef}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      ingredientsRef.current?.focus()
-                    }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <CustomTextField
-                  fullWidth
-                  multiline
-                  rows={3}
-                  label='Ingredients'
-                  value={formData.ingredients}
-                  onChange={e => setFormData({ ...formData, ingredients: e.target.value })}
-                  inputRef={ingredientsRef}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault()
-                      if (isEdit) statusRef.current?.focus()
-                    }
-                  }}
-                />
-              </Grid>
-              {isEdit && (
-                <Grid item xs={12}>
-                  <CustomTextField
-                    select
-                    fullWidth
-                    label='Status'
-                    value={formData.status}
-                    onChange={handleStatusChange}
-                    inputRef={statusRef}
-                  >
-                    <MenuItem value='Active'>Active</MenuItem>
-                    <MenuItem value='Inactive'>Inactive</MenuItem>
-                  </CustomTextField>
-                </Grid>
-              )}
-            </Grid>
-            <Box mt={4} display='flex' gap={2}>
-              <Button type='submit' variant='contained' fullWidth disabled={loading}>
-                {loading ? 'Saving...' : isEdit ? 'Update' : 'Save'}
-              </Button>
-              <Button variant='outlined' fullWidth onClick={toggleDrawer}>
-                Cancel
-              </Button>
-            </Box>
-          </form>
-        </Box>
-      </Drawer>
+          <input
+            type='file'
+            ref={fileInputRef}
+            style={{ display: 'none' }}
+            onChange={e => {
+              const file = e.target.files[0]
+              if (file) {
+                setSelectedFile(file.name)
+                handleFieldChange('file', file.name)
+              }
+            }}
+          />
+        </Grid>
+
+        {/* Status (only on edit) */}
+        {isEdit && (
+          <Grid item xs={12}>
+            <CustomSelectField
+              label='Status'
+              value={formData.status}
+              onChange={e => handleFieldChange('status', e.target.value)}
+              options={[
+                { value: 'Active', label: 'Active' },
+                { value: 'Inactive', label: 'Inactive' }
+              ]}
+            />
+          </Grid>
+        )}
+      </Grid>
+
+      {/* Footer Buttons */}
+      <Box mt={4} display='flex' gap={2}>
+        <Button type='submit' variant='contained' fullWidth disabled={loading}>
+          {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
+        </Button>
+        <Button variant='outlined' color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
+          Cancel
+        </Button>
+      </Box>
+    </form>
+  </Box>
+</Drawer>
+
 
       {/* Delete Dialog */}
       <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false, row: null })}>
@@ -690,8 +767,7 @@ export default function ChemicalsPage() {
         </DialogTitle>
         <DialogContent>
           <Typography textAlign='center'>
-            Are you sure you want to delete{' '}
-            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name}</strong>?
+            Are you sure you want to delete <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name}</strong>?
           </Typography>
         </DialogContent>
         <DialogActions sx={{ justifyContent: 'center', pb: 3 }}>

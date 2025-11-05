@@ -27,6 +27,8 @@ import {
   CircularProgress,
   InputAdornment
 } from '@mui/material'
+
+import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import EditIcon from '@mui/icons-material/Edit'
@@ -44,6 +46,12 @@ import { toast } from 'react-toastify'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 import classnames from 'classnames'
 import { rankItem } from '@tanstack/match-sorter-utils'
+
+// ✅ Custom reusable form components
+import CustomTextFieldWrapper from '@/components/common/CustomTextField'
+import CustomTextarea from '@/components/common/CustomTextarea'
+import CustomSelectField from '@/components/common/CustomSelectField'
+
 import {
   useReactTable,
   getCoreRowModel,
@@ -71,13 +79,7 @@ const initDB = async () => {
 }
 
 // Default Leave Types
-const DEFAULT_LEAVE_OPTIONS = [
-  'Annual Leave',
-  'Sick Leave',
-  'Casual Leave',
-  'Maternity Leave',
-  'Paternity Leave'
-]
+const DEFAULT_LEAVE_OPTIONS = ['Annual Leave', 'Sick Leave', 'Casual Leave', 'Maternity Leave', 'Paternity Leave']
 
 // Toast helper
 const showToast = (type, message) => {
@@ -119,6 +121,7 @@ export default function EmployeeLeavePage() {
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
   const [dateError, setDateError] = useState('')
+  const [unsavedAddData, setUnsavedAddData] = useState(null)
 
   const [formData, setFormData] = useState({
     id: null,
@@ -143,6 +146,8 @@ export default function EmployeeLeavePage() {
     try {
       const db = await initDB()
       const all = await db.getAll(STORE_NAME)
+
+      // 🔍 Search filter
       const filtered = searchText
         ? all.filter(r =>
             ['employee', 'supervisor', 'leaveType', 'status'].some(key =>
@@ -150,18 +155,27 @@ export default function EmployeeLeavePage() {
             )
           )
         : all
+
+      // 🔢 Sort by latest
       const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
+
+      // 📄 Paginate
       const start = pagination.pageIndex * pagination.pageSize
-      const pageSlice = sorted.slice(start, start + pagination.pageSize)
-      const normalized = pageSlice.map((item, i) => ({
+      const end = start + pagination.pageSize
+      const paginated = sorted.slice(start, end)
+
+      // 🧾 Normalize and format date
+      const normalized = paginated.map((item, idx) => ({
         ...item,
         fromDate: new Date(item.fromDate),
         toDate: new Date(item.toDate),
-        sno: start + i + 1
+        sno: start + idx + 1
       }))
+
       setRows(normalized)
       setRowCount(filtered.length)
     } catch (err) {
+      console.error(err)
       showToast('error', 'Failed to load data')
     } finally {
       setLoading(false)
@@ -174,8 +188,8 @@ export default function EmployeeLeavePage() {
 
   // Drawer
   const toggleDrawer = () => setDrawerOpen(p => !p)
-  const handleAdd = () => {
-    setIsEdit(false)
+  // 🔹 Cancel drawer + reset form
+  const handleCancel = () => {
     setFormData({
       id: null,
       employee: '',
@@ -185,10 +199,40 @@ export default function EmployeeLeavePage() {
       toDate: new Date(),
       status: 'Pending'
     })
+    setUnsavedAddData(null)
+    setDrawerOpen(false)
+  }
+
+  // 🔹 Handle field change + store unsaved add data
+  const handleFieldChange = (field, value) => {
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value }
+      if (!isEdit) setUnsavedAddData(updated)
+      return updated
+    })
+  }
+
+  // 🔹 Updated Add handler with unsaved data restore
+  const handleAdd = () => {
+    setIsEdit(false)
+    if (unsavedAddData) {
+      setFormData(unsavedAddData)
+    } else {
+      setFormData({
+        id: null,
+        employee: '',
+        supervisor: '',
+        leaveType: '',
+        fromDate: new Date(),
+        toDate: new Date(),
+        status: 'Pending'
+      })
+    }
     setDateError('')
     setDrawerOpen(true)
     setTimeout(() => employeeRef.current?.focus(), 100)
   }
+
   const handleEdit = row => {
     setIsEdit(true)
     setFormData({
@@ -262,7 +306,11 @@ export default function EmployeeLeavePage() {
       const updatedRow = { ...formData, status: newStatus }
       setRows(prev => prev.map(r => (r.id === formData.id ? updatedRow : r)))
       const db = await initDB()
-      await db.put(STORE_NAME, { ...updatedRow, fromDate: updatedRow.fromDate.getTime(), toDate: updatedRow.toDate.getTime() })
+      await db.put(STORE_NAME, {
+        ...updatedRow,
+        fromDate: updatedRow.fromDate.getTime(),
+        toDate: updatedRow.toDate.getTime()
+      })
       showToast('success', 'Status updated')
     }
   }
@@ -355,15 +403,17 @@ export default function EmployeeLeavePage() {
     const headers = ['S.No', 'Employee', 'Supervisor', 'Leave Type', 'From', 'To', 'Status']
     const csv = [
       headers.join(','),
-      ...rows.map(r => [
-        r.sno,
-        `"${r.employee}"`,
-        `"${r.supervisor}"`,
-        `"${r.leaveType}"`,
-        `"${r.fromDate.toLocaleString()}"`,
-        `"${r.toDate.toLocaleString()}"`,
-        r.status
-      ].join(','))
+      ...rows.map(r =>
+        [
+          r.sno,
+          `"${r.employee}"`,
+          `"${r.supervisor}"`,
+          `"${r.leaveType}"`,
+          `"${r.fromDate.toLocaleString()}"`,
+          `"${r.toDate.toLocaleString()}"`,
+          r.status
+        ].join(',')
+      )
     ].join('\n')
     const link = document.createElement('a')
     link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
@@ -386,7 +436,8 @@ export default function EmployeeLeavePage() {
       <th>S.No</th><th>Employee</th><th>Supervisor</th><th>Leave Type</th><th>From</th><th>To</th><th>Status</th>
       </tr></thead><tbody>
       ${rows
-        .map(r => `<tr>
+        .map(
+          r => `<tr>
           <td>${r.sno}</td>
           <td>${r.employee}</td>
           <td>${r.supervisor}</td>
@@ -394,7 +445,8 @@ export default function EmployeeLeavePage() {
           <td>${r.fromDate.toLocaleString()}</td>
           <td>${r.toDate.toLocaleString()}</td>
           <td>${r.status}</td>
-        </tr>`)
+        </tr>`
+        )
         .join('')}
       </tbody></table></body></html>`
     w.document.write(html)
@@ -488,15 +540,22 @@ export default function EmployeeLeavePage() {
               position: 'fixed',
               inset: 0,
               bgcolor: 'rgba(255,255,255,0.7)',
+              backdropFilter: 'blur(2px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               zIndex: 2000
             }}
           >
-            <CircularProgress />
+            <Box textAlign='center'>
+              <ProgressCircularCustomization size={60} thickness={5} />
+              <Typography mt={2} fontWeight={600} color='primary'>
+                Loading...
+              </Typography>
+            </Box>
           </Box>
         )}
+
         <Divider sx={{ mb: 2 }} />
         <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
           <FormControl size='small' sx={{ width: 140 }}>
@@ -580,70 +639,72 @@ export default function EmployeeLeavePage() {
       </Card>
 
       {/* Drawer */}
-      <Drawer anchor='right' open={drawerOpen} onClose={toggleDrawer}>
-        <Box sx={{ p: 5, width: 440 }}>
+      <Drawer
+        anchor='right'
+        open={drawerOpen}
+        onClose={toggleDrawer}
+        PaperProps={{ sx: { width: 460, boxShadow: '0px 0px 15px rgba(0,0,0,0.08)' } }}
+      >
+        <Box sx={{ p: 5, display: 'flex', flexDirection: 'column', height: '100%' }}>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
             <Typography variant='h5' fontWeight={600}>
               {isEdit ? 'Edit Leave Request' : 'Add Leave Request'}
             </Typography>
-            <IconButton onClick={toggleDrawer}>
+            <IconButton onClick={toggleDrawer} size='small'>
               <CloseIcon />
             </IconButton>
           </Box>
-          <form onSubmit={handleSubmit}>
-            <Grid container spacing={2}>
+
+          <Divider sx={{ mb: 3 }} />
+
+          <form onSubmit={handleSubmit} style={{ flexGrow: 1 }}>
+            <Grid container spacing={3}>
+              {/* Employee */}
               <Grid item xs={12}>
-                <CustomTextField
+                <CustomTextFieldWrapper
                   fullWidth
-                  label={<span>Employee <span style={{ color: 'red' }}>*</span></span>}
+                  required
+                  label='Employee Name'
+                  placeholder='Enter employee name'
                   value={formData.employee}
-                  onChange={e => setFormData({ ...formData, employee: e.target.value.replace(/[^a-zA-Z\s]/g, '') })}
                   inputRef={employeeRef}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      supervisorRef.current?.focus()
-                    }
-                  }}
+                  onChange={e => handleFieldChange('employee', e.target.value.replace(/[^a-zA-Z\s]/g, ''))}
                 />
               </Grid>
+
+              {/* Supervisor */}
               <Grid item xs={12}>
-                <CustomTextField
+                <CustomTextFieldWrapper
                   fullWidth
                   label='Supervisor'
+                  placeholder='Enter supervisor name'
                   value={formData.supervisor}
-                  onChange={e => setFormData({ ...formData, supervisor: e.target.value.replace(/[^a-zA-Z\s]/g, '') })}
                   inputRef={supervisorRef}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      leaveTypeRef.current?.querySelector('input')?.focus()
-                    }
-                  }}
+                  onChange={e => handleFieldChange('supervisor', e.target.value.replace(/[^a-zA-Z\s]/g, ''))}
                 />
               </Grid>
+
+              {/* Leave Type */}
               <Grid item xs={12}>
                 <Autocomplete
                   freeSolo={false}
                   options={leaveTypeOptions}
                   value={formData.leaveType}
-                  onChange={(e, v) => setFormData({ ...formData, leaveType: v || '' })}
+                  onChange={(e, v) => handleFieldChange('leaveType', v || '')}
                   renderInput={params => (
-                    <CustomTextField
+                    <CustomTextFieldWrapper
                       {...params}
                       fullWidth
-                      label={<span>Leave Type <span style={{ color: 'red' }}>*</span></span>}
+                      required
+                      label='Leave Type'
+                      placeholder='Select or search leave type'
                       inputRef={leaveTypeRef}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter' && leaveTypeOptions.includes(formData.leaveType)) {
-                          e.preventDefault()
-                          fromDateRef.current?.querySelector('input')?.focus()
-                        }
-                      }}
                     />
                   )}
                 />
               </Grid>
+
+              {/* From Date */}
               <Grid item xs={12}>
                 <AppReactDatepicker
                   showTimeSelect
@@ -652,7 +713,7 @@ export default function EmployeeLeavePage() {
                   onChange={date => handleDateChange(date, 'fromDate')}
                   dateFormat='dd/MM/yyyy h:mm aa'
                   customInput={
-                    <CustomTextField
+                    <CustomTextFieldWrapper
                       fullWidth
                       label='From Date & Time'
                       InputProps={{
@@ -667,6 +728,8 @@ export default function EmployeeLeavePage() {
                   }
                 />
               </Grid>
+
+              {/* To Date */}
               <Grid item xs={12}>
                 <AppReactDatepicker
                   showTimeSelect
@@ -675,7 +738,7 @@ export default function EmployeeLeavePage() {
                   onChange={date => handleDateChange(date, 'toDate')}
                   dateFormat='dd/MM/yyyy h:mm aa'
                   customInput={
-                    <CustomTextField
+                    <CustomTextFieldWrapper
                       fullWidth
                       label='To Date & Time'
                       InputProps={{
@@ -690,35 +753,50 @@ export default function EmployeeLeavePage() {
                   }
                 />
               </Grid>
+
+              {/* Date Error */}
               {dateError && (
                 <Grid item xs={12}>
-                  <Typography color='error' variant='body2' sx={{ mt: 1 }}>
+                  <Typography color='error' variant='body2'>
                     {dateError}
                   </Typography>
                 </Grid>
               )}
+
+              {/* Description */}
+              <Grid item xs={12}>
+                <CustomTextarea
+                  label='Description'
+                  placeholder='Add remarks or leave reason...'
+                  rows={3}
+                  value={formData.description || ''}
+                  onChange={e => handleFieldChange('description', e.target.value)}
+                />
+              </Grid>
+
+              {/* Status (Edit only) */}
               {isEdit && (
                 <Grid item xs={12}>
-                  <CustomTextField
-                    select
-                    fullWidth
+                  <CustomSelectField
                     label='Status'
                     value={formData.status}
-                    onChange={handleStatusChange}
-                    inputRef={statusRef}
-                  >
-                    <MenuItem value='Pending'>Pending</MenuItem>
-                    <MenuItem value='Approved'>Approved</MenuItem>
-                    <MenuItem value='Rejected'>Rejected</MenuItem>
-                  </CustomTextField>
+                    onChange={e => handleFieldChange('status', e.target.value)}
+                    options={[
+                      { value: 'Pending', label: 'Pending' },
+                      { value: 'Approved', label: 'Approved' },
+                      { value: 'Rejected', label: 'Rejected' }
+                    ]}
+                  />
                 </Grid>
               )}
             </Grid>
+
+            {/* Footer Buttons */}
             <Box mt={4} display='flex' gap={2}>
               <Button type='submit' variant='contained' fullWidth disabled={loading || !!dateError}>
-                {loading ? 'Saving...' : isEdit ? 'Update' : 'Save'}
+                {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
               </Button>
-              <Button variant='outlined' fullWidth onClick={toggleDrawer}>
+              <Button variant='outlined' color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
                 Cancel
               </Button>
             </Box>

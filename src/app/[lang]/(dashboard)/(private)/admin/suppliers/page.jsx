@@ -27,6 +27,8 @@ import {
   CircularProgress,
   Autocomplete
 } from '@mui/material'
+
+import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import EditIcon from '@mui/icons-material/Edit'
@@ -128,6 +130,7 @@ export default function SupplierPage() {
     try {
       const db = await initDB()
       const all = await db.getAll(STORE_NAME)
+
       const filtered = searchText
         ? all.filter(r =>
             ['name', 'type', 'address', 'status', 'id'].some(key =>
@@ -138,14 +141,18 @@ export default function SupplierPage() {
 
       const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
       const start = pagination.pageIndex * pagination.pageSize
-      const pageSlice = sorted.slice(start, start + pagination.pageSize)
-      const normalized = pageSlice.map((item, i) => ({
+      const end = start + pagination.pageSize
+      const paginated = sorted.slice(start, end)
+
+      const normalized = paginated.map((item, i) => ({
         ...item,
         sno: start + i + 1
       }))
+
       setRows(normalized)
       setRowCount(filtered.length)
     } catch (err) {
+      console.error(err)
       showToast('error', 'Failed to load data')
     } finally {
       setLoading(false)
@@ -172,14 +179,14 @@ export default function SupplierPage() {
     setTimeout(() => typeRef.current?.focus(), 100)
   }
 
-  const handleEdit = (row) => {
+  const handleEdit = row => {
     setIsEdit(true)
     setFormData(row)
     setDrawerOpen(true)
     setTimeout(() => typeRef.current?.focus(), 100)
   }
 
-  const handleDelete = async (row) => {
+  const handleDelete = async row => {
     const db = await initDB()
     await db.delete(STORE_NAME, row.id)
     showToast('delete', `${row.name} deleted`)
@@ -191,7 +198,7 @@ export default function SupplierPage() {
     setDeleteDialog({ open: false, row: null })
   }
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async e => {
     e.preventDefault()
     if (!formData.name.trim() || !formData.type.trim()) {
       showToast('warning', 'Name and Type are required')
@@ -218,7 +225,7 @@ export default function SupplierPage() {
     }
   }
 
-  const handleStatusChange = async (e) => {
+  const handleStatusChange = async e => {
     const newStatus = e.target.value
     setFormData(prev => ({ ...prev, status: newStatus }))
     if (isEdit && formData.id) {
@@ -326,8 +333,7 @@ export default function SupplierPage() {
       </tr></thead><tbody>
       ${rows
         .map(
-          r =>
-            `<tr><td>${r.sno}</td><td>${r.name}</td><td>${r.type}</td><td>${r.address}</td><td>${r.status}</td></tr>`
+          r => `<tr><td>${r.sno}</td><td>${r.name}</td><td>${r.type}</td><td>${r.address}</td><td>${r.status}</td></tr>`
         )
         .join('')}
       </tbody></table></body></html>`
@@ -424,13 +430,19 @@ export default function SupplierPage() {
               position: 'fixed',
               inset: 0,
               bgcolor: 'rgba(255,255,255,0.7)',
+              backdropFilter: 'blur(2px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               zIndex: 2000
             }}
           >
-            <CircularProgress />
+            <Box textAlign='center'>
+              <ProgressCircularCustomization size={60} thickness={5} />
+              <Typography mt={2} fontWeight={600} color='primary'>
+                Loading Suppliers...
+              </Typography>
+            </Box>
           </Box>
         )}
 
@@ -618,8 +630,7 @@ export default function SupplierPage() {
         </DialogTitle>
         <DialogContent>
           <Typography textAlign='center'>
-            Are you sure you want to delete{' '}
-            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name}</strong>?
+            Are you sure you want to delete <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name}</strong>?
           </Typography>
         </DialogContent>
         <DialogActions sx={{ justifyContent: 'center', pb: 3 }}>

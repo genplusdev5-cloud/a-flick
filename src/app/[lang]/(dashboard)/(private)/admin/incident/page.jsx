@@ -26,6 +26,8 @@ import {
   CircularProgress,
   InputAdornment
 } from '@mui/material'
+
+import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import EditIcon from '@mui/icons-material/Edit'
@@ -41,6 +43,12 @@ import { toast } from 'react-toastify'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 import classnames from 'classnames'
 import { rankItem } from '@tanstack/match-sorter-utils'
+
+// ✅ Custom reusable form components
+import CustomTextFieldWrapper from '@/components/common/CustomTextField'
+import CustomTextarea from '@/components/common/CustomTextarea'
+import CustomSelectField from '@/components/common/CustomSelectField'
+
 import {
   useReactTable,
   getCoreRowModel,
@@ -106,6 +114,7 @@ export default function IncidentPage() {
   const [loading, setLoading] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
+  const [unsavedAddData, setUnsavedAddData] = useState(null)
   const [formData, setFormData] = useState({
     id: null,
     name: '',
@@ -122,6 +131,8 @@ export default function IncidentPage() {
     try {
       const db = await initDB()
       const all = await db.getAll(STORE_NAME)
+
+      // 🔍 Apply search filter
       const filtered = searchText
         ? all.filter(r =>
             ['name', 'description', 'status'].some(key =>
@@ -129,16 +140,25 @@ export default function IncidentPage() {
             )
           )
         : all
+
+      // 🔢 Sort newest first
       const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
+
+      // 📄 Apply pagination
       const start = pagination.pageIndex * pagination.pageSize
-      const pageSlice = sorted.slice(start, start + pagination.pageSize)
-      const normalized = pageSlice.map((item, i) => ({
+      const end = start + pagination.pageSize
+      const paginated = sorted.slice(start, end)
+
+      // 🧾 Add serial numbers
+      const normalized = paginated.map((item, idx) => ({
         ...item,
-        sno: start + i + 1
+        sno: start + idx + 1
       }))
+
       setRows(normalized)
       setRowCount(filtered.length)
     } catch (err) {
+      console.error(err)
       showToast('error', 'Failed to load data')
     } finally {
       setLoading(false)
@@ -153,15 +173,41 @@ export default function IncidentPage() {
   const toggleDrawer = () => setDrawerOpen(p => !p)
   const handleAdd = () => {
     setIsEdit(false)
+    if (unsavedAddData) {
+      setFormData(unsavedAddData)
+    } else {
+      setFormData({
+        id: null,
+        name: '',
+        description: '',
+        status: 'Active'
+      })
+    }
+    setDrawerOpen(true)
+    setTimeout(() => nameRef.current?.focus(), 100)
+  }
+
+  // 🔹 Cancel drawer + reset
+  const handleCancel = () => {
     setFormData({
       id: null,
       name: '',
       description: '',
       status: 'Active'
     })
-    setDrawerOpen(true)
-    setTimeout(() => nameRef.current?.focus(), 100)
+    setUnsavedAddData(null)
+    setDrawerOpen(false)
   }
+
+  // 🔹 Handle field change + preserve unsaved data
+  const handleFieldChange = (field, value) => {
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value }
+      if (!isEdit) setUnsavedAddData(updated)
+      return updated
+    })
+  }
+
   const handleEdit = row => {
     setIsEdit(true)
     setFormData(row)
@@ -185,10 +231,12 @@ export default function IncidentPage() {
       showToast('warning', 'Incident name is required')
       return
     }
+
     setLoading(true)
     try {
       const db = await initDB()
       const payload = { ...formData }
+
       if (isEdit && formData.id) {
         await db.put(STORE_NAME, payload)
         showToast('success', 'Incident updated')
@@ -197,8 +245,12 @@ export default function IncidentPage() {
         await db.add(STORE_NAME, payload)
         showToast('success', 'Incident added')
       }
-      toggleDrawer()
-      loadData()
+
+      // ✅ Reset draft + close drawer
+      setUnsavedAddData(null)
+      setFormData({ id: null, name: '', description: '', status: 'Active' })
+      setDrawerOpen(false)
+      await loadData()
     } catch {
       showToast('error', 'Failed to save')
     } finally {
@@ -289,12 +341,9 @@ export default function IncidentPage() {
     const headers = ['S.No', 'Incident Name', 'Description', 'Status']
     const csv = [
       headers.join(','),
-      ...rows.map(r => [
-        r.sno,
-        `"${r.name.replace(/"/g, '""')}"`,
-        `"${r.description.replace(/"/g, '""')}"`,
-        r.status
-      ].join(','))
+      ...rows.map(r =>
+        [r.sno, `"${r.name.replace(/"/g, '""')}"`, `"${r.description.replace(/"/g, '""')}"`, r.status].join(',')
+      )
     ].join('\n')
     const link = document.createElement('a')
     link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
@@ -317,10 +366,7 @@ export default function IncidentPage() {
       <th>S.No</th><th>Name</th><th>Description</th><th>Status</th>
       </tr></thead><tbody>
       ${rows
-        .map(
-          r =>
-            `<tr><td>${r.sno}</td><td>${r.name}</td><td>${r.description}</td><td>${r.status}</td></tr>`
-        )
+        .map(r => `<tr><td>${r.sno}</td><td>${r.name}</td><td>${r.description}</td><td>${r.status}</td></tr>`)
         .join('')}
       </tbody></table></body></html>`
     w.document.write(html)
@@ -414,15 +460,22 @@ export default function IncidentPage() {
               position: 'fixed',
               inset: 0,
               bgcolor: 'rgba(255,255,255,0.7)',
+              backdropFilter: 'blur(2px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               zIndex: 2000
             }}
           >
-            <CircularProgress />
+            <Box textAlign='center'>
+              <ProgressCircularCustomization size={60} thickness={5} />
+              <Typography mt={2} fontWeight={600} color='primary'>
+                Loading...
+              </Typography>
+            </Box>
           </Box>
         )}
+
         <Divider sx={{ mb: 2 }} />
         <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
           <FormControl size='small' sx={{ width: 140 }}>
@@ -506,74 +559,72 @@ export default function IncidentPage() {
       </Card>
 
       {/* Drawer */}
-      <Drawer anchor='right' open={drawerOpen} onClose={toggleDrawer}>
-        <Box sx={{ p: 5, width: 420 }}>
+      <Drawer
+        anchor='right'
+        open={drawerOpen}
+        onClose={toggleDrawer}
+        PaperProps={{ sx: { width: 420, boxShadow: '0px 0px 15px rgba(0,0,0,0.08)' } }}
+      >
+        <Box sx={{ p: 5, display: 'flex', flexDirection: 'column', height: '100%' }}>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
             <Typography variant='h5' fontWeight={600}>
               {isEdit ? 'Edit Incident' : 'Add Incident'}
             </Typography>
-            <IconButton onClick={toggleDrawer}>
+            <IconButton onClick={toggleDrawer} size='small'>
               <CloseIcon />
             </IconButton>
           </Box>
-          <form onSubmit={handleSubmit}>
-            <Grid container spacing={2}>
+
+          <Divider sx={{ mb: 3 }} />
+
+          <form onSubmit={handleSubmit} style={{ flexGrow: 1 }}>
+            <Grid container spacing={3}>
+              {/* Incident Name */}
               <Grid item xs={12}>
-                <CustomTextField
+                <CustomTextFieldWrapper
                   fullWidth
-                  label='Incident Name *'
+                  required
+                  label='Incident Name'
+                  placeholder='Enter incident name'
                   value={formData.name}
-                  onChange={e => {
-                    const filtered = e.target.value.replace(/[^a-zA-Z\s]/g, '')
-                    setFormData({ ...formData, name: filtered })
-                  }}
                   inputRef={nameRef}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      descriptionRef.current?.focus()
-                    }
-                  }}
+                  onChange={e => handleFieldChange('name', e.target.value.replace(/[^a-zA-Z\s]/g, ''))}
                 />
               </Grid>
+
+              {/* Description */}
               <Grid item xs={12}>
-                <CustomTextField
-                  fullWidth
-                  multiline
-                  rows={4}
+                <CustomTextarea
                   label='Description'
+                  placeholder='Enter description or details...'
+                  rows={3}
                   value={formData.description}
-                  onChange={e => setFormData({ ...formData, description: e.target.value })}
-                  inputRef={descriptionRef}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault()
-                      if (isEdit) statusRef.current?.focus()
-                    }
-                  }}
+                  onChange={e => handleFieldChange('description', e.target.value)}
                 />
               </Grid>
+
+              {/* Status - only on edit */}
               {isEdit && (
                 <Grid item xs={12}>
-                  <CustomTextField
-                    select
-                    fullWidth
+                  <CustomSelectField
                     label='Status'
                     value={formData.status}
-                    onChange={handleStatusChange}
-                    inputRef={statusRef}
-                  >
-                    <MenuItem value='Active'>Active</MenuItem>
-                    <MenuItem value='Inactive'>Inactive</MenuItem>
-                  </CustomTextField>
+                    onChange={e => handleFieldChange('status', e.target.value)}
+                    options={[
+                      { value: 'Active', label: 'Active' },
+                      { value: 'Inactive', label: 'Inactive' }
+                    ]}
+                  />
                 </Grid>
               )}
             </Grid>
+
+            {/* Drawer Footer */}
             <Box mt={4} display='flex' gap={2}>
               <Button type='submit' variant='contained' fullWidth disabled={loading}>
-                {loading ? 'Saving...' : isEdit ? 'Update' : 'Save'}
+                {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
               </Button>
-              <Button variant='outlined' fullWidth onClick={toggleDrawer}>
+              <Button variant='outlined' color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
                 Cancel
               </Button>
             </Box>
@@ -588,8 +639,7 @@ export default function IncidentPage() {
         </DialogTitle>
         <DialogContent>
           <Typography textAlign='center'>
-            Are you sure you want to delete{' '}
-            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name}</strong>?
+            Are you sure you want to delete <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name}</strong>?
           </Typography>
         </DialogContent>
         <DialogActions sx={{ justifyContent: 'center', pb: 3 }}>

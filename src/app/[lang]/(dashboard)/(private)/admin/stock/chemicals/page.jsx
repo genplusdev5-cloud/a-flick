@@ -27,6 +27,8 @@ import {
   CircularProgress,
   InputAdornment
 } from '@mui/material'
+
+import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import EditIcon from '@mui/icons-material/Edit'
@@ -136,6 +138,8 @@ export default function ChemicalsPage() {
     try {
       const db = await initDB()
       const all = await db.getAll(STORE_NAME)
+
+      // 🔍 Filter by search input
       const filtered = searchText
         ? all.filter(r =>
             ['name', 'unit', 'ingredients'].some(key =>
@@ -143,16 +147,25 @@ export default function ChemicalsPage() {
             )
           )
         : all
+
+      // 🔢 Sort latest first
       const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
+
+      // 📄 Pagination logic
       const start = pagination.pageIndex * pagination.pageSize
-      const pageSlice = sorted.slice(start, start + pagination.pageSize)
-      const normalized = pageSlice.map((item, i) => ({
+      const end = start + pagination.pageSize
+      const paginated = sorted.slice(start, end)
+
+      // 🧾 Add serial numbers
+      const normalized = paginated.map((item, idx) => ({
         ...item,
-        sno: start + i + 1
+        sno: start + idx + 1
       }))
+
       setRows(normalized)
       setRowCount(filtered.length)
     } catch (err) {
+      console.error(err)
       showToast('error', 'Failed to load data')
     } finally {
       setLoading(false)
@@ -209,7 +222,7 @@ export default function ChemicalsPage() {
     }
   }
 
-  const handleStatusChange = async (e) => {
+  const handleStatusChange = async e => {
     const newStatus = e.target.value
     setFormData(prev => ({ ...prev, status: newStatus }))
 
@@ -326,14 +339,7 @@ export default function ChemicalsPage() {
     const headers = ['S.No', 'Chemical Name', 'Unit', 'Dosage', 'Ingredients', 'Status']
     const csv = [
       headers.join(','),
-      ...rows.map(r => [
-        r.sno,
-        `"${r.name}"`,
-        r.unit,
-        r.dosage,
-        `"${r.ingredients}"`,
-        r.status
-      ].join(','))
+      ...rows.map(r => [r.sno, `"${r.name}"`, r.unit, r.dosage, `"${r.ingredients}"`, r.status].join(','))
     ].join('\n')
     const link = document.createElement('a')
     link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
@@ -356,14 +362,16 @@ export default function ChemicalsPage() {
       <th>S.No</th><th>Chemical Name</th><th>Unit</th><th>Dosage</th><th>Ingredients</th><th>Status</th>
       </tr></thead><tbody>
       ${rows
-        .map(r => `<tr>
+        .map(
+          r => `<tr>
           <td>${r.sno}</td>
           <td>${r.name}</td>
           <td>${r.unit}</td>
           <td>${r.dosage}</td>
           <td>${r.ingredients}</td>
           <td>${r.status}</td>
-        </tr>`)
+        </tr>`
+        )
         .join('')}
       </tbody></table></body></html>`
     w.document.write(html)
@@ -457,15 +465,22 @@ export default function ChemicalsPage() {
               position: 'fixed',
               inset: 0,
               bgcolor: 'rgba(255,255,255,0.7)',
+              backdropFilter: 'blur(2px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               zIndex: 2000
             }}
           >
-            <CircularProgress />
+            <Box textAlign='center'>
+              <ProgressCircularCustomization size={60} thickness={5} />
+              <Typography mt={2} fontWeight={600} color='primary'>
+                Loading Chemicals...
+              </Typography>
+            </Box>
           </Box>
         )}
+
         <Divider sx={{ mb: 2 }} />
         <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
           <FormControl size='small' sx={{ width: 140 }}>
@@ -588,7 +603,7 @@ export default function ChemicalsPage() {
                   open={unitOpen}
                   onOpen={() => setUnitOpen(true)}
                   onClose={() => setUnitOpen(false)}
- onFocus={() => setUnitOpen(true)}
+                  onFocus={() => setUnitOpen(true)}
                   onChange={(e, v) => setFormData({ ...formData, unit: v })}
                   renderInput={params => (
                     <CustomTextField

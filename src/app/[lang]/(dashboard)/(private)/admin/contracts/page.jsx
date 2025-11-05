@@ -23,6 +23,8 @@ import {
   CircularProgress,
   InputAdornment
 } from '@mui/material'
+
+import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import EditIcon from '@mui/icons-material/Edit'
@@ -80,7 +82,7 @@ const getContracts = async () => {
   })
 }
 
-const deleteContract = async (id) => {
+const deleteContract = async id => {
   const db = await openDB()
   const tx = db.transaction(STORE_NAME, 'readwrite')
   const store = tx.objectStore(STORE_NAME)
@@ -93,7 +95,11 @@ const deleteContract = async (id) => {
 
 // Toast helper
 const showToast = (type, message) => {
-  const content = <Typography variant='body2' sx={{ fontWeight: 500 }}>{message}</Typography>
+  const content = (
+    <Typography variant='body2' sx={{ fontWeight: 500 }}>
+      {message}
+    </Typography>
+  )
   if (type === 'success') toast.success(content)
   else if (type === 'error' || type === 'delete') toast.error(content)
   else if (type === 'warning') toast.warn(content)
@@ -124,31 +130,41 @@ export default function ContractsPage() {
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
 
-  // Load data
   const loadData = async () => {
     setLoading(true)
     try {
       const all = await getContracts()
+
+      // 🔍 Filter contracts by search input
       const filtered = searchText
-        ? all.filter(r =>
-            ['customer', 'contractCode', 'serviceAddress', 'contractType'].some(key =>
-              (r[key] || '').toString().toLowerCase().includes(searchText.toLowerCase())
-            ) ||
-            (r.pestItems || []).some(p => p.pest.toLowerCase().includes(searchText.toLowerCase()))
+        ? all.filter(
+            r =>
+              ['customer', 'contractCode', 'serviceAddress', 'contractType'].some(key =>
+                (r[key] || '').toString().toLowerCase().includes(searchText.toLowerCase())
+              ) || (r.pestItems || []).some(p => (p.pest || '').toLowerCase().includes(searchText.toLowerCase()))
           )
         : all
 
+      // 🔢 Sort newest first
+      const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
+
+      // 📄 Pagination logic
       const start = pagination.pageIndex * pagination.pageSize
-      const pageSlice = filtered.slice(start, start + pagination.pageSize)
-      const normalized = pageSlice.map((item, i) => ({
+      const end = start + pagination.pageSize
+      const paginated = sorted.slice(start, end)
+
+      // 🧾 Normalize and add serial numbers
+      const normalized = paginated.map((item, idx) => ({
         ...item,
-        sno: start + i + 1,
+        sno: start + idx + 1,
         pestList: item.pestItems?.map(p => p.pest).join(', ') || 'N/A',
         date: item.startDate ? new Date(item.startDate).toLocaleDateString('en-GB') : ''
       }))
+
       setRows(normalized)
       setRowCount(filtered.length)
     } catch (err) {
+      console.error(err)
       showToast('error', 'Failed to load contracts')
     } finally {
       setLoading(false)
@@ -264,16 +280,18 @@ export default function ContractsPage() {
     const headers = ['S.No', 'Customer', 'Code', 'Address', 'Type', 'Date', 'Pests', 'Status']
     const csv = [
       headers.join(','),
-      ...rows.map(r => [
-        r.sno,
-        `"${r.customer}"`,
-        r.contractCode,
-        `"${r.serviceAddress}"`,
-        r.contractType,
-        r.date,
-        `"${r.pestList}"`,
-        r.status
-      ].join(','))
+      ...rows.map(r =>
+        [
+          r.sno,
+          `"${r.customer}"`,
+          r.contractCode,
+          `"${r.serviceAddress}"`,
+          r.contractType,
+          r.date,
+          `"${r.pestList}"`,
+          r.status
+        ].join(',')
+      )
     ].join('\n')
     const link = document.createElement('a')
     link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
@@ -296,7 +314,8 @@ export default function ContractsPage() {
       <th>S.No</th><th>Customer</th><th>Code</th><th>Address</th><th>Type</th><th>Date</th><th>Pests</th><th>Status</th>
       </tr></thead><tbody>
       ${rows
-        .map(r => `<tr>
+        .map(
+          r => `<tr>
           <td>${r.sno}</td>
           <td>${r.customer}</td>
           <td>${r.contractCode}</td>
@@ -305,7 +324,8 @@ export default function ContractsPage() {
           <td>${r.date}</td>
           <td>${r.pestList}</td>
           <td>${r.status}</td>
-        </tr>`)
+        </tr>`
+        )
         .join('')}
       </tbody></table></body></html>`
     w.document.write(html)
@@ -401,15 +421,22 @@ export default function ContractsPage() {
               position: 'fixed',
               inset: 0,
               bgcolor: 'rgba(255,255,255,0.7)',
+              backdropFilter: 'blur(2px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               zIndex: 2000
             }}
           >
-            <CircularProgress />
+            <Box textAlign='center'>
+              <ProgressCircularCustomization size={60} thickness={5} />
+              <Typography mt={2} fontWeight={600} color='primary'>
+                Loading...
+              </Typography>
+            </Box>
           </Box>
         )}
+
         <Divider sx={{ mb: 2 }} />
         <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
           <FormControl size='small' sx={{ width: 140 }}>

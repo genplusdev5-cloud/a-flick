@@ -22,6 +22,7 @@ import {
 
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
+import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 
 // Components
 import CustomContainedButton from '@/components/CustomContainedButton'
@@ -273,7 +274,7 @@ export default function UsageReportPage() {
                     await loadData(true) // show toast only when manually refreshed
                     setTimeout(() => setLoading(false), 600)
                   }}
-                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
                 >
                   {loading ? 'Refreshing...' : 'Refresh'}
                 </Button>
@@ -317,22 +318,33 @@ export default function UsageReportPage() {
           <Box
             sx={{
               position: 'fixed',
-              top: 0,
-              left: 0,
-              width: '100vw',
-              height: '100vh',
-              backgroundColor: 'rgba(255,255,255,0.7)',
-              backdropFilter: 'blur(2px)',
+              inset: 0,
+              bgcolor: 'rgba(255,255,255,0.65)',
+              backdropFilter: 'blur(3px)',
               display: 'flex',
-              justifyContent: 'center',
               alignItems: 'center',
-              zIndex: 2000
+              justifyContent: 'center',
+              flexDirection: 'column',
+              zIndex: 2000,
+              animation: 'fadeIn 0.3s ease-in-out',
+              '@keyframes fadeIn': {
+                from: { opacity: 0 },
+                to: { opacity: 1 }
+              }
             }}
           >
-            <Box sx={{ textAlign: 'center' }}>
-              <CircularProgress size={70} thickness={5} color='primary' />
-              <Typography sx={{ mt: 2, fontWeight: 600 }}>Refreshing Usage Report...</Typography>
-            </Box>
+            <ProgressCircularCustomization size={70} thickness={5} />
+            <Typography
+              mt={2}
+              sx={{
+                color: 'primary.main',
+                fontWeight: 600,
+                fontSize: '1.05rem',
+                letterSpacing: 0.3
+              }}
+            >
+              Loading Usage Report...
+            </Typography>
           </Box>
         )}
 
