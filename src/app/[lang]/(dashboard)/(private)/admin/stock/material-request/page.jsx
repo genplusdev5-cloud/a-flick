@@ -37,6 +37,10 @@ import CustomTextField from '@core/components/mui/TextField'
 import CustomAutocomplete from '@core/components/mui/Autocomplete'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 
+import DialogCloseButton from '@components/dialogs/DialogCloseButton'
+import { Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material'
+import WarningAmberIcon from '@mui/icons-material/WarningAmber'
+
 import { toast, ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 
@@ -82,17 +86,34 @@ const deleteRequest = async id => {
   await db.delete(STORE_NAME, Number(id))
 }
 
-// ───────────────────────────────────────
-// Toast (same style as Stock Report)
-// ───────────────────────────────────────
-const showToast = (type, message) => {
+
+// ──────────────────────────────────────────────────────────────
+// Toast (Custom Styled, Global, with Icons & Colors)
+// ──────────────────────────────────────────────────────────────
+const showToast = (type, message = '') => {
+  const icons = {
+    success: 'tabler-circle-check',
+    delete: 'tabler-trash',
+    error: 'tabler-alert-triangle',
+    warning: 'tabler-info-circle',
+    info: 'tabler-refresh'
+  }
+
   toast(
     <div className='flex items-center gap-2'>
       <i
-        className='tabler-info-circle'
+        className={icons[type]}
         style={{
           color:
-            type === 'success' ? '#16a34a' : type === 'error' ? '#dc2626' : type === 'warning' ? '#f59e0b' : '#2563eb',
+            type === 'success'
+              ? '#16a34a'
+              : type === 'error'
+                ? '#dc2626'
+                : type === 'delete'
+                  ? '#dc2626'
+                  : type === 'warning'
+                    ? '#f59e0b'
+                    : '#2563eb',
           fontSize: '22px'
         }}
       />
@@ -102,16 +123,18 @@ const showToast = (type, message) => {
     </div>,
     {
       position: 'top-right',
-      autoClose: 2200,
+      autoClose: 2000,
       hideProgressBar: true,
-      pauseOnHover: false,
       closeOnClick: true,
+      pauseOnHover: false,
       draggable: false,
       theme: 'light',
       style: {
         borderRadius: '10px',
         padding: '8px 14px',
-        boxShadow: '0 4px 10px rgba(0,0,0,0.06)'
+        boxShadow: '0 4px 10px rgba(0,0,0,0.06)',
+        display: 'flex',
+        alignItems: 'center'
       }
     }
   )
@@ -183,6 +206,26 @@ export default function MaterialRequestPage() {
   const [toLocation, setToLocation] = useState('')
   const [requestedBy, setRequestedBy] = useState('')
   const [searchText, setSearchText] = useState('')
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
+
+
+  // ✅ Confirm delete (properly scoped)
+const confirmDelete = async () => {
+  try {
+    const row = deleteDialog.row
+    if (!row) return
+
+    await deleteRequest(row.id)
+    showToast('delete', `Request ${row.requestNo || `REQ-${row.id}`} deleted`)
+    await loadData()
+  } catch (err) {
+    console.error(err)
+    showToast('error', 'Failed to delete request')
+  } finally {
+    setDeleteDialog({ open: false, row: null })
+  }
+}
+
 
   const statusRef = useRef(null)
   const fromRef = useRef(null)
@@ -331,16 +374,24 @@ export default function MaterialRequestPage() {
         size: 100,
         meta: { align: 'center' },
         cell: ({ row }) => (
-          <Box sx={{ display: 'flex', gap: 0.5 }}>
-            <IconButton size='small' color='error' onClick={() => handleDelete(row.original)}>
-              <DeleteIcon fontSize='small' />
-            </IconButton>
-            <IconButton size='small' onClick={() => handleEdit(row.original)}>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            {/* ✏️ Edit Button */}
+            <IconButton
+              size='small'
+              color='primary'
+              onClick={() => router.push(`/admin/stock/material-request/${row.original.id}/edit`)}
+            >
               <EditIcon fontSize='small' />
+            </IconButton>
+
+            {/* 🗑️ Delete Button */}
+            <IconButton size='small' color='error' onClick={() => setDeleteDialog({ open: true, row: row.original })}>
+              <DeleteIcon fontSize='small' />
             </IconButton>
           </Box>
         )
       }),
+
       columnHelper.accessor('requestType', { header: 'Request Type', size: 150 }),
       columnHelper.accessor(row => row.requestNo || `REQ-${row.id}`, {
         id: 'requestNo',
@@ -745,6 +796,81 @@ export default function MaterialRequestPage() {
           />
         </Box>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        onClose={() => setDeleteDialog({ open: false, row: null })}
+        aria-labelledby='delete-request-dialog'
+        open={deleteDialog.open}
+        closeAfterTransition={false}
+        PaperProps={{
+          sx: {
+            overflow: 'visible',
+            width: 420,
+            borderRadius: 1,
+            textAlign: 'center'
+          }
+        }}
+      >
+        {/* 🔴 Header with Close Button */}
+        <DialogTitle
+          id='delete-request-dialog'
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1,
+            color: 'error.main',
+            fontWeight: 700,
+            pb: 1,
+            position: 'relative'
+          }}
+        >
+          <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
+          Confirm Delete
+          {/* ❌ Close Button */}
+          <DialogCloseButton
+            onClick={() => setDeleteDialog({ open: false, row: null })}
+            disableRipple
+            sx={{ position: 'absolute', right: 1, top: 1 }}
+          >
+            <i className='tabler-x' />
+          </DialogCloseButton>
+        </DialogTitle>
+
+        {/* 🧾 Message */}
+        <DialogContent sx={{ px: 5, pt: 1 }}>
+          <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
+            Are you sure you want to delete material request{' '}
+            <strong style={{ color: '#d32f2f' }}>
+              {deleteDialog.row?.requestNo || `REQ-${deleteDialog.row?.id || ''}`}
+            </strong>
+            ?
+            <br />
+            This action cannot be undone.
+          </Typography>
+        </DialogContent>
+
+        {/* ⚙️ Buttons */}
+        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+          <Button
+            onClick={() => setDeleteDialog({ open: false, row: null })}
+            variant='tonal'
+            color='secondary'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={confirmDelete}
+            variant='contained'
+            color='error'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <ToastContainer />
     </Box>

@@ -41,6 +41,7 @@ import ShoppingCartIcon from '@mui/icons-material/ShoppingCart'
 import MonetizationOnIcon from '@mui/icons-material/MonetizationOn'
 import GroupIcon from '@mui/icons-material/Group'
 import BarChartIcon from '@mui/icons-material/BarChart'
+import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import { useRouter } from 'next/navigation'
 import { toast } from 'react-toastify'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
@@ -71,18 +72,58 @@ const getCustomerDB = async () => {
 }
 
 // Toast helper
-const showToast = (type, message) => {
-  const content = (
-    <Typography variant='body2' sx={{ fontWeight: 500 }}>
-      {message}
-    </Typography>
-  )
-  if (type === 'success') toast.success(content)
-  else if (type === 'error' || type === 'delete') toast.error(content)
-  else if (type === 'warning') toast.warn(content)
-  else toast.info(content)
-}
+// ──────────────────────────────────────────────────────────────
+// Toast (Custom Styled, Global, with Icons & Colors)
+// ──────────────────────────────────────────────────────────────
+const showToast = (type, message = '') => {
+  const icons = {
+    success: 'tabler-circle-check',
+    delete: 'tabler-trash',
+    error: 'tabler-alert-triangle',
+    warning: 'tabler-info-circle',
+    info: 'tabler-refresh'
+  }
 
+  toast(
+    <div className='flex items-center gap-2'>
+      <i
+        className={icons[type]}
+        style={{
+          color:
+            type === 'success'
+              ? '#16a34a'
+              : type === 'error'
+                ? '#dc2626'
+                : type === 'delete'
+                  ? '#dc2626'
+                  : type === 'warning'
+                    ? '#f59e0b'
+                    : '#2563eb',
+          fontSize: '22px'
+        }}
+      />
+      <Typography variant='body2' sx={{ fontSize: '0.9rem', color: '#111' }}>
+        {message}
+      </Typography>
+    </div>,
+    {
+      position: 'top-right',
+      autoClose: 2000,
+      hideProgressBar: true,
+      closeOnClick: true,
+      pauseOnHover: false,
+      draggable: false,
+      theme: 'light',
+      style: {
+        borderRadius: '10px',
+        padding: '8px 14px',
+        boxShadow: '0 4px 10px rgba(0,0,0,0.06)',
+        display: 'flex',
+        alignItems: 'center'
+      }
+    }
+  )
+}
 // Debounced Input
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
   const [value, setValue] = useState(initialValue)
@@ -541,19 +582,71 @@ export default function CustomersPage() {
         <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
       </Card>
 
-      {/* Delete Dialog */}
-      <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false })}>
-        <DialogTitle sx={{ textAlign: 'center', color: 'error.main', fontWeight: 600 }}>
-          <WarningAmberIcon sx={{ verticalAlign: 'middle', mr: 1 }} /> Confirm Delete
+      <Dialog
+        onClose={() => setDeleteDialog({ open: false })}
+        aria-labelledby='customized-dialog-title'
+        open={deleteDialog.open}
+        closeAfterTransition={false}
+        PaperProps={{
+          sx: {
+            overflow: 'visible',
+            width: 420,
+            borderRadius: 1,
+            textAlign: 'center'
+          }
+        }}
+      >
+        {/* 🔴 Title with Warning Icon */}
+        <DialogTitle
+          id='customized-dialog-title'
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1,
+            color: 'error.main',
+            fontWeight: 700,
+            pb: 1,
+            position: 'relative'
+          }}
+        >
+          <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
+          Confirm Delete
+          <DialogCloseButton
+            onClick={() => setDeleteDialog({ open: false })}
+            disableRipple
+            sx={{ position: 'absolute', right: 1, top: 1 }}
+          >
+            <i className='tabler-x' />
+          </DialogCloseButton>
         </DialogTitle>
-        <DialogContent>
-          <Typography textAlign='center'>
-            Delete customer "<strong>{deleteDialog.row?.name}</strong>"?
+
+        {/* 🧾 Message */}
+        <DialogContent sx={{ px: 5, pt: 1 }}>
+          <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
+            Are you sure you want to delete customer{' '}
+            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name || 'this customer'}</strong>?
+            <br />
+            This action cannot be undone.
           </Typography>
         </DialogContent>
-        <DialogActions sx={{ justifyContent: 'center', pb: 3 }}>
-          <Button onClick={() => setDeleteDialog({ open: false })}>Cancel</Button>
-          <Button color='error' variant='contained' onClick={confirmDelete}>
+
+        {/* ⚙️ Buttons */}
+        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+          <Button
+            onClick={() => setDeleteDialog({ open: false })}
+            variant='tonal'
+            color='secondary'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={confirmDelete}
+            variant='contained'
+            color='error'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+          >
             Delete
           </Button>
         </DialogActions>

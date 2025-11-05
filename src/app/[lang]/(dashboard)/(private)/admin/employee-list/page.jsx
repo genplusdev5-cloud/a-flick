@@ -1,496 +1,462 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { openDB } from 'idb'
 import {
   Box,
-  Typography,
   Button,
-  IconButton,
-  Drawer,
-  InputAdornment,
-  MenuItem,
   Card,
+  CardHeader,
+  Typography,
+  Menu,
+  MenuItem,
+  IconButton,
   Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Breadcrumbs,
+  Chip,
+  TextField,
   FormControl,
   Select,
-  Pagination,
-  Menu // Added Menu for Export like Page A
+  CircularProgress,
+  InputAdornment
 } from '@mui/material'
-
-// Icons
+import DialogCloseButton from '@components/dialogs/DialogCloseButton'
+import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
-import CloseIcon from '@mui/icons-material/Close'
-import SearchIcon from '@mui/icons-material/Search'
-import EditIcon from '@mui/icons-material/Edit'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
-import { MdDelete } from 'react-icons/md'
+import EditIcon from '@mui/icons-material/Edit'
+import DeleteIcon from '@mui/icons-material/Delete'
+import PrintIcon from '@mui/icons-material/Print'
+import FileDownloadIcon from '@mui/icons-material/FileDownload'
+import WarningAmberIcon from '@mui/icons-material/WarningAmber'
+import RefreshIcon from '@mui/icons-material/Refresh'
+import SearchIcon from '@mui/icons-material/Search'
+import { toast } from 'react-toastify'
+import TablePaginationComponent from '@/components/TablePaginationComponent'
+import classnames from 'classnames'
+import { rankItem } from '@tanstack/match-sorter-utils'
+import {
+  useReactTable,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getSortedRowModel,
+  flexRender,
+  createColumnHelper
+} from '@tanstack/react-table'
+import styles from '@core/styles/table.module.css'
+import ChevronRight from '@menu/svg/ChevronRight'
 
-// Wrapper & Custom Components
-import CustomTextField from '@core/components/mui/TextField'
-import Link from 'next/link'
-import { useTheme } from '@mui/material/styles'
-
-// IndexedDB Config
-const dbName = 'EmployeeDB'
-const storeName = 'employees'
+// ───────────────────────────────────────────
+// IndexedDB Setup
+// ───────────────────────────────────────────
+const DB_NAME = 'EmployeeDB'
+const STORE_NAME = 'employees'
 const DB_VERSION = 2
 
-// ------------------- IndexedDB Operations -------------------
-
-const initDB = async () => {
-  return openDB(dbName, DB_VERSION, {
+const openDBInstance = () => {
+  return openDB(DB_NAME, DB_VERSION, {
     upgrade(db) {
-      if (!db.objectStoreNames.contains(storeName)) {
-        // NOTE: All employee fields must be created here
-        db.createObjectStore(storeName, { keyPath: 'id', autoIncrement: true })
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true })
       }
     }
   })
 }
 
-async function getAllRows() {
-  const db = await initDB()
-  return db.getAll(storeName)
+const getEmployees = async () => {
+  const db = await openDBInstance()
+  return db.getAll(STORE_NAME)
 }
 
-async function addOrUpdateRow(row) {
-  const db = await initDB()
-  await db.put(storeName, row)
+const deleteEmployee = async (id) => {
+  const db = await openDBInstance()
+  await db.delete(STORE_NAME, id)
 }
 
-async function deleteRowFromDB(id) {
-  const db = await initDB()
-  await db.delete(storeName, id)
-}
-
-// ------------------- Component -------------------
-
-export default function EmployeePage() {
-  const [rows, setRows] = useState([])
-  const [open, setOpen] = useState(false)
-  const [isEdit, setIsEdit] = useState(false)
-  const [editRow, setEditRow] = useState(null)
-  const [formData, setFormData] = useState({
-    name: '',
-    phone: '',
-    email: '',
-    city: '',
-    state: '',
-    pincode: '',
-    address1: '',
-    address2: '',
-    status: 'Active'
-  })
-  const [errors, setErrors] = useState({})
-  const [searchText, setSearchText] = useState('')
-
-  // State for Sorting
-  const [sortField, setSortField] = useState('id')
-  const [sortDirection, setSortDirection] = useState('desc')
-
-  // State variables for Pagination
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
-
-  // File upload states
-  const fileInputRef = useRef(null)
-  const [selectedFile, setSelectedFile] = useState('') // This holds the file name for the form
-  const [isDragOver, setIsDragOver] = useState(false)
-  const [exportAnchorEl, setExportAnchorEl] = useState(null)
-  const exportOpen = Boolean(exportAnchorEl)
-
-  // Input refs for Drawer
-  const nameRef = useRef(null)
-  const phoneRef = useRef(null)
-  const emailRef = useRef(null)
-  const cityRef = useRef(null)
-  const stateRef = useRef(null)
-  const pincodeRef = useRef(null)
-  const address1Ref = useRef(null)
-  const address2Ref = useRef(null)
-  const statusRef = useRef(null)
-  const submitRef = useRef(null)
-
-  // Helper for keyboard navigation
-  const focusNext = ref => {
-    if (!ref.current) return
-    // Focus the actual input element within the CustomTextField component
-    const input =
-      ref.current.querySelector('input') ||
-      ref.current.querySelector('textarea') ||
-      ref.current.querySelector('button') ||
-      ref.current
-    input.focus()
+// Toast helper
+// ──────────────────────────────────────────────────────────────
+// Toast (Custom Styled, Global, with Icons & Colors)
+// ──────────────────────────────────────────────────────────────
+const showToast = (type, message = '') => {
+  const icons = {
+    success: 'tabler-circle-check',
+    delete: 'tabler-trash',
+    error: 'tabler-alert-triangle',
+    warning: 'tabler-info-circle',
+    info: 'tabler-refresh'
   }
 
-  // ------------------- Data Loading -------------------
+  toast(
+    <div className='flex items-center gap-2'>
+      <i
+        className={icons[type]}
+        style={{
+          color:
+            type === 'success'
+              ? '#16a34a'
+              : type === 'error'
+                ? '#dc2626'
+                : type === 'delete'
+                  ? '#dc2626'
+                  : type === 'warning'
+                    ? '#f59e0b'
+                    : '#2563eb',
+          fontSize: '22px'
+        }}
+      />
+      <Typography variant='body2' sx={{ fontSize: '0.9rem', color: '#111' }}>
+        {message}
+      </Typography>
+    </div>,
+    {
+      position: 'top-right',
+      autoClose: 2000,
+      hideProgressBar: true,
+      closeOnClick: true,
+      pauseOnHover: false,
+      draggable: false,
+      theme: 'light',
+      style: {
+        borderRadius: '10px',
+        padding: '8px 14px',
+        boxShadow: '0 4px 10px rgba(0,0,0,0.06)',
+        display: 'flex',
+        alignItems: 'center'
+      }
+    }
+  )
+}
 
-  const loadRows = async () => {
-    const allRows = await getAllRows()
-    // Initial load: sort by ID descending (latest first)
-    allRows.sort((a, b) => b.id - a.id)
-    setRows(allRows)
+// Debounced Input
+const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
+  const [value, setValue] = useState(initialValue)
+  useEffect(() => setValue(initialValue), [initialValue])
+  useEffect(() => {
+    const t = setTimeout(() => onChange(value), debounce)
+    return () => clearTimeout(t)
+  }, [value])
+  return <TextField {...props} value={value} onChange={e => setValue(e.target.value)} />
+}
+
+// ───────────────────────────────────────────
+// Component
+// ───────────────────────────────────────────
+export default function EmployeePage() {
+  const router = useRouter()
+  const [rows, setRows] = useState([])
+  const [rowCount, setRowCount] = useState(0)
+  const [searchText, setSearchText] = useState('')
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
+  const [loading, setLoading] = useState(false)
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
+  const [exportAnchorEl, setExportAnchorEl] = useState(null)
+
+  const loadData = async () => {
+    setLoading(true)
+    try {
+      const all = await getEmployees()
+      const filtered = searchText
+        ? all.filter(r =>
+            ['name', 'email', 'phone', 'city', 'state', 'pincode', 'address1', 'address2'].some(key =>
+              (r[key] || '').toString().toLowerCase().includes(searchText.toLowerCase())
+            )
+          )
+        : all
+
+      const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
+      const start = pagination.pageIndex * pagination.pageSize
+      const end = start + pagination.pageSize
+      const paginated = sorted.slice(start, end)
+
+      const normalized = paginated.map((item, idx) => ({
+        ...item,
+        sno: start + idx + 1,
+        department: item.city || 'N/A',
+        supervisor: item.state || 'N/A'
+      }))
+
+      setRows(normalized)
+      setRowCount(filtered.length)
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'Failed to load employees')
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
-    loadRows()
-  }, [])
+    loadData()
+    const handleFocus = () => loadData()
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [pagination.pageIndex, pagination.pageSize, searchText])
 
-  // ------------------- CRUD & Drawer Handlers -------------------
-
-  const toggleDrawer = () => {
-    setOpen(prev => !prev)
-    setErrors({})
-  }
-
-  const handleAdd = () => {
-    setIsEdit(false)
-    setEditRow(null)
-    setFormData({
-      name: '',
-      phone: '',
-      email: '',
-      city: '',
-      state: '',
-      pincode: '',
-      address1: '',
-      address2: '',
-      status: 'Active'
-    })
-    setSelectedFile('')
-    setErrors({})
-    setOpen(true)
-    setTimeout(() => nameRef.current?.focus(), 100)
-  }
-
-  const handleEdit = row => {
-    if (!row) return
-    setIsEdit(true)
-    setEditRow(row)
-    setFormData(row)
-    setSelectedFile(row.fileName || '')
-    setErrors({})
-    setOpen(true)
-    setTimeout(() => nameRef.current?.focus(), 100)
-  }
-
-  const handleDelete = async row => {
-    setRows(prev => prev.filter(r => r.id !== row.id))
-    await deleteRowFromDB(row.id)
-  }
-
-  // ------------------- Validation & Form Handlers -------------------
-
-  const validateEmail = email => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-
-  const handleNameChange = e => {
-    const value = e.target.value.replace(/[^a-zA-Z\s]/g, '')
-    setFormData(prev => ({ ...prev, name: value }))
-    setErrors(prev => {
-      const newErrors = { ...prev }
-      if (!value) newErrors.name = 'Name is required'
-      else delete newErrors.name
-      return newErrors
-    })
-  }
-
-  const handlePhoneChange = e => {
-    let value = e.target.value.replace(/\D/g, '')
-    const displayValue = value.slice(0, 10)
-    setFormData(prev => ({ ...prev, phone: displayValue }))
-    setErrors(prev => {
-      const newErrors = { ...prev }
-      if (displayValue.length !== 10) newErrors.phone = 'Phone must be 10 digits'
-      else delete newErrors.phone
-      return newErrors
-    })
-  }
-
-  const handleEmailChange = e => {
-    const value = e.target.value
-    setFormData(prev => ({ ...prev, email: value }))
-    setErrors(prev => {
-      const newErrors = { ...prev }
-      if (!validateEmail(value)) newErrors.email = 'Invalid email'
-      else delete newErrors.email
-      return newErrors
-    })
-  }
-
-  const handleGenericChange = e => {
-    const { name, value } = e.target
-    let processedValue = value
-
-    if (name === 'city' || name === 'state') {
-      processedValue = value.replace(/[^a-zA-Z\s]/g, '')
-    } else if (name === 'pincode') {
-      processedValue = value.replace(/\D/g, '').slice(0, 6)
+  const handleEdit = (id) => router.push(`/admin/employee-list/${id}/edit`)
+  const confirmDelete = async () => {
+    if (deleteDialog.row) {
+      await deleteEmployee(deleteDialog.row.id)
+      showToast('delete', `Employee ${deleteDialog.row.name} deleted`)
+      loadData()
     }
-
-    setFormData(prev => ({ ...prev, [name]: processedValue }))
+    setDeleteDialog({ open: false, row: null })
   }
 
-  const handleSubmit = async e => {
-    e.preventDefault()
-    const tempErrors = {}
-
-    // Re-run all required validations
-    if (!formData.name) tempErrors.name = 'Name is required'
-    if (!formData.phone || formData.phone.length !== 10) tempErrors.phone = 'Phone must be 10 digits'
-    if (!formData.email || !validateEmail(formData.email)) tempErrors.email = 'Invalid email'
-
-    setErrors(tempErrors)
-    if (Object.keys(tempErrors).length > 0) return
-
-    // Save the file name from state
-    const rowData = { ...formData, fileName: selectedFile }
-
-    let rowToSave
-    if (isEdit && editRow) {
-      rowToSave = { ...rowData, id: editRow.id }
-      await addOrUpdateRow(rowToSave)
-    } else {
-      const newId = await initDB().then(db => db.add(storeName, rowData))
-      rowToSave = { ...rowData, id: newId }
-    }
-
-    await loadRows()
-    setSortField('id')
-    setSortDirection('desc')
-
-    toggleDrawer()
-  }
-
-  // ------------------- Key Navigation -------------------
-
-  // Using Page A's handleKeyDown logic for refs
-  const handleKeyDown = (e, nextRef) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      // Special case for multiline text areas (address1/address2)
-      if (e.target.name === 'address1' || e.target.name === 'address2') {
-        if (!e.shiftKey) {
-          // Allows Shift+Enter for new line
-          focusNext(nextRef)
+  // --- Table Columns ---
+  const columnHelper = createColumnHelper()
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor('sno', { header: 'S.No' }),
+      columnHelper.display({
+        id: 'actions',
+        header: 'Actions',
+        cell: info => (
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original.id)}>
+              <EditIcon />
+            </IconButton>
+            <IconButton
+              size='small'
+              color='error'
+              onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
+            >
+              <DeleteIcon />
+            </IconButton>
+          </Box>
+        )
+      }),
+      columnHelper.accessor('name', { header: 'Full Name' }),
+      columnHelper.accessor('email', { header: 'Email' }),
+      columnHelper.accessor('phone', { header: 'Phone' }),
+      columnHelper.accessor('department', { header: 'Department' }),
+      columnHelper.accessor('supervisor', { header: 'Supervisor' }),
+      columnHelper.accessor('status', {
+        header: 'Status',
+        cell: info => {
+          const status = info.getValue() || 'Active'
+          return (
+            <Chip
+              label={status}
+              size='small'
+              sx={{
+                color: '#fff',
+                bgcolor: status === 'Active' ? 'success.main' : 'error.main',
+                fontWeight: 600,
+                borderRadius: '6px',
+                px: 1.5
+              }}
+            />
+          )
         }
-      } else {
-        focusNext(nextRef)
-      }
-    }
-  }
-
-  // ------------------- File Upload Handlers -------------------
-
-  const handleFileChange = e => {
-    const file = e.target.files[0]
-    if (file) setSelectedFile(file.name)
-  }
-
-  const handleFileDrop = e => {
-    e.preventDefault()
-    const file = e.dataTransfer.files[0]
-    if (file) setSelectedFile(file.name)
-    setIsDragOver(false)
-  }
-
-  // ------------------- Export Handler -------------------
-
-  const handleExport = () => {
-    if (!rows.length) return
-    // Export all fields from the data model, including file name, even if not shown in table
-    const headers = [
-      'ID',
-      'Name',
-      'Phone',
-      'Email',
-      'City',
-      'State',
-      'Pin Code',
-      'Address 1',
-      'Address 2',
-      'File Name',
-      'Status'
-    ]
-    const csvRows = rows.map(r =>
-      [
-        r.id,
-        `"${r.name}"`,
-        r.phone,
-        r.email,
-        `"${r.city}"`,
-        `"${r.state}"`,
-        r.pincode,
-        `"${r.address1 || ''}"`,
-        `"${r.address2 || ''}"`,
-        r.fileName || '',
-        r.status
-      ].join(',')
-    )
-    const csv = [headers.join(','), ...csvRows].join('\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'employee.csv'
-    a.click()
-    URL.revokeObjectURL(url)
-    setExportAnchorEl(null)
-  }
-
-  // ------------------- Sorting Logic -------------------
-
-  const handleSort = field => {
-    if (sortField === field) {
-      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'))
-    } else {
-      // Note: Changed default sort for text fields to 'asc'
-      setSortField(field)
-      setSortDirection(['id', 'phone', 'pincode'].includes(field) ? 'desc' : 'asc')
-    }
-    setPage(1)
-  }
-
-  const sortedRows = [...rows].sort((a, b) => {
-    const aValue = a[sortField] || ''
-    const bValue = b[sortField] || ''
-
-    let comparison = 0
-    const isNumeric = ['id', 'phone', 'pincode'].includes(sortField)
-
-    if (isNumeric) {
-      comparison = Number(String(aValue).replace(/\s/g, '')) - Number(String(bValue).replace(/\s/g, ''))
-    } else {
-      comparison = String(aValue).localeCompare(String(bValue), undefined, { sensitivity: 'base' })
-    }
-
-    return sortDirection === 'asc' ? comparison : comparison * -1
-  })
-
-  // ------------------- Filtering and Pagination -------------------
-
-  const handleSearch = e => {
-    setSearchText(e.target.value)
-    setPage(1)
-  }
-
-  // Client-side filtering based on search text (optimized for all fields)
-  const filteredRows = sortedRows.filter(row =>
-    Object.values(row).some(val =>
-      String(val || '')
-        .toLowerCase()
-        .includes(searchText.toLowerCase())
-    )
+      })
+    ],
+    []
   )
 
-  // Client-side pagination logic
-  const rowCount = filteredRows.length
-  const pageCount = Math.max(1, Math.ceil(rowCount / pageSize))
-  const paginatedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize)
-  const startIndex = rowCount === 0 ? 0 : (page - 1) * pageSize + 1
-  const endIndex = Math.min(page * pageSize, rowCount)
-  const paginationText = `Showing ${startIndex} to ${endIndex} of ${rowCount} entries`
-
-  // Helper component to render the sort icon
-  const SortIcon = ({ field }) => {
-    if (sortField !== field) return null
-    return sortDirection === 'asc' ? (
-      <ArrowUpwardIcon sx={{ fontSize: 16, ml: 0.5 }} />
-    ) : (
-      <ArrowDownwardIcon sx={{ fontSize: 16, ml: 0.5 }} />
-    )
+  const fuzzyFilter = (row, columnId, value, addMeta) => {
+    const itemRank = rankItem(row.getValue(columnId), value)
+    addMeta({ itemRank })
+    return itemRank.passed
   }
 
-  // Define ALL columns for the table with new labels, mapping to existing fields
-  const tableColumns = [
-    { label: 'Full Name', field: 'name', minWidth: '150px' },
-    { label: 'Email', field: 'email', minWidth: '220px' },
-    { label: 'Phone', field: 'phone', minWidth: '120px' },
-    { label: 'Department', field: 'city', minWidth: '120px' }, // Mapped to existing 'city' data
-    { label: 'Supervisor', field: 'state', minWidth: '120px' }, // Mapped to existing 'state' data
-    { label: 'Status', field: 'status', minWidth: '100px' }
-  ]
+  const table = useReactTable({
+    data: rows,
+    columns,
+    manualPagination: true,
+    pageCount: Math.ceil(rowCount / pagination.pageSize),
+    state: { globalFilter: searchText, pagination },
+    onGlobalFilterChange: setSearchText,
+    onPaginationChange: setPagination,
+    globalFilterFn: fuzzyFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getSortedRowModel: getSortedRowModel()
+  })
 
-  // Total minimum width needed for the table (S.No + Action + all data columns)
-  const totalMinWidth = 60 + 100 + tableColumns.reduce((sum, col) => sum + parseInt(col.minWidth), 0) + 'px'
+  // --- Export ---
+  const exportOpen = Boolean(exportAnchorEl)
+  const exportCSV = () => {
+    const headers = ['S.No', 'Name', 'Email', 'Phone', 'Department', 'Supervisor', 'Status']
+    const csv = [
+      headers.join(','),
+      ...rows.map(r => [
+        r.sno,
+        `"${r.name}"`,
+        r.email,
+        r.phone,
+        `"${r.department}"`,
+        `"${r.supervisor}"`,
+        r.status
+      ].join(','))
+    ].join('\n')
 
-  const theme = useTheme()
-  // ------------------- Render -------------------
+    const link = document.createElement('a')
+    link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
+    link.download = 'employees.csv'
+    link.click()
+    showToast('success', 'CSV downloaded')
+  }
 
+  const exportPrint = () => {
+    const w = window.open('', '_blank')
+    const html = `
+      <html><head><title>Employee List</title><style>
+      body{font-family:Arial;padding:24px;}
+      table{width:100%;border-collapse:collapse;}
+      th,td{border:1px solid #ccc;padding:8px;text-align:left;}
+      th{background:#f4f4f4;}
+      </style></head><body>
+      <h2>Employee List</h2>
+      <table><thead><tr>
+      <th>S.No</th><th>Name</th><th>Email</th><th>Phone</th><th>Department</th><th>Supervisor</th><th>Status</th>
+      </tr></thead><tbody>
+      ${rows.map(r => `<tr>
+        <td>${r.sno}</td>
+        <td>${r.name}</td>
+        <td>${r.email}</td>
+        <td>${r.phone}</td>
+        <td>${r.department}</td>
+        <td>${r.supervisor}</td>
+        <td>${r.status}</td>
+      </tr>`).join('')}
+      </tbody></table></body></html>`
+    w.document.write(html)
+    w.document.close()
+    w.print()
+  }
+
+  // ───────────────────────────────────────────
+  // Render
+  // ───────────────────────────────────────────
   return (
     <Box>
-      {/* Breadcrumb (Modified for Employee page) */}
-      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
-        <Link
-          href='/admin/dashboards'
-          style={{
-            textDecoration: 'none',
-            fontSize: 14,
-            color: theme.palette.primary.main // 👈 Theme primary color used
-          }}
-        >
+      <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
+        <Link underline='hover' color='inherit' href='/admin/dashboards'>
           Dashboard
         </Link>
-        <Typography sx={{ mx: 1, color: 'text.secondary' }}>/</Typography>
-        <Typography variant='body2' sx={{ fontSize: 14 }}>
-          Employee
-        </Typography>
-      </Box>
+        <Typography color='text.primary'>Employee</Typography>
+      </Breadcrumbs>
 
-      <Card sx={{ p: 6 }}>
-        {/* Header + actions (From Page A) */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-          <Typography variant='h6'>Employee List</Typography>
-
-          <Box display='flex' gap={1}>
-            <Button
-              variant='outlined'
-              endIcon={<ArrowDropDownIcon />}
-              onClick={e => setExportAnchorEl(e.currentTarget)}
-            >
-              Export
-            </Button>
-            {/* Note: Modified Link to use existing handleAdd logic if no separate add page exists, otherwise leave as is. */}
-            <Link href='/admin/employee-list/add' style={{ textDecoration: 'none' }}>
-              <Button variant='contained' startIcon={<AddIcon />}>
+      <Card sx={{ p: 3 }}>
+        <CardHeader
+          sx={{
+            pb: 1.5,
+            pt: 1.5,
+            '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
+            '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
+          }}
+          title={
+            <Box display='flex' alignItems='center' gap={2}>
+              <Typography variant='h5' sx={{ fontWeight: 600 }}>
+                Employee List
+              </Typography>
+              <Button
+                variant='contained'
+                color='primary'
+                startIcon={
+                  <RefreshIcon
+                    sx={{
+                      animation: loading ? 'spin 1s linear infinite' : 'none',
+                      '@keyframes spin': { '0%': { transform: 'rotate(0deg)' }, '100%': { transform: 'rotate(360deg)' } }
+                    }}
+                  />
+                }
+                disabled={loading}
+                onClick={async () => {
+                  setLoading(true)
+                  await loadData()
+                  setTimeout(() => setLoading(false), 600)
+                }}
+                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+              >
+                {loading ? 'Refreshing...' : 'Refresh'}
+              </Button>
+            </Box>
+          }
+          action={
+            <Box display='flex' alignItems='center' gap={2}>
+              <Button
+                variant='outlined'
+                color='secondary'
+                endIcon={<ArrowDropDownIcon />}
+                onClick={e => setExportAnchorEl(e.currentTarget)}
+                disabled={!rows.length}
+                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+              >
+                Export
+              </Button>
+              <Menu anchorEl={exportAnchorEl} open={exportOpen} onClose={() => setExportAnchorEl(null)}>
+                <MenuItem onClick={exportPrint}>
+                  <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
+                </MenuItem>
+                <MenuItem onClick={exportCSV}>
+                  <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
+                </MenuItem>
+              </Menu>
+              <Button
+                variant='contained'
+                startIcon={<AddIcon />}
+                onClick={() => router.push('/admin/employee-list/add')}
+                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+              >
                 Add Employee
               </Button>
-            </Link>
-            {/* Export Menu (Like Page A) */}
-            <Menu anchorEl={exportAnchorEl} open={exportOpen} onClose={() => setExportAnchorEl(null)}>
-              <MenuItem onClick={handleExport}>Download CSV</MenuItem>
-            </Menu>
+            </Box>
+          }
+        />
+
+        {loading && (
+          <Box
+            sx={{
+              position: 'fixed',
+              inset: 0,
+              bgcolor: 'rgba(255,255,255,0.7)',
+              backdropFilter: 'blur(2px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 2000
+            }}
+          >
+            <Box textAlign='center'>
+              <ProgressCircularCustomization size={60} thickness={5} />
+              <Typography mt={2} fontWeight={600} color='primary'>
+                Loading...
+              </Typography>
+            </Box>
           </Box>
-        </Box>
+        )}
 
-        <Divider sx={{ mb: 3 }} />
+        <Divider sx={{ mb: 2 }} />
 
-        {/* Search / entries (From Page A) */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <FormControl size='small' sx={{ minWidth: 120 }}>
+        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+          <FormControl size='small' sx={{ width: 140 }}>
             <Select
-              value={pageSize}
-              onChange={e => {
-                setPageSize(Number(e.target.value))
-                setPage(1)
-              }}
+              value={pagination.pageSize}
+              onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
             >
-              {[10, 25, 50, 100].map(i => (
-                <MenuItem key={i} value={i}>
-                  {i} entries
-                </MenuItem>
+              {[10, 25, 50, 100].map(s => (
+                <MenuItem key={s} value={s}>{s} entries</MenuItem>
               ))}
             </Select>
           </FormControl>
 
-          <CustomTextField
-            size='small'
-            placeholder='Search All Fields...'
+          <DebouncedInput
             value={searchText}
-            onChange={handleSearch}
+            onChange={v => {
+              setSearchText(String(v))
+              setPagination(p => ({ ...p, pageIndex: 0 }))
+            }}
+            placeholder='Search name, email, phone, department...'
             sx={{ width: 420 }}
+            variant='outlined'
+            size='small'
             slotProps={{
               input: {
                 startAdornment: (
@@ -503,131 +469,108 @@ export default function EmployeePage() {
           />
         </Box>
 
-        {/* Table (Manual HTML Table with updated columns) */}
-        <Box sx={{ overflowX: 'auto' }}>
-          <table
-            style={{
-              width: '100%',
-              borderCollapse: 'collapse',
-              tableLayout: 'fixed', // Fixed layout from Page A
-              minWidth: totalMinWidth // Ensures all visible columns fit
-            }}
-          >
+        <div className='overflow-x-auto'>
+          <table className={styles.table}>
             <thead>
-              <tr style={{ textAlign: 'left', borderBottom: '1px solid #E5E7EB' }}>
-                {/* S.No Header */}
-                <th
-                  onClick={() => handleSort('id')}
-                  style={{ padding: '12px', width: '60px', cursor: 'pointer', userSelect: 'none' }}
-                >
-                  <Box display='flex' alignItems='center'>
-                    S.No <SortIcon field='id' />
-                  </Box>
-                </th>
-
-                <th style={{ padding: '12px', width: '100px' }}>Action</th>
-
-                {/* Dynamic Data Columns (6 fields) */}
-                {tableColumns.map(col => (
-                  <th
-                    key={col.field + col.label}
-                    onClick={() => handleSort(col.field)}
-                    style={{ padding: '12px', width: col.minWidth, cursor: 'pointer', userSelect: 'none' }}
-                  >
-                    <Box display='flex' alignItems='center'>
-                      {col.label} <SortIcon field={col.field} />
-                    </Box>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-
-            <tbody>
-              {paginatedRows.map((r, i) => (
-                <tr key={r.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
-                  <td style={{ padding: '12px', wordWrap: 'break-word', whiteSpace: 'normal' }}>
-                    {(page - 1) * pageSize + i + 1}
-                  </td>
-                  {/* Actions */}
-                  <td style={{ padding: '12px' }}>
-                    <Box sx={{ display: 'flex', gap: 1 }}>
-                      <IconButton size='small' onClick={() => handleEdit(r)}>
-                        <EditIcon />
-                      </IconButton>
-                      <IconButton size='small' color='error' onClick={() => handleDelete(r)}>
-                        <MdDelete />
-                      </IconButton>
-                    </Box>
-                  </td>
-                  {/* Data Cells (6 fields: Full Name, Email, Phone, Department, Supervisor, Status) */}
-                  <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.name}</td>
-                  <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.email}</td>
-                  <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.phone}</td>
-                  <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.city}</td>{' '}
-                  {/* Department using City data */}
-                  <td style={{ padding: '12px', whiteSpace: 'normal', wordWrap: 'break-word' }}>{r.state}</td>{' '}
-                  {/* Supervisor using State data */}
-                  {/* Status Badge (From Page A) */}
-                  <td style={{ padding: '12px' }}>
-                    <Box
-                      component='span'
-                      sx={{
-                        fontWeight: 600,
-                        color: '#fff',
-                        backgroundColor: r.status === 'Active' ? 'success.main' : 'error.main',
-                        px: 1.5,
-                        py: 0.5,
-                        borderRadius: '6px',
-                        display: 'inline-block'
-                      }}
-                    >
-                      {r.status}
-                    </Box>
-                  </td>
+              {table.getHeaderGroups().map(hg => (
+                <tr key={hg.id}>
+                  {hg.headers.map(h => (
+                    <th key={h.id}>
+                      <div
+                        className={classnames({
+                          'flex items-center': h.column.getIsSorted(),
+                          'cursor-pointer select-none': h.column.getCanSort()
+                        })}
+                        onClick={h.column.getToggleSortingHandler()}
+                      >
+                        {flexRender(h.column.columnDef.header, h.getContext())}
+                        {{
+                          asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
+                          desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
+                        }[h.column.getIsSorted()] ?? null}
+                      </div>
+                    </th>
+                  ))}
                 </tr>
               ))}
+            </thead>
+            <tbody>
+              {rows.length ? (
+                table.getRowModel().rows.map(row => (
+                  <tr key={row.id}>
+                    {row.getVisibleCells().map(cell => (
+                      <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                    ))}
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={columns.length} className='text-center py-4'>
+                    {loading ? 'Loading employees...' : 'No results found'}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
-          {rowCount === 0 && (
-            <Box sx={{ textAlign: 'center', py: 4 }}>
-              <Typography color='text.secondary'>No results found</Typography>
-            </Box>
-          )}
-        </Box>
+        </div>
 
-        {/* Pagination (From Page A) */}
-        <Box
+        <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+      </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialog.open}
+        onClose={() => setDeleteDialog({ open: false })}
+        PaperProps={{ sx: { overflow: 'visible', width: 420, borderRadius: 1, textAlign: 'center' } }}
+      >
+        <DialogTitle
           sx={{
             display: 'flex',
-            justifyContent: 'space-between',
             alignItems: 'center',
-            px: 2,
-            py: 2,
-            mt: 2,
-            flexWrap: 'wrap'
+            justifyContent: 'center',
+            gap: 1,
+            color: 'error.main',
+            fontWeight: 700,
+            pb: 1,
+            position: 'relative'
           }}
         >
-          <Typography variant='body2' color='text.secondary'>
-            {paginationText}
+          <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
+          Confirm Delete
+          <DialogCloseButton
+            onClick={() => setDeleteDialog({ open: false })}
+            disableRipple
+            sx={{ position: 'absolute', right: 1, top: 1 }}
+          >
+            <i className='tabler-x' />
+          </DialogCloseButton>
+        </DialogTitle>
+        <DialogContent sx={{ px: 5, pt: 1 }}>
+          <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
+            Are you sure you want to delete employee <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name}</strong>?
+            <br />
+            This action cannot be undone.
           </Typography>
-
-          <Box display='flex' alignItems='center' gap={2}>
-            <Typography variant='body2' color='text.secondary'>
-              Page {page} of {pageCount}
-            </Typography>
-
-            <Pagination
-              count={pageCount}
-              page={page}
-              onChange={(e, value) => setPage(value)}
-              shape='rounded'
-              color='primary'
-              showFirstButton
-              showLastButton
-            />
-          </Box>
-        </Box>
-      </Card>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+          <Button
+            onClick={() => setDeleteDialog({ open: false })}
+            variant='tonal'
+            color='secondary'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={confirmDelete}
+            variant='contained'
+            color='error'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   )
 }

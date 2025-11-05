@@ -1,20 +1,18 @@
-// File Path: /admin/customers/add/page.jsx (Page B/C - Add/Edit Form)
-
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Box, Button, Grid, Typography, Card, Autocomplete, IconButton, Divider } from '@mui/material'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useState, useEffect, useRef } from 'react'
+import { Box, Button, Grid, Typography, Card, IconButton, Divider } from '@mui/material'
+import { useRouter, useSearchParams, useParams } from 'next/navigation'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
-// Removed: import { DataGrid } from '@mui/x-data-grid'
 import { openDB } from 'idb'
 
 import ContentLayout from '@/components/layout/ContentLayout'
-import CustomTextField from '@core/components/mui/TextField'
+import CustomTextFieldWrapper from '@/components/common/CustomTextField'
+import CustomTextarea from '@/components/common/CustomTextarea'
+import CustomSelectField from '@/components/common/CustomSelectField'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 
-// Consistent cell style for text wrapping (Copied from Page A)
 const tableCellStyle = {
   padding: '12px',
   wordWrap: 'break-word',
@@ -30,9 +28,9 @@ const initialFormData = {
   customerName: '',
   cardId: '',
   abssCustomerName: '',
-  picName: '', // Page A uses 'spocName'
-  picEmail: '', // Page A uses 'spocEmail'
-  picPhone: '', // Page A uses 'spocPhone'
+  picName: '',
+  picEmail: '',
+  picPhone: '',
   billingName: '',
   billingEmail: '',
   billingPhone: '',
@@ -47,7 +45,6 @@ const initialFormData = {
   remarks2: ''
 }
 
-// IndexedDB helper for Customer Contacts (Temporary Store)
 async function getDB() {
   return openDB('customerDB', 1, {
     upgrade(db) {
@@ -58,7 +55,6 @@ async function getDB() {
   })
 }
 
-// IndexedDB helper for Main Customer List (Permanent Storage)
 async function getCustomerDB() {
   return openDB('mainCustomerDB', 1, {
     upgrade(db) {
@@ -69,110 +65,124 @@ async function getCustomerDB() {
   })
 }
 
-// ✅ FIX: The component now accepts `params` from the dynamic route segment
-export default function AddCustomerPage({ params }) {
+export default function EditCustomerPage() {
   const router = useRouter()
-
-  // For dynamic route: ID comes from params (e.g., /123/edit -> params.id is '123')
-  const customerIdFromPath = params?.id
-
-  // For query parameter fallback (e.g., /add?id=123)
+  const params = useParams()
   const searchParams = useSearchParams()
+  const customerIdFromPath = params?.id
   const customerIdFromQuery = searchParams.get('id')
-
-  // Determine the final ID. Prioritize path ID for the requested edit flow.
   const customerId = customerIdFromPath || customerIdFromQuery
 
   const [formData, setFormData] = useState(initialFormData)
   const [picEmailError, setPicEmailError] = useState(false)
   const [billingEmailError, setBillingEmailError] = useState(false)
-
   const [editCustomerId, setEditCustomerId] = useState(null)
-  const isEditMode = editCustomerId !== null
-
   const [contacts, setContacts] = useState([])
   const [contactForm, setContactForm] = useState({ miniName: '', miniEmail: '', miniPhone: '' })
   const [editingContact, setEditingContact] = useState(null)
   const [miniEmailError, setMiniEmailError] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [notFound, setNotFound] = useState(false)
 
-  // Core Logic: Load data and setup contacts for Edit Mode
+  // REFS FOR FOCUS
+  const originRef = useRef(null)
+  const companyPrefixRef = useRef(null)
+  const customerNameRef = useRef(null)
+  const abssCustomerNameRef = useRef(null)
+  const cardIdRef = useRef(null)
+  const picNameRef = useRef(null)
+  const picEmailRef = useRef(null)
+  const picPhoneRef = useRef(null)
+  const billingNameRef = useRef(null)
+  const billingEmailRef = useRef(null)
+  const billingPhoneRef = useRef(null)
+  const cityRef = useRef(null)
+  const postalCodeRef = useRef(null)
+  const paymentTermsRef = useRef(null)
+  const salespersonRef = useRef(null)
+  const loginEmailRef = useRef(null)
+  const passwordRef = useRef(null)
+  const billingAddressRef = useRef(null)
+  const remarks1Ref = useRef(null)
+  const remarks2Ref = useRef(null)
+
+  // Load Customer Data (ONLY EDIT MODE)
   useEffect(() => {
+    if (!customerId) {
+      setNotFound(true)
+      setLoading(false)
+      return
+    }
+
     ;(async () => {
-      // 1. Clear temporary contacts storage on page load
+      setLoading(true)
       const contactsDb = await getDB()
       await contactsDb.clear('contacts')
       setContacts([])
 
-      if (customerId) {
-        const idAsNumber = Number(customerId)
-        if (isNaN(idAsNumber)) return
+      const idAsNumber = Number(customerId)
+      if (isNaN(idAsNumber)) {
+        setNotFound(true)
+        setLoading(false)
+        return
+      }
 
-        try {
-          const mainDb = await getCustomerDB()
-          // 2. Load existing customer data
-          const customerData = await mainDb.get('customers', idAsNumber)
+      try {
+        const mainDb = await getCustomerDB()
+        const customerData = await mainDb.get('customers', idAsNumber)
 
-          if (customerData) {
-            setEditCustomerId(idAsNumber)
-
-            // Set main form data (retaining field names from Page B)
-            setFormData({
-              ...initialFormData, // Use initialFormData to ensure all fields are present
-              ...customerData,
-              commenceDate: customerData.commenceDate ? new Date(customerData.commenceDate) : new Date(),
-              customerName: customerData.customerName || customerData.name || '',
-              loginEmail: customerData.loginEmail || customerData.email || '',
-              password: customerData.password || '',
-              // Ensure PIC/SPOC fields are loaded correctly
-              picName: customerData.picName || customerData.spocName || '',
-              picEmail: customerData.picEmail || customerData.spocEmail || '',
-              picPhone: customerData.picPhone || customerData.spocPhone || ''
-            })
-
-            // Set contacts for the mini-table and save them temporarily
-            const loadedContacts = customerData.contacts || []
-            setContacts(loadedContacts)
-
-            // Save contacts to temporary DB (customerDB)
-            const tx = contactsDb.transaction('contacts', 'readwrite')
-            loadedContacts.forEach(c => tx.objectStore('contacts').put(c))
-            await tx.done
-          } else {
-            console.warn(`Customer with ID ${customerId} not found. Starting in Add mode.`)
-            setEditCustomerId(null)
-          }
-        } catch (error) {
-          console.error('Failed to load customer data for edit:', error)
-          setEditCustomerId(null)
+        if (!customerData) {
+          setNotFound(true)
+          setLoading(false)
+          return
         }
-      } else {
-        // Add Mode
-        setEditCustomerId(null)
-        setFormData(initialFormData)
+
+        setEditCustomerId(idAsNumber)
+        setFormData({
+          ...initialFormData,
+          ...customerData,
+          commenceDate: customerData.commenceDate ? new Date(customerData.commenceDate) : new Date(),
+          customerName: customerData.customerName || customerData.name || '',
+          loginEmail: customerData.loginEmail || customerData.email || '',
+          password: customerData.password || '',
+          picName: customerData.picName || customerData.spocName || '',
+          picEmail: customerData.picEmail || customerData.spocEmail || '',
+          picPhone: customerData.picPhone || customerData.spocPhone || ''
+        })
+
+        const loadedContacts = customerData.contacts || []
+        setContacts(loadedContacts)
+        const tx = contactsDb.transaction('contacts', 'readwrite')
+        loadedContacts.forEach(c => tx.objectStore('contacts').put(c))
+        await tx.done
+
+        setTimeout(() => originRef.current?.querySelector('input')?.focus(), 100)
+      } catch (error) {
+        console.error('Failed to load customer:', error)
+        setNotFound(true)
+      } finally {
+        setLoading(false)
       }
     })()
-  }, [customerId]) // Dependency changed to the resolved ID
+  }, [customerId])
 
-  // Sync temporary contacts DB with local contacts state
+  // Sync contacts to temp DB
   useEffect(() => {
+    if (!editCustomerId) return
     ;(async () => {
-      if (!isEditMode && contacts.length === 0) return
-
       const db = await getDB()
       const tx = db.transaction('contacts', 'readwrite')
-      const store = tx.objectStore('contacts')
-      await store.clear()
-      contacts.forEach(c => store.put(c))
+      await tx.objectStore('contacts').clear()
+      contacts.forEach(c => tx.objectStore('contacts').put(c))
       await tx.done
     })()
-  }, [contacts, isEditMode])
+  }, [contacts, editCustomerId])
 
-  const pageTitle = isEditMode ? 'Edit Customer' : 'Add Customer'
+  const pageTitle = 'Edit Customer'
 
   const handlePhoneChange = (e, name) => {
     let value = e.target.value.replace(/\D/g, '')
     if (value.length > 10) value = value.slice(0, 10)
-    // Removed the second slice(0, 5) which was inconsistent in Page A's implementation
     if (value.length > 5) value = value.slice(0, 5) + ' ' + value.slice(5)
     setFormData(prev => ({ ...prev, [name]: value }))
   }
@@ -182,19 +192,22 @@ export default function AddCustomerPage({ params }) {
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
-  // Not strictly needed for Page A's layout, but keeping the function.
-  const handleEnterFocus = (e, nextFieldName) => {
+  const handleTypedChange = (e, regex, name) => {
+    const { value } = e.target
+    if (regex.test(value)) {
+      setFormData(prev => ({ ...prev, [name]: value }))
+    }
+  }
+
+  const handleEnterFocus = (e, nextRef) => {
     if (e.key === 'Enter') {
       e.preventDefault()
-      document.querySelector(`[name="${nextFieldName}"]`)?.focus()
+      nextRef.current?.querySelector('input')?.focus()
     }
   }
 
   const handleAddOrUpdateContact = () => {
-    // ✅ Only require Name
     if (!contactForm.miniName) return
-
-    // Optional: Validate email only if filled
     if (contactForm.miniEmail) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
       if (!emailRegex.test(contactForm.miniEmail)) {
@@ -229,10 +242,9 @@ export default function AddCustomerPage({ params }) {
 
   const handleDeleteContact = id => {
     setContacts(prev => prev.filter(c => c.id !== id))
-    if (editingContact && editingContact.id === id) {
+    if (editingContact?.id === id) {
       setEditingContact(null)
       setContactForm({ miniName: '', miniEmail: '', miniPhone: '' })
-      setMiniEmailError(false)
     }
   }
 
@@ -244,42 +256,31 @@ export default function AddCustomerPage({ params }) {
 
   const handleFinalCancel = () => router.push('/admin/customers')
 
-  // Final Save/Update Logic: Saves to main IndexedDB
   const handleFinalSave = async () => {
-    // 1. Prepare the complete customer object
     const customerRecord = {
       ...formData,
       commenceDate: formData.commenceDate?.toISOString() || new Date().toISOString(),
       contracts: formData.companyPrefix,
       status: 'Active',
-      contacts: contacts // Include the multiple contacts array
+      contacts: contacts
     }
 
-    if (isEditMode && editCustomerId) {
-      customerRecord.id = editCustomerId // Retain existing ID for update
+    if (editCustomerId) {
+      customerRecord.id = editCustomerId
     }
 
     try {
       const db = await getCustomerDB()
-
-      // IndexedDB .put() handles both add (if no id or id is new) and update (if id exists)
       await db.put('customers', customerRecord)
-
-      console.log(`✅ Customer ${isEditMode ? 'Updated' : 'Saved'} successfully.`)
-
-      // Clear the temporary contacts list
       const contactsDb = await getDB()
       await contactsDb.clear('contacts')
-
-      // Navigate back to the list page (Page A)
       router.push('/admin/customers')
     } catch (error) {
-      console.error('Failed to save/update customer:', error)
-      alert('Error saving customer data. Check console for details.')
+      console.error('Save error:', error)
+      alert('Error updating customer.')
     }
   }
 
-  // Manual Table Columns (Copied from Page A)
   const contactManualColumns = [
     {
       key: 'actions',
@@ -302,280 +303,326 @@ export default function AddCustomerPage({ params }) {
     { key: 'miniPhone', header: 'Phone', align: 'left', render: r => r.miniPhone || '-' }
   ]
 
+  if (loading) {
+    return (
+      <ContentLayout title='Loading...'>
+        <Box display='flex' justifyContent='center' p={4}>
+          <Typography>Loading customer data...</Typography>
+        </Box>
+      </ContentLayout>
+    )
+  }
+
+  if (notFound) {
+    return (
+      <ContentLayout title='Customer Not Found'>
+        <Box display='flex' justifyContent='center' p={4}>
+          <Typography color='error'>Customer with ID {customerId} not found.</Typography>
+        </Box>
+      </ContentLayout>
+    )
+  }
 
   return (
     <Grid container spacing={4}>
-      {/* LEFT SIDE - Customer Details (md=8) */}
+      {/* LEFT: Customer Details */}
       <Grid item xs={12} md={8}>
         <ContentLayout
-          title={<Box sx={{ m: 2 }}>{pageTitle} Details</Box>}
+          title={<Box sx={{ m: 2 }}>Edit Customer Details</Box>}
           breadcrumbs={[
             { label: 'Home', href: '/' },
             { label: 'Customer', href: '/admin/customers' },
-            { label: pageTitle }
+            { label: 'Edit Customer' }
           ]}
         >
           <Card sx={{ p: 4, boxShadow: 'none' }}>
-            {/* Using spacing={4} like Page A */}
             <Grid container spacing={4}>
-              {/* Row 1 */}
+              {/* Origin */}
               <Grid item xs={12} md={4}>
-                <Autocomplete
-                  freeSolo={false}
-                  options={['India', 'USA']}
-                  value={formData.origin || ''}
-                  onChange={(e, val) => setFormData(prev => ({ ...prev, origin: val }))}
-                  renderInput={params => <CustomTextField {...params} label='Origin' name='origin' />}
+                <CustomSelectField
+                  ref={originRef}
+                  fullWidth
+                  label='Origin'
+                  value={formData.origin}
+                  onChange={e => setFormData(prev => ({ ...prev, origin: e.target.value }))}
+                  options={['India', 'USA'].map(v => ({ value: v, label: v }))}
+                  onKeyDown={e => handleEnterFocus(e, companyPrefixRef)}
                 />
               </Grid>
 
+              {/* Commence Date */}
               <Grid item xs={12} md={4}>
                 <AppReactDatepicker
                   selected={formData.commenceDate}
                   onChange={date => setFormData(prev => ({ ...prev, commenceDate: date }))}
                   dateFormat='dd/MM/yyyy'
-                  customInput={<CustomTextField fullWidth label='Commence Date' />}
+                  customInput={<CustomTextFieldWrapper fullWidth label='Commence Date' />}
                 />
               </Grid>
 
+              {/* Company Prefix */}
               <Grid item xs={12} md={4}>
-                <CustomTextField
+                <CustomTextFieldWrapper
+                  ref={companyPrefixRef}
                   fullWidth
                   label='Company Prefix'
                   name='companyPrefix'
                   value={formData.companyPrefix}
                   onChange={handleChange}
-                  onKeyDown={e => handleEnterFocus(e, 'customerName')}
+                  onKeyDown={e => handleEnterFocus(e, customerNameRef)}
                 />
               </Grid>
-              {/* Row 2 */}
+
+              {/* Customer Name */}
               <Grid item xs={12} md={4}>
-                <CustomTextField
+                <CustomTextFieldWrapper
+                  ref={customerNameRef}
                   fullWidth
                   label='Customer Name'
                   name='customerName'
                   value={formData.customerName}
-                  onChange={e => {
-                    const value = e.target.value
-                    if (/^[a-zA-Z\s]*$/.test(value)) setFormData(prev => ({ ...prev, customerName: value }))
-                  }}
-                  onKeyDown={e => handleEnterFocus(e, 'abssCustomerName')}
+                  onChange={e => handleTypedChange(e, /^[a-zA-Z\s]*$/, 'customerName')}
+                  onKeyDown={e => handleEnterFocus(e, abssCustomerNameRef)}
                 />
               </Grid>
+
+              {/* ABSS Customer Name */}
               <Grid item xs={12} md={4}>
-                <CustomTextField
+                <CustomTextFieldWrapper
+                  ref={abssCustomerNameRef}
                   fullWidth
                   label='ABSS Customer Name'
                   name='abssCustomerName'
                   value={formData.abssCustomerName}
-                  onChange={e => {
-                    const value = e.target.value
-                    if (/^[a-zA-Z\s]*$/.test(value)) setFormData(prev => ({ ...prev, abssCustomerName: value }))
-                  }}
-                  onKeyDown={e => handleEnterFocus(e, 'cardId')}
+                  onChange={e => handleTypedChange(e, /^[a-zA-Z\s]*$/, 'abssCustomerName')}
+                  onKeyDown={e => handleEnterFocus(e, cardIdRef)}
                 />
               </Grid>
+
+              {/* Card ID */}
               <Grid item xs={12} md={4}>
-                <CustomTextField
+                <CustomTextFieldWrapper
+                  ref={cardIdRef}
                   fullWidth
                   label='Card ID'
                   name='cardId'
                   value={formData.cardId}
                   onChange={handleChange}
-                  onKeyDown={e => handleEnterFocus(e, 'picName')}
+                  onKeyDown={e => handleEnterFocus(e, picNameRef)}
                 />
               </Grid>
-              {/* Row 3 - PIC Details (Note: Page B uses PIC, Page A uses SPOC) */}
+
+              {/* PIC Name */}
               <Grid item xs={12} md={4}>
-                <CustomTextField
+                <CustomTextFieldWrapper
+                  ref={picNameRef}
                   fullWidth
                   label='PIC Name'
                   name='picName'
                   value={formData.picName}
-                  onChange={e => {
-                    const value = e.target.value
-                    if (/^[a-zA-Z\s]*$/.test(value)) setFormData(prev => ({ ...prev, picName: value }))
-                  }}
-                  onKeyDown={e => handleEnterFocus(e, 'picEmail')}
+                  onChange={e => handleTypedChange(e, /^[a-zA-Z\s]*$/, 'picName')}
+                  onKeyDown={e => handleEnterFocus(e, picEmailRef)}
                 />
               </Grid>
+
+              {/* PIC Email */}
               <Grid item xs={12} md={4}>
-                <CustomTextField
+                <CustomTextFieldWrapper
+                  ref={picEmailRef}
                   fullWidth
                   label='PIC Email'
                   name='picEmail'
                   value={formData.picEmail}
                   onChange={e => {
-                    const value = e.target.value
-                    setFormData(prev => ({ ...prev, picEmail: value }))
-                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-                    setPicEmailError(value && !emailRegex.test(value))
+                    const val = e.target.value
+                    setFormData(prev => ({ ...prev, picEmail: val }))
+                    setPicEmailError(val && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val))
                   }}
                   error={picEmailError}
-                  helperText={picEmailError ? 'Please enter a valid email address' : ''}
-                  onKeyDown={e => handleEnterFocus(e, 'picPhone')}
+                  helperText={picEmailError ? 'Invalid email' : ''}
+                  onKeyDown={e => handleEnterFocus(e, picPhoneRef)}
                 />
               </Grid>
+
+              {/* PIC Phone */}
               <Grid item xs={12} md={4}>
-                <CustomTextField
+                <CustomTextFieldWrapper
+                  ref={picPhoneRef}
                   fullWidth
                   label='PIC Phone'
                   name='picPhone'
                   value={formData.picPhone}
                   onChange={e => handlePhoneChange(e, 'picPhone')}
-                  onKeyDown={e => handleEnterFocus(e, 'billingName')}
+                  onKeyDown={e => handleEnterFocus(e, billingNameRef)}
                 />
               </Grid>
 
-              {/* Row 4 - Billing Details */}
+              {/* Billing Name */}
               <Grid item xs={12} md={4}>
-                <CustomTextField
+                <CustomTextFieldWrapper
+                  ref={billingNameRef}
                   fullWidth
                   label='Billing Contact Name'
                   name='billingName'
                   value={formData.billingName}
-                  onChange={e => {
-                    const value = e.target.value
-                    if (/^[a-zA-Z\s]*$/.test(value)) setFormData(prev => ({ ...prev, billingName: value }))
-                  }}
-                  onKeyDown={e => handleEnterFocus(e, 'billingEmail')}
+                  onChange={e => handleTypedChange(e, /^[a-zA-Z\s]*$/, 'billingName')}
+                  onKeyDown={e => handleEnterFocus(e, billingEmailRef)}
                 />
               </Grid>
+
+              {/* Billing Email */}
               <Grid item xs={12} md={4}>
-                <CustomTextField
+                <CustomTextFieldWrapper
+                  ref={billingEmailRef}
                   fullWidth
                   label='Billing Email'
                   name='billingEmail'
                   value={formData.billingEmail}
                   onChange={e => {
-                    const value = e.target.value
-                    setFormData(prev => ({ ...prev, billingEmail: value }))
-                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-                    setBillingEmailError(value && !emailRegex.test(value))
+                    const val = e.target.value
+                    setFormData(prev => ({ ...prev, billingEmail: val }))
+                    setBillingEmailError(val && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val))
                   }}
                   error={billingEmailError}
-                  helperText={billingEmailError ? 'Please enter a valid email address' : ''}
-                  onKeyDown={e => handleEnterFocus(e, 'billingPhone')}
+                  helperText={billingEmailError ? 'Invalid email' : ''}
+                  onKeyDown={e => handleEnterFocus(e, billingPhoneRef)}
                 />
               </Grid>
+
+              {/* Billing Phone */}
               <Grid item xs={12} md={4}>
-                <CustomTextField
+                <CustomTextFieldWrapper
+                  ref={billingPhoneRef}
                   fullWidth
                   label='Billing Phone'
                   name='billingPhone'
                   value={formData.billingPhone}
                   onChange={e => handlePhoneChange(e, 'billingPhone')}
-                  onKeyDown={e => handleEnterFocus(e, 'city')}
+                  onKeyDown={e => handleEnterFocus(e, cityRef)}
                 />
               </Grid>
 
-              {/* Row 5 - Location/Terms */}
+              {/* City */}
               <Grid item xs={12} md={4}>
-                <CustomTextField
+                <CustomTextFieldWrapper
+                  ref={cityRef}
                   fullWidth
                   label='City'
                   name='city'
                   value={formData.city}
-                  onChange={e => {
-                    const value = e.target.value
-                    if (/^[a-zA-Z\s]*$/.test(value)) setFormData(prev => ({ ...prev, city: value }))
-                  }}
-                  onKeyDown={e => handleEnterFocus(e, 'postalCode')}
+                  onChange={e => handleTypedChange(e, /^[a-zA-Z\s]*$/, 'city')}
+                  onKeyDown={e => handleEnterFocus(e, postalCodeRef)}
                 />
               </Grid>
+
+              {/* Postal Code */}
               <Grid item xs={12} md={4}>
-                <CustomTextField
+                <CustomTextFieldWrapper
+                  ref={postalCodeRef}
                   fullWidth
                   label='Postal Code'
                   name='postalCode'
                   value={formData.postalCode}
                   onChange={handleChange}
-                  onKeyDown={e => handleEnterFocus(e, 'paymentTerms')}
-                />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <Autocomplete
-                  freeSolo={false}
-                  options={['Monthly', 'Yearly']}
-                  value={formData.paymentTerms || ''}
-                  onChange={(e, newValue) => {
-                    setFormData(prev => ({ ...prev, paymentTerms: newValue }))
-                    document.querySelector('[name="salesperson"]')?.focus()
-                  }}
-                  renderInput={params => <CustomTextField {...params} label='Payment Terms' name='paymentTerms' />}
+                  onKeyDown={e => handleEnterFocus(e, paymentTermsRef)}
                 />
               </Grid>
 
-              {/* Row 6 - Sales/Login */}
+              {/* Payment Terms */}
               <Grid item xs={12} md={4}>
-                <Autocomplete
-                  freeSolo={false}
-                  options={['Employee 1', 'Employee 2']}
-                  value={formData.salesperson || ''}
-                  onChange={(e, newValue) => {
-                    setFormData(prev => ({ ...prev, salesperson: newValue }))
-                    document.querySelector('[name="loginEmail"]')?.focus()
+                <CustomSelectField
+                  ref={paymentTermsRef}
+                  fullWidth
+                  label='Payment Terms'
+                  value={formData.paymentTerms}
+                  onChange={e => {
+                    setFormData(prev => ({ ...prev, paymentTerms: e.target.value }))
+                    salespersonRef.current?.querySelector('input')?.focus()
                   }}
-                  renderInput={params => <CustomTextField {...params} label='Sales Person' name='salesperson' />}
+                  options={['Monthly', 'Yearly'].map(v => ({ value: v, label: v }))}
                 />
               </Grid>
+
+              {/* Sales Person */}
               <Grid item xs={12} md={4}>
-                <CustomTextField
+                <CustomSelectField
+                  ref={salespersonRef}
+                  fullWidth
+                  label='Sales Person'
+                  value={formData.salesperson}
+                  onChange={e => {
+                    setFormData(prev => ({ ...prev, salesperson: e.target.value }))
+                    loginEmailRef.current?.querySelector('input')?.focus()
+                  }}
+                  options={['Employee 1', 'Employee 2'].map(v => ({ value: v, label: v }))}
+                />
+              </Grid>
+
+              {/* Login Email */}
+              <Grid item xs={12} md={4}>
+                <CustomTextFieldWrapper
+                  ref={loginEmailRef}
                   fullWidth
                   label='Login Email'
                   name='loginEmail'
                   value={formData.loginEmail}
                   onChange={handleChange}
-                  onKeyDown={e => handleEnterFocus(e, 'password')}
+                  onKeyDown={e => handleEnterFocus(e, passwordRef)}
                 />
               </Grid>
+
+              {/* Password */}
               <Grid item xs={12} md={4}>
-                <CustomTextField
+                <CustomTextFieldWrapper
+                  ref={passwordRef}
                   fullWidth
                   type='password'
                   label='Password'
                   name='password'
                   value={formData.password}
                   onChange={handleChange}
-                  onKeyDown={e => handleEnterFocus(e, 'billingAddress')}
+                  onKeyDown={e => handleEnterFocus(e, billingAddressRef)}
                 />
               </Grid>
-              {/* Row 7 - Billing Address */}
+
+              {/* Billing Address */}
               <Grid item xs={12} md={4}>
-                <CustomTextField
+                <CustomTextarea
+                  ref={billingAddressRef}
                   fullWidth
-                  multiline
-                  rows={2}
                   label='Billing Address'
                   name='billingAddress'
                   value={formData.billingAddress}
                   onChange={handleChange}
-                  onKeyDown={e => handleEnterFocus(e, 'remarks1')}
+                  rows={2}
+                  onKeyDown={e => handleEnterFocus(e, remarks1Ref)}
                 />
               </Grid>
+
               {/* Remarks 1 */}
               <Grid item xs={12} md={4}>
-                <CustomTextField
+                <CustomTextarea
+                  ref={remarks1Ref}
                   fullWidth
-                  multiline
-                  rows={2}
                   label='Remarks 1'
                   name='remarks1'
                   value={formData.remarks1}
                   onChange={handleChange}
-                  onKeyDown={e => handleEnterFocus(e, 'remarks2')}
+                  rows={2}
+                  onKeyDown={e => handleEnterFocus(e, remarks2Ref)}
                 />
               </Grid>
+
               {/* Remarks 2 */}
               <Grid item xs={12} md={4}>
-                <CustomTextField
+                <CustomTextarea
+                  ref={remarks2Ref}
                   fullWidth
-                  multiline
-                  rows={2}
                   label='Remarks 2'
                   name='remarks2'
                   value={formData.remarks2}
                   onChange={handleChange}
+                  rows={2}
                 />
               </Grid>
             </Grid>
@@ -583,14 +630,13 @@ export default function AddCustomerPage({ params }) {
         </ContentLayout>
       </Grid>
 
-      {/* RIGHT SIDE - Customer Team (md=4) */}
-      <Grid item xs={12} md={4} sx={{ mt: { md: 5, xs: 0 } }}> {/* Added margin-top for alignment on desktop */}
+      {/* RIGHT: Customer Contacts */}
+      <Grid item xs={12} md={4} sx={{ mt: { md: 5, xs: 0 } }}>
         <ContentLayout title={<Box sx={{ m: 2 }}>Customer Contacts</Box>}>
           <Grid container spacing={1}>
-            <Grid item xs={12} md={12}>
-              {/* Contact Add/Edit Form */}
+            <Grid item xs={12}>
               <Card sx={{ p: 2, boxShadow: 'none' }} elevation={0}>
-                <CustomTextField
+                <CustomTextFieldWrapper
                   fullWidth
                   label={<span>Name <span style={{ color: 'red' }}>*</span></span>}
                   name='miniName'
@@ -598,7 +644,7 @@ export default function AddCustomerPage({ params }) {
                   onChange={e => setContactForm(prev => ({ ...prev, miniName: e.target.value }))}
                 />
                 <Box mt={3} />
-                <CustomTextField
+                <CustomTextFieldWrapper
                   fullWidth
                   label='Email'
                   name='miniEmail'
@@ -606,14 +652,13 @@ export default function AddCustomerPage({ params }) {
                   onChange={e => {
                     const val = e.target.value
                     setContactForm(prev => ({ ...prev, miniEmail: val }))
-                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-                    setMiniEmailError(val ? !emailRegex.test(val) : false)
+                    setMiniEmailError(val ? !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val) : false)
                   }}
                   error={miniEmailError}
                   helperText={miniEmailError ? 'Invalid email' : ''}
                 />
                 <Box mt={3} />
-                <CustomTextField
+                <CustomTextFieldWrapper
                   fullWidth
                   label='Phone'
                   name='miniPhone'
@@ -625,39 +670,33 @@ export default function AddCustomerPage({ params }) {
                     setContactForm(prev => ({ ...prev, miniPhone: v }))
                   }}
                 />
+
                 <Box mt={3} display='flex' gap={2}>
                   {editingContact && (
                     <Button variant='outlined' color='secondary' fullWidth onClick={handleCancelEdit}>
                       Cancel
                     </Button>
                   )}
-                  <Button variant='contained' fullWidth color={editingContact ? 'success' : 'primary'} onClick={handleAddOrUpdateContact}>
+                  <Button
+                    variant='contained'
+                    fullWidth
+                    color={editingContact ? 'success' : 'primary'}
+                    onClick={handleAddOrUpdateContact}
+                    disabled={contactForm.miniEmail && miniEmailError}
+                  >
                     {editingContact ? 'Update Member' : 'Add Member'}
                   </Button>
                 </Box>
               </Card>
 
-              {/* Contact List Table (Manual table from Page A) */}
               <Card sx={{ mt: 4, p: 2, boxShadow: 'none' }} elevation={0}>
-                <Typography variant='h6' sx={{ mt: 1, mb: 2 }}>
-                  Team List
-                </Typography>
-
+                <Typography variant='h6' sx={{ mt: 1, mb: 2 }}>Team List</Typography>
                 <Box sx={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'auto' }}>
                     <thead>
                       <tr style={{ textAlign: 'left', borderBottom: '1px solid #E5E7EB' }}>
                         {contactManualColumns.map(col => (
-                          <th
-                            key={col.key}
-                            style={{
-                              padding: '12px',
-                              width: col.width || 'auto',
-                              minWidth: col.minWidth || '100px',
-                              userSelect: 'none',
-                              textAlign: col.align || 'left'
-                            }}
-                          >
+                          <th key={col.key} style={{ padding: '12px', width: col.width || 'auto', textAlign: col.align }}>
                             <Box display='flex' alignItems='center'>{col.header}</Box>
                           </th>
                         ))}
@@ -665,9 +704,9 @@ export default function AddCustomerPage({ params }) {
                     </thead>
                     <tbody>
                       {contacts.map(r => (
-                        <tr key={r.id}>
+                        <tr key={r.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
                           {contactManualColumns.map(col => (
-                            <td key={col.key} style={{ ...tableCellStyle, textAlign: col.align || 'left' }}>
+                            <td key={col.key} style={{ ...tableCellStyle, textAlign: col.align }}>
                               {col.render(r)}
                             </td>
                           ))}
@@ -685,7 +724,7 @@ export default function AddCustomerPage({ params }) {
                 <Divider sx={{ mt: 4 }} />
                 <Box mt={2} p={2} display='flex' gap={2} justifyContent='flex-end'>
                   <Button variant='outlined' onClick={handleFinalCancel}>Cancel</Button>
-                  <Button variant='contained' onClick={handleFinalSave}>{isEditMode ? 'Update Customer' : 'Save'}</Button>
+                  <Button variant='contained' onClick={handleFinalSave}>Update Customer</Button>
                 </Box>
               </Card>
             </Grid>

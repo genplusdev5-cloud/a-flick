@@ -109,28 +109,57 @@ const getContracts = async () => {
   return new Promise(resolve => setTimeout(() => resolve(mockData), 300))
 }
 
-// ───────────────────────────────────────────
-// Toast helper – 100% JavaScript (no TypeScript)
-// ───────────────────────────────────────────
-const showToast = (type, message) => {
-  // react-toastify gives us a `closeToast` function when we use a render-prop
-  const content = ({ closeToast }) => (
-    <div className='flex items-center justify-between gap-2'>
-      <Typography variant='body2' sx={{ fontWeight: 500 }}>
+// ──────────────────────────────────────────────────────────────
+// Toast (Custom Styled, Global, with Icons & Colors)
+// ──────────────────────────────────────────────────────────────
+const showToast = (type, message = '') => {
+  const icons = {
+    success: 'tabler-circle-check',
+    delete: 'tabler-trash',
+    error: 'tabler-alert-triangle',
+    warning: 'tabler-info-circle',
+    info: 'tabler-refresh'
+  }
+
+  toast(
+    <div className='flex items-center gap-2'>
+      <i
+        className={icons[type]}
+        style={{
+          color:
+            type === 'success'
+              ? '#16a34a'
+              : type === 'error'
+                ? '#dc2626'
+                : type === 'delete'
+                  ? '#dc2626'
+                  : type === 'warning'
+                    ? '#f59e0b'
+                    : '#2563eb',
+          fontSize: '22px'
+        }}
+      />
+      <Typography variant='body2' sx={{ fontSize: '0.9rem', color: '#111' }}>
         {message}
       </Typography>
-      <IconButton size='small' onClick={closeToast}>
-        <CloseIcon fontSize='small' />
-      </IconButton>
-    </div>
+    </div>,
+    {
+      position: 'top-right',
+      autoClose: 2000,
+      hideProgressBar: true,
+      closeOnClick: true,
+      pauseOnHover: false,
+      draggable: false,
+      theme: 'light',
+      style: {
+        borderRadius: '10px',
+        padding: '8px 14px',
+        boxShadow: '0 4px 10px rgba(0,0,0,0.06)',
+        display: 'flex',
+        alignItems: 'center'
+      }
+    }
   )
-
-  const options = { closeButton: false } // we draw our own X button
-
-  if (type === 'success') toast.success(content, options)
-  else if (type === 'error' || type === 'delete') toast.error(content, options)
-  else if (type === 'warning') toast.warn(content, options)
-  else toast.info(content, options)
 }
 
 // Debounced Input

@@ -91,9 +91,13 @@ const dummyData = [
 // ─────────────────────────────────────────────
 // Toast Helper (Fixed)
 // ─────────────────────────────────────────────
-const showToast = (type, message) => {
+// ──────────────────────────────────────────────────────────────
+// Toast (Custom Styled, Global, with Icons & Colors)
+// ──────────────────────────────────────────────────────────────
+const showToast = (type, message = '') => {
   const icons = {
     success: 'tabler-circle-check',
+    delete: 'tabler-trash',
     error: 'tabler-alert-triangle',
     warning: 'tabler-info-circle',
     info: 'tabler-refresh'
@@ -102,10 +106,18 @@ const showToast = (type, message) => {
   toast(
     <div className='flex items-center gap-2'>
       <i
-        className={icons[type] || 'tabler-info-circle'}
+        className={icons[type]}
         style={{
           color:
-            type === 'success' ? '#16a34a' : type === 'error' ? '#dc2626' : type === 'warning' ? '#f59e0b' : '#2563eb',
+            type === 'success'
+              ? '#16a34a'
+              : type === 'error'
+                ? '#dc2626'
+                : type === 'delete'
+                  ? '#dc2626'
+                  : type === 'warning'
+                    ? '#f59e0b'
+                    : '#2563eb',
           fontSize: '22px'
         }}
       />
@@ -115,16 +127,18 @@ const showToast = (type, message) => {
     </div>,
     {
       position: 'top-right',
-      autoClose: 2200,
+      autoClose: 2000,
       hideProgressBar: true,
-      pauseOnHover: false,
       closeOnClick: true,
+      pauseOnHover: false,
       draggable: false,
       theme: 'light',
       style: {
         borderRadius: '10px',
         padding: '8px 14px',
-        boxShadow: '0 4px 10px rgba(0,0,0,0.06)'
+        boxShadow: '0 4px 10px rgba(0,0,0,0.06)',
+        display: 'flex',
+        alignItems: 'center'
       }
     }
   )

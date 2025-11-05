@@ -26,7 +26,7 @@ import {
   CircularProgress,
   InputAdornment
 } from '@mui/material'
-
+import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
@@ -76,18 +76,57 @@ const initDB = async () => {
 }
 
 // Toast helper
-const showToast = (type, message) => {
-  const content = (
+// ──────────────────────────────────────────────────────────────
+// Toast (Custom Styled, Global, with Icons & Colors)
+// ──────────────────────────────────────────────────────────────
+const showToast = (type, message = '') => {
+  const icons = {
+    success: 'tabler-circle-check',
+    delete: 'tabler-trash',
+    error: 'tabler-alert-triangle',
+    warning: 'tabler-info-circle',
+    info: 'tabler-refresh'
+  }
+
+  toast(
     <div className='flex items-center gap-2'>
-      <Typography variant='body2' sx={{ fontWeight: 500 }}>
+      <i
+        className={icons[type]}
+        style={{
+          color:
+            type === 'success'
+              ? '#16a34a'
+              : type === 'error'
+                ? '#dc2626'
+                : type === 'delete'
+                  ? '#dc2626'
+                  : type === 'warning'
+                    ? '#f59e0b'
+                    : '#2563eb',
+          fontSize: '22px'
+        }}
+      />
+      <Typography variant='body2' sx={{ fontSize: '0.9rem', color: '#111' }}>
         {message}
       </Typography>
-    </div>
+    </div>,
+    {
+      position: 'top-right',
+      autoClose: 2000,
+      hideProgressBar: true,
+      closeOnClick: true,
+      pauseOnHover: false,
+      draggable: false,
+      theme: 'light',
+      style: {
+        borderRadius: '10px',
+        padding: '8px 14px',
+        boxShadow: '0 4px 10px rgba(0,0,0,0.06)',
+        display: 'flex',
+        alignItems: 'center'
+      }
+    }
   )
-  if (type === 'success') toast.success(content)
-  else if (type === 'error' || type === 'delete') toast.error(content)
-  else if (type === 'warning') toast.warn(content)
-  else toast.info(content)
 }
 
 // Debounced Input
@@ -610,23 +649,78 @@ export default function TodoItemsPage() {
         </Box>
       </Drawer>
 
-      {/* Delete Dialog */}
-      <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false, row: null })}>
-        <DialogTitle sx={{ textAlign: 'center', color: 'error.main', fontWeight: 600 }}>
-          <WarningAmberIcon sx={{ verticalAlign: 'middle', mr: 1 }} /> Confirm Delete
-        </DialogTitle>
-        <DialogContent>
-          <Typography textAlign='center'>
-            Are you sure you want to delete <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.title}</strong>?
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ justifyContent: 'center', pb: 3 }}>
-          <Button onClick={() => setDeleteDialog({ open: false, row: null })}>Cancel</Button>
-          <Button color='error' variant='contained' onClick={confirmDelete}>
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <Dialog
+  onClose={() => setDeleteDialog({ open: false, row: null })}
+  aria-labelledby='customized-dialog-title'
+  open={deleteDialog.open}
+  closeAfterTransition={false}
+  PaperProps={{
+    sx: {
+      overflow: 'visible',
+      width: 420,
+      borderRadius: 1,
+      textAlign: 'center'
+    }
+  }}
+>
+  {/* 🔴 Title with Warning Icon */}
+  <DialogTitle
+    id='customized-dialog-title'
+    sx={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 1,
+      color: 'error.main',
+      fontWeight: 700,
+      pb: 1,
+      position: 'relative'
+    }}
+  >
+    <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
+    Confirm Delete
+    <DialogCloseButton
+      onClick={() => setDeleteDialog({ open: false, row: null })}
+      disableRipple
+      sx={{ position: 'absolute', right: 1, top: 1 }}
+    >
+      <i className='tabler-x' />
+    </DialogCloseButton>
+  </DialogTitle>
+
+  {/* Centered Text */}
+  <DialogContent sx={{ px: 5, pt: 1 }}>
+    <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
+      Are you sure you want to delete{' '}
+      <strong style={{ color: '#d32f2f' }}>
+        {deleteDialog.row?.title || 'this todo'}
+      </strong>?
+      <br />
+      This action cannot be undone.
+    </Typography>
+  </DialogContent>
+
+  {/* Centered Buttons */}
+  <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+    <Button
+      onClick={() => setDeleteDialog({ open: false, row: null })}
+      variant='tonal'
+      color='secondary'
+      sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+    >
+      Cancel
+    </Button>
+    <Button
+      onClick={confirmDelete}
+      variant='contained'
+      color='error'
+      sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+    >
+      Delete
+    </Button>
+  </DialogActions>
+</Dialog>
+
     </Box>
   )
 }

@@ -28,6 +28,14 @@ import {
   InputAdornment
 } from '@mui/material'
 
+// ADD THIS LINE (after other imports)
+import CustomTextFieldWrapper from '@/components/common/CustomTextField'
+import CustomTextarea from '@/components/common/CustomTextarea'
+import CustomSelectField from '@/components/common/CustomSelectField'
+
+
+
+import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
@@ -71,18 +79,57 @@ const initDB = async () => {
 }
 
 // Toast helper
-const showToast = (type, message) => {
-  const content = (
+// ──────────────────────────────────────────────────────────────
+// Toast (Custom Styled, Global, with Icons & Colors)
+// ──────────────────────────────────────────────────────────────
+const showToast = (type, message = '') => {
+  const icons = {
+    success: 'tabler-circle-check',
+    delete: 'tabler-trash',
+    error: 'tabler-alert-triangle',
+    warning: 'tabler-info-circle',
+    info: 'tabler-refresh'
+  }
+
+  toast(
     <div className='flex items-center gap-2'>
-      <Typography variant='body2' sx={{ fontWeight: 500 }}>
+      <i
+        className={icons[type]}
+        style={{
+          color:
+            type === 'success'
+              ? '#16a34a'
+              : type === 'error'
+                ? '#dc2626'
+                : type === 'delete'
+                  ? '#dc2626'
+                  : type === 'warning'
+                    ? '#f59e0b'
+                    : '#2563eb',
+          fontSize: '22px'
+        }}
+      />
+      <Typography variant='body2' sx={{ fontSize: '0.9rem', color: '#111' }}>
         {message}
       </Typography>
-    </div>
+    </div>,
+    {
+      position: 'top-right',
+      autoClose: 2000,
+      hideProgressBar: true,
+      closeOnClick: true,
+      pauseOnHover: false,
+      draggable: false,
+      theme: 'light',
+      style: {
+        borderRadius: '10px',
+        padding: '8px 14px',
+        boxShadow: '0 4px 10px rgba(0,0,0,0.06)',
+        display: 'flex',
+        alignItems: 'center'
+      }
+    }
   )
-  if (type === 'success') toast.success(content)
-  else if (type === 'error' || type === 'delete') toast.error(content)
-  else if (type === 'warning') toast.warn(content)
-  else toast.info(content)
 }
 
 // Debounced Input
@@ -195,8 +242,11 @@ export default function PestPage() {
       user_role: 'Admin'
     })
     setMainDrawerOpen(true)
-    setTimeout(() => pestCodeRef.current?.focus(), 100)
+    setTimeout(() => {
+      pestCodeRef.current?.querySelector('input')?.focus()
+    }, 100)
   }
+
   const handleEdit = row => {
     setIsEdit(true)
     setEditPest(row)
@@ -210,9 +260,10 @@ export default function PestPage() {
       user_role: row.user_role
     })
     setMainDrawerOpen(true)
-    setTimeout(() => pestCodeRef.current?.focus(), 100)
+    setTimeout(() => {
+      pestCodeRef.current?.querySelector('input')?.focus()
+    }, 100)
   }
-
   const handleMainSubmit = async () => {
     if (!mainFormData.pest_code.trim() || !mainFormData.name.trim()) {
       showToast('warning', 'Pest Code and Name are required')
@@ -758,80 +809,94 @@ export default function PestPage() {
             </IconButton>
           </Box>
           <Grid container spacing={2}>
+            {/* Pest Code */}
+            {/* Pest Code */}
             <Grid item xs={12}>
-              <CustomTextField
+              <CustomTextFieldWrapper
+                ref={pestCodeRef}
                 fullWidth
                 label='Service Type Code'
+                placeholder='Enter pest code'
                 value={mainFormData.pest_code}
-                onChange={e => setMainFormData({ ...mainFormData, pest_code: e.target.value })}
-                inputRef={pestCodeRef}
+                onChange={e => setMainFormData(prev => ({ ...prev, pest_code: e.target.value }))}
                 onKeyDown={e => {
                   if (e.key === 'Enter') {
                     e.preventDefault()
-                    parentCodeRef.current?.focus()
+                    parentCodeRef.current?.querySelector('input')?.focus()
                   }
                 }}
               />
             </Grid>
+
+            {/* Parent Code */}
             <Grid item xs={12}>
-              <CustomTextField
+              <CustomTextFieldWrapper
+                ref={parentCodeRef}
                 fullWidth
                 label='Parent Pest Group Code'
+                placeholder='Enter parent code'
                 value={mainFormData.parent_code}
-                onChange={e => setMainFormData({ ...mainFormData, parent_code: e.target.value })}
-                inputRef={parentCodeRef}
+                onChange={e => setMainFormData(prev => ({ ...prev, parent_code: e.target.value }))}
                 onKeyDown={e => {
                   if (e.key === 'Enter') {
                     e.preventDefault()
-                    nameRef.current?.focus()
+                    nameRef.current?.querySelector('input')?.focus()
                   }
                 }}
               />
             </Grid>
+
+            {/* Name */}
             <Grid item xs={12}>
-              <CustomTextField
+              <CustomTextFieldWrapper
+                ref={nameRef}
                 fullWidth
                 label='Display Pest Name'
+                placeholder='Enter display name'
                 value={mainFormData.name}
-                onChange={e => setMainFormData({ ...mainFormData, name: e.target.value })}
-                inputRef={nameRef}
+                onChange={e => setMainFormData(prev => ({ ...prev, name: e.target.value }))}
                 onKeyDown={e => {
                   if (e.key === 'Enter') {
                     e.preventDefault()
-                    valueRef.current?.focus()
+                    valueRef.current?.querySelector('input')?.focus()
                   }
                 }}
               />
             </Grid>
+
+            {/* Value (Numeric) */}
             <Grid item xs={12}>
-              <CustomTextField
+              <CustomTextFieldWrapper
+                ref={valueRef}
                 fullWidth
                 label='Pest Value'
+                placeholder='Enter numeric value'
                 value={mainFormData.value}
                 onChange={e => {
                   const val = e.target.value
                   if (/^-?\d*\.?\d*$/.test(val)) {
-                    setMainFormData({ ...mainFormData, value: val })
+                    setMainFormData(prev => ({ ...prev, value: val }))
                   }
                 }}
-                inputRef={valueRef}
                 onKeyDown={e => {
                   if (e.key === 'Enter') {
                     e.preventDefault()
-                    descRef.current?.focus()
+                    descRef.current?.querySelector('textarea')?.focus()
                   }
                 }}
               />
             </Grid>
+
+            {/* Description */}
             <Grid item xs={12}>
-              <CustomTextField
+              <CustomTextarea
+                ref={descRef}
                 fullWidth
                 label='Description'
-                multiline
+                placeholder='Enter description'
                 rows={3}
                 value={mainFormData.description}
-                onChange={e => setMainFormData({ ...mainFormData, description: e.target.value })}
-                inputRef={descRef}
+                onChange={e => setMainFormData(prev => ({ ...prev, description: e.target.value }))}
                 onKeyDown={e => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault()
@@ -840,14 +905,17 @@ export default function PestPage() {
                 }}
               />
             </Grid>
+
+            {/* Status (Only in Edit Mode) */}
             {isEdit && (
               <Grid item xs={12}>
-                <Autocomplete
-                  freeSolo={false}
-                  options={statusOptions}
+                <CustomSelectField
+                  ref={statusRef}
+                  fullWidth
+                  label='Status'
                   value={mainFormData.status}
-                  onChange={(e, v) => setMainFormData({ ...mainFormData, status: v })}
-                  renderInput={params => <CustomTextField {...params} label='Status' inputRef={statusRef} />}
+                  onChange={e => setMainFormData(prev => ({ ...prev, status: e.target.value }))}
+                  options={statusOptions.map(opt => ({ value: opt, label: opt }))}
                 />
               </Grid>
             )}
@@ -876,24 +944,26 @@ export default function PestPage() {
           </Box>
           <Grid container spacing={2}>
             <Grid item xs={12}>
-              <CustomTextField
+              <CustomTextFieldWrapper
                 fullWidth
                 label={`${drawerType} Name`}
+                placeholder={`Enter ${drawerType.toLowerCase()} name`}
                 value={subFormData.name}
-                onChange={e => setSubFormData({ ...subFormData, name: e.target.value })}
+                onChange={e => setSubFormData(prev => ({ ...prev, name: e.target.value }))}
               />
             </Grid>
+
             <Grid item xs={12}>
-              <CustomTextField
-                select
+              <CustomSelectField
                 fullWidth
                 label='Status'
                 value={subFormData.status}
-                onChange={e => setSubFormData({ ...subFormData, status: e.target.value })}
-              >
-                <MenuItem value='Active'>Active</MenuItem>
-                <MenuItem value='Inactive'>Inactive</MenuItem>
-              </CustomTextField>
+                onChange={e => setSubFormData(prev => ({ ...prev, status: e.target.value }))}
+                options={[
+                  { value: 'Active', label: 'Active' },
+                  { value: 'Inactive', label: 'Inactive' }
+                ]}
+              />
             </Grid>
           </Grid>
           <Button variant='contained' fullWidth sx={{ mt: 2 }} onClick={handleSubSubmit} disabled={loading}>
@@ -959,21 +1029,80 @@ export default function PestPage() {
         </Box>
       </Drawer>
 
-      {/* Delete Dialog */}
-      <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false })}>
-        <DialogTitle sx={{ textAlign: 'center', color: 'error.main', fontWeight: 600 }}>
-          <WarningAmberIcon sx={{ verticalAlign: 'middle', mr: 1 }} /> Confirm Delete
+      <Dialog
+        onClose={() => setDeleteDialog({ open: false })}
+        aria-labelledby='customized-dialog-title'
+        open={deleteDialog.open}
+        closeAfterTransition={false}
+        PaperProps={{
+          sx: {
+            overflow: 'visible',
+            width: 420,
+            borderRadius: 1,
+            textAlign: 'center'
+          }
+        }}
+      >
+        {/* 🔴 Title with Warning Icon */}
+        <DialogTitle
+          id='customized-dialog-title'
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1,
+            color: 'error.main',
+            fontWeight: 700,
+            pb: 1,
+            position: 'relative'
+          }}
+        >
+          <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
+          Confirm Delete
+          <DialogCloseButton
+            onClick={() => setDeleteDialog({ open: false })}
+            disableRipple
+            sx={{ position: 'absolute', right: 1, top: 1 }}
+          >
+            <i className='tabler-x' />
+          </DialogCloseButton>
         </DialogTitle>
-        <DialogContent>
-          <Typography textAlign='center'>
-            {deleteDialog.isSub
-              ? `Delete this ${drawerType.toLowerCase()}?`
-              : `Delete pest "${deleteDialog.row?.name}"?`}
+
+        {/* 🧾 Message */}
+        <DialogContent sx={{ px: 5, pt: 1 }}>
+          <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
+            {deleteDialog.isSub ? (
+              <>
+                Are you sure you want to delete this{' '}
+                <strong style={{ color: '#d32f2f' }}>{drawerType.toLowerCase()}</strong>?
+              </>
+            ) : (
+              <>
+                Are you sure you want to delete the pest{' '}
+                <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name || 'this pest'}</strong>?
+              </>
+            )}
+            <br />
+            This action cannot be undone.
           </Typography>
         </DialogContent>
-        <DialogActions sx={{ justifyContent: 'center', pb: 3 }}>
-          <Button onClick={() => setDeleteDialog({ open: false })}>Cancel</Button>
-          <Button color='error' variant='contained' onClick={deleteDialog.isSub ? confirmSubDelete : confirmMainDelete}>
+
+        {/* ⚙️ Buttons */}
+        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+          <Button
+            onClick={() => setDeleteDialog({ open: false })}
+            variant='tonal'
+            color='secondary'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={deleteDialog.isSub ? confirmSubDelete : confirmMainDelete}
+            variant='contained'
+            color='error'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+          >
             Delete
           </Button>
         </DialogActions>

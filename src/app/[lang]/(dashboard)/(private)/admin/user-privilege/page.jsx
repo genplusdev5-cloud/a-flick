@@ -28,6 +28,8 @@ import {
   CircularProgress,
   InputAdornment
 } from '@mui/material'
+import CustomTextFieldWrapper from '@/components/common/CustomTextField'
+import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
@@ -44,6 +46,7 @@ import { toast } from 'react-toastify'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 import classnames from 'classnames'
 import { rankItem } from '@tanstack/match-sorter-utils'
+
 import {
   useReactTable,
   getCoreRowModel,
@@ -71,18 +74,57 @@ const initDB = async () => {
 }
 
 // Toast helper
-const showToast = (type, message) => {
-  const content = (
+// ──────────────────────────────────────────────────────────────
+// Toast (Custom Styled, Global, with Icons & Colors)
+// ──────────────────────────────────────────────────────────────
+const showToast = (type, message = '') => {
+  const icons = {
+    success: 'tabler-circle-check',
+    delete: 'tabler-trash',
+    error: 'tabler-alert-triangle',
+    warning: 'tabler-info-circle',
+    info: 'tabler-refresh'
+  }
+
+  toast(
     <div className='flex items-center gap-2'>
-      <Typography variant='body2' sx={{ fontWeight: 500 }}>
+      <i
+        className={icons[type]}
+        style={{
+          color:
+            type === 'success'
+              ? '#16a34a'
+              : type === 'error'
+                ? '#dc2626'
+                : type === 'delete'
+                  ? '#dc2626'
+                  : type === 'warning'
+                    ? '#f59e0b'
+                    : '#2563eb',
+          fontSize: '22px'
+        }}
+      />
+      <Typography variant='body2' sx={{ fontSize: '0.9rem', color: '#111' }}>
         {message}
       </Typography>
-    </div>
+    </div>,
+    {
+      position: 'top-right',
+      autoClose: 2000,
+      hideProgressBar: true,
+      closeOnClick: true,
+      pauseOnHover: false,
+      draggable: false,
+      theme: 'light',
+      style: {
+        borderRadius: '10px',
+        padding: '8px 14px',
+        boxShadow: '0 4px 10px rgba(0,0,0,0.06)',
+        display: 'flex',
+        alignItems: 'center'
+      }
+    }
   )
-  if (type === 'success') toast.success(content)
-  else if (type === 'error' || type === 'delete') toast.error(content)
-  else if (type === 'warning') toast.warn(content)
-  else toast.info(content)
 }
 
 // Debounced Input
@@ -172,13 +214,20 @@ export default function UserPrivilegePage() {
       delete: false
     })
     setDrawerOpen(true)
-    setTimeout(() => moduleRef.current?.focus(), 100)
+
+    setTimeout(() => {
+      moduleRef.current?.querySelector('input')?.focus()
+    }, 100)
   }
+
   const handleEdit = row => {
     setIsEdit(true)
     setFormData(row)
     setDrawerOpen(true)
-    setTimeout(() => moduleRef.current?.focus(), 100)
+
+    setTimeout(() => {
+      moduleRef.current?.querySelector('input')?.focus()
+    }, 100)
   }
   const handleDelete = async row => {
     const db = await initDB()
@@ -536,19 +585,21 @@ export default function UserPrivilegePage() {
           <form onSubmit={handleSubmit}>
             <Grid container spacing={2}>
               <Grid item xs={12}>
-                <CustomTextField
+                <CustomTextFieldWrapper
+                  ref={moduleRef}
                   fullWidth
                   label='Module'
+                  placeholder='Enter module name'
                   value={formData.module}
                   onChange={e => {
                     const filtered = e.target.value.replace(/[^a-zA-Z\s]/g, '')
-                    setFormData({ ...formData, module: filtered })
+                    setFormData(prev => ({ ...prev, module: filtered }))
                   }}
-                  inputRef={moduleRef}
                   onKeyDown={e => {
                     if (e.key === 'Enter') {
                       e.preventDefault()
-                      document.querySelector('input[type="checkbox"]')?.focus()
+                      const firstCheckbox = document.querySelector('input[type="checkbox"]')
+                      firstCheckbox?.focus()
                     }
                   }}
                 />
@@ -606,20 +657,71 @@ export default function UserPrivilegePage() {
         </Box>
       </Drawer>
 
-      {/* Delete Dialog */}
-      <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false, row: null })}>
-        <DialogTitle sx={{ textAlign: 'center', color: 'error.main', fontWeight: 600 }}>
-          <WarningAmberIcon sx={{ verticalAlign: 'middle', mr: 1 }} /> Confirm Delete
+      <Dialog
+        onClose={() => setDeleteDialog({ open: false, row: null })}
+        aria-labelledby='customized-dialog-title'
+        open={deleteDialog.open}
+        closeAfterTransition={false}
+        PaperProps={{
+          sx: {
+            overflow: 'visible',
+            width: 420,
+            borderRadius: 1,
+            textAlign: 'center'
+          }
+        }}
+      >
+        {/* 🔴 Title with Warning Icon */}
+        <DialogTitle
+          id='customized-dialog-title'
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1,
+            color: 'error.main',
+            fontWeight: 700,
+            pb: 1,
+            position: 'relative'
+          }}
+        >
+          <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
+          Confirm Delete
+          <DialogCloseButton
+            onClick={() => setDeleteDialog({ open: false, row: null })}
+            disableRipple
+            sx={{ position: 'absolute', right: 1, top: 1 }}
+          >
+            <i className='tabler-x' />
+          </DialogCloseButton>
         </DialogTitle>
-        <DialogContent>
-          <Typography textAlign='center'>
-            Are you sure you want to delete module{' '}
-            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.module}</strong>?
+
+        {/* Centered Text */}
+        <DialogContent sx={{ px: 5, pt: 1 }}>
+          <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
+            Are you sure you want to delete the module{' '}
+            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.module || 'this module'}</strong>?
+            <br />
+            This action cannot be undone.
           </Typography>
         </DialogContent>
-        <DialogActions sx={{ justifyContent: 'center', pb: 3 }}>
-          <Button onClick={() => setDeleteDialog({ open: false, row: null })}>Cancel</Button>
-          <Button color='error' variant='contained' onClick={confirmDelete}>
+
+        {/* Centered Buttons */}
+        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+          <Button
+            onClick={() => setDeleteDialog({ open: false, row: null })}
+            variant='tonal'
+            color='secondary'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={confirmDelete}
+            variant='contained'
+            color='error'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+          >
             Delete
           </Button>
         </DialogActions>
