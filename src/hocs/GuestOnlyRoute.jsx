@@ -1,22 +1,29 @@
-// Next Imports
-import { redirect } from 'next/navigation'
+'use client'
 
-// Third-party Imports
-import { getServerSession } from 'next-auth'
+// ✅ React Imports
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
-// Config Imports
+// ✅ Config Imports
 import themeConfig from '@configs/themeConfig'
 
-// Util Imports
+// ✅ Util Imports
 import { getLocalizedUrl } from '@/utils/i18n'
 
-const GuestOnlyRoute = async ({ children, lang }) => {
-  const session = await getServerSession()
+// 🧩 GuestOnlyRoute
+// Allows only unauthenticated users (no token) to access routes like /login
+// If user already logged in (token exists), redirect to dashboard
+const GuestOnlyRoute = ({ children, lang }) => {
+  const router = useRouter()
 
-  if (session) {
-    // Always send authenticated users to the localized admin dashboards route
-    redirect(getLocalizedUrl('/admin/dashboards', lang))
-  }
+  useEffect(() => {
+    const token = localStorage.getItem('access_token')
+
+    // ✅ If user is already logged in → redirect to dashboard
+    if (token) {
+      router.replace(getLocalizedUrl('/admin/dashboards', lang))
+    }
+  }, [router, lang])
 
   return <>{children}</>
 }

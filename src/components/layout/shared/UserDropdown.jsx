@@ -1,12 +1,12 @@
 'use client'
 
-// React Imports
-import { useRef, useState } from 'react'
+// ✅ React Imports
+import { useRef, useState, useEffect } from 'react'
 
-// Next Imports
+// ✅ Next Imports
 import { useParams, useRouter } from 'next/navigation'
 
-// MUI Imports
+// ✅ MUI Imports
 import { styled } from '@mui/material/styles'
 import Badge from '@mui/material/Badge'
 import Avatar from '@mui/material/Avatar'
@@ -20,17 +20,15 @@ import Divider from '@mui/material/Divider'
 import MenuItem from '@mui/material/MenuItem'
 import Button from '@mui/material/Button'
 
-// Third-party Imports
-// Third-party Imports
-import { signOut, useSession } from 'next-auth/react'
-
-// Hook Imports
+// ✅ Hook Imports
 import { useSettings } from '@core/hooks/useSettings'
 
-// Util Imports
+// ✅ Util Imports
 import { getLocalizedUrl } from '@/utils/i18n'
+import { clearTokens } from '@/utils/tokenUtils'
+import api from '@/utils/axiosInstance'
 
-// Styled component for badge content
+// ✅ Styled component for badge content
 const BadgeContentSpan = styled('span')({
   width: 8,
   height: 8,
@@ -40,40 +38,74 @@ const BadgeContentSpan = styled('span')({
   boxShadow: '0 0 0 2px var(--mui-palette-background-paper)'
 })
 
-const UserDropdown = () => {
-  // States
-  const [open, setOpen] = useState(false)
+// ✅ Logout API helper
+const logoutUser = async () => {
+  try {
+    const refresh =
+      typeof window !== 'undefined'
+        ? localStorage.getItem('refresh_token')
+        : null```
+// 🧾 Try blacklisting token if backend supports it
+if (refresh) {
+  await api.post('auth/token/blacklist/', { refresh })
+}
 
-  // Refs
+return { status: 'success' }
+```
+  } catch (err) {
+    const code = err?.response?.status
+    if (code === 404 || code === 405) {
+      console.warn('⚠️ Logout endpoint not found. Skipping server logout.')
+      return { status: 'skipped' }
+    }
+
+    ;```
+console.error('Logout API error:', err)
+return { status: 'error', message: 'Server logout failed; proceeding locally.' }
+```
+  }
+}
+
+const UserDropdown = () => {
+  // ✅ States
+  const [open, setOpen] = useState(false)
+  const [userData, setUserData] = useState({ name: '', email: '' })
+
+  // ✅ Refs
   const anchorRef = useRef(null)
 
-  // Hooks
+  // ✅ Hooks
   const router = useRouter()
-  const { data: session } = useSession()
   const { settings } = useSettings()
   const { lang: locale } = useParams()
 
-  const handleDropdownOpen = () => {
-    !open ? setOpen(true) : setOpen(false)
-  }
+  // ✅ Load user info from localStorage
+  useEffect(() => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user_info'))
+      if (user) setUserData(user)
+    } catch (err) {
+      console.error('Error parsing user info:', err)
+    }
+  }, [])
 
+  // ✅ Toggle dropdown open/close
+  const handleDropdownOpen = () => setOpen(prev => !prev)
   const handleDropdownClose = (event, url) => {
-    if (url) {
-      router.push(getLocalizedUrl(url, locale))
-    }
-
-    if (anchorRef.current && anchorRef.current.contains(event?.target)) {
-      return
-    }
-
+    if (url) router.push(getLocalizedUrl(url, locale))
+    if (anchorRef.current && anchorRef.current.contains(event?.target)) return
     setOpen(false)
   }
 
+  // ✅ Handle logout
   const handleUserLogout = async () => {
     try {
-      await signOut({ callbackUrl: getLocalizedUrl('/login', locale) })
+      await logoutUser()
     } catch (error) {
-      console.error(error)
+      console.error('Logout error:', error)
+    } finally {
+      clearTokens()
+      localStorage.removeItem('user_info')
       router.push(getLocalizedUrl('/login', locale))
     }
   }
@@ -88,13 +120,13 @@ const UserDropdown = () => {
         className='mis-2'
       >
         <Avatar
-          ref={anchorRef}
-          alt={session?.user?.name || ''}
-          src={session?.user?.image || ''}
+          alt={userData.name || 'User'}
+          src={userData.image || ''}
           onClick={handleDropdownOpen}
           className='cursor-pointer bs-[38px] is-[38px]'
-        />
+        />{' '}
       </Badge>
+
       <Popper
         open={open}
         transition
@@ -113,32 +145,26 @@ const UserDropdown = () => {
             <Paper className={settings.skin === 'bordered' ? 'border shadow-none' : 'shadow-lg'}>
               <ClickAwayListener onClickAway={e => handleDropdownClose(e)}>
                 <MenuList>
+                  {/* ✅ User Info Section */}
                   <div className='flex items-center plb-2 pli-6 gap-2' tabIndex={-1}>
-                    <Avatar alt={session?.user?.name || ''} src={session?.user?.image || ''} />
+                    <Avatar alt={userData.name || ''} src={userData.image || ''} />
                     <div className='flex items-start flex-col'>
                       <Typography className='font-medium' color='text.primary'>
-                        {session?.user?.name || ''}
+                        {userData.name || 'Admin'}
                       </Typography>
-                      <Typography variant='caption'>{session?.user?.email || ''}</Typography>
+                      <Typography variant='caption'>{userData.email || 'admin@gmail.com'}</Typography>
                     </div>
                   </div>
+
                   <Divider className='mlb-1' />
+
+                  {/* ✅ Example menu link */}
                   <MenuItem className='mli-2 gap-3' onClick={e => handleDropdownClose(e, '/pages/user-profile')}>
                     <i className='tabler-user' />
                     <Typography color='text.primary'>My Profile</Typography>
                   </MenuItem>
-                  {/* <MenuItem className='mli-2 gap-3' onClick={e => handleDropdownClose(e, '/pages/account-settings')}>
-                    <i className='tabler-settings' />
-                    <Typography color='text.primary'>Settings</Typography>
-                  </MenuItem> */}
-                  {/* <MenuItem className='mli-2 gap-3' onClick={e => handleDropdownClose(e, '/pages/pricing')}>
-                    <i className='tabler-currency-dollar' />
-                    <Typography color='text.primary'>Pricing</Typography>
-                  </MenuItem> */}
-                  {/* <MenuItem className='mli-2 gap-3' onClick={e => handleDropdownClose(e, '/pages/faq')}>
-                    <i className='tabler-help-circle' />
-                    <Typography color='text.primary'>FAQ</Typography>
-                  </MenuItem> */}
+
+                  {/* ✅ Logout Button */}
                   <div className='flex items-center plb-2 pli-3'>
                     <Button
                       fullWidth

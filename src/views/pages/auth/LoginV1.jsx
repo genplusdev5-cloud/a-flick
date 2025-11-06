@@ -22,11 +22,12 @@ import { useForm, Controller } from 'react-hook-form'
 // ✅ Component Imports
 import Logo from '@components/layout/shared/Logo'
 import CustomTextField from '@core/components/mui/TextField'
-// Next-auth
-import { signIn } from 'next-auth/react'
 
 // ✅ Config Imports
 import themeConfig from '@configs/themeConfig'
+
+// ✅ Custom Utils
+import { loginUser } from '@/api/auth/login'
 
 const LoginV1 = () => {
   const router = useRouter()
@@ -51,31 +52,25 @@ const LoginV1 = () => {
   // ✅ Toggle Password Visibility
   const handleClickShowPassword = () => setIsPasswordShown(!isPasswordShown)
 
-  // Login Handler: use NextAuth credentials provider
+  // ✅ Handle Login
   const onSubmit = async data => {
     setLoading(true)
     setErrorMsg('')
 
     try {
-      const res = await signIn('credentials', {
-        redirect: false,
-        email: data.email,
-        password: data.password,
-        callbackUrl: '/en/admin/dashboards'
-      })
+      const res = await loginUser(data.email, data.password)
 
-      if (res?.error) {
-        setErrorMsg('Invalid email or password')
-      } else if (res?.url) {
-        // On success, go to the callback URL
-        router.push(res.url)
+      if (res.status === 'success') {
+        // ✅ Give small delay to ensure token is saved before redirect
+        setTimeout(() => {
+          router.push('/en/admin/dashboards')
+        }, 400)
       } else {
-        // Fallback redirect
-        router.push('/en/admin/dashboards')
+        setErrorMsg(res.message || 'Login failed. Please try again.')
       }
-    } catch (err) {
-      console.error('Login error:', err)
-      setErrorMsg('Invalid credentials or connection error. Please try again.')
+    } catch (error) {
+      console.error('Login error:', error)
+      setErrorMsg(error.message || 'Invalid credentials or network error.')
     } finally {
       setLoading(false)
     }
