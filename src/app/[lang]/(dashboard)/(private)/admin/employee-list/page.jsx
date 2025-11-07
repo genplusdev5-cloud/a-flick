@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { openDB } from 'idb'
 import {
   Box,
   Button,
@@ -26,6 +25,10 @@ import {
   CircularProgress,
   InputAdornment
 } from '@mui/material'
+
+import { getEmployeeList, addEmployee, updateEmployee, deleteEmployee, getEmployeeDetails } from '@/api/employee'
+
+import { encryptId } from '@/utils/encryption'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
@@ -52,31 +55,9 @@ import {
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
 
-// ───────────────────────────────────────────
-// IndexedDB Setup
-// ───────────────────────────────────────────
-const DB_NAME = 'EmployeeDB'
-const STORE_NAME = 'employees'
-const DB_VERSION = 2
-
-const openDBInstance = () => {
-  return openDB(DB_NAME, DB_VERSION, {
-    upgrade(db) {
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true })
-      }
-    }
-  })
-}
-
 const getEmployees = async () => {
   const db = await openDBInstance()
   return db.getAll(STORE_NAME)
-}
-
-const deleteEmployee = async (id) => {
-  const db = await openDBInstance()
-  await db.delete(STORE_NAME, id)
 }
 
 // Toast helper
@@ -160,36 +141,52 @@ export default function EmployeePage() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const all = await getEmployees()
-      const filtered = searchText
-        ? all.filter(r =>
-            ['name', 'email', 'phone', 'city', 'state', 'pincode', 'address1', 'address2'].some(key =>
-              (r[key] || '').toString().toLowerCase().includes(searchText.toLowerCase())
-            )
-          )
-        : all
+      const res = await getEmployeeList()
+      const results = res?.data?.results || []
 
-      const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
-      const start = pagination.pageIndex * pagination.pageSize
-      const end = start + pagination.pageSize
-      const paginated = sorted.slice(start, end)
-
-      const normalized = paginated.map((item, idx) => ({
-        ...item,
-        sno: start + idx + 1,
-        department: item.city || 'N/A',
-        supervisor: item.state || 'N/A'
+      const formatted = results.map((item, index) => ({
+        sno: index + 1,
+        id: item.id,
+        name: item.name || '-',
+        nick_name: item.nick_name || '-',
+        email: item.email || '-',
+        phone: item.phone || '-',
+        department: item.department && item.department !== '-' ? item.department : '-',
+        designation: item.designation && item.designation !== '-' ? item.designation : '-',
+        user_role: item.user_role && item.user_role !== '-' ? item.user_role : '-',
+        scheduler: item.scheduler && item.scheduler !== '-' ? item.scheduler : '-',
+        supervisor: item.supervisor && item.supervisor !== '-' ? item.supervisor : '-',
+        vehicle_no: item.vehicle_no || '-',
+        lunch_time: item.lunch_time || '-',
+        target_day: item.target_day || '-',
+        target_night: item.target_night || '-',
+        target_saturday: item.target_saturday || '-',
+        description: item.description || '-',
+        // ✅ Handle boolean/null values
+        is_scheduler: item.is_scheduler === 1 ? 'Yes' : 'No',
+        is_sales: item.is_sales === 1 ? 'Yes' : 'No',
+        is_technician: item.is_technician === 1 ? 'Yes' : 'No',
+        created_on: item.created_on || '-',
+        status: item.is_active === 1 ? 'Active' : 'Inactive'
       }))
 
-      setRows(normalized)
-      setRowCount(filtered.length)
-    } catch (err) {
-      console.error(err)
+      setRows(formatted)
+      setRowCount(formatted.length)
+    } catch (error) {
+      console.error('❌ Employee List Error:', error)
       showToast('error', 'Failed to load employees')
     } finally {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    // ✅ Auto refresh after adding new employee
+    if (sessionStorage.getItem('reloadAfterAdd') === 'true') {
+      loadData()
+      sessionStorage.removeItem('reloadAfterAdd')
+    }
+  }, [])
 
   useEffect(() => {
     loadData()
@@ -198,14 +195,28 @@ export default function EmployeePage() {
     return () => window.removeEventListener('focus', handleFocus)
   }, [pagination.pageIndex, pagination.pageSize, searchText])
 
-  const handleEdit = (id) => router.push(`/admin/employee-list/${id}/edit`)
+  const handleEdit = id => {
+    const encodedId = encryptId(id)
+    router.push(`/en/admin/employee-list/edit?id=${encodedId}`)
+  }
   const confirmDelete = async () => {
     if (deleteDialog.row) {
-      await deleteEmployee(deleteDialog.row.id)
-      showToast('delete', `Employee ${deleteDialog.row.name} deleted`)
-      loadData()
+      try {
+        const res = await deleteEmployee(deleteDialog.row.id)
+
+        if (res?.status === 'success') {
+          showToast('delete', `Employee ${deleteDialog.row.name} deleted successfully`)
+          await loadData() // refresh list
+        } else {
+          showToast('error', res?.message || 'Failed to delete employee')
+        }
+      } catch (error) {
+        console.error('❌ Delete Employee Error:', error)
+        showToast('error', error.response?.data?.message || 'Something went wrong')
+      } finally {
+        setDeleteDialog({ open: false, row: null })
+      }
     }
-    setDeleteDialog({ open: false, row: null })
   }
 
   // --- Table Columns ---
@@ -235,7 +246,62 @@ export default function EmployeePage() {
       columnHelper.accessor('email', { header: 'Email' }),
       columnHelper.accessor('phone', { header: 'Phone' }),
       columnHelper.accessor('department', { header: 'Department' }),
+      columnHelper.accessor('designation', { header: 'Designation' }),
+      columnHelper.accessor('user_role', { header: 'User Role' }),
+      columnHelper.accessor('scheduler', { header: 'Scheduler' }),
       columnHelper.accessor('supervisor', { header: 'Supervisor' }),
+      columnHelper.accessor('vehicle_no', { header: 'Vehicle No' }),
+      columnHelper.accessor('lunch_time', { header: 'Lunch Time' }),
+      columnHelper.accessor('target_day', { header: 'Target Day' }),
+      columnHelper.accessor('target_night', { header: 'Target Night' }),
+      columnHelper.accessor('target_saturday', { header: 'Target Saturday' }),
+      columnHelper.accessor('description', { header: 'Description' }),
+      columnHelper.accessor('is_scheduler', {
+        header: 'Scheduler',
+        cell: info => (
+          <Chip
+            label={info.getValue()}
+            size='small'
+            sx={{
+              color: '#fff',
+              bgcolor: info.getValue() === 'Yes' ? 'success.main' : 'error.main',
+              fontWeight: 600,
+              borderRadius: '6px'
+            }}
+          />
+        )
+      }),
+      columnHelper.accessor('is_sales', {
+        header: 'Sales',
+        cell: info => (
+          <Chip
+            label={info.getValue()}
+            size='small'
+            sx={{
+              color: '#fff',
+              bgcolor: info.getValue() === 'Yes' ? 'success.main' : 'error.main',
+              fontWeight: 600,
+              borderRadius: '6px'
+            }}
+          />
+        )
+      }),
+      columnHelper.accessor('is_technician', {
+        header: 'Technician',
+        cell: info => (
+          <Chip
+            label={info.getValue()}
+            size='small'
+            sx={{
+              color: '#fff',
+              bgcolor: info.getValue() === 'Yes' ? 'success.main' : 'error.main',
+              fontWeight: 600,
+              borderRadius: '6px'
+            }}
+          />
+        )
+      }),
+      // ✅ Status same as your old setup
       columnHelper.accessor('status', {
         header: 'Status',
         cell: info => {
@@ -285,15 +351,9 @@ export default function EmployeePage() {
     const headers = ['S.No', 'Name', 'Email', 'Phone', 'Department', 'Supervisor', 'Status']
     const csv = [
       headers.join(','),
-      ...rows.map(r => [
-        r.sno,
-        `"${r.name}"`,
-        r.email,
-        r.phone,
-        `"${r.department}"`,
-        `"${r.supervisor}"`,
-        r.status
-      ].join(','))
+      ...rows.map(r =>
+        [r.sno, `"${r.name}"`, r.email, r.phone, `"${r.department}"`, `"${r.supervisor}"`, r.status].join(',')
+      )
     ].join('\n')
 
     const link = document.createElement('a')
@@ -316,7 +376,9 @@ export default function EmployeePage() {
       <table><thead><tr>
       <th>S.No</th><th>Name</th><th>Email</th><th>Phone</th><th>Department</th><th>Supervisor</th><th>Status</th>
       </tr></thead><tbody>
-      ${rows.map(r => `<tr>
+      ${rows
+        .map(
+          r => `<tr>
         <td>${r.sno}</td>
         <td>${r.name}</td>
         <td>${r.email}</td>
@@ -324,7 +386,9 @@ export default function EmployeePage() {
         <td>${r.department}</td>
         <td>${r.supervisor}</td>
         <td>${r.status}</td>
-      </tr>`).join('')}
+      </tr>`
+        )
+        .join('')}
       </tbody></table></body></html>`
     w.document.write(html)
     w.document.close()
@@ -363,7 +427,10 @@ export default function EmployeePage() {
                   <RefreshIcon
                     sx={{
                       animation: loading ? 'spin 1s linear infinite' : 'none',
-                      '@keyframes spin': { '0%': { transform: 'rotate(0deg)' }, '100%': { transform: 'rotate(360deg)' } }
+                      '@keyframes spin': {
+                        '0%': { transform: 'rotate(0deg)' },
+                        '100%': { transform: 'rotate(360deg)' }
+                      }
                     }}
                   />
                 }
@@ -442,7 +509,9 @@ export default function EmployeePage() {
               onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
             >
               {[10, 25, 50, 100].map(s => (
-                <MenuItem key={s} value={s}>{s} entries</MenuItem>
+                <MenuItem key={s} value={s}>
+                  {s} entries
+                </MenuItem>
               ))}
             </Select>
           </FormControl>
@@ -547,7 +616,8 @@ export default function EmployeePage() {
         </DialogTitle>
         <DialogContent sx={{ px: 5, pt: 1 }}>
           <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
-            Are you sure you want to delete employee <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name}</strong>?
+            Are you sure you want to delete employee{' '}
+            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name}</strong>?
             <br />
             This action cannot be undone.
           </Typography>

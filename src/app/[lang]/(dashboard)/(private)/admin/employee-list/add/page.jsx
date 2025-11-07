@@ -13,68 +13,18 @@ import {
   Checkbox,
   FormControlLabel
 } from '@mui/material'
+
+import { addEmployee } from '@/api/employee'
+
 import { useRouter } from 'next/navigation'
+
+import { toast } from 'react-toastify'
+import { Typography } from '@mui/material'
 
 // Layout + Inputs (Assuming these paths are correct)
 import ContentLayout from '@/components/layout/ContentLayout'
 import CustomTextField from '@core/components/mui/TextField'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
-
-// ----------------------------------------------------------------------
-// INDEXEDDB HELPER FUNCTIONS (Kept for submission logic)
-// ----------------------------------------------------------------------
-
-const DB_NAME = 'EmployeeDB'
-const DB_VERSION = 1
-const STORE_NAME = 'employees'
-
-const openDB = () => {
-  // ... (openDB implementation remains the same)
-  return new Promise((resolve, reject) => {
-    if (!('indexedDB' in window)) {
-      console.error('IndexedDB not supported.')
-      reject(new Error('IndexedDB not supported.'))
-      return
-    }
-    const request = indexedDB.open(DB_NAME, DB_VERSION)
-    request.onerror = event => {
-      console.error('Database error:', event.target.error)
-      reject(event.target.error)
-    }
-    request.onsuccess = event => {
-      resolve(event.target.result)
-    }
-    request.onupgradeneeded = event => {
-      const db = event.target.result
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id' })
-      }
-    }
-  })
-}
-
-const saveEmployee = async employee => {
-  try {
-    const db = await openDB()
-    const transaction = db.transaction([STORE_NAME], 'readwrite')
-    const store = transaction.objectStore(STORE_NAME)
-    const request = store.add(employee)
-
-    return new Promise((resolve, reject) => {
-      request.onsuccess = () => {
-        resolve()
-      }
-      request.onerror = event => {
-        console.error('Error saving employee to IndexedDB:', event.target.error)
-        reject(event.target.error)
-      }
-    })
-  } catch (error) {
-    console.error('Failed to open DB or save employee:', error)
-  }
-}
-
-const generateUniqueId = () => Date.now().toString(36) + Math.random().toString(36).substring(2)
 
 // ----------------------------------------------------------------------
 // MAIN COMPONENT
@@ -151,12 +101,51 @@ export default function AddEmployeePage() {
 
   // Autocomplete Fields Definition
   const autocompleteFields = [
-    { name: 'employeeRole', options: ['Confirmed Sales', 'Quotation'] },
-    { name: 'department', options: ['GP Industries Pvt Ltd', 'Marketing', 'IT'] },
-    { name: 'designation', options: ['Manager', 'Senior Developer', 'Sales Executive'] },
-    { name: 'userRole', options: ['Admin', 'Standard User', 'Technician'] },
-    { name: 'scheduler', options: ['User A', 'User B'] },
-    { name: 'supervisor', options: ['Supervisor 1', 'Supervisor 2'] }
+    {
+      name: 'employeeRole',
+      options: [
+        { id: 1, label: 'Confirmed Sales' },
+        { id: 2, label: 'Quotation' }
+      ]
+    },
+    {
+      name: 'department',
+      options: [
+        { id: 1, label: 'GP Industries Pvt Ltd' },
+        { id: 2, label: 'Marketing' },
+        { id: 3, label: 'IT' }
+      ]
+    },
+    {
+      name: 'designation',
+      options: [
+        { id: 1, label: 'Manager' },
+        { id: 2, label: 'Senior Developer' },
+        { id: 3, label: 'Sales Executive' }
+      ]
+    },
+    {
+      name: 'userRole',
+      options: [
+        { id: 1, label: 'Admin' },
+        { id: 2, label: 'Standard User' },
+        { id: 3, label: 'Technician' }
+      ]
+    },
+    {
+      name: 'scheduler',
+      options: [
+        { id: 1, label: 'User A' },
+        { id: 2, label: 'User B' }
+      ]
+    },
+    {
+      name: 'supervisor',
+      options: [
+        { id: 1, label: 'Supervisor 1' },
+        { id: 2, label: 'Supervisor 2' }
+      ]
+    }
   ]
 
   // Dynamic Refs and Open States for Autocomplete
@@ -227,6 +216,59 @@ export default function AddEmployeePage() {
     if (setter) {
       setter(value)
     }
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // Toast (Custom Styled, Global, with Icons & Colors)
+  // ──────────────────────────────────────────────────────────────
+  const showToast = (type, message = '') => {
+    const icons = {
+      success: 'tabler-circle-check',
+      delete: 'tabler-trash',
+      error: 'tabler-alert-triangle',
+      warning: 'tabler-info-circle',
+      info: 'tabler-refresh'
+    }
+
+    toast(
+      <div className='flex items-center gap-2'>
+        <i
+          className={icons[type]}
+          style={{
+            color:
+              type === 'success'
+                ? '#16a34a'
+                : type === 'error'
+                  ? '#dc2626'
+                  : type === 'delete'
+                    ? '#dc2626'
+                    : type === 'warning'
+                      ? '#f59e0b'
+                      : '#2563eb',
+            fontSize: '22px'
+          }}
+        />
+        <Typography variant='body2' sx={{ fontSize: '0.9rem', color: '#111' }}>
+          {message}
+        </Typography>
+      </div>,
+      {
+        position: 'top-right',
+        autoClose: 2000,
+        hideProgressBar: true,
+        closeOnClick: true,
+        pauseOnHover: false,
+        draggable: false,
+        theme: 'light',
+        style: {
+          borderRadius: '10px',
+          padding: '8px 14px',
+          boxShadow: '0 4px 10px rgba(0,0,0,0.06)',
+          display: 'flex',
+          alignItems: 'center'
+        }
+      }
+    )
   }
 
   const focusNextElement = useCallback(
@@ -311,44 +353,64 @@ export default function AddEmployeePage() {
   const handleCloseDialog = () => setOpenDialog(false)
 
   const handleSubmit = async () => {
-    if (uploadedFileURL) {
-      URL.revokeObjectURL(uploadedFileURL)
-    }
-
-    const newEmployee = {
-      id: generateUniqueId(),
-      employeeRole,
-      nickname,
-      name,
-      department,
-      designation,
-      userRole,
-      scheduler,
-      supervisor,
-      lunchTime,
-      email,
-      password,
-      phone,
-      dob: dob.toISOString(),
-      targetDay,
-      targetNight,
-      targetSaturday,
-      vehicleNumber,
-      description,
-      color, // Included color
-      uploadedFileName,
-      uploadedFileURL,
-      isScheduler,
-      isSales,
-      isTechnician
-    }
-
     try {
-      await saveEmployee(newEmployee)
-      router.push('/admin/employee-list')
+      if (!name || !email || !password) {
+        showToast('warning', 'Please fill Name, Email, and Password')
+        return
+      }
+
+      // ✅ Build the final payload (using backend field names)
+      const newEmployee = {
+        name,
+        email,
+        password,
+        phone: phone || null,
+        // 👉 These fields must send IDs, not labels
+        employee_role: employeeRole?.label || '-',
+        department_id: department?.id || null,
+        designation_id: designation?.id || null,
+        user_role_id: userRole?.id || null,
+        scheduler_id: scheduler?.id || null,
+        supervisor_id: supervisor?.id || null,
+
+        // Optional / numeric fields
+        target_day: targetDay || null,
+        target_night: targetNight || null,
+        target_saturday: targetSaturday || null,
+
+        // Boolean/flag values
+        is_scheduler: isScheduler ? 1 : 0,
+        is_sales: isSales ? 1 : 0,
+        is_technician: isTechnician ? 1 : 0,
+        is_active: 1,
+
+        // Extra fields
+        lunch_time: lunchTime || null,
+        vehicle_no: vehicleNumber || null,
+        description: description || null,
+        color_code: color || '#000000',
+        dob: dob ? new Date(dob).toISOString().split('T')[0] : null
+      }
+
+      console.log('🔍 Payload sent to API:', newEmployee)
+
+      const res = await addEmployee(newEmployee)
+
+      if (res?.status === 'success') {
+        showToast('success', 'Employee added successfully!')
+
+        // ✅ Let backend commit data and trigger reload flag
+        sessionStorage.setItem('reloadAfterAdd', 'true')
+
+        setTimeout(() => {
+          router.push('/admin/employee-list')
+        }, 1000)
+      } else {
+        showToast('error', res?.message || 'Failed to add employee')
+      }
     } catch (error) {
-      alert('Failed to save employee to database. See console for details.')
-      console.error('Submission failed:', error)
+      console.error('❌ Add Employee Error:', error)
+      showToast('error', error.response?.data?.message || 'Validation failed')
     }
   }
 
@@ -370,18 +432,15 @@ export default function AddEmployeePage() {
       <Grid item {...gridProps} key={name}>
         <Autocomplete
           ref={ref}
-          freeSolo={false}
           options={options}
+          getOptionLabel={option => (typeof option === 'string' ? option : option?.label || '')}
+          isOptionEqualToValue={(option, value) => option?.id === value?.id || option?.label === value?.label}
           value={value}
-          open={isOpen}
-          onFocus={() => setIsOpen(true)}
-          onBlur={() => setIsOpen(false)}
-          onOpen={() => setIsOpen(true)}
-          onClose={() => setIsOpen(false)}
-          onInputChange={(e, newValue, reason) => handleAutocompleteInputChange(name, options, newValue, reason)}
           onChange={(e, newValue) => handleAutocompleteChange(name, newValue, inputRef)}
-          onKeyDown={e => handleKeyDown(e, inputRef)}
-          noOptionsText='No options'
+          onInputChange={(e, newValue) => {
+            const setter = stateSetters[name]
+            if (setter) setter(newValue)
+          }}
           renderInput={params => <CustomTextField {...params} label={label} inputRef={inputRef} />}
         />
       </Grid>

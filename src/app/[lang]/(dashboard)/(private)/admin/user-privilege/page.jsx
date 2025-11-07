@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { openDB } from 'idb'
+
 import {
   Box,
   Button,
@@ -28,6 +28,21 @@ import {
   CircularProgress,
   InputAdornment
 } from '@mui/material'
+
+// 🔹 Imports (add these to the top of your file)
+import {
+  addUserRole,
+  getUserRoleList,
+  getUserRoleDetails,
+  updateUserRole,
+  deleteUserRole,
+  duplicateUserRole,
+  refreshUserRole
+} from '@/api/userRole'
+
+import { getUserPrivilegeList, getUserPrivilegeDetails, updateUserPrivilege } from '@/api/userPrivilege'
+
+import FileCopyIcon from '@mui/icons-material/FileCopy'
 import CustomTextFieldWrapper from '@/components/common/CustomTextField'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
@@ -35,6 +50,11 @@ import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
+
+// Component Imports
+
+import CustomAutocomplete from '@core/components/mui/Autocomplete'
+
 import CloseIcon from '@mui/icons-material/Close'
 import PrintIcon from '@mui/icons-material/Print'
 import FileDownloadIcon from '@mui/icons-material/FileDownload'
@@ -57,21 +77,6 @@ import {
 } from '@tanstack/react-table'
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
-
-// ───────────────────────────────────────────
-// IndexedDB
-// ───────────────────────────────────────────
-const DB_NAME = 'UserPrivilegeDB'
-const STORE_NAME = 'modules'
-const initDB = async () => {
-  return await openDB(DB_NAME, 1, {
-    upgrade(db) {
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true })
-      }
-    }
-  })
-}
 
 // Toast helper
 // ──────────────────────────────────────────────────────────────
@@ -152,9 +157,17 @@ export default function UserPrivilegePage() {
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
 
+  const [roles, setRoles] = useState([])
+  const [selectedRole, setSelectedRole] = useState('')
+  const [selectedRoleId, setSelectedRoleId] = useState(null)
+  const [data, setData] = useState([])
+
+  const [privileges, setPrivileges] = useState([])
+
   const [formData, setFormData] = useState({
     id: null,
     module: '',
+    description: '', // ✅ add this to prevent undefined issue
     create: false,
     view: false,
     update: false,
@@ -163,51 +176,111 @@ export default function UserPrivilegePage() {
 
   const moduleRef = useRef(null)
 
-  // Load rows
-  const loadData = async () => {
+  const handleUpdatePrivileges = async () => {
+    if (!selectedRole) {
+      showToast('warning', 'Select a role first')
+      return
+    }
+
     setLoading(true)
     try {
-      const db = await initDB()
-      const all = await db.getAll(STORE_NAME)
-
-      // 🔍 Search Filter
-      const filtered = searchText ? all.filter(r => r.module.toLowerCase().includes(searchText.toLowerCase())) : all
-
-      // 🔢 Sort latest first
-      const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
-
-      // 📄 Pagination
-      const start = pagination.pageIndex * pagination.pageSize
-      const end = start + pagination.pageSize
-      const paginated = sorted.slice(start, end)
-
-      // 🧾 Normalize data with serial number
-      const normalized = paginated.map((item, idx) => ({
-        ...item,
-        sno: start + idx + 1
+      const payload = privileges.map(p => ({
+        module_id: p.module_id,
+        create: p.create ? 1 : 0,
+        read: p.view ? 1 : 0,
+        update: p.update ? 1 : 0,
+        delete: p.delete ? 1 : 0
       }))
 
-      setRows(normalized)
-      setRowCount(filtered.length)
+      console.log('🚀 Final payload sending to backend:', {
+        role_id: selectedRole,
+        privileges: payload
+      })
+
+      await updateUserPrivilege(selectedRole, payload)
+      showToast('success', 'Privileges updated successfully')
+    } catch (err) {
+      console.error('❌ Update error:', err)
+      showToast('error', 'Failed to update privileges')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Load rows
+  const loadRoles = async () => {
+    setLoading(true)
+    try {
+      const res = await getUserRoleList()
+      setRoles(res?.data?.results || [])
     } catch (err) {
       console.error(err)
-      showToast('error', 'Failed to load data')
+      showToast('error', 'Failed to fetch roles')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadPrivileges = async roleId => {
+    if (!roleId) {
+      console.warn('⚠️ No roleId provided to loadPrivileges')
+      return
+    }
+
+    setLoading(true)
+    try {
+      console.log('🔹 Fetching privileges for Role ID:', roleId)
+      const res = await getUserPrivilegeList(roleId)
+
+      console.log('🔹 API response:', res?.data)
+      const data = res?.data?.results || res?.data || []
+
+      if (data.length === 0) {
+        console.warn('⚠️ No privileges returned from API')
+      }
+
+      // ✅ Convert integer values to boolean for checkboxes
+      const formatted = data.map((item, idx) => ({
+        sno: idx + 1,
+        module: item.module_name,
+        id: item.id,
+        module_id: item.module_id,
+        create: item.is_create === 1,
+        view: item.is_read === 1,
+        update: item.is_update === 1,
+        delete: item.is_delete === 1
+      }))
+
+      setPrivileges(formatted)
+      setRows(formatted)
+      setRowCount(formatted.length)
+    } catch (err) {
+      console.error('❌ Error loading privileges:', err)
+      showToast('error', 'Failed to load privileges')
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    loadData()
-  }, [pagination.pageIndex, pagination.pageSize, searchText])
+    console.log('Privilege list:', privileges)
+  }, [privileges])
 
-  // Drawer
+  useEffect(() => {
+    loadRoles()
+  }, [])
+
+  useEffect(() => {
+    if (selectedRole) loadPrivileges(selectedRole)
+  }, [selectedRole])
+
   const toggleDrawer = () => setDrawerOpen(p => !p)
   const handleAdd = () => {
     setIsEdit(false)
     setFormData({
       id: null,
-      module: '',
+      module: '', // start blank for Add
+      description: '',
       create: false,
       view: false,
       update: false,
@@ -215,9 +288,38 @@ export default function UserPrivilegePage() {
     })
     setDrawerOpen(true)
 
+    // Optional: Focus on input
     setTimeout(() => {
       moduleRef.current?.querySelector('input')?.focus()
     }, 100)
+  }
+
+  const fetchPrivileges = async roleId => {
+    try {
+      const res = await getUserPrivilegeList(roleId)
+      console.log('Fetched privileges:', res.data)
+
+      const formatted = (res.data.results || []).map(item => ({
+        id: item.id,
+        module_id: item.module_id,
+        module: item.module_name,
+        is_create: item.is_create === 1, // ✅ convert int → boolean
+        is_read: item.is_read === 1,
+        is_update: item.is_update === 1,
+        is_delete: item.is_delete === 1
+      }))
+
+      setPrivileges(formatted)
+    } catch (error) {
+      console.error('❌ Error fetching privileges:', error)
+    }
+  }
+
+  const handlePrivilegeChange = (moduleId, key, value) => {
+    // Update both privileges and rows correctly
+    setPrivileges(prev => prev.map(p => (p.module_id === moduleId ? { ...p, [key]: value } : p)))
+
+    setRows(prev => prev.map(r => (r.module_id === moduleId ? { ...r, [key]: value } : r)))
   }
 
   const handleEdit = row => {
@@ -229,39 +331,146 @@ export default function UserPrivilegePage() {
       moduleRef.current?.querySelector('input')?.focus()
     }, 100)
   }
-  const handleDelete = async row => {
-    const db = await initDB()
-    await db.delete(STORE_NAME, row.id)
-    showToast('delete', `${row.module} deleted`)
-    loadData()
+  // ───────────────────────────────────────────
+  // Delete Role
+  const handleDeleteRole = async id => {
+    try {
+      if (!id) {
+        toast.error('No role selected for deletion.')
+        return
+      }
+
+      const result = await deleteUserRole(id)
+
+      if (result.status === 'success') {
+        showToast('delete', result.message || 'UserRole deleted successfully')
+        await loadRoles()
+      } else {
+        showToast('error', result.message || 'Failed to delete user role')
+      }
+    } catch (error) {
+      console.error('❌ Delete error:', error)
+      toast.error('Something went wrong while deleting.')
+    }
   }
+
+  // 🔴 Delete Handlers
+  const handleDelete = async row => {
+    try {
+      // you can call your delete API here (if backend delete endpoint exists)
+      showToast('delete', `${row.module} deleted successfully`)
+      setRows(prev => prev.filter(r => r.id !== row.id)) // instantly remove from UI
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'Failed to delete')
+    }
+  }
+
+  // Confirm delete from dialog
   const confirmDelete = async () => {
-    if (deleteDialog.row) await handleDelete(deleteDialog.row)
+    if (deleteDialog.row) {
+      await handleDelete(deleteDialog.row)
+    }
     setDeleteDialog({ open: false, row: null })
   }
 
+  // ───────────────────────────────────────────
+  // Duplicate Role
+  const handleDuplicateRole = async roleId => {
+    try {
+      if (!roleId) {
+        showToast('warning', 'Please select a role to duplicate.')
+        return
+      }
+
+      // 1️⃣ Fetch role details
+      const res = await getUserRoleDetails(roleId)
+      const originalRole = res?.data
+
+      if (!originalRole) {
+        showToast('error', 'Failed to fetch role details.')
+        return
+      }
+
+      // 2️⃣ Pre-fill drawer with role data for editing
+      setIsEdit(false) // This will trigger save (not update)
+      setFormData({
+        id: null, // because it's a new one
+        module: `${originalRole.name} Copy`,
+        description: originalRole.description || ''
+      })
+
+      // 3️⃣ Store reference of the original role for privileges
+      setSelectedRoleId(roleId) // keep old ID temporarily
+
+      setDrawerOpen(true) // ✅ open drawer only
+      showToast('info', `Editing duplicate of "${originalRole.name}"`)
+    } catch (error) {
+      console.error('❌ Duplicate setup error:', error)
+      showToast('error', 'Failed to open duplicate role drawer.')
+    }
+  }
+
+  // ───────────────────────────────────────────
   const handleSubmit = async e => {
     e.preventDefault()
+
     if (!formData.module.trim()) {
-      showToast('warning', 'Module name is required')
+      showToast('warning', 'Role name is required')
       return
     }
+
     setLoading(true)
     try {
-      const db = await initDB()
-      const payload = { ...formData }
       if (isEdit && formData.id) {
-        await db.put(STORE_NAME, payload)
-        showToast('success', 'Module updated')
+        // 🟢 Normal update
+        const payload = {
+          name: formData.module,
+          description: formData.description || ''
+        }
+        await updateUserRole(formData.id, payload)
+        showToast('success', 'Role updated successfully')
       } else {
-        delete payload.id
-        await db.add(STORE_NAME, payload)
-        showToast('success', 'Module added')
+        // 🟢 Duplicate mode or new role add
+        const payload = {
+          name: formData.module,
+          description: formData.description || ''
+        }
+
+        // 1️⃣ Create the new role
+        const newRole = await addUserRole(payload)
+        const newRoleId = newRole?.data?.id
+
+        if (!newRoleId) {
+          showToast('error', 'Failed to create role.')
+          return
+        }
+
+        // 2️⃣ If it’s a duplicate, copy privileges
+        if (selectedRoleId) {
+          const privRes = await getUserPrivilegeList(selectedRoleId)
+          const oldPrivileges = privRes?.data?.results || []
+
+          const duplicatedPrivileges = oldPrivileges.map(p => ({
+            module_id: p.module_id,
+            create: p.is_create,
+            read: p.is_read,
+            update: p.is_update,
+            delete: p.is_delete
+          }))
+
+          await updateUserPrivilege(newRoleId, duplicatedPrivileges)
+          showToast('success', `Privileges duplicated from "${roles.find(r => r.id === selectedRoleId)?.name}"`)
+        } else {
+          showToast('success', 'New role added successfully')
+        }
       }
+
       toggleDrawer()
-      loadData()
-    } catch {
-      showToast('error', 'Failed to save')
+      await loadRoles()
+    } catch (err) {
+      console.error('❌ Role save error:', err)
+      showToast('error', 'Failed to save role')
     } finally {
       setLoading(false)
     }
@@ -272,43 +481,64 @@ export default function UserPrivilegePage() {
   const columns = useMemo(
     () => [
       columnHelper.accessor('sno', { header: 'S.No' }),
-      columnHelper.display({
-        id: 'actions',
-        header: 'Actions',
-        cell: info => (
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
-              <EditIcon />
-            </IconButton>
-            <IconButton
-              size='small'
-              color='error'
-              onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
-            >
-              <DeleteIcon />
-            </IconButton>
-          </Box>
-        )
-      }),
+
       columnHelper.accessor('module', { header: 'Module' }),
+
       columnHelper.accessor('create', {
         header: 'Create',
-        cell: info => <Checkbox checked={info.getValue()} disabled size='small' />
+        cell: info => {
+          const row = info.row.original
+          return (
+            <Checkbox
+              checked={!!row.create}
+              onChange={e => handlePrivilegeChange(row.module_id, 'create', e.target.checked)}
+              disabled={!selectedRole}
+            />
+          )
+        }
       }),
       columnHelper.accessor('view', {
         header: 'View',
-        cell: info => <Checkbox checked={info.getValue()} disabled size='small' />
+        cell: info => {
+          const row = info.row.original
+          return (
+            <Checkbox
+              checked={!!row.view}
+              onChange={e => handlePrivilegeChange(row.module_id, 'view', e.target.checked)}
+              disabled={!selectedRole}
+            />
+          )
+        }
       }),
       columnHelper.accessor('update', {
-        header: 'Edit/Update',
-        cell: info => <Checkbox checked={info.getValue()} disabled size='small' />
+        header: 'Add/Edit',
+        cell: info => {
+          const row = info.row.original
+          return (
+            <Checkbox
+              checked={!!row.update}
+              onChange={e => handlePrivilegeChange(row.module_id, 'update', e.target.checked)}
+              disabled={!selectedRole}
+            />
+          )
+        }
       }),
+
       columnHelper.accessor('delete', {
         header: 'Delete',
-        cell: info => <Checkbox checked={info.getValue()} disabled size='small' />
+        cell: info => {
+          const row = info.row.original
+          return (
+            <Checkbox
+              checked={!!row.delete}
+              onChange={e => handlePrivilegeChange(row.module_id, 'delete', e.target.checked)}
+              disabled={!selectedRole}
+            />
+          )
+        }
       })
     ],
-    []
+    [selectedRole]
   )
 
   const fuzzyFilter = (row, columnId, value, addMeta) => {
@@ -399,95 +629,132 @@ export default function UserPrivilegePage() {
         <Typography color='text.primary'>User Privilege</Typography>
       </Breadcrumbs>
       <Card sx={{ p: 3 }}>
-        <CardHeader
+        {/* 🔹 Page Header Title */}
+
+        <Box display='flex' alignItems='center' gap={2} mb={7}>
+          <Typography variant='h5' sx={{ fontWeight: 600 }}>
+            User Privilege Management
+          </Typography>
+        </Box>
+
+        <Divider sx={{ mb: 5 }} />
+
+        {/* 🔹 Role Dropdown + Action Buttons */}
+        <Box
+          display='flex'
+          alignItems='center'
+          justifyContent='space-between'
+          flexWrap='wrap'
+          mb={3}
           sx={{
-            pb: 1.5,
-            pt: 1.5,
-            '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
-            '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
+            gap: 2,
+            '@media (max-width: 1200px)': {
+              flexDirection: 'column',
+              alignItems: 'stretch'
+            }
           }}
-          title={
-            <Box display='flex' alignItems='center' gap={2}>
-              <Typography variant='h5' sx={{ fontWeight: 600 }}>
-                User Privilege Management
-              </Typography>
-              <Button
-                variant='contained'
-                color='primary'
-                startIcon={
-                  <RefreshIcon
-                    sx={{
-                      animation: loading ? 'spin 1s linear infinite' : 'none',
-                      '@keyframes spin': {
-                        '0%': { transform: 'rotate(0deg)' },
-                        '100%': { transform: 'rotate(360deg)' }
-                      }
-                    }}
-                  />
-                }
-                disabled={loading}
-                onClick={async () => {
-                  setLoading(true)
-                  await loadData()
-                  setTimeout(() => setLoading(false), 600)
-                }}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-              >
-                {loading ? 'Refreshing...' : 'Refresh'}
-              </Button>
-            </Box>
-          }
-          action={
-            <Box display='flex' alignItems='center' gap={2}>
-              <Button
-                variant='outlined'
-                color='secondary'
-                endIcon={<ArrowDropDownIcon />}
-                onClick={e => setExportAnchorEl(e.currentTarget)}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-              >
-                Export
-              </Button>
-              <Menu anchorEl={exportAnchorEl} open={exportOpen} onClose={() => setExportAnchorEl(null)}>
-                <MenuItem onClick={exportPrint}>
-                  <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
-                </MenuItem>
-                <MenuItem onClick={exportCSV}>
-                  <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
-                </MenuItem>
-              </Menu>
-              <Button
-                variant='contained'
-                startIcon={<AddIcon />}
-                onClick={handleAdd}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-              >
-                Add Module
-              </Button>
-            </Box>
-          }
-        />
-        {loading && (
+        >
+          {/* 🔹 Left Section (Role + Buttons) */}
           <Box
+            display='flex'
+            alignItems='center'
+            flexWrap='nowrap'
+            gap={2}
             sx={{
-              position: 'fixed',
-              inset: 0,
-              bgcolor: 'rgba(255,255,255,0.7)',
-              backdropFilter: 'blur(2px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 2000
+              overflowX: 'auto',
+              pb: 1
             }}
           >
-            <Box textAlign='center'>
-              <ProgressCircularCustomization size={60} thickness={5} />
-              <Typography mt={2} fontWeight={600} color='primary'>
-                Loading...
-              </Typography>
+            {/* User Role Dropdown */}
+            <Box sx={{ minWidth: 250 }}>
+              <CustomAutocomplete
+                fullWidth
+                options={roles}
+                value={roles.find(r => r.id === selectedRole) || null}
+                getOptionLabel={option => option.name || ''}
+                onChange={(e, newValue) => {
+                  if (newValue) {
+                    setSelectedRole(newValue.id)
+                    fetchPrivileges(newValue.id)
+                  } else {
+                    setSelectedRole('')
+                    setPrivileges([])
+                  }
+                }}
+                renderInput={params => <CustomTextField {...params} label='User Role' placeholder='Choose a role...' />}
+              />
             </Box>
+
+            {/* Buttons inline with dropdown */}
+            <Button variant='contained' startIcon={<AddIcon />} onClick={handleAdd}>
+              Add
+            </Button>
+
+            <Button
+              variant='outlined'
+              startIcon={<EditIcon />}
+              disabled={!selectedRole}
+              onClick={async () => {
+                const res = await getUserRoleDetails(selectedRole)
+                setIsEdit(true)
+                setFormData({
+                  id: res?.data?.id,
+                  module: res?.data?.name,
+                  description: res?.data?.description || ''
+                })
+                setDrawerOpen(true)
+              }}
+            >
+              Edit
+            </Button>
+
+            <Button
+              variant='outlined'
+              color='error'
+              startIcon={<DeleteIcon />}
+              disabled={!selectedRole}
+              onClick={() => handleDeleteRole(selectedRole)}
+            >
+              Delete
+            </Button>
+
+            <Button
+              variant='outlined'
+              color='secondary'
+              startIcon={<FileCopyIcon />}
+              disabled={!selectedRole}
+              onClick={() => handleDuplicateRole(selectedRole)}
+            >
+              Duplicate
+            </Button>
+
+            <Button
+              variant='outlined'
+              color='info'
+              startIcon={<RefreshIcon />}
+              disabled={!selectedRole}
+              onClick={() => loadPrivileges(selectedRole)}
+            >
+              Refresh
+            </Button>
           </Box>
-        )}
+
+          {/* 🔹 Right Section - Update Privileges */}
+          <Button
+            variant='contained'
+            color='success'
+            startIcon={<ArrowDropDownIcon />}
+            onClick={handleUpdatePrivileges}
+            sx={{
+              textTransform: 'none',
+              fontWeight: 600,
+              px: 3,
+              whiteSpace: 'nowrap'
+            }}
+          >
+            Update Privileges
+          </Button>
+        </Box>
 
         <Divider sx={{ mb: 2 }} />
         <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
@@ -572,6 +839,7 @@ export default function UserPrivilegePage() {
       </Card>
 
       {/* Drawer */}
+      {/* Drawer */}
       <Drawer anchor='right' open={drawerOpen} onClose={toggleDrawer}>
         <Box sx={{ p: 5, width: 420 }}>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
@@ -582,69 +850,34 @@ export default function UserPrivilegePage() {
               <CloseIcon />
             </IconButton>
           </Box>
+
           <form onSubmit={handleSubmit}>
             <Grid container spacing={2}>
               <Grid item xs={12}>
                 <CustomTextFieldWrapper
                   ref={moduleRef}
                   fullWidth
-                  label='Module'
+                  label='Module Name'
                   placeholder='Enter module name'
                   value={formData.module}
-                  onChange={e => {
-                    const filtered = e.target.value.replace(/[^a-zA-Z\s]/g, '')
-                    setFormData(prev => ({ ...prev, module: filtered }))
-                  }}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      const firstCheckbox = document.querySelector('input[type="checkbox"]')
-                      firstCheckbox?.focus()
-                    }
-                  }}
+                  onChange={e => setFormData(prev => ({ ...prev, module: e.target.value }))}
                 />
               </Grid>
+
+              {/* 🔹 Description field replaces checkboxes */}
               <Grid item xs={12}>
-                <FormGroup>
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={formData.create}
-                        onChange={() => setFormData(prev => ({ ...prev, create: !prev.create }))}
-                      />
-                    }
-                    label='Create'
-                  />
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={formData.view}
-                        onChange={() => setFormData(prev => ({ ...prev, view: !prev.view }))}
-                      />
-                    }
-                    label='View'
-                  />
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={formData.update}
-                        onChange={() => setFormData(prev => ({ ...prev, update: !prev.update }))}
-                      />
-                    }
-                    label='Edit/Update'
-                  />
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={formData.delete}
-                        onChange={() => setFormData(prev => ({ ...prev, delete: !prev.delete }))}
-                      />
-                    }
-                    label='Delete'
-                  />
-                </FormGroup>
+                <CustomTextFieldWrapper
+                  fullWidth
+                  multiline
+                  rows={3}
+                  label='Description'
+                  placeholder='Enter description'
+                  value={formData.description}
+                  onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                />
               </Grid>
             </Grid>
+
             <Box mt={4} display='flex' gap={2}>
               <Button type='submit' variant='contained' fullWidth disabled={loading}>
                 {loading ? 'Saving...' : isEdit ? 'Update' : 'Save'}

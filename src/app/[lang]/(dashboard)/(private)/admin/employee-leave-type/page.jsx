@@ -263,6 +263,7 @@ export default function EmployeeLeaveTypePage() {
 
   const handleSubmit = async e => {
     e.preventDefault()
+
     if (!formData.leaveCode.trim() || !formData.name.trim()) {
       showToast('warning', 'Leave Code and Name are required')
       return
@@ -277,23 +278,27 @@ export default function EmployeeLeaveTypePage() {
         is_active: formData.status === 'Active' ? 1 : 0,
         status: 1
       }
-      await updateLeaveType(payload)
 
       console.log('🛰️ Payload Sent:', payload)
 
-      if (isEdit && formData.id) {
+      if (isEdit) {
+        if (!formData.id) {
+          showToast('error', 'Invalid record ID for update')
+          setLoading(false)
+          return
+        }
         await updateLeaveType(payload)
-        showToast('success', 'Leave Type updated')
+        showToast('success', 'Leave Type updated successfully!')
       } else {
         await addLeaveType(payload)
-        showToast('success', 'Leave Type added')
+        showToast('success', 'Leave Type added successfully!')
       }
 
       await loadData()
       setDrawerOpen(false)
     } catch (err) {
-      console.error(err)
-      showToast('error', 'Failed to save')
+      console.error('❌ Error while saving:', err)
+      showToast('error', err.response?.data?.message || err.message)
     } finally {
       setLoading(false)
     }
