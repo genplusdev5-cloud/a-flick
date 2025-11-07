@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { openDB } from 'idb'
+
 import {
   Box,
   Button,
@@ -26,6 +26,8 @@ import {
   CircularProgress
 } from '@mui/material'
 
+import { getCallTypeList, addCallType, updateCallType, deleteCallType } from '@/api/calltype'
+
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
@@ -47,7 +49,6 @@ import CustomTextarea from '@/components/common/CustomTextarea'
 import CustomSelectField from '@/components/common/CustomSelectField'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 
-
 import {
   useReactTable,
   getCoreRowModel,
@@ -58,21 +59,6 @@ import {
 } from '@tanstack/react-table'
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
-
-// ───────────────────────────────────────────
-// IndexedDB
-// ───────────────────────────────────────────
-const DB_NAME = 'calltype_db'
-const STORE_NAME = 'calltypes'
-const initDB = async () => {
-  return await openDB(DB_NAME, 1, {
-    upgrade(db) {
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true })
-      }
-    }
-  })
-}
 
 // Toast helper
 // ──────────────────────────────────────────────────────────────
@@ -187,37 +173,38 @@ export default function CallTypePage() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const db = await initDB()
-      const all = await db.getAll(STORE_NAME)
+      const result = await getCallTypeList()
 
-      // 🔍 Apply search filter
-      const filtered = searchText
-        ? all.filter(r =>
-            ['name', 'sortOrder', 'description'].some(key =>
-              (r[key] || '').toString().toLowerCase().includes(searchText.toLowerCase())
+      if (result.success) {
+        const all = result.data || []
+
+        // 🔍 Apply search filter
+        const filtered = searchText
+          ? all.filter(r =>
+              ['name', 'description', 'sort_order'].some(key =>
+                (r[key] || '').toString().toLowerCase().includes(searchText.toLowerCase())
+              )
             )
-          )
-        : all
+          : all
 
-      // 🔢 Sort by newest ID
-      const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
+        // 🧾 Normalize data for UI
+        const normalized = filtered.map((item, idx) => ({
+          id: item.id,
+          sno: idx + 1,
+          name: item.name || '-',
+          description: item.description || '-',
+          sortOrder: item.sort_order || 0,
+          status: item.is_active === 1 ? 'Active' : 'Inactive'
+        }))
 
-      // 📄 Apply pagination
-      const start = pagination.pageIndex * pagination.pageSize
-      const end = start + pagination.pageSize
-      const paginated = sorted.slice(start, end)
-
-      // 🧾 Add serial numbering
-      const normalized = paginated.map((item, idx) => ({
-        ...item,
-        sno: start + idx + 1
-      }))
-
-      setRows(normalized)
-      setRowCount(filtered.length)
+        setRows(normalized)
+        setRowCount(normalized.length)
+      } else {
+        showToast('error', result.message)
+      }
     } catch (err) {
       console.error(err)
-      showToast('error', 'Failed to load data')
+      showToast('error', 'Failed to load call types')
     } finally {
       setLoading(false)
     }
@@ -251,9 +238,16 @@ export default function CallTypePage() {
 
   const handleEdit = row => {
     setIsEdit(true)
-    setFormData({ ...row, sortOrder: String(row.sortOrder) })
+    setFormData({
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      sortOrder: row.sortOrder,
+      status: row.status
+    })
     setDrawerOpen(true)
   }
+
   const handleDelete = async row => {
     const db = await initDB()
     await db.delete(STORE_NAME, row.id)
@@ -261,34 +255,63 @@ export default function CallTypePage() {
     loadData()
   }
   const confirmDelete = async () => {
-    if (deleteDialog.row) await handleDelete(deleteDialog.row)
-    setDeleteDialog({ open: false, row: null })
-  }
-  const handleSubmit = async e => {
-    e.preventDefault()
-    if (!formData.name || !formData.sortOrder || !/^\d+$/.test(formData.sortOrder)) {
-      showToast('warning', 'Please fill name and a valid sort order')
-      return
-    }
+    if (!deleteDialog.row) return
     setLoading(true)
     try {
-      const db = await initDB()
-      const payload = { ...formData, sortOrder: String(formData.sortOrder) }
-      if (isEdit && formData.id) {
-        await db.put(STORE_NAME, payload)
-        showToast('success', 'Call Type updated')
+      const result = await deleteCallType(deleteDialog.row.id)
+      if (result.success) {
+        showToast('delete', result.message)
+        loadData()
       } else {
-        delete payload.id
-        await db.add(STORE_NAME, payload)
-        showToast('success', 'Call Type added')
+        showToast('error', result.message)
+      }
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'Failed to delete Call Type')
+    } finally {
+      setDeleteDialog({ open: false, row: null })
+      setLoading(false)
+    }
+  }
+
+  const handleSubmit = async e => {
+    e.preventDefault()
+
+    if (!formData.name) {
+      showToast('warning', 'Please enter Call Type name')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const payload = {
+        id: formData.id,
+        name: formData.name,
+        description: formData.description || null,
+        sort_order: formData.sortOrder || 0,
+        is_active: formData.status === 'Active' ? 1 : 0
       }
 
-      setUnsavedAddData(null) // ✅ Clears the drawer memory
+      const result = isEdit ? await updateCallType(payload) : await addCallType(payload)
 
-      toggleDrawer()
-      loadData()
-    } catch {
-      showToast('error', 'Failed to save')
+      if (result.success) {
+        showToast('success', result.message)
+        setDrawerOpen(false)
+        loadData()
+        setFormData({
+          id: null,
+          name: '',
+          description: '',
+          sortOrder: '',
+          status: 'Active'
+        })
+        setIsEdit(false)
+      } else {
+        showToast('error', result.message)
+      }
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'Failed to save Call Type')
     } finally {
       setLoading(false)
     }

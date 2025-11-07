@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { openDB } from 'idb'
 import {
   Box,
   Button,
@@ -67,22 +66,10 @@ import ChevronRight from '@menu/svg/ChevronRight'
 import { toast } from 'react-toastify'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 
-// ──────────────────────────────────────────────────────────────
-// IndexedDB
-// ──────────────────────────────────────────────────────────────
-const DB_NAME = 'tax_db'
-const STORE_NAME = 'taxes'
+// ✅ Paste your API imports here 👇
+import { addTax, getTaxList, updateTax, deleteTax } from '@/api/tax'
 
-const initDB = async () => {
-  return await openDB(DB_NAME, 1, {
-    upgrade(db) {
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true })
-      }
-    }
-  })
-}
-
+// ✅ Utility to format numbers
 const formatTax = v => {
   const n = parseFloat(v)
   return isNaN(n) ? '' : n.toFixed(2)
@@ -178,38 +165,35 @@ export default function TaxPage() {
 
   const nameRef = useRef(null)
 
-  // Load Taxes
   const loadTaxes = async () => {
     setLoading(true)
     try {
-      const db = await initDB()
-      const all = await db.getAll(STORE_NAME)
+      const res = await getTaxList()
+      console.log('🧾 TAX LIST RAW RESPONSE:', res)
 
-      // Sort newest first
-      const sorted = all.sort((a, b) => (b.id || 0) - (a.id || 0))
+      // ✅ Handle nested response correctly
+      const data = res?.data?.results || res?.data?.data?.results || res?.results || []
 
-      // Apply search filter (by name or tax value)
-      const filtered = sorted.filter(
-        item =>
-          item.name.toLowerCase().includes(searchText.toLowerCase()) || String(item.tax || '').includes(searchText)
-      )
+      if (!Array.isArray(data)) {
+        showToast('error', 'Invalid response format')
+        return
+      }
 
-      // Pagination slice
-      const start = pagination.pageIndex * pagination.pageSize
-      const end = start + pagination.pageSize
-      const paginated = filtered.slice(start, end)
-
-      // Format and map S.No
-      const normalized = paginated.map((item, idx) => ({
-        ...item,
-        sno: start + idx + 1,
-        tax: formatTax(item.tax || '0')
+      const normalized = data.map((item, index) => ({
+        sno: index + 1,
+        id: item.id,
+        name: item.name,
+        tax: Number(item.percent ?? 0),
+        description: item.description ?? '',
+        is_active: item.is_active ?? 1, // ✅ from backend
+        status: item.status ?? 1
       }))
 
       setRows(normalized)
-      setRowCount(filtered.length)
-    } catch (e) {
-      showToast('error', 'Failed to load taxes')
+      setRowCount(normalized.length)
+    } catch (err) {
+      console.error('❌ TAX LIST ERROR:', err.response?.data || err.message)
+      showToast('error', err.response?.data?.message || 'Failed to load taxes')
     } finally {
       setLoading(false)
     }
@@ -271,8 +255,21 @@ export default function TaxPage() {
   }
 
   const confirmDelete = async () => {
-    if (deleteDialog.row) await handleDelete(deleteDialog.row)
-    setDeleteDialog({ open: false, row: null })
+    if (!deleteDialog.row) return
+    try {
+      const res = await deleteTax(deleteDialog.row.id)
+      if (res.status === 'success') {
+        showToast('delete', `${deleteDialog.row.name} deleted`)
+        await loadTaxes()
+      } else {
+        showToast('error', res.message || 'Failed to delete tax')
+      }
+    } catch (err) {
+      console.error('❌ DELETE ERROR:', err.response?.data || err.message)
+      showToast('error', err.response?.data?.message || 'Delete failed')
+    } finally {
+      setDeleteDialog({ open: false, row: null })
+    }
   }
 
   const handleSubmit = async e => {
@@ -284,32 +281,31 @@ export default function TaxPage() {
 
     setLoading(true)
     try {
-      const db = await initDB()
       const payload = {
-        name: formData.name,
-        tax: formatTax(formData.tax_value),
-        status: Number(formData.status)
+        id: formData.id,
+        name: formData.name.trim(),
+        percent: formData.tax_value ? Number(formData.tax_value) : 0, // ✅ correctly mapped
+        description: formData.description?.trim() || '',
+        status: Number(formData.status ?? 1)
       }
 
-      if (isEdit && formData.id) {
-        await db.put(STORE_NAME, { id: formData.id, ...payload })
-        showToast('success', 'Tax updated')
+      let res
+      if (isEdit) {
+        res = await updateTax(payload)
       } else {
-        await db.add(STORE_NAME, payload)
-        showToast('success', 'Tax added')
+        res = await addTax(payload)
       }
 
-      // 🧹 Clear unsaved draft + reset form after successful save
-      setUnsavedAddData(null)
-      setFormData({ id: null, name: '', tax_value: '', description: '', status: 1 })
-
-      // ✅ Close the drawer after save
-      setDrawerOpen(false)
-
-      // 🔄 Reload updated data
-      await loadTaxes()
-    } catch {
-      showToast('error', 'Failed to save')
+      if (res.status === 'success') {
+        showToast('success', isEdit ? 'Tax updated successfully' : 'Tax added successfully')
+        setDrawerOpen(false)
+        await loadTaxes()
+      } else {
+        showToast('error', res.message || 'Failed to save tax')
+      }
+    } catch (err) {
+      console.error('❌ TAX SAVE ERROR:', err.response?.data || err.message)
+      showToast('error', err.response?.data?.message || 'Error saving tax')
     } finally {
       setLoading(false)
     }
@@ -341,17 +337,17 @@ export default function TaxPage() {
       }),
       columnHelper.accessor('name', { header: 'Tax Name' }),
       columnHelper.accessor('tax', { header: 'Tax (%)' }),
-      columnHelper.accessor('status', {
+      columnHelper.accessor('is_active', {
         header: 'Status',
         cell: info => {
-          const val = info.getValue()
+          const val = info.row.original.is_active // ✅ correctly maps backend key
           return (
             <Chip
               label={val === 1 ? 'Active' : 'Inactive'}
               size='small'
               sx={{
                 color: '#fff',
-                bgcolor: val === 1 ? 'success.main' : 'error.main',
+                bgcolor: val === 1 ? 'success.main' : 'error.main', // ✅ Green for active, red for inactive
                 fontWeight: 600,
                 borderRadius: '6px',
                 px: 1.5

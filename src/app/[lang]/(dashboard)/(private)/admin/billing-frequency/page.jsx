@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { openDB } from 'idb'
+
 import {
   Box,
   Button,
@@ -26,6 +26,14 @@ import {
   InputLabel,
   CircularProgress
 } from '@mui/material'
+
+import {
+  addBillingFrequency,
+  getBillingFrequencyList,
+  getBillingFrequencyDetails,
+  updateBillingFrequency,
+  deleteBillingFrequency
+} from '@/api/billingFrequency'
 
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
@@ -58,21 +66,6 @@ import {
 } from '@tanstack/react-table'
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
-
-// ───────────────────────────────────────────
-// IndexedDB
-// ───────────────────────────────────────────
-const DB_NAME = 'billing_frequency_db'
-const STORE_NAME = 'frequencies'
-const initDB = async () => {
-  return await openDB(DB_NAME, 1, {
-    upgrade(db) {
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true })
-      }
-    }
-  })
-}
 
 // Toast helper
 // ──────────────────────────────────────────────────────────────
@@ -155,52 +148,53 @@ export default function BillingFrequencyPage() {
   const [unsavedAddData, setUnsavedAddData] = useState(null)
   const [formData, setFormData] = useState({
     id: null,
+    billingFrequency: '', // ✅ change this key
     incrementType: '',
     noOfIncrements: '',
     backlogAge: '',
     frequencyCode: '',
-    displayFrequency: '',
     sortOrder: '',
     description: '',
     status: 'Active'
   })
+
   const incrementTypeRef = useRef(null)
 
   // Load rows
+  // 🧠 Fetch data from backend
   const loadData = async () => {
     setLoading(true)
     try {
-      const db = await initDB()
-      const all = await db.getAll(STORE_NAME)
+      const res = await getBillingFrequencyList()
+      console.log('📥 Billing Frequency List:', res)
 
-      // 🔍 Apply search filter
-      const filtered = searchText
-        ? all.filter(r =>
-            ['displayFrequency', 'frequencyCode', 'description', 'incrementType'].some(key =>
-              (r[key] || '').toLowerCase().includes(searchText.toLowerCase())
-            )
-          )
-        : all
+      if (res?.status === 'success') {
+        const results = res.data?.results || []
 
-      // 🔢 Sort newest first
-      const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
+        // Format data for table display
+        const formatted = results
+          .filter(item => item.is_billing === 1) // ✅ only billing frequencies
+          .map((item, index) => ({
+            sno: index + 1,
+            id: item.id,
+            billingFrequency: item.name || '',
+            incrementType: item.frequency || '—',
+            noOfIncrements: item.times || '—',
+            frequencyCode: item.frequency_code || '—',
+            backlogAge: item.backlog_age || '—',
+            sortOrder: item.sort_order || '—',
+            description: item.description || '—',
+            is_active: item.is_active // ✅ add this field
+          }))
 
-      // 📄 Paginate
-      const start = pagination.pageIndex * pagination.pageSize
-      const end = start + pagination.pageSize
-      const paginated = sorted.slice(start, end)
-
-      // 🧾 Add S.No numbering
-      const normalized = paginated.map((item, idx) => ({
-        ...item,
-        sno: start + idx + 1
-      }))
-
-      setRows(normalized)
-      setRowCount(filtered.length)
+        setRows(formatted)
+        setRowCount(formatted.length)
+      } else {
+        showToast('error', 'Failed to load billing frequency list')
+      }
     } catch (err) {
-      console.error(err)
-      showToast('error', 'Failed to load data')
+      console.error('❌ Error fetching billing frequency list:', err)
+      showToast('error', 'Something went wrong')
     } finally {
       setLoading(false)
     }
@@ -217,11 +211,11 @@ export default function BillingFrequencyPage() {
   const handleCancel = () => {
     setFormData({
       id: null,
+      billingFrequency: '', // ✅ correct key
       incrementType: '',
       noOfIncrements: '',
       backlogAge: '',
       frequencyCode: '',
-      displayFrequency: '',
       sortOrder: '',
       description: '',
       status: 'Active'
@@ -238,81 +232,105 @@ export default function BillingFrequencyPage() {
   const toggleDrawer = () => setDrawerOpen(p => !p)
   const handleAdd = () => {
     setIsEdit(false)
-    if (unsavedAddData) {
-      setFormData(unsavedAddData)
-    } else {
-      setFormData({
-        id: null,
-        incrementType: '',
-        noOfIncrements: '',
-        backlogAge: '',
-        frequencyCode: '',
-        displayFrequency: '',
-        sortOrder: '',
-        description: '',
-        status: 'Active'
-      })
-    }
+    setFormData({
+      id: null,
+      billingFrequency: '', // ✅ correct
+      incrementType: '',
+      noOfIncrements: '',
+      backlogAge: '',
+      frequencyCode: '',
+      sortOrder: '',
+      description: '',
+      status: 'Active'
+    })
     setDrawerOpen(true)
-    setTimeout(() => incrementTypeRef.current?.focus(), 100)
   }
 
   const handleEdit = row => {
     setIsEdit(true)
-    setFormData(row)
+    setFormData({
+      id: row.id,
+      billingFrequency: row.billingFrequency || row.displayFrequency || '',
+      incrementType: row.incrementType || '',
+      noOfIncrements: row.noOfIncrements || '',
+      backlogAge: row.backlogAge || '',
+      frequencyCode: row.frequencyCode || '',
+      sortOrder: row.sortOrder || '',
+      description: row.description || '',
+      status: row.status === 'Active' ? 'Active' : 'Active' // ✅ force normalize
+    })
     setDrawerOpen(true)
   }
+
   const handleDelete = async row => {
-    const db = await initDB()
-    await db.delete(STORE_NAME, row.id)
-    showToast('delete', `${row.displayFrequency} deleted`)
-    loadData()
+    if (!row?.id) return
+
+    try {
+      const res = await deleteBillingFrequency(row.id)
+      if (res?.status === 'success') {
+        showToast('delete', 'Billing Frequency deleted successfully')
+        await loadData()
+      } else {
+        showToast('error', 'Failed to delete Billing Frequency')
+      }
+    } catch (err) {
+      console.error('❌ Delete error:', err)
+      showToast('error', 'Something went wrong while deleting')
+    }
   }
+
   const confirmDelete = async () => {
-    if (deleteDialog.row) await handleDelete(deleteDialog.row)
+    if (deleteDialog.row) {
+      await handleDelete(deleteDialog.row)
+    }
     setDeleteDialog({ open: false, row: null })
   }
+
+  // 🧩 Handle Add / Update Billing Frequency
+  // 🧩 Handle Add / Update Billing Frequency
   const handleSubmit = async e => {
     e.preventDefault()
-    if (!formData.displayFrequency || !formData.frequencyCode) {
+
+    if (!formData.billingFrequency || !formData.frequencyCode) {
       showToast('warning', 'Please fill all required fields')
       return
     }
-    setLoading(true)
-    try {
-      const db = await initDB()
-      const payload = { ...formData }
 
-      if (isEdit && formData.id) {
-        await db.put(STORE_NAME, payload)
-        showToast('success', 'Frequency updated')
-      } else {
-        delete payload.id
-        await db.add(STORE_NAME, payload)
-        showToast('success', 'Frequency added')
+    setLoading(true)
+
+    try {
+      // ✅ Prepare payload exactly as backend expects
+      const payload = {
+        name: formData.billingFrequency || '', // ✅ backend expects "name"
+        frequency: formData.incrementType || '',
+        times: formData.noOfIncrements?.toString() || '0',
+        frequency_code: formData.frequencyCode || '',
+        frequency_count: formData.noOfIncrements?.toString() || '0',
+        backlog_age: formData.backlogAge?.toString() || '0',
+        sort_order: formData.sortOrder?.toString() || '0',
+        description: formData.description || '',
+        is_active: formData.status === 'Active' ? 1 : 0,
+        is_billing: 1, // ✅ this field is needed to mark it as billing frequency
+        status: 1
       }
 
-      // 🧹 Clear unsaved data + reset form
-      setUnsavedAddData(null)
-      setFormData({
-        id: null,
-        incrementType: '',
-        noOfIncrements: '',
-        backlogAge: '',
-        frequencyCode: '',
-        displayFrequency: '',
-        sortOrder: '',
-        description: '',
-        status: 'Active'
-      })
+      console.log('🚀 FINAL PAYLOAD SENT:', payload)
 
-      // ✅ Close drawer after save
-      setDrawerOpen(false)
+      // ✅ Call correct API
+      const res = isEdit
+        ? await updateBillingFrequency({ id: formData.id, ...payload })
+        : await addBillingFrequency(payload)
 
-      // 🔄 Refresh table data
-      loadData()
-    } catch {
-      showToast('error', 'Failed to save')
+      if (res?.status === 'success') {
+        showToast('success', isEdit ? 'Billing Frequency updated successfully' : 'Billing Frequency added successfully')
+        setDrawerOpen(false)
+        await loadData()
+      } else {
+        showToast('error', res?.message || 'Operation failed')
+      }
+    } catch (err) {
+      console.error('❌ Error in Billing Frequency Submit:', err)
+      showToast('error', 'Something went wrong')
     } finally {
       setLoading(false)
     }
@@ -342,24 +360,30 @@ export default function BillingFrequencyPage() {
         )
       }),
       columnHelper.accessor('displayFrequency', { header: 'Display Frequency' }),
+      columnHelper.accessor('incrementType', { header: 'Increment Type' }),
+      columnHelper.accessor('noOfIncrements', { header: 'No of Increments' }),
+      columnHelper.accessor('backlogAge', { header: 'Backlog Age' }),
       columnHelper.accessor('frequencyCode', { header: 'Frequency Code' }),
-      columnHelper.accessor('description', { header: 'Description' }),
       columnHelper.accessor('sortOrder', { header: 'Sort Order' }),
-      columnHelper.accessor('status', {
+      columnHelper.accessor('description', { header: 'Description' }),
+      columnHelper.accessor('is_active', {
         header: 'Status',
-        cell: info => (
-          <Chip
-            label={info.getValue() === 'Active' ? 'Active' : 'Inactive'}
-            size='small'
-            sx={{
-              color: '#fff',
-              bgcolor: info.getValue() === 'Active' ? 'success.main' : 'error.main',
-              fontWeight: 600,
-              borderRadius: '6px',
-              px: 1.5
-            }}
-          />
-        )
+        cell: info => {
+          const isActive = info.getValue() === 1 || info.getValue() === '1'
+          return (
+            <Chip
+              label={isActive ? 'Active' : 'Inactive'}
+              size='small'
+              sx={{
+                color: '#fff',
+                bgcolor: isActive ? 'success.main' : 'error.main',
+                fontWeight: 600,
+                borderRadius: '6px',
+                px: 1.5
+              }}
+            />
+          )
+        }
       })
     ],
     []
@@ -621,6 +645,19 @@ export default function BillingFrequencyPage() {
 
           <form onSubmit={handleSubmit} style={{ flexGrow: 1 }}>
             <Grid container spacing={3}>
+              {/* 🧾 Billing Frequency Name */}
+              <Grid item xs={12}>
+                <CustomTextFieldWrapper
+                  fullWidth
+                  required
+                  label=' Name'
+                  placeholder='Enter billing frequency name'
+                  value={formData.billingFrequency || ''}
+                  onChange={e => handleFieldChange('billingFrequency', e.target.value)}
+                />
+              </Grid>
+
+              {/* 🧮 Increment Type */}
               <Grid item xs={12}>
                 <CustomSelectField
                   label='Increment Type'
@@ -636,6 +673,7 @@ export default function BillingFrequencyPage() {
                 />
               </Grid>
 
+              {/* 🔢 No of Increments */}
               <Grid item xs={12}>
                 <CustomTextFieldWrapper
                   fullWidth
@@ -646,6 +684,7 @@ export default function BillingFrequencyPage() {
                 />
               </Grid>
 
+              {/* 🧓 Backlog Age */}
               <Grid item xs={12}>
                 <CustomTextFieldWrapper
                   fullWidth
@@ -656,6 +695,7 @@ export default function BillingFrequencyPage() {
                 />
               </Grid>
 
+              {/* 🧾 Frequency Code */}
               <Grid item xs={12}>
                 <CustomTextFieldWrapper
                   fullWidth
@@ -667,17 +707,7 @@ export default function BillingFrequencyPage() {
                 />
               </Grid>
 
-              <Grid item xs={12}>
-                <CustomTextFieldWrapper
-                  fullWidth
-                  required
-                  label='Display Frequency'
-                  placeholder='Enter display frequency'
-                  value={formData.displayFrequency}
-                  onChange={e => handleFieldChange('displayFrequency', e.target.value)}
-                />
-              </Grid>
-
+              {/* 🔢 Sort Order */}
               <Grid item xs={12}>
                 <CustomTextFieldWrapper
                   fullWidth
@@ -688,6 +718,7 @@ export default function BillingFrequencyPage() {
                 />
               </Grid>
 
+              {/* 📝 Description */}
               <Grid item xs={12}>
                 <CustomTextarea
                   label='Description'
@@ -698,12 +729,13 @@ export default function BillingFrequencyPage() {
                 />
               </Grid>
 
+              {/* ✅ Status (only for Edit mode) */}
               {isEdit && (
                 <Grid item xs={12}>
                   <CustomSelectField
                     label='Status'
                     value={formData.status}
-                    onChange={e => handleFieldChange('status', e.target.value)}
+                    onChange={e => handleFieldChange('status', e.target.value)} // ✅ use e.target.value
                     options={[
                       { value: 'Active', label: 'Active' },
                       { value: 'Inactive', label: 'Inactive' }

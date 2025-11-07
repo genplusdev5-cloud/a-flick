@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { openDB } from 'idb'
+
 import {
   Box,
   Button,
@@ -25,6 +25,8 @@ import {
   FormControl,
   CircularProgress
 } from '@mui/material'
+
+import { getIndustryList, addIndustry, updateIndustry, deleteIndustry, getIndustryDetails } from '@/api/industry'
 
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
@@ -58,21 +60,6 @@ import {
 } from '@tanstack/react-table'
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
-
-// ───────────────────────────────────────────
-// IndexedDB
-// ───────────────────────────────────────────
-const DB_NAME = 'industry-db'
-const STORE_NAME = 'industries'
-const initDB = async () => {
-  return await openDB(DB_NAME, 1, {
-    upgrade(db) {
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true })
-      }
-    }
-  })
-}
 
 // Toast helper
 // ──────────────────────────────────────────────────────────────
@@ -167,37 +154,31 @@ export default function IndustryPage() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const db = await initDB()
-      const all = await db.getAll(STORE_NAME)
+      const result = await getIndustryList()
 
-      // 🔍 Apply search filter
-      const filtered = searchText
-        ? all.filter(r =>
-            ['name', 'description', 'status'].some(key =>
-              (r[key] || '').toString().toLowerCase().includes(searchText.toLowerCase())
-            )
-          )
-        : all
+      if (result.success) {
+        const all = result.data || []
 
-      // 🔢 Sort newest first
-      const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
+        const filtered = searchText
+          ? all.filter(r => (r.name || '').toLowerCase().includes(searchText.toLowerCase()))
+          : all
 
-      // 📄 Apply pagination
-      const start = pagination.pageIndex * pagination.pageSize
-      const end = start + pagination.pageSize
-      const paginated = sorted.slice(start, end)
+        const normalized = filtered.map((item, idx) => ({
+          id: item.id,
+          sno: idx + 1,
+          name: item.name || '-',
+          description: item.description || '-',
+          status: item.is_active === 1 ? 'Active' : 'Inactive'
+        }))
 
-      // 🧾 Add serial numbers
-      const normalized = paginated.map((item, idx) => ({
-        ...item,
-        sno: start + idx + 1
-      }))
-
-      setRows(normalized)
-      setRowCount(filtered.length)
+        setRows(normalized)
+        setRowCount(normalized.length)
+      } else {
+        showToast('error', result.message)
+      }
     } catch (err) {
-      console.error(err)
-      showToast('error', 'Failed to load data')
+      console.error('❌ Industry List Error:', err)
+      showToast('error', 'Failed to load industries')
     } finally {
       setLoading(false)
     }
@@ -246,12 +227,34 @@ export default function IndustryPage() {
     })
   }
 
-  const handleEdit = row => {
-    setIsEdit(true)
-    setFormData(row)
-    setDrawerOpen(true)
-    setTimeout(() => nameRef.current?.focus(), 100)
+  const handleEdit = async row => {
+    try {
+      setLoading(true)
+      setIsEdit(true)
+
+      const result = await getIndustryDetails(row.id)
+
+      if (result.success && result.data) {
+        const data = result.data
+        setFormData({
+          id: data.id,
+          name: data.name || '',
+          description: data.description || '',
+          status: data.is_active === 1 ? 'Active' : 'Inactive'
+        })
+        setDrawerOpen(true)
+        setTimeout(() => nameRef.current?.focus(), 100)
+      } else {
+        showToast('error', result.message || 'Failed to fetch industry details')
+      }
+    } catch (err) {
+      console.error('❌ Industry Details Error:', err)
+      showToast('error', 'Something went wrong while loading details')
+    } finally {
+      setLoading(false)
+    }
   }
+
   const handleDelete = async row => {
     const db = await initDB()
     await db.delete(STORE_NAME, row.id)
@@ -259,8 +262,23 @@ export default function IndustryPage() {
     loadData()
   }
   const confirmDelete = async () => {
-    if (deleteDialog.row) await handleDelete(deleteDialog.row)
-    setDeleteDialog({ open: false, row: null })
+    if (!deleteDialog.row) return
+    setLoading(true)
+    try {
+      const result = await deleteIndustry(deleteDialog.row.id)
+      if (result.success) {
+        showToast('delete', result.message)
+        loadData()
+      } else {
+        showToast('error', result.message)
+      }
+    } catch (err) {
+      console.error('❌ Delete Industry Error:', err)
+      showToast('error', 'Failed to delete industry')
+    } finally {
+      setDeleteDialog({ open: false, row: null })
+      setLoading(false)
+    }
   }
 
   const handleSubmit = async e => {
@@ -272,29 +290,27 @@ export default function IndustryPage() {
 
     setLoading(true)
     try {
-      const db = await initDB()
-      const payload = { ...formData }
-
-      if (isEdit && formData.id) {
-        await db.put(STORE_NAME, payload)
-        showToast('success', 'Industry updated')
-      } else {
-        delete payload.id
-        await db.add(STORE_NAME, payload)
-        showToast('success', 'Industry added')
+      const payload = {
+        id: formData.id,
+        name: formData.name,
+        description: formData.description || null,
+        is_active: formData.status === 'Active' ? 1 : 0
       }
 
-      // ✅ Clear unsaved draft + reset form
-      setUnsavedAddData(null)
-      setFormData({ id: null, name: '', description: '', status: 'Active' })
+      const result = isEdit ? await updateIndustry(payload) : await addIndustry(payload)
 
-      // ✅ Close drawer after save
-      setDrawerOpen(false)
-
-      // 🔄 Reload table data
-      await loadData()
-    } catch {
-      showToast('error', 'Failed to save')
+      if (result.success) {
+        showToast('success', result.message)
+        setDrawerOpen(false)
+        setFormData({ id: null, name: '', description: '', status: 'Active' })
+        setIsEdit(false)
+        loadData()
+      } else {
+        showToast('error', result.message)
+      }
+    } catch (err) {
+      console.error('❌ Save Industry Error:', err)
+      showToast('error', 'Failed to save industry')
     } finally {
       setLoading(false)
     }
@@ -660,78 +676,75 @@ export default function IndustryPage() {
         </Box>
       </Drawer>
 
-     <Dialog
-  onClose={() => setDeleteDialog({ open: false, row: null })}
-  aria-labelledby='customized-dialog-title'
-  open={deleteDialog.open}
-  closeAfterTransition={false}
-  PaperProps={{
-    sx: {
-      overflow: 'visible',
-      width: 420,
-      borderRadius: 1,
-      textAlign: 'center'
-    }
-  }}
->
-  {/* 🔴 Title with Warning Icon */}
-  <DialogTitle
-    id='customized-dialog-title'
-    sx={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 1,
-      color: 'error.main',
-      fontWeight: 700,
-      pb: 1,
-      position: 'relative'
-    }}
-  >
-    <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
-    Confirm Delete
-    <DialogCloseButton
-      onClick={() => setDeleteDialog({ open: false, row: null })}
-      disableRipple
-      sx={{ position: 'absolute', right: 1, top: 1 }}
-    >
-      <i className='tabler-x' />
-    </DialogCloseButton>
-  </DialogTitle>
+      <Dialog
+        onClose={() => setDeleteDialog({ open: false, row: null })}
+        aria-labelledby='customized-dialog-title'
+        open={deleteDialog.open}
+        closeAfterTransition={false}
+        PaperProps={{
+          sx: {
+            overflow: 'visible',
+            width: 420,
+            borderRadius: 1,
+            textAlign: 'center'
+          }
+        }}
+      >
+        {/* 🔴 Title with Warning Icon */}
+        <DialogTitle
+          id='customized-dialog-title'
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1,
+            color: 'error.main',
+            fontWeight: 700,
+            pb: 1,
+            position: 'relative'
+          }}
+        >
+          <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
+          Confirm Delete
+          <DialogCloseButton
+            onClick={() => setDeleteDialog({ open: false, row: null })}
+            disableRipple
+            sx={{ position: 'absolute', right: 1, top: 1 }}
+          >
+            <i className='tabler-x' />
+          </DialogCloseButton>
+        </DialogTitle>
 
-  {/* Centered Text */}
-  <DialogContent sx={{ px: 5, pt: 1 }}>
-    <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
-      Are you sure you want to delete{' '}
-      <strong style={{ color: '#d32f2f' }}>
-        {deleteDialog.row?.name || 'this industry'}
-      </strong>?
-      <br />
-      This action cannot be undone.
-    </Typography>
-  </DialogContent>
+        {/* Centered Text */}
+        <DialogContent sx={{ px: 5, pt: 1 }}>
+          <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
+            Are you sure you want to delete{' '}
+            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name || 'this industry'}</strong>?
+            <br />
+            This action cannot be undone.
+          </Typography>
+        </DialogContent>
 
-  {/* Centered Buttons */}
-  <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-    <Button
-      onClick={() => setDeleteDialog({ open: false, row: null })}
-      variant='tonal'
-      color='secondary'
-      sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
-    >
-      Cancel
-    </Button>
-    <Button
-      onClick={confirmDelete}
-      variant='contained'
-      color='error'
-      sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
-    >
-      Delete
-    </Button>
-  </DialogActions>
-</Dialog>
-
+        {/* Centered Buttons */}
+        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+          <Button
+            onClick={() => setDeleteDialog({ open: false, row: null })}
+            variant='tonal'
+            color='secondary'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={confirmDelete}
+            variant='contained'
+            color='error'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   )
 }

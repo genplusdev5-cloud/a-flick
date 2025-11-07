@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { openDB } from 'idb'
+
 import {
   Box,
   Button,
@@ -26,6 +26,9 @@ import {
   CircularProgress,
   InputAdornment
 } from '@mui/material'
+
+import { addLeaveType, getLeaveTypeList, updateLeaveType, deleteLeaveType } from '@/api/leaveType'
+
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
@@ -59,21 +62,6 @@ import {
 } from '@tanstack/react-table'
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
-
-// ───────────────────────────────────────────
-// IndexedDB
-// ───────────────────────────────────────────
-const DB_NAME = 'EmployeeLeaveDB'
-const STORE_NAME = 'leaveTypes'
-const initDB = async () => {
-  return await openDB(DB_NAME, 1, {
-    upgrade(db) {
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true })
-      }
-    }
-  })
-}
 
 // Toast helper
 // ──────────────────────────────────────────────────────────────
@@ -168,34 +156,18 @@ export default function EmployeeLeaveTypePage() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const db = await initDB()
-      const all = await db.getAll(STORE_NAME)
-
-      // 🔍 Search filter
-      const filtered = searchText
-        ? all.filter(r =>
-            ['leaveCode', 'name', 'status'].some(key =>
-              (r[key] || '').toString().toLowerCase().includes(searchText.toLowerCase())
-            )
-          )
-        : all
-
-      // 🔢 Sort newest first
-      const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
-
-      // 📄 Apply pagination
-      const start = pagination.pageIndex * pagination.pageSize
-      const end = start + pagination.pageSize
-      const paginated = sorted.slice(start, end)
-
-      // 🧾 Add S.No
-      const normalized = paginated.map((item, idx) => ({
-        ...item,
-        sno: start + idx + 1
+      const res = await getLeaveTypeList()
+      const results = res?.data?.results || []
+      const normalized = results.map((item, idx) => ({
+        sno: idx + 1,
+        id: item.id,
+        leaveCode: item.leave_code || '',
+        name: item.name || '',
+        is_active: item.is_active === 1 ? 1 : 0 // keep numeric for chip condition
       }))
 
       setRows(normalized)
-      setRowCount(filtered.length)
+      setRowCount(results.length)
     } catch (err) {
       console.error(err)
       showToast('error', 'Failed to load data')
@@ -248,21 +220,45 @@ export default function EmployeeLeaveTypePage() {
     setTimeout(() => leaveCodeRef.current?.focus(), 100)
   }
 
+  // 🔹 Edit Handler
   const handleEdit = row => {
     setIsEdit(true)
-    setFormData(row)
+    setFormData({
+      id: row.id,
+      leaveCode: row.leaveCode || '',
+      name: row.name || '',
+      status: row.is_active === 1 ? 'Active' : 'Inactive' // ✅ correct field
+    })
     setDrawerOpen(true)
     setTimeout(() => leaveCodeRef.current?.focus(), 100)
   }
+
   const handleDelete = async row => {
-    const db = await initDB()
-    await db.delete(STORE_NAME, row.id)
-    showToast('delete', `${row.name} deleted`)
-    loadData()
+    try {
+      await deleteLeaveType(row.id)
+      showToast('delete', `${row.name} deleted successfully`)
+      await loadData() // Refresh table
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'Failed to delete leave type')
+    }
   }
+
   const confirmDelete = async () => {
-    if (deleteDialog.row) await handleDelete(deleteDialog.row)
-    setDeleteDialog({ open: false, row: null })
+    if (!deleteDialog.row) return
+
+    try {
+      setLoading(true)
+      await deleteLeaveType(deleteDialog.row.id)
+      showToast('delete', `${deleteDialog.row.name} deleted successfully`)
+      await loadData() // refresh table after delete
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'Failed to delete leave type')
+    } finally {
+      setLoading(false)
+      setDeleteDialog({ open: false, row: null })
+    }
   }
 
   const handleSubmit = async e => {
@@ -274,24 +270,29 @@ export default function EmployeeLeaveTypePage() {
 
     setLoading(true)
     try {
-      const db = await initDB()
-      const payload = { ...formData }
+      const payload = {
+        id: formData.id,
+        leave_code: formData.leaveCode,
+        name: formData.name,
+        is_active: formData.status === 'Active' ? 1 : 0,
+        status: 1
+      }
+      await updateLeaveType(payload)
+
+      console.log('🛰️ Payload Sent:', payload)
 
       if (isEdit && formData.id) {
-        await db.put(STORE_NAME, payload)
+        await updateLeaveType(payload)
         showToast('success', 'Leave Type updated')
       } else {
-        delete payload.id
-        await db.add(STORE_NAME, payload)
+        await addLeaveType(payload)
         showToast('success', 'Leave Type added')
       }
 
-      // ✅ Reset + close Drawer
-      setUnsavedAddData(null)
-      setFormData({ id: null, leaveCode: '', name: '', status: 'Active' })
-      setDrawerOpen(false)
       await loadData()
-    } catch {
+      setDrawerOpen(false)
+    } catch (err) {
+      console.error(err)
       showToast('error', 'Failed to save')
     } finally {
       setLoading(false)
@@ -335,21 +336,28 @@ export default function EmployeeLeaveTypePage() {
       }),
       columnHelper.accessor('leaveCode', { header: 'Leave Code' }),
       columnHelper.accessor('name', { header: 'Name' }),
-      columnHelper.accessor('status', {
+      columnHelper.accessor('is_active', {
         header: 'Status',
-        cell: info => (
-          <Chip
-            label={info.getValue() === 'Active' ? 'Active' : 'Inactive'}
-            size='small'
-            sx={{
-              color: '#fff',
-              bgcolor: info.getValue() === 'Active' ? 'success.main' : 'error.main',
-              fontWeight: 600,
-              borderRadius: '6px',
-              px: 1.5
-            }}
-          />
-        )
+        cell: info => {
+          const value = info.getValue()
+          const label = value === 1 ? 'Active' : 'Inactive'
+          const color = value === 1 ? 'success.main' : 'error.main'
+
+          return (
+            <Chip
+              label={label}
+              size='small'
+              sx={{
+                color: '#fff',
+                bgcolor: color,
+                fontWeight: 600,
+                borderRadius: '6px',
+                px: 1.5,
+                textTransform: 'capitalize'
+              }}
+            />
+          )
+        }
       })
     ],
     []

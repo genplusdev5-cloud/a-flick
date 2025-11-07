@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { openDB } from 'idb'
+
 import {
   Box,
   Button,
@@ -28,6 +28,7 @@ import {
   CircularProgress
 } from '@mui/material'
 
+import { addAccount, getAccountList, updateAccount, deleteAccount } from '@/api/account'
 
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
@@ -63,22 +64,6 @@ import {
 } from '@tanstack/react-table'
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
-
-// ──────────────────────────────────────────────────────────────
-// IndexedDB Setup
-// ──────────────────────────────────────────────────────────────
-const DB_NAME = 'accountDB'
-const STORE_NAME = 'accountItems'
-
-const initDB = async () => {
-  return await openDB(DB_NAME, 1, {
-    upgrade(db) {
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true })
-      }
-    }
-  })
-}
 
 // ──────────────────────────────────────────────────────────────
 // Toast helper
@@ -176,36 +161,29 @@ export default function AccountItemCodePage() {
   const loadItems = async () => {
     setLoading(true)
     try {
-      const db = await initDB()
-      const all = await db.getAll(STORE_NAME)
+      const res = await getAccountList()
+      if (res?.status === 'success') {
+        const results = res.data?.results || []
 
-      // 🔍 Apply search filter
-      const filtered = searchText
-        ? all.filter(
-            r =>
-              (r.name || '').toString().toLowerCase().includes(searchText.toLowerCase()) ||
-              (r.itemNumber || '').toString().toLowerCase().includes(searchText.toLowerCase()) ||
-              (r.description || '').toString().toLowerCase().includes(searchText.toLowerCase())
-          )
-        : all
+        // 🧮 Add serial numbers for table
+        const formatted = results.map((item, index) => ({
+          sno: index + 1,
+          id: item.id,
+          name: item.name,
+          itemNumber: item.item_number,
+          description: item.description || '',
+          status: item.status === 1 ? 'Active' : 'Inactive',
+          is_active: item.is_active
+        }))
 
-      // 🔢 Sort & Paginate
-      const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
-      const start = pagination.pageIndex * pagination.pageSize
-      const end = start + pagination.pageSize
-      const paginated = sorted.slice(start, end)
-
-      // 🧮 Add serial numbers
-      const normalized = paginated.map((item, idx) => ({
-        ...item,
-        sno: start + idx + 1
-      }))
-
-      setRows(normalized)
-      setRowCount(filtered.length)
-    } catch (e) {
-      console.error(e)
-      showToast('error', 'Failed to load data')
+        setRows(formatted)
+        setRowCount(formatted.length)
+      } else {
+        showToast('error', 'Failed to load account list')
+      }
+    } catch (err) {
+      console.error('❌ Error loading list:', err)
+      showToast('error', 'Something went wrong while fetching data')
     } finally {
       setLoading(false)
     }
@@ -287,10 +265,24 @@ export default function AccountItemCodePage() {
   }
 
   const confirmDelete = async () => {
-    if (deleteDialog.row) await handleDelete(deleteDialog.row)
-    setDeleteDialog({ open: false, row: null })
+    if (!deleteDialog.row?.id) return
+    setLoading(true)
+    try {
+      const res = await deleteAccount(deleteDialog.row.id)
+      if (res.status === 'success') showToast('delete', 'Account deleted successfully')
+      else showToast('error', 'Failed to delete account')
+      await loadItems()
+    } catch (err) {
+      console.error('❌ Delete error:', err)
+      showToast('error', 'Something went wrong during delete')
+    } finally {
+      setLoading(false)
+      setDeleteDialog({ open: false, row: null })
+    }
   }
 
+  // 💾 Add / Update Account
+  // ─────────────────────────────────────────────
   const handleSubmit = async e => {
     e.preventDefault()
     if (!formData.name || !formData.itemNumber) {
@@ -300,34 +292,27 @@ export default function AccountItemCodePage() {
 
     setLoading(true)
     try {
-      const db = await initDB()
       const payload = {
+        id: formData.id,
         name: formData.name,
         itemNumber: formData.itemNumber,
         description: formData.description,
         status: formData.status
       }
 
-      if (isEdit && formData.id) {
-        await db.put(STORE_NAME, { id: formData.id, ...payload })
-        showToast('success', 'Item updated')
+      if (isEdit) {
+        const res = await updateAccount(payload)
+        if (res.status === 'success') showToast('success', 'Account updated successfully')
       } else {
-        await db.add(STORE_NAME, payload)
-        showToast('success', 'Item added')
+        const res = await addAccount(payload)
+        if (res.status === 'success') showToast('success', 'Account added successfully')
       }
 
-      // 🧹 Clear unsaved draft + reset form after successful save
-      setUnsavedAddData(null)
-      setFormData({ id: null, name: '', itemNumber: '', description: '', status: 'Active' })
-
-      // ✅ Close the drawer after save
       setDrawerOpen(false)
-
-      // 🔄 Reload updated table data
       await loadItems()
     } catch (err) {
-      console.error(err)
-      showToast('error', 'Failed to save')
+      console.error('❌ Error saving account:', err)
+      showToast('error', 'Failed to save account')
     } finally {
       setLoading(false)
     }
@@ -362,17 +347,19 @@ export default function AccountItemCodePage() {
       columnHelper.accessor('name', { header: 'Name' }),
       columnHelper.accessor('itemNumber', { header: 'Item Number' }),
       columnHelper.accessor('description', { header: 'Description' }),
-      columnHelper.accessor('status', {
+      columnHelper.display({
+        id: 'status',
         header: 'Status',
         cell: info => {
-          const val = info.getValue()
+          const row = info.row.original
+          const isActive = row.is_active === 1
           return (
             <Chip
-              label={val === 'Active' ? 'Active' : 'Inactive'}
+              label={isActive ? 'Active' : 'Inactive'}
               size='small'
               sx={{
                 color: '#fff',
-                bgcolor: val === 'Active' ? 'success.main' : 'error.main',
+                bgcolor: isActive ? 'success.main' : 'error.main',
                 fontWeight: 600,
                 borderRadius: '6px',
                 px: 1.5
@@ -802,76 +789,75 @@ export default function AccountItemCodePage() {
         </Box>
       </Drawer>
 
-     <Dialog
-  onClose={() => setDeleteDialog({ open: false, row: null })}
-  aria-labelledby='customized-dialog-title'
-  open={deleteDialog.open}
-  closeAfterTransition={false}
-  PaperProps={{
-    sx: {
-      overflow: 'visible',
-      width: 420,
-      borderRadius: 1,
-      textAlign: 'center'
-    }
-  }}
->
-  {/* 🔴 Title with Warning Icon */}
-  <DialogTitle
-    id='customized-dialog-title'
-    sx={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 1,
-      color: 'error.main',
-      fontWeight: 700,
-      pb: 1,
-      position: 'relative'
-    }}
-  >
-    <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
-    Confirm Delete
-    <DialogCloseButton
-      onClick={() => setDeleteDialog({ open: false, row: null })}
-      disableRipple
-      sx={{ position: 'absolute', right: 1, top: 1 }}
-    >
-      <i className='tabler-x' />
-    </DialogCloseButton>
-  </DialogTitle>
+      <Dialog
+        onClose={() => setDeleteDialog({ open: false, row: null })}
+        aria-labelledby='customized-dialog-title'
+        open={deleteDialog.open}
+        closeAfterTransition={false}
+        PaperProps={{
+          sx: {
+            overflow: 'visible',
+            width: 420,
+            borderRadius: 1,
+            textAlign: 'center'
+          }
+        }}
+      >
+        {/* 🔴 Title with Warning Icon */}
+        <DialogTitle
+          id='customized-dialog-title'
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1,
+            color: 'error.main',
+            fontWeight: 700,
+            pb: 1,
+            position: 'relative'
+          }}
+        >
+          <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
+          Confirm Delete
+          <DialogCloseButton
+            onClick={() => setDeleteDialog({ open: false, row: null })}
+            disableRipple
+            sx={{ position: 'absolute', right: 1, top: 1 }}
+          >
+            <i className='tabler-x' />
+          </DialogCloseButton>
+        </DialogTitle>
 
-  {/* Centered text */}
-  <DialogContent sx={{ px: 5, pt: 1 }}>
-    <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
-      Are you sure you want to delete{' '}
-      <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name || 'this item'}</strong>?
-      <br />
-      This action cannot be undone.
-    </Typography>
-  </DialogContent>
+        {/* Centered text */}
+        <DialogContent sx={{ px: 5, pt: 1 }}>
+          <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
+            Are you sure you want to delete{' '}
+            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name || 'this item'}</strong>?
+            <br />
+            This action cannot be undone.
+          </Typography>
+        </DialogContent>
 
-  {/* Centered buttons */}
-  <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-    <Button
-      onClick={() => setDeleteDialog({ open: false, row: null })}
-      variant='tonal'
-      color='secondary'
-      sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
-    >
-      Cancel
-    </Button>
-    <Button
-      onClick={confirmDelete}
-      variant='contained'
-      color='error'
-      sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
-    >
-      Delete
-    </Button>
-  </DialogActions>
-</Dialog>
-
+        {/* Centered buttons */}
+        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+          <Button
+            onClick={() => setDeleteDialog({ open: false, row: null })}
+            variant='tonal'
+            color='secondary'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={confirmDelete}
+            variant='contained'
+            color='error'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* NO TOASTCONTAINER HERE — keep it in your layout (as in Tax page) */}
     </Box>

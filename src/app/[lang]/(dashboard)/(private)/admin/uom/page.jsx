@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { openDB } from 'idb'
+
 import {
   Box,
   Button,
@@ -26,6 +26,8 @@ import {
   CircularProgress
 } from '@mui/material'
 
+import { getUomList, addUom, updateUom, deleteUom } from '@/api/uom'
+
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
@@ -46,7 +48,6 @@ import CustomTextarea from '@/components/common/CustomTextarea'
 import CustomSelectField from '@/components/common/CustomSelectField'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 
-
 import { rankItem } from '@tanstack/match-sorter-utils'
 import {
   useReactTable,
@@ -58,21 +59,6 @@ import {
 } from '@tanstack/react-table'
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
-
-// ───────────────────────────────────────────
-// IndexedDB
-// ───────────────────────────────────────────
-const DB_NAME = 'uom_db'
-const STORE_NAME = 'uoms'
-const initDB = async () => {
-  return await openDB(DB_NAME, 2, {
-    upgrade(db) {
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true })
-      }
-    }
-  })
-}
 
 // Toast helper
 // ──────────────────────────────────────────────────────────────
@@ -168,44 +154,32 @@ export default function UnitOfMeasurementPage() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const db = await initDB()
-      const all = await db.getAll(STORE_NAME)
+      const result = await getUomList()
 
-      const handleFieldChange = (field, value) => {
-        setFormData(prev => {
-          const updated = { ...prev, [field]: value }
-          if (!isEdit) setUnsavedAddData(updated)
-          return updated
-        })
+      if (result.success) {
+        // 🧠 Handle both array and paginated-object responses
+        const raw = result.data
+        const dataArray = Array.isArray(raw) ? raw : Array.isArray(raw?.results) ? raw.results : []
+
+        // 🔢 Sort newest first
+        const sorted = dataArray.sort((a, b) => (b.id || 0) - (a.id || 0))
+
+        // 🧾 Normalize and add serial numbers
+        const normalized = sorted.map((item, idx) => ({
+          ...item,
+          sno: idx + 1,
+          name: item.name || '-',
+          status: item.is_active === 1 ? 'Active' : 'Inactive'
+        }))
+
+        setRows(normalized)
+        setRowCount(normalized.length)
+      } else {
+        showToast('error', result.message)
+        setRows([])
       }
-
-      // 🔍 Apply search filter
-      const filtered = searchText
-        ? all.filter(r =>
-            ['name', 'description', 'uomStore', 'uomPurchase', 'conversion'].some(key =>
-              (r[key] || '').toString().toLowerCase().includes(searchText.toLowerCase())
-            )
-          )
-        : all
-
-      // 🔢 Sort newest first
-      const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
-
-      // 📄 Paginate
-      const start = pagination.pageIndex * pagination.pageSize
-      const end = start + pagination.pageSize
-      const paginated = sorted.slice(start, end)
-
-      // 🧾 Add serial numbers
-      const normalized = paginated.map((item, idx) => ({
-        ...item,
-        sno: start + idx + 1
-      }))
-
-      setRows(normalized)
-      setRowCount(filtered.length)
-    } catch (err) {
-      console.error(err)
+    } catch (error) {
+      console.error('❌ Load Data Error:', error)
       showToast('error', 'Failed to load data')
     } finally {
       setLoading(false)
@@ -260,28 +234,25 @@ export default function UnitOfMeasurementPage() {
 
   const handleAdd = () => {
     setIsEdit(false)
-    if (unsavedAddData) {
-      setFormData(unsavedAddData)
-    } else {
-      setFormData({
-        id: null,
-        name: '',
-        description: '',
-        status: 'Active',
-        uomStore: '',
-        uomPurchase: '',
-        conversion: ''
-      })
-    }
+    setFormData({
+      id: null,
+      name: '',
+      status: 'Active'
+    })
     setDrawerOpen(true)
     setTimeout(() => nameRef.current?.focus(), 100)
   }
 
   const handleEdit = row => {
     setIsEdit(true)
-    setFormData(row)
+    setFormData({
+      id: row.id,
+      name: row.name,
+      status: row.is_active === 1 ? 'Active' : 'Inactive'
+    })
     setDrawerOpen(true)
   }
+
   const handleDelete = async row => {
     const db = await initDB()
     await db.delete(STORE_NAME, row.id)
@@ -289,48 +260,56 @@ export default function UnitOfMeasurementPage() {
     loadData()
   }
   const confirmDelete = async () => {
-    if (deleteDialog.row) await handleDelete(deleteDialog.row)
-    setDeleteDialog({ open: false, row: null })
-  }
-  const handleSubmit = async e => {
-    e.preventDefault()
-    if (!formData.name || !formData.uomStore || !formData.uomPurchase) {
-      showToast('warning', 'Please fill all required fields')
-      return
-    }
+    if (!deleteDialog.row) return
+
     setLoading(true)
     try {
-      const db = await initDB()
-      const payload = { ...formData }
-
-      if (isEdit && formData.id) {
-        await db.put(STORE_NAME, payload)
-        showToast('success', 'UOM updated')
+      const result = await deleteUom(deleteDialog.row.id) // ✅ correct
+      if (result.success) {
+        showToast('delete', result.message)
+        loadData()
       } else {
-        delete payload.id
-        await db.add(STORE_NAME, payload)
-        showToast('success', 'UOM added')
+        showToast('error', result.message)
+      }
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'Failed to delete UOM')
+    } finally {
+      setDeleteDialog({ open: false, row: null })
+      setLoading(false)
+    }
+  }
+
+  const handleSubmit = async e => {
+    e.preventDefault()
+
+    if (!formData.name) {
+      showToast('warning', 'Please enter UOM name')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const payload = {
+        id: formData.id,
+        name: formData.name,
+        is_active: formData.status === 'Active' ? 1 : 0
       }
 
-      // 🧹 Clear draft + reset form after save
-      setUnsavedAddData(null)
-      setFormData({
-        id: null,
-        name: '',
-        description: '',
-        status: 'Active',
-        uomStore: '',
-        uomPurchase: '',
-        conversion: ''
-      })
+      const result = isEdit ? await updateUom(payload) : await addUom(payload)
 
-      // ✅ Close drawer after save
-      setDrawerOpen(false)
-
-      // 🔄 Refresh data
-      loadData()
-    } catch {
-      showToast('error', 'Failed to save')
+      if (result.success) {
+        showToast('success', result.message)
+        loadData()
+        setDrawerOpen(false)
+        setFormData({ id: null, name: '', status: 'Active' })
+        setIsEdit(false)
+      } else {
+        showToast('error', result.message)
+      }
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'Failed to save data')
     } finally {
       setLoading(false)
     }
@@ -360,10 +339,6 @@ export default function UnitOfMeasurementPage() {
         )
       }),
       columnHelper.accessor('name', { header: 'UOM Name' }),
-      columnHelper.accessor('uomStore', { header: 'UOM Store' }),
-      columnHelper.accessor('uomPurchase', { header: 'UOM Purchase' }),
-      columnHelper.accessor('conversion', { header: 'Conversion' }),
-      columnHelper.accessor('description', { header: 'Description' }),
       columnHelper.accessor('status', {
         header: 'Status',
         cell: info => (
@@ -652,49 +627,6 @@ export default function UnitOfMeasurementPage() {
                 />
               </Grid>
 
-              <Grid item xs={12}>
-                <CustomTextFieldWrapper
-                  fullWidth
-                  required
-                  label='UOM Store'
-                  placeholder='Enter store unit'
-                  value={formData.uomStore}
-                  onChange={e => handleFieldChange('uomStore', e.target.value)}
-                />
-              </Grid>
-
-              <Grid item xs={12}>
-                <CustomTextFieldWrapper
-                  fullWidth
-                  required
-                  label='UOM Purchase'
-                  placeholder='Enter purchase unit'
-                  value={formData.uomPurchase}
-                  onChange={e => handleFieldChange('uomPurchase', e.target.value)}
-                />
-              </Grid>
-
-              <Grid item xs={12}>
-                <CustomTextFieldWrapper
-                  fullWidth
-                  type='number'
-                  label='Conversion'
-                  placeholder='Enter conversion value'
-                  value={formData.conversion}
-                  onChange={e => handleFieldChange('conversion', e.target.value)}
-                />
-              </Grid>
-
-              <Grid item xs={12}>
-                <CustomTextarea
-                  label='Description'
-                  placeholder='Enter UOM description...'
-                  value={formData.description}
-                  onChange={e => handleFieldChange('description', e.target.value)}
-                  rows={3}
-                />
-              </Grid>
-
               {isEdit && (
                 <Grid item xs={12}>
                   <CustomSelectField
@@ -723,77 +655,74 @@ export default function UnitOfMeasurementPage() {
       </Drawer>
 
       <Dialog
-  onClose={() => setDeleteDialog({ open: false, row: null })}
-  aria-labelledby='customized-dialog-title'
-  open={deleteDialog.open}
-  closeAfterTransition={false}
-  PaperProps={{
-    sx: {
-      overflow: 'visible',
-      width: 420,
-      borderRadius: 1,
-      textAlign: 'center'
-    }
-  }}
->
-  {/* 🔴 Title with Warning Icon */}
-  <DialogTitle
-    id='customized-dialog-title'
-    sx={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 1,
-      color: 'error.main',
-      fontWeight: 700,
-      pb: 1,
-      position: 'relative'
-    }}
-  >
-    <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
-    Confirm Delete
-    <DialogCloseButton
-      onClick={() => setDeleteDialog({ open: false, row: null })}
-      disableRipple
-      sx={{ position: 'absolute', right: 1, top: 1 }}
-    >
-      <i className='tabler-x' />
-    </DialogCloseButton>
-  </DialogTitle>
+        onClose={() => setDeleteDialog({ open: false, row: null })}
+        aria-labelledby='customized-dialog-title'
+        open={deleteDialog.open}
+        closeAfterTransition={false}
+        PaperProps={{
+          sx: {
+            overflow: 'visible',
+            width: 420,
+            borderRadius: 1,
+            textAlign: 'center'
+          }
+        }}
+      >
+        {/* 🔴 Title with Warning Icon */}
+        <DialogTitle
+          id='customized-dialog-title'
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1,
+            color: 'error.main',
+            fontWeight: 700,
+            pb: 1,
+            position: 'relative'
+          }}
+        >
+          <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
+          Confirm Delete
+          <DialogCloseButton
+            onClick={() => setDeleteDialog({ open: false, row: null })}
+            disableRipple
+            sx={{ position: 'absolute', right: 1, top: 1 }}
+          >
+            <i className='tabler-x' />
+          </DialogCloseButton>
+        </DialogTitle>
 
-  {/* Centered text */}
-  <DialogContent sx={{ px: 5, pt: 1 }}>
-    <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
-      Are you sure you want to delete{' '}
-      <strong style={{ color: '#d32f2f' }}>
-        {deleteDialog.row?.name || 'this UOM'}
-      </strong>?
-      <br />
-      This action cannot be undone.
-    </Typography>
-  </DialogContent>
+        {/* Centered text */}
+        <DialogContent sx={{ px: 5, pt: 1 }}>
+          <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
+            Are you sure you want to delete{' '}
+            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name || 'this UOM'}</strong>?
+            <br />
+            This action cannot be undone.
+          </Typography>
+        </DialogContent>
 
-  {/* Centered buttons */}
-  <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-    <Button
-      onClick={() => setDeleteDialog({ open: false, row: null })}
-      variant='tonal'
-      color='secondary'
-      sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
-    >
-      Cancel
-    </Button>
-    <Button
-      onClick={confirmDelete}
-      variant='contained'
-      color='error'
-      sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
-    >
-      Delete
-    </Button>
-  </DialogActions>
-</Dialog>
-
+        {/* Centered buttons */}
+        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+          <Button
+            onClick={() => setDeleteDialog({ open: false, row: null })}
+            variant='tonal'
+            color='secondary'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={confirmDelete}
+            variant='contained'
+            color='error'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   )
 }

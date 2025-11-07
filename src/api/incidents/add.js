@@ -1,0 +1,16 @@
+import api from '@/utils/axiosInstance'
+
+export const addIncident = async payload => {
+  try {
+    const response = await api.post('incident-add/', payload)
+
+    if (response?.data?.status === 'success') {
+      return { success: true, message: response.data.message }
+    } else {
+      return { success: false, message: response.data?.message || 'Failed to add incident' }
+    }
+  } catch (error) {
+    console.error('❌ Add Incident Error:', error)
+    return { success: false, message: error?.response?.data?.message || 'Something went wrong' }
+  }
+}

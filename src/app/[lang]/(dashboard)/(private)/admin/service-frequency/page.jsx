@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { openDB } from 'idb'
+
 import {
   Box,
   Button,
@@ -28,6 +28,13 @@ import {
   CircularProgress
 } from '@mui/material'
 
+import {
+  addServiceFrequency,
+  getServiceFrequencyList,
+  updateServiceFrequency,
+  deleteServiceFrequency
+} from '@/api/serviceFrequency'
+
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
@@ -48,7 +55,6 @@ import CustomTextarea from '@/components/common/CustomTextarea'
 import CustomSelectField from '@/components/common/CustomSelectField'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 
-
 import CustomTextField from '@core/components/mui/TextField'
 import CustomAutocomplete from '@core/components/mui/Autocomplete'
 import { toast } from 'react-toastify'
@@ -65,22 +71,6 @@ import {
 } from '@tanstack/react-table'
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
-
-// ───────────────────────────────────────────
-// IndexedDB
-// ───────────────────────────────────────────
-const DB_NAME = 'serviceFrequencyDB'
-const STORE_NAME = 'frequencies'
-
-const initDB = async () => {
-  return await openDB(DB_NAME, 1, {
-    upgrade(db) {
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true })
-      }
-    }
-  })
-}
 
 // Toast helper
 // ──────────────────────────────────────────────────────────────
@@ -169,6 +159,7 @@ export default function ServiceFrequencyPage() {
     backlogAge: '',
     frequencyCode: '',
     displayFrequency: '',
+    serviceFrequency: '', // ✅ new field added
     sortOrder: '',
     description: '',
     status: 'Active'
@@ -192,53 +183,65 @@ export default function ServiceFrequencyPage() {
       backlogAge: '',
       frequencyCode: '',
       displayFrequency: '',
+      serviceFrequency: '', // ✅ add this line here too
       sortOrder: '',
       description: '',
       status: 'Active'
     })
+
     setUnsavedAddData(null)
     setDrawerOpen(false)
   }
 
   // Load rows
-  const loadData = async () => {
-    setLoading(true)
-    try {
-      const db = await initDB()
-      const all = await db.getAll(STORE_NAME)
+const loadData = async () => {
+  setLoading(true)
+  try {
+    const res = await getServiceFrequencyList()
+    console.log('📥 Full Service Frequency Response:', res)
 
-      // 🔍 Apply search filter
-      const filtered = searchText
-        ? all.filter(r =>
-            ['displayFrequency', 'frequencyCode', 'description'].some(key =>
-              (r[key] || '').toLowerCase().includes(searchText.toLowerCase())
-            )
-          )
-        : all
+    // ✅ Safely handle your backend structure
+    const results =
+      res?.data?.data?.results ||
+      res?.data?.results ||
+      res?.results ||
+      []
 
-      // 🔢 Sort newest first
-      const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
+    console.log('📦 Extracted Results:', results)
 
-      // 🧮 Apply pagination
-      const start = pagination.pageIndex * pagination.pageSize
-      const end = start + pagination.pageSize
-      const paginated = sorted.slice(start, end)
-
-      // 🧾 Add serial numbers
-      const normalized = paginated.map((item, idx) => ({
-        ...item,
-        sno: start + idx + 1
+    if (Array.isArray(results) && results.length > 0) {
+      const formatted = results.map((item, index) => ({
+        sno: index + 1,
+        id: item.id,
+        serviceFrequency: item.name || '—',
+        displayFrequency: item.name || '—',
+        frequencyCode: item.frequency_code || '—',
+        incrementType: item.frequency || '—',
+        noOfIncrements: item.times || '—',
+        backlogAge: item.backlog_age || '—',
+        sortOrder: item.sort_order || '—',
+        description: item.description || '—',
+        is_active: item.is_active,
+        status: item.is_active === 1 ? 'Active' : 'Inactive'
       }))
 
-      setRows(normalized)
-      setRowCount(filtered.length)
-    } catch (err) {
-      console.error(err)
-      showToast('error', 'Failed to load data')
-    } finally {
-      setLoading(false)
+      console.log('✅ Formatted Table Data:', formatted)
+
+      setRows(formatted)
+      setRowCount(formatted.length)
+    } else {
+      console.warn('⚠️ No results found in API response')
+      setRows([])
+      setRowCount(0)
     }
+  } catch (err) {
+    console.error('❌ Error loading service frequency list:', err)
+    showToast('error', 'Something went wrong while loading data')
+  } finally {
+    setLoading(false)
   }
+}
+
 
   useEffect(() => {
     loadData()
@@ -259,6 +262,7 @@ export default function ServiceFrequencyPage() {
         backlogAge: '',
         frequencyCode: '',
         displayFrequency: '',
+        serviceFrequency: '', // ✅ add this line here too
         sortOrder: '',
         description: '',
         status: 'Active'
@@ -270,7 +274,21 @@ export default function ServiceFrequencyPage() {
 
   const handleEdit = row => {
     setIsEdit(true)
-    setFormData(row)
+
+    // ✅ Prevent null values & fix uncontrolled input warning
+    setFormData({
+      id: row.id || null,
+      serviceFrequency: row.serviceFrequency || row.name || '',
+      incrementType: row.incrementType || '',
+      noOfIncrements: row.noOfIncrements || '',
+      backlogAge: row.backlogAge || '',
+      frequencyCode: row.frequencyCode || '',
+      displayFrequency: row.displayFrequency || '',
+      sortOrder: row.sortOrder || '',
+      description: row.description || '',
+      status: row.status || 'Active'
+    })
+
     setDrawerOpen(true)
   }
 
@@ -282,8 +300,20 @@ export default function ServiceFrequencyPage() {
   }
 
   const confirmDelete = async () => {
-    if (deleteDialog.row) await handleDelete(deleteDialog.row)
-    setDeleteDialog({ open: false, row: null })
+    if (!deleteDialog.row?.id) return
+    setLoading(true)
+    try {
+      const res = await deleteServiceFrequency(deleteDialog.row.id)
+      if (res?.status === 'success') showToast('delete', 'Frequency deleted successfully')
+      else showToast('error', 'Failed to delete')
+      await loadData()
+    } catch (err) {
+      console.error('❌ Delete error:', err)
+      showToast('error', 'Something went wrong')
+    } finally {
+      setLoading(false)
+      setDeleteDialog({ open: false, row: null })
+    }
   }
 
   const handleSubmit = async e => {
@@ -292,46 +322,30 @@ export default function ServiceFrequencyPage() {
       showToast('warning', 'Please fill all required fields')
       return
     }
+
     setLoading(true)
     try {
-      const db = await initDB()
-      const payload = { ...formData }
-
-      if (isEdit && formData.id) {
-        await db.put(STORE_NAME, payload)
-        showToast('success', 'Frequency updated')
-      } else {
-        delete payload.id
-        await db.add(STORE_NAME, payload)
-        showToast('success', 'Frequency added')
+      const payload = {
+        ...formData,
+        serviceFrequency: formData.serviceFrequency || formData.displayFrequency // ✅ ensure value
       }
 
-      // 🧹 Clear unsaved draft data + reset form
-      setUnsavedAddData(null)
-      setFormData({
-        id: null,
-        incrementType: '',
-        noOfIncrements: '',
-        backlogAge: '',
-        frequencyCode: '',
-        displayFrequency: '',
-        sortOrder: '',
-        description: '',
-        status: 'Active'
-      })
+      const res = isEdit ? await updateServiceFrequency(payload) : await addServiceFrequency(payload)
 
-      // ✅ Close drawer after save
-      setDrawerOpen(false)
-
-      // 🔄 Refresh the table
-      loadData()
-    } catch {
-      showToast('error', 'Failed to save')
+      if (res?.status === 'success') {
+        showToast('success', isEdit ? 'Frequency updated successfully' : 'Frequency added successfully')
+        setDrawerOpen(false)
+        await loadData()
+      } else {
+        showToast('error', 'Operation failed')
+      }
+    } catch (err) {
+      console.error('❌ Error saving frequency:', err)
+      showToast('error', 'Something went wrong')
     } finally {
       setLoading(false)
     }
   }
-
   // Table setup
   const columnHelper = createColumnHelper()
 
@@ -671,6 +685,17 @@ export default function ServiceFrequencyPage() {
           <form onSubmit={handleSubmit} style={{ flexGrow: 1 }}>
             <Grid container spacing={3}>
               <Grid item xs={12}>
+                <CustomTextFieldWrapper
+                  fullWidth
+                  required
+                  label='Service Frequency Name'
+                  placeholder='Enter service frequency name'
+                  value={formData.serviceFrequency || ''} // ✅ ensures it never becomes undefined
+                  onChange={e => handleFieldChange('serviceFrequency', e.target.value)}
+                />
+              </Grid>
+
+              <Grid item xs={12}>
                 <CustomSelectField
                   label='Increment Type'
                   value={formData.incrementType}
@@ -774,78 +799,75 @@ export default function ServiceFrequencyPage() {
         </Box>
       </Drawer>
 
-    <Dialog
-  onClose={() => setDeleteDialog({ open: false, row: null })}
-  aria-labelledby='customized-dialog-title'
-  open={deleteDialog.open}
-  closeAfterTransition={false}
-  PaperProps={{
-    sx: {
-      overflow: 'visible',
-      width: 420,
-      borderRadius: 1,
-      textAlign: 'center'
-    }
-  }}
->
-  {/* 🔴 Title with Warning Icon */}
-  <DialogTitle
-    id='customized-dialog-title'
-    sx={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 1,
-      color: 'error.main',
-      fontWeight: 700,
-      pb: 1,
-      position: 'relative'
-    }}
-  >
-    <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
-    Confirm Delete
-    <DialogCloseButton
-      onClick={() => setDeleteDialog({ open: false, row: null })}
-      disableRipple
-      sx={{ position: 'absolute', right: 1, top: 1 }}
-    >
-      <i className='tabler-x' />
-    </DialogCloseButton>
-  </DialogTitle>
+      <Dialog
+        onClose={() => setDeleteDialog({ open: false, row: null })}
+        aria-labelledby='customized-dialog-title'
+        open={deleteDialog.open}
+        closeAfterTransition={false}
+        PaperProps={{
+          sx: {
+            overflow: 'visible',
+            width: 420,
+            borderRadius: 1,
+            textAlign: 'center'
+          }
+        }}
+      >
+        {/* 🔴 Title with Warning Icon */}
+        <DialogTitle
+          id='customized-dialog-title'
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1,
+            color: 'error.main',
+            fontWeight: 700,
+            pb: 1,
+            position: 'relative'
+          }}
+        >
+          <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
+          Confirm Delete
+          <DialogCloseButton
+            onClick={() => setDeleteDialog({ open: false, row: null })}
+            disableRipple
+            sx={{ position: 'absolute', right: 1, top: 1 }}
+          >
+            <i className='tabler-x' />
+          </DialogCloseButton>
+        </DialogTitle>
 
-  {/* Centered text */}
-  <DialogContent sx={{ px: 5, pt: 1 }}>
-    <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
-      Are you sure you want to delete{' '}
-      <strong style={{ color: '#d32f2f' }}>
-        {deleteDialog.row?.displayFrequency || 'this frequency'}
-      </strong>?
-      <br />
-      This action cannot be undone.
-    </Typography>
-  </DialogContent>
+        {/* Centered text */}
+        <DialogContent sx={{ px: 5, pt: 1 }}>
+          <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
+            Are you sure you want to delete{' '}
+            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.displayFrequency || 'this frequency'}</strong>?
+            <br />
+            This action cannot be undone.
+          </Typography>
+        </DialogContent>
 
-  {/* Centered buttons */}
-  <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-    <Button
-      onClick={() => setDeleteDialog({ open: false, row: null })}
-      variant='tonal'
-      color='secondary'
-      sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
-    >
-      Cancel
-    </Button>
-    <Button
-      onClick={confirmDelete}
-      variant='contained'
-      color='error'
-      sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
-    >
-      Delete
-    </Button>
-  </DialogActions>
-</Dialog>
-
+        {/* Centered buttons */}
+        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+          <Button
+            onClick={() => setDeleteDialog({ open: false, row: null })}
+            variant='tonal'
+            color='secondary'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={confirmDelete}
+            variant='contained'
+            color='error'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   )
 }

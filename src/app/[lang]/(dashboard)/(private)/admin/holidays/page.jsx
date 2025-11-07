@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { openDB } from 'idb'
+
 import {
   Box,
   Button,
@@ -27,6 +27,7 @@ import {
   CircularProgress
 } from '@mui/material'
 
+import { getHolidaysList, addHoliday, updateHoliday, deleteHoliday, getHolidayDetails } from '@/api/holidays'
 
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
@@ -62,21 +63,6 @@ import {
 } from '@tanstack/react-table'
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
-
-// ───────────────────────────────────────────
-// IndexedDB
-// ───────────────────────────────────────────
-const DB_NAME = 'HolidayDB'
-const STORE_NAME = 'holidays'
-const initDB = async () => {
-  return await openDB(DB_NAME, 1, {
-    upgrade(db) {
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true })
-      }
-    }
-  })
-}
 
 // Toast helper
 // ──────────────────────────────────────────────────────────────
@@ -172,37 +158,28 @@ export default function HolidayPage() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const db = await initDB()
-      const all = await db.getAll(STORE_NAME)
-
-      // 🔍 Apply search filter
-      const filtered = searchText
-        ? all.filter(r =>
-            ['name', 'date', 'year'].some(key =>
-              (r[key] || '').toString().toLowerCase().includes(searchText.toLowerCase())
-            )
-          )
-        : all
-
-      // 🔢 Sort newest first
-      const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
-
-      // 📄 Apply pagination
-      const start = pagination.pageIndex * pagination.pageSize
-      const end = start + pagination.pageSize
-      const paginated = sorted.slice(start, end)
-
-      // 🧾 Add serial numbers
-      const normalized = paginated.map((item, idx) => ({
-        ...item,
-        sno: start + idx + 1
-      }))
-
-      setRows(normalized)
-      setRowCount(filtered.length)
+      const result = await getHolidaysList()
+      if (result.success) {
+        const all = result.data || []
+        const filtered = searchText
+          ? all.filter(r => (r.name || '').toLowerCase().includes(searchText.toLowerCase()))
+          : all
+        const normalized = filtered.map((item, idx) => ({
+          id: item.id,
+          sno: idx + 1,
+          name: item.name || '-',
+          date: item.date || '-',
+          year: item.year || '-',
+          status: item.is_active === 1 ? 'Active' : 'Inactive'
+        }))
+        setRows(normalized)
+        setRowCount(normalized.length)
+      } else {
+        showToast('error', result.message)
+      }
     } catch (err) {
       console.error(err)
-      showToast('error', 'Failed to load data')
+      showToast('error', 'Failed to load holidays')
     } finally {
       setLoading(false)
     }
@@ -253,62 +230,97 @@ export default function HolidayPage() {
     })
   }
 
-  const handleEdit = row => {
+const handleEdit = async row => {
+  try {
+    setLoading(true)
     setIsEdit(true)
-    setFormData(row)
-    setDrawerOpen(true)
-    setTimeout(() => nameRef.current?.focus(), 100)
-  }
-  const handleDelete = async row => {
-    const db = await initDB()
-    await db.delete(STORE_NAME, row.id)
-    showToast('delete', `${row.name} deleted`)
-    loadData()
-  }
-  const confirmDelete = async () => {
-    if (deleteDialog.row) await handleDelete(deleteDialog.row)
-    setDeleteDialog({ open: false, row: null })
-  }
 
-  const handleSubmit = async e => {
-    e.preventDefault()
-    if (!formData.name || !formData.date) {
-      showToast('warning', 'Holiday name and date are required')
-      return
+    const result = await getHolidayDetails(row.id)
+
+    if (result.success && result.data) {
+      const data = result.data
+      const formattedDate = data.date ? data.date.split('-').reverse().join('/') : ''
+
+      setFormData({
+        id: data.id, // ✅ ensures update API gets the correct ID
+        name: data.name || '',
+        date: formattedDate,
+        year: data.year || '',
+        status: data.is_active === 1 ? 'Active' : 'Inactive'
+      })
+
+      console.log('🧩 Holiday Edit Data:', data)
+      setDrawerOpen(true)
+    } else {
+      showToast('error', result.message)
     }
+  } catch (err) {
+    console.error('❌ Error fetching holiday details:', err)
+    showToast('error', 'Failed to fetch holiday details')
+  } finally {
+    setLoading(false)
+  }
+}
 
+
+  const confirmDelete = async () => {
+    if (!deleteDialog.row) return
     setLoading(true)
     try {
-      const db = await initDB()
-      const payload = {
-        ...formData,
-        year: formData.date.split('/')[2] || ''
-      }
-
-      if (isEdit && formData.id) {
-        await db.put(STORE_NAME, payload)
-        showToast('success', 'Holiday updated')
+      const result = await deleteHoliday(deleteDialog.row.id)
+      if (result.success) {
+        showToast('delete', result.message)
+        await loadData()
       } else {
-        delete payload.id
-        await db.add(STORE_NAME, payload)
-        showToast('success', 'Holiday added')
+        showToast('error', result.message)
       }
-
-      // ✅ Clear unsaved draft + reset
-      setUnsavedAddData(null)
-      setFormData({ id: null, name: '', date: '', year: '', status: 'Active' })
-
-      // ✅ Close drawer after save
-      setDrawerOpen(false)
-
-      // 🔄 Reload data
-      await loadData()
-    } catch {
-      showToast('error', 'Failed to save')
+    } catch (err) {
+      console.error('❌ Delete Error:', err)
+      showToast('error', 'Failed to delete holiday')
     } finally {
+      setDeleteDialog({ open: false, row: null })
       setLoading(false)
     }
   }
+
+const handleSubmit = async e => {
+  e.preventDefault()
+
+  console.log('🧠 handleSubmit formData:', formData)
+
+  if (!formData.name || !formData.date) {
+    showToast('warning', 'Holiday name and date are required')
+    return
+  }
+
+  setLoading(true)
+  try {
+    const payload = {
+      id: formData.id, // ✅ keep it here
+      name: formData.name,
+      date: formData.date.split('/').reverse().join('-'), // convert DD/MM/YYYY → YYYY-MM-DD
+      year: formData.year || formData.date.split('/')[2],
+      is_active: formData.status === 'Active' ? 1 : 0
+    }
+
+    const result = isEdit ? await updateHoliday(payload) : await addHoliday(payload)
+
+    if (result.success) {
+      showToast('success', result.message)
+      setDrawerOpen(false)
+      loadData()
+      setFormData({ id: null, name: '', date: '', year: '', status: 'Active' })
+      setIsEdit(false)
+    } else {
+      showToast('error', result.message)
+    }
+  } catch (err) {
+    console.error(err)
+    showToast('error', 'Failed to save holiday')
+  } finally {
+    setLoading(false)
+  }
+}
 
   const handleStatusChange = async e => {
     const newStatus = e.target.value
@@ -699,77 +711,74 @@ export default function HolidayPage() {
       </Drawer>
 
       <Dialog
-  onClose={() => setDeleteDialog({ open: false, row: null })}
-  aria-labelledby='customized-dialog-title'
-  open={deleteDialog.open}
-  closeAfterTransition={false}
-  PaperProps={{
-    sx: {
-      overflow: 'visible',
-      width: 420,
-      borderRadius: 1,
-      textAlign: 'center'
-    }
-  }}
->
-  {/* 🔴 Title with Warning Icon */}
-  <DialogTitle
-    id='customized-dialog-title'
-    sx={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 1,
-      color: 'error.main',
-      fontWeight: 700,
-      pb: 1,
-      position: 'relative'
-    }}
-  >
-    <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
-    Confirm Delete
-    <DialogCloseButton
-      onClick={() => setDeleteDialog({ open: false, row: null })}
-      disableRipple
-      sx={{ position: 'absolute', right: 1, top: 1 }}
-    >
-      <i className='tabler-x' />
-    </DialogCloseButton>
-  </DialogTitle>
+        onClose={() => setDeleteDialog({ open: false, row: null })}
+        aria-labelledby='customized-dialog-title'
+        open={deleteDialog.open}
+        closeAfterTransition={false}
+        PaperProps={{
+          sx: {
+            overflow: 'visible',
+            width: 420,
+            borderRadius: 1,
+            textAlign: 'center'
+          }
+        }}
+      >
+        {/* 🔴 Title with Warning Icon */}
+        <DialogTitle
+          id='customized-dialog-title'
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1,
+            color: 'error.main',
+            fontWeight: 700,
+            pb: 1,
+            position: 'relative'
+          }}
+        >
+          <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
+          Confirm Delete
+          <DialogCloseButton
+            onClick={() => setDeleteDialog({ open: false, row: null })}
+            disableRipple
+            sx={{ position: 'absolute', right: 1, top: 1 }}
+          >
+            <i className='tabler-x' />
+          </DialogCloseButton>
+        </DialogTitle>
 
-  {/* Centered Text */}
-  <DialogContent sx={{ px: 5, pt: 1 }}>
-    <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
-      Are you sure you want to delete{' '}
-      <strong style={{ color: '#d32f2f' }}>
-        {deleteDialog.row?.name || 'this holiday'}
-      </strong>?
-      <br />
-      This action cannot be undone.
-    </Typography>
-  </DialogContent>
+        {/* Centered Text */}
+        <DialogContent sx={{ px: 5, pt: 1 }}>
+          <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
+            Are you sure you want to delete{' '}
+            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name || 'this holiday'}</strong>?
+            <br />
+            This action cannot be undone.
+          </Typography>
+        </DialogContent>
 
-  {/* Centered Buttons */}
-  <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-    <Button
-      onClick={() => setDeleteDialog({ open: false, row: null })}
-      variant='tonal'
-      color='secondary'
-      sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
-    >
-      Cancel
-    </Button>
-    <Button
-      onClick={confirmDelete}
-      variant='contained'
-      color='error'
-      sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
-    >
-      Delete
-    </Button>
-  </DialogActions>
-</Dialog>
-
+        {/* Centered Buttons */}
+        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+          <Button
+            onClick={() => setDeleteDialog({ open: false, row: null })}
+            variant='tonal'
+            color='secondary'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={confirmDelete}
+            variant='contained'
+            color='error'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   )
 }

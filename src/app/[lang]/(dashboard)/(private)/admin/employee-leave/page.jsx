@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { openDB } from 'idb'
+
 import {
   Box,
   Button,
@@ -27,6 +27,9 @@ import {
   CircularProgress,
   InputAdornment
 } from '@mui/material'
+
+import { addEmployeeLeave, getEmployeeLeaveList, updateEmployeeLeave, deleteEmployeeLeave } from '@/api/employeeLeave'
+
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
@@ -63,22 +66,11 @@ import {
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
 
-// ───────────────────────────────────────────
-// IndexedDB
-// ───────────────────────────────────────────
-const DB_NAME = 'employee_leave_db'
-const STORE_NAME = 'leaves'
-const initDB = async () => {
-  return await openDB(DB_NAME, 1, {
-    upgrade(db) {
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true })
-      }
-    }
-  })
-}
-
-
+// Temporary static list — replace later with API list if needed
+const employeeOptions = [
+  { id: 1, name: 'Admin' },
+  { id: 2, name: 'Technician' }
+]
 
 // Default Leave Types
 const DEFAULT_LEAVE_OPTIONS = ['Annual Leave', 'Sick Leave', 'Casual Leave', 'Maternity Leave', 'Paternity Leave']
@@ -166,12 +158,14 @@ export default function EmployeeLeavePage() {
 
   const [formData, setFormData] = useState({
     id: null,
-    employee: '',
+    employee_id: '', // ✅ backend needs id
+    name: '', // label for UI only
     supervisor: '',
     leaveType: '',
     fromDate: new Date(),
     toDate: new Date(),
-    status: 'Pending'
+    status: 'Pending',
+    description: ''
   })
 
   const employeeRef = useRef(null)
@@ -185,36 +179,23 @@ export default function EmployeeLeavePage() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const db = await initDB()
-      const all = await db.getAll(STORE_NAME)
+      const res = await getEmployeeLeaveList()
+      const results = res?.data?.results || []
 
-      // 🔍 Search filter
-      const filtered = searchText
-        ? all.filter(r =>
-            ['employee', 'supervisor', 'leaveType', 'status'].some(key =>
-              (r[key] || '').toString().toLowerCase().includes(searchText.toLowerCase())
-            )
-          )
-        : all
-
-      // 🔢 Sort by latest
-      const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
-
-      // 📄 Paginate
-      const start = pagination.pageIndex * pagination.pageSize
-      const end = start + pagination.pageSize
-      const paginated = sorted.slice(start, end)
-
-      // 🧾 Normalize and format date
-      const normalized = paginated.map((item, idx) => ({
-        ...item,
-        fromDate: new Date(item.fromDate),
-        toDate: new Date(item.toDate),
-        sno: start + idx + 1
+      const formatted = results.map((item, idx) => ({
+        sno: idx + 1,
+        id: item.id,
+        employee: item.name || '-', // 👈 from API
+        supervisor: item.supervisor || '-', // 👈 from API
+        leaveType: item.leave_type || '-', // 👈 from API
+        fromDate: item.leave_date ? new Date(item.leave_date) : '-',
+        toDate: item.to_date ? new Date(item.to_date) : '-',
+        status: item.is_approved === 1 ? 'Approved' : item.is_approved === 0 ? 'Rejected' : 'Pending',
+        is_active: item.is_active
       }))
 
-      setRows(normalized)
-      setRowCount(filtered.length)
+      setRows(formatted)
+      setRowCount(formatted.length)
     } catch (err) {
       console.error(err)
       showToast('error', 'Failed to load data')
@@ -223,21 +204,102 @@ export default function EmployeeLeavePage() {
     }
   }
 
+  // ✅ Date formatter function
+  const formatDate = date => {
+    if (!date) return null
+    const d = new Date(date)
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
+  // ✅ Final working submit handler
+  const handleSubmit = async e => {
+    e.preventDefault()
+
+    if (!formData.employee_id || !formData.leaveType) {
+      showToast('warning', 'Employee and Leave Type are required')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const formatDate = d => {
+        if (!d) return null
+        const x = new Date(d)
+        return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+      }
+
+      // 🧩 FIXED PAYLOAD
+      const payload = {
+        id: formData.id,
+        employee_id: Number(formData.employee_id), // FK integer
+        supervisor: String(formData.supervisor || '-').trim(), // text field
+        leave_type: String(formData.leaveType || '-').trim(), // text field
+        leave_date: formatDate(formData.fromDate),
+        to_date: formatDate(formData.toDate),
+        is_approved: formData.status === 'Approved' ? 1 : formData.status === 'Rejected' ? 0 : null,
+        is_active: 1,
+        status: 1,
+        created_by: 1,
+        updated_by: 1
+      }
+
+      console.log('🧾 Submitting payload:', payload)
+
+      if (isEdit && formData.id) {
+        await updateEmployeeLeave(payload)
+        showToast('success', 'Leave updated successfully')
+      } else {
+        await addEmployeeLeave(payload)
+        showToast('success', 'Leave added successfully')
+      }
+
+      setDrawerOpen(false)
+      await loadData()
+    } catch (err) {
+      console.error('❌ Error:', err)
+      showToast('error', 'Failed to save leave')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDateChange = (date, field) => {
+    if (field === 'fromDate' && formData.toDate && date > formData.toDate) {
+      setDateError('Start date cannot be after end date')
+    } else if (field === 'toDate' && formData.fromDate && date < formData.fromDate) {
+      setDateError('End date cannot be before start date')
+    } else {
+      setDateError('')
+    }
+
+    // ✅ Update date fields properly
+    setFormData(prev => ({
+      ...prev,
+      [field]: date
+    }))
+  }
 
   const handleDelete = async row => {
-  const db = await initDB()
-  await db.delete(STORE_NAME, row.id)
-  showToast('delete', `${row.employee}'s leave deleted`)
-  loadData()
-}
-
-// ADD THIS — MISSING FUNCTION
-const confirmDelete = async () => {
-  if (deleteDialog.row) {
-    await handleDelete(deleteDialog.row)
+    try {
+      await deleteEmployeeLeave(row.id)
+      showToast('delete', `${row.employee}'s leave deleted successfully`)
+      await loadData()
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'Failed to delete leave')
+    }
   }
-  setDeleteDialog({ open: false, row: null })
-}
+
+  // ADD THIS — MISSING FUNCTION
+  const confirmDelete = async () => {
+    if (deleteDialog.row) {
+      await handleDelete(deleteDialog.row)
+    }
+    setDeleteDialog({ open: false, row: null })
+  }
 
   useEffect(() => {
     loadData()
@@ -248,94 +310,79 @@ const confirmDelete = async () => {
   // 🔹 Cancel drawer + reset form
   const handleCancel = () => {
     setFormData({
-      id: null,
-      employee: '',
-      supervisor: '',
-      leaveType: '',
-      fromDate: new Date(),
-      toDate: new Date(),
-      status: 'Pending'
+      id: data.id || row.id,
+      name: data.employee_name || '', // ✅ consistent key + fallback
+      supervisor: data.supervisor || '',
+      leaveType: data.leave_type || '',
+      fromDate: data.leave_date ? new Date(data.leave_date) : new Date(),
+      toDate: data.to_date ? new Date(data.to_date) : new Date(),
+      status: data.is_approved === 1 ? 'Approved' : data.is_approved === 0 ? 'Rejected' : 'Pending',
+      description: data.description || ''
     })
+
     setUnsavedAddData(null)
     setDrawerOpen(false)
   }
 
   // 🔹 Handle field change + store unsaved add data
   const handleFieldChange = (field, value) => {
-    setFormData(prev => {
-      const updated = { ...prev, [field]: value }
-      if (!isEdit) setUnsavedAddData(updated)
-      return updated
-    })
+    setFormData(prev => ({
+      ...prev,
+      [field]: value ?? ''
+    }))
   }
 
   // 🔹 Updated Add handler with unsaved data restore
   const handleAdd = () => {
     setIsEdit(false)
-    if (unsavedAddData) {
-      setFormData(unsavedAddData)
-    } else {
-      setFormData({
-        id: null,
-        employee: '',
-        supervisor: '',
-        leaveType: '',
-        fromDate: new Date(),
-        toDate: new Date(),
-        status: 'Pending'
-      })
-    }
-    setDateError('')
-    setDrawerOpen(true)
-
-    // Focus the actual <input> inside the wrapper
-    setTimeout(() => {
-      employeeRef.current?.querySelector('input')?.focus()
-    }, 100)
-  }
-
-  const handleEdit = row => {
-    setIsEdit(true)
+    // in handleAdd / handleCancel resets
     setFormData({
-      ...row,
-      fromDate: new Date(row.fromDate),
-      toDate: new Date(row.toDate)
+      id: null,
+      employee_id: '', // ✅
+      name: '', // ✅
+      supervisor: '',
+      leaveType: '',
+      fromDate: new Date(),
+      toDate: new Date(),
+      status: 'Pending',
+      description: ''
     })
+
     setDateError('')
     setDrawerOpen(true)
 
+    // Focus the employee input field
     setTimeout(() => {
       employeeRef.current?.querySelector('input')?.focus()
     }, 100)
   }
-  const handleSubmit = async e => {
-    e.preventDefault()
-    if (!formData.employee.trim() || !formData.leaveType.trim()) {
-      showToast('warning', 'Employee and Leave Type are required')
-      return
-    }
-    if (dateError) return
 
-    setLoading(true)
+  const handleEdit = async row => {
     try {
-      const db = await initDB()
-      const payload = {
-        ...formData,
-        fromDate: formData.fromDate.getTime(),
-        toDate: formData.toDate.getTime()
-      }
-      if (isEdit && formData.id) {
-        await db.put(STORE_NAME, payload)
-        showToast('success', 'Leave updated')
-      } else {
-        delete payload.id
-        await db.add(STORE_NAME, payload)
-        showToast('success', 'Leave added')
-      }
-      toggleDrawer()
-      loadData()
-    } catch {
-      showToast('error', 'Failed to save')
+      setLoading(true)
+      const res = await getEmployeeLeaveDetails(row.id)
+      const data = res?.data || {}
+
+      setIsEdit(true)
+      setFormData({
+        id: data.id || row.id,
+        employee_name: data.employee_name ?? '',
+        leaveType: data.leave_type ?? '',
+        fromDate: data.leave_date ? new Date(data.leave_date) : new Date(),
+        toDate: data.to_date ? new Date(data.to_date) : new Date(),
+        status: data.is_approved === 1 ? 'Approved' : data.is_approved === 0 ? 'Rejected' : 'Pending',
+        description: data.description ?? '',
+        supervisor: data.supervisor ?? ''
+      })
+
+      setDrawerOpen(true)
+
+      setTimeout(() => {
+        employeeRef.current?.querySelector('input')?.focus()
+      }, 150)
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'Failed to load leave details')
     } finally {
       setLoading(false)
     }
@@ -702,19 +749,31 @@ const confirmDelete = async () => {
 
           <form onSubmit={handleSubmit} style={{ flexGrow: 1 }}>
             <Grid container spacing={3}>
-              {/* Employee Name */}
+              {/* Employee (Dropdown sends ID, shows name) */}
               <Grid item xs={12}>
-                <CustomTextFieldWrapper
+                <CustomSelectField
                   ref={employeeRef}
                   fullWidth
                   required
-                  label='Employee Name'
-                  placeholder='Enter employee name'
-                  value={formData.employee}
-                  onChange={e => handleFieldChange('employee', e.target.value.replace(/[^a-zA-Z\s]/g, ''))}
+                  label='Employee'
+                  value={formData.employee_id ?? ''} // keep controlled
+                  onChange={e => {
+                    const selectedId = Number(e.target.value) || '' // keep types stable
+                    const selected = employeeOptions.find(emp => emp.id === selectedId)
+                    setFormData(prev => ({
+                      ...prev,
+                      employee_id: selectedId,
+                      name: selected ? selected.name : ''
+                    }))
+                  }}
+                  options={employeeOptions.map(emp => ({
+                    value: emp.id,
+                    label: emp.name
+                  }))}
                 />
               </Grid>
 
+              {/* Supervisor */}
               {/* Supervisor */}
               <Grid item xs={12}>
                 <CustomTextFieldWrapper
@@ -722,8 +781,8 @@ const confirmDelete = async () => {
                   fullWidth
                   label='Supervisor'
                   placeholder='Enter supervisor name'
-                  value={formData.supervisor}
-                  onChange={e => handleFieldChange('supervisor', e.target.value.replace(/[^a-zA-Z\s]/g, ''))}
+                  value={formData.supervisor || ''} // ✅ Fallback to empty string
+                  onChange={e => handleFieldChange('supervisor', e.target.value.replace(/[^a-zA-Z\s]/g, '') || '')}
                 />
               </Grid>
 
@@ -734,8 +793,8 @@ const confirmDelete = async () => {
                   fullWidth
                   required
                   label='Leave Type'
-                  value={formData.leaveType}
-                  onChange={e => handleFieldChange('leaveType', e.target.value)}
+                  value={formData.leaveType || ''} // ✅ never undefined
+                  onChange={e => handleFieldChange('leaveType', e.target.value || '')}
                   options={leaveTypeOptions.map(type => ({ value: type, label: type }))}
                 />
               </Grid>

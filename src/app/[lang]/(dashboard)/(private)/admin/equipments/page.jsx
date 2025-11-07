@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { openDB } from 'idb'
+
 import {
   Box,
   Button,
@@ -27,6 +27,8 @@ import {
   InputAdornment
 } from '@mui/material'
 
+import { addEquipment, getEquipmentList, getEquipmentDetails, updateEquipment, deleteEquipment } from '@/api/equipments'
+
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
@@ -50,7 +52,6 @@ import CustomTextFieldWrapper from '@/components/common/CustomTextField'
 import CustomTextarea from '@/components/common/CustomTextarea'
 import CustomSelectField from '@/components/common/CustomSelectField'
 
-
 import {
   useReactTable,
   getCoreRowModel,
@@ -61,21 +62,6 @@ import {
 } from '@tanstack/react-table'
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
-
-// ───────────────────────────────────────────
-// IndexedDB
-// ───────────────────────────────────────────
-const DB_NAME = 'equipment_db'
-const STORE_NAME = 'equipments'
-const initDB = async () => {
-  return await openDB(DB_NAME, 1, {
-    upgrade(db) {
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true })
-      }
-    }
-  })
-}
 
 // Toast helper
 // ──────────────────────────────────────────────────────────────
@@ -166,41 +152,43 @@ export default function EquipmentsPage() {
   const descriptionRef = useRef(null)
   const statusRef = useRef(null)
 
-  // Load rows
   const loadData = async () => {
     setLoading(true)
     try {
-      const db = await initDB()
-      const all = await db.getAll(STORE_NAME)
+      const result = await getEquipmentList()
 
-      // 🔍 Apply search filter
-      const filtered = searchText
-        ? all.filter(r =>
-            ['name', 'description', 'status'].some(key =>
-              (r[key] || '').toString().toLowerCase().includes(searchText.toLowerCase())
+      if (result.success) {
+        const all = result.data || []
+
+        // 🔍 Apply search filter
+        const filtered = searchText
+          ? all.filter(r =>
+              ['name', 'description'].some(key =>
+                (r[key] || '').toString().toLowerCase().includes(searchText.toLowerCase())
+              )
             )
-          )
-        : all
+          : all
 
-      // 🔢 Sort by latest
-      const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
+        // 🔢 Sort and paginate
+        const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
+        const start = pagination.pageIndex * pagination.pageSize
+        const end = start + pagination.pageSize
+        const paginated = sorted.slice(start, end)
 
-      // 📄 Apply pagination
-      const start = pagination.pageIndex * pagination.pageSize
-      const end = start + pagination.pageSize
-      const paginated = sorted.slice(start, end)
+        const normalized = paginated.map((item, idx) => ({
+          ...item,
+          sno: start + idx + 1,
+          status: item.is_active === 1 ? 'Active' : 'Inactive'
+        }))
 
-      // 🧾 Add S.No
-      const normalized = paginated.map((item, idx) => ({
-        ...item,
-        sno: start + idx + 1
-      }))
-
-      setRows(normalized)
-      setRowCount(filtered.length)
+        setRows(normalized)
+        setRowCount(filtered.length)
+      } else {
+        showToast('error', result.message)
+      }
     } catch (err) {
-      console.error(err)
-      showToast('error', 'Failed to load data')
+      console.error('❌ Load Data Error:', err)
+      showToast('error', 'Failed to load equipments')
     } finally {
       setLoading(false)
     }
@@ -250,12 +238,33 @@ export default function EquipmentsPage() {
     setTimeout(() => nameRef.current?.focus(), 100)
   }
 
-  const handleEdit = row => {
-    setIsEdit(true)
-    setFormData(row)
-    setDrawerOpen(true)
-    setTimeout(() => nameRef.current?.focus(), 100)
+  const handleEdit = async row => {
+    try {
+      setIsEdit(true)
+      setLoading(true)
+
+      const result = await getEquipmentDetails(row.id)
+
+      if (result.success && result.data) {
+        const data = result.data
+        setFormData({
+          id: data.id,
+          name: data.name || '',
+          description: data.description || '',
+          status: data.is_active === 1 ? 'Active' : 'Inactive'
+        })
+        setDrawerOpen(true)
+      } else {
+        showToast('error', result.message)
+      }
+    } catch (err) {
+      console.error('❌ Fetch Equipment Details Error:', err)
+      showToast('error', 'Failed to fetch equipment details')
+    } finally {
+      setLoading(false)
+    }
   }
+
   const handleDelete = async row => {
     const db = await initDB()
     await db.delete(STORE_NAME, row.id)
@@ -263,12 +272,26 @@ export default function EquipmentsPage() {
     loadData()
   }
   const confirmDelete = async () => {
-    if (deleteDialog.row) await handleDelete(deleteDialog.row)
-    setDeleteDialog({ open: false, row: null })
+    try {
+      if (!deleteDialog.row?.id) return
+      const result = await deleteEquipment(deleteDialog.row.id)
+      if (result.success) {
+        showToast('delete', result.message)
+        await loadData()
+      } else {
+        showToast('error', result.message)
+      }
+    } catch (err) {
+      console.error('❌ Delete Equipment Error:', err)
+      showToast('error', 'Failed to delete equipment')
+    } finally {
+      setDeleteDialog({ open: false, row: null })
+    }
   }
 
   const handleSubmit = async e => {
     e.preventDefault()
+
     if (!formData.name.trim()) {
       showToast('warning', 'Equipment name is required')
       return
@@ -276,25 +299,27 @@ export default function EquipmentsPage() {
 
     setLoading(true)
     try {
-      const db = await initDB()
-      const payload = { ...formData }
-
-      if (isEdit && formData.id) {
-        await db.put(STORE_NAME, payload)
-        showToast('success', 'Equipment updated')
-      } else {
-        delete payload.id
-        await db.add(STORE_NAME, payload)
-        showToast('success', 'Equipment added')
+      const payload = {
+        id: formData.id,
+        name: formData.name,
+        description: formData.description,
+        is_active: formData.status === 'Active' ? 1 : 0
       }
 
-      // ✅ Reset draft & close drawer
-      setUnsavedAddData(null)
-      setFormData({ id: null, name: '', description: '', status: 'Active' })
-      setDrawerOpen(false)
-      await loadData()
-    } catch {
-      showToast('error', 'Failed to save')
+      const result = isEdit ? await updateEquipment(payload) : await addEquipment(payload)
+
+      if (result.success) {
+        showToast('success', result.message)
+        setDrawerOpen(false)
+        setFormData({ id: null, name: '', description: '', status: 'Active' })
+        setIsEdit(false)
+        await loadData()
+      } else {
+        showToast('error', result.message)
+      }
+    } catch (err) {
+      console.error('❌ Submit Error:', err)
+      showToast('error', 'Something went wrong while saving equipment')
     } finally {
       setLoading(false)
     }
@@ -675,77 +700,74 @@ export default function EquipmentsPage() {
       </Drawer>
 
       <Dialog
-  onClose={() => setDeleteDialog({ open: false, row: null })}
-  aria-labelledby='customized-dialog-title'
-  open={deleteDialog.open}
-  closeAfterTransition={false}
-  PaperProps={{
-    sx: {
-      overflow: 'visible',
-      width: 420,
-      borderRadius: 1,
-      textAlign: 'center'
-    }
-  }}
->
-  {/* 🔴 Title with Warning Icon */}
-  <DialogTitle
-    id='customized-dialog-title'
-    sx={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 1,
-      color: 'error.main',
-      fontWeight: 700,
-      pb: 1,
-      position: 'relative'
-    }}
-  >
-    <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
-    Confirm Delete
-    <DialogCloseButton
-      onClick={() => setDeleteDialog({ open: false, row: null })}
-      disableRipple
-      sx={{ position: 'absolute', right: 1, top: 1 }}
-    >
-      <i className='tabler-x' />
-    </DialogCloseButton>
-  </DialogTitle>
+        onClose={() => setDeleteDialog({ open: false, row: null })}
+        aria-labelledby='customized-dialog-title'
+        open={deleteDialog.open}
+        closeAfterTransition={false}
+        PaperProps={{
+          sx: {
+            overflow: 'visible',
+            width: 420,
+            borderRadius: 1,
+            textAlign: 'center'
+          }
+        }}
+      >
+        {/* 🔴 Title with Warning Icon */}
+        <DialogTitle
+          id='customized-dialog-title'
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1,
+            color: 'error.main',
+            fontWeight: 700,
+            pb: 1,
+            position: 'relative'
+          }}
+        >
+          <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
+          Confirm Delete
+          <DialogCloseButton
+            onClick={() => setDeleteDialog({ open: false, row: null })}
+            disableRipple
+            sx={{ position: 'absolute', right: 1, top: 1 }}
+          >
+            <i className='tabler-x' />
+          </DialogCloseButton>
+        </DialogTitle>
 
-  {/* Centered Text */}
-  <DialogContent sx={{ px: 5, pt: 1 }}>
-    <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
-      Are you sure you want to delete{' '}
-      <strong style={{ color: '#d32f2f' }}>
-        {deleteDialog.row?.name || 'this equipment'}
-      </strong>?
-      <br />
-      This action cannot be undone.
-    </Typography>
-  </DialogContent>
+        {/* Centered Text */}
+        <DialogContent sx={{ px: 5, pt: 1 }}>
+          <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
+            Are you sure you want to delete{' '}
+            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name || 'this equipment'}</strong>?
+            <br />
+            This action cannot be undone.
+          </Typography>
+        </DialogContent>
 
-  {/* Centered Buttons */}
-  <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-    <Button
-      onClick={() => setDeleteDialog({ open: false, row: null })}
-      variant='tonal'
-      color='secondary'
-      sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
-    >
-      Cancel
-    </Button>
-    <Button
-      onClick={confirmDelete}
-      variant='contained'
-      color='error'
-      sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
-    >
-      Delete
-    </Button>
-  </DialogActions>
-</Dialog>
-
+        {/* Centered Buttons */}
+        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+          <Button
+            onClick={() => setDeleteDialog({ open: false, row: null })}
+            variant='tonal'
+            color='secondary'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={confirmDelete}
+            variant='contained'
+            color='error'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   )
 }
