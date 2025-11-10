@@ -138,47 +138,52 @@ export default function EmployeePage() {
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
 
-  const loadData = async () => {
-    setLoading(true)
-    try {
-      const res = await getEmployeeList()
-      const results = res?.data?.results || []
+const loadData = async () => {
+  setLoading(true)
+  try {
+    // ✅ API returns { message, status, count, data: { results: [...] } }
+    const res = await getEmployeeList()
+    const results = res?.results || []
 
-      const formatted = results.map((item, index) => ({
-        sno: index + 1,
-        id: item.id,
-        name: item.name || '-',
-        nick_name: item.nick_name || '-',
-        email: item.email || '-',
-        phone: item.phone || '-',
-        department: item.department && item.department !== '-' ? item.department : '-',
-        designation: item.designation && item.designation !== '-' ? item.designation : '-',
-        user_role: item.user_role && item.user_role !== '-' ? item.user_role : '-',
-        scheduler: item.scheduler && item.scheduler !== '-' ? item.scheduler : '-',
-        supervisor: item.supervisor && item.supervisor !== '-' ? item.supervisor : '-',
-        vehicle_no: item.vehicle_no || '-',
-        lunch_time: item.lunch_time || '-',
-        target_day: item.target_day || '-',
-        target_night: item.target_night || '-',
-        target_saturday: item.target_saturday || '-',
-        description: item.description || '-',
-        // ✅ Handle boolean/null values
-        is_scheduler: item.is_scheduler === 1 ? 'Yes' : 'No',
-        is_sales: item.is_sales === 1 ? 'Yes' : 'No',
-        is_technician: item.is_technician === 1 ? 'Yes' : 'No',
-        created_on: item.created_on || '-',
-        status: item.is_active === 1 ? 'Active' : 'Inactive'
-      }))
+    console.log('✅ API Full Response:', res)
+    console.log('✅ Extracted Results:', results)
 
-      setRows(formatted)
-      setRowCount(formatted.length)
-    } catch (error) {
-      console.error('❌ Employee List Error:', error)
-      showToast('error', 'Failed to load employees')
-    } finally {
-      setLoading(false)
-    }
+    // ✅ Correct mapping — match backend field names
+    const formatted = results.map((item, index) => ({
+      sno: index + 1,
+      id: item.id,
+      name: item.name || '-',               // ✅ backend key: name
+      email: item.email || '-',             // ✅ backend key: email
+      phone: item.phone || '-',             // ✅ backend key: phone
+      department: item.department || '-',   // ✅ backend key: department
+      designation: item.designation || '-', // ✅ backend key: designation
+      user_role: item.user_role || '-',     // ✅ backend key: user_role
+      scheduler: item.scheduler || '-',     // ✅ backend key: scheduler
+      supervisor: item.supervisor || '-',   // ✅ backend key: supervisor
+      vehicle_no: item.vehicle_no || '-',   // ✅ backend key: vehicle_no
+      lunch_time: item.lunch_time || '-',   // ✅ backend key: lunch_time
+      target_day: item.target_day || '-',   // ✅ backend key: target_day
+      target_night: item.target_night || '-', // ✅ backend key: target_night
+      target_saturday: item.target_saturday || '-', // ✅ backend key: target_saturday
+      description: item.description || '-', // ✅ backend key: description
+      is_scheduler: item.is_scheduler === 1 ? 'Yes' : 'No',
+      is_sales: item.is_sales === 1 ? 'Yes' : 'No',
+      is_technician: item.is_technician === 1 ? 'Yes' : 'No',
+      created_on: item.created_on || '-',
+      status: item.is_active === 1 ? 'Active' : 'Inactive'
+    }))
+
+    console.log('✅ Formatted Data for Table:', formatted)
+
+    setRows(formatted)
+    setRowCount(formatted.length)
+  } catch (error) {
+    console.error('❌ Employee List Error:', error)
+    showToast('error', 'Failed to load employees')
+  } finally {
+    setLoading(false)
   }
+}
 
   useEffect(() => {
     // ✅ Auto refresh after adding new employee

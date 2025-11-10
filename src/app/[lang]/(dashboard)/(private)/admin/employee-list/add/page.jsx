@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
+
 import {
   Box,
   Button,
@@ -13,6 +14,10 @@ import {
   Checkbox,
   FormControlLabel
 } from '@mui/material'
+
+import { getDepartmentList } from '../../../../../../../api/departments/list'
+import { getDesignationList } from '../../../../../../../api/designations/list'
+import { getUserRoleList } from '../../../../../../../api/userRole/list'
 
 import { addEmployee } from '@/api/employee'
 
@@ -55,6 +60,11 @@ export default function AddEmployeePage() {
   const [targetSaturday, setTargetSaturday] = useState('')
   const [vehicleNumber, setVehicleNumber] = useState('')
   const [description, setDescription] = useState('')
+
+  const [departmentList, setDepartmentList] = useState([])
+  const [designationList, setDesignationList] = useState([])
+  const [userRoleList, setUserRoleList] = useState([])
+
   // 👇 CHANGED INITIAL COLOR STATE TO A DEFAULT HEX VALUE
   const [color, setColor] = useState('#000000')
 
@@ -110,27 +120,15 @@ export default function AddEmployeePage() {
     },
     {
       name: 'department',
-      options: [
-        { id: 1, label: 'GP Industries Pvt Ltd' },
-        { id: 2, label: 'Marketing' },
-        { id: 3, label: 'IT' }
-      ]
+      options: departmentList // ✅ use directly — already sanitized
     },
     {
       name: 'designation',
-      options: [
-        { id: 1, label: 'Manager' },
-        { id: 2, label: 'Senior Developer' },
-        { id: 3, label: 'Sales Executive' }
-      ]
+      options: designationList
     },
     {
       name: 'userRole',
-      options: [
-        { id: 1, label: 'Admin' },
-        { id: 2, label: 'Standard User' },
-        { id: 3, label: 'Technician' }
-      ]
+      options: userRoleList
     },
     {
       name: 'scheduler',
@@ -205,6 +203,54 @@ export default function AddEmployeePage() {
     closeButtonRef,
     saveButtonRef
   ].filter(ref => ref)
+
+  useEffect(() => {
+    const fetchDropdowns = async () => {
+      try {
+        const [deptRes, desigRes, roleRes] = await Promise.all([
+          getDepartmentList(),
+          getDesignationList(),
+          getUserRoleList()
+        ])
+
+        const extractResults = res => {
+          if (res?.data?.data?.results) return res.data.data.results
+          if (res?.data?.results) return res.data.results
+          if (Array.isArray(res?.data?.data)) return res.data.data
+          if (Array.isArray(res?.data)) return res.data
+          return []
+        }
+
+        const departmentData = extractResults(deptRes)
+        const designationData = extractResults(desigRes)
+        const userRoleData = extractResults(roleRes)
+
+        // ✅ Utility function to sanitize list data
+        const sanitizeOptions = (list, labelKey, prefix) => {
+          const seen = new Set()
+          return list.map((item, index) => {
+            let safeId = item?.id ?? `${prefix}-${index}`
+            if (seen.has(safeId)) safeId = `${prefix}-${index}-${Math.random().toString(36).slice(2, 7)}`
+            seen.add(safeId)
+            return {
+              id: safeId,
+              label: item?.[labelKey] || item?.name || item?.title || `${prefix} ${index + 1}`
+            }
+          })
+        }
+
+        // ✅ Apply to all dropdowns
+        setDepartmentList(sanitizeOptions(departmentData, 'department_name', 'dept'))
+        setDesignationList(sanitizeOptions(designationData, 'designation_name', 'desig'))
+        setUserRoleList(sanitizeOptions(userRoleData, 'role_name', 'role'))
+      } catch (error) {
+        console.error('❌ Dropdown fetch failed:', error)
+        showToast('error', 'Failed to load dropdown data')
+      }
+    }
+
+    fetchDropdowns()
+  }, [])
 
   // ----------------------------------------------------------------------
   // Handlers
@@ -318,12 +364,11 @@ export default function AddEmployeePage() {
   const handleAutocompleteChange = (name, newValue, currentInputRef) => {
     const setter = stateSetters[name]
     if (setter) {
+      // ✅ Always store the entire selected object, not just text
       setter(newValue)
     }
     const setStateFunc = setOpenStates[name + 'SetOpen']
-    if (setStateFunc) {
-      setStateFunc(false)
-    }
+    if (setStateFunc) setStateFunc(false)
     focusNextElement(currentInputRef)
   }
 
@@ -359,52 +404,60 @@ export default function AddEmployeePage() {
         return
       }
 
-      // ✅ Build the final payload (using backend field names)
+      // ✅ Final backend-ready payload (snake_case)
       const newEmployee = {
-        name,
-        email,
-        password,
+        company_name: '-', // optional but keeps backend consistent
+        user_role: userRole?.label || '-', // ✅ backend expects string, not object
+        department: department?.label || '-',
+        designation: designation?.label || '-',
+        scheduler: scheduler?.label || '-',
+        supervisor: supervisor?.label || '-',
+
+        // ✅ plain fields
+        name: name?.trim(),
+        email: email?.trim(),
+        password: password?.trim(),
         phone: phone || null,
-        // 👉 These fields must send IDs, not labels
-        employee_role: employeeRole?.label || '-',
+        description: description || '-',
+
+        // ✅ relational IDs (if backend maps them)
         department_id: department?.id || null,
         designation_id: designation?.id || null,
         user_role_id: userRole?.id || null,
         scheduler_id: scheduler?.id || null,
         supervisor_id: supervisor?.id || null,
 
-        // Optional / numeric fields
+        // ✅ numbers & flags
         target_day: targetDay || null,
         target_night: targetNight || null,
         target_saturday: targetSaturday || null,
+        lunch_time: lunchTime || null,
+        vehicle_no: vehicleNumber || null,
+        color_code: color || '#000000',
+        dob: dob ? new Date(dob).toISOString().split('T')[0] : null,
 
-        // Boolean/flag values
+        // ✅ boolean flags as numeric
         is_scheduler: isScheduler ? 1 : 0,
         is_sales: isSales ? 1 : 0,
         is_technician: isTechnician ? 1 : 0,
         is_active: 1,
 
-        // Extra fields
-        lunch_time: lunchTime || null,
-        vehicle_no: vehicleNumber || null,
-        description: description || null,
-        color_code: color || '#000000',
-        dob: dob ? new Date(dob).toISOString().split('T')[0] : null
+        // ✅ audit fields
+        created_by: 1,
+        updated_by: 1
       }
 
-      console.log('🔍 Payload sent to API:', newEmployee)
+      console.log('🚀 Final Payload Sent to API:', newEmployee)
 
       const res = await addEmployee(newEmployee)
 
       if (res?.status === 'success') {
         showToast('success', 'Employee added successfully!')
 
-        // ✅ Let backend commit data and trigger reload flag
+        // Trigger list refresh
         sessionStorage.setItem('reloadAfterAdd', 'true')
 
-        setTimeout(() => {
-          router.push('/admin/employee-list')
-        }, 1000)
+        setTimeout(() => router.push('/admin/employee-list'), 1000)
       } else {
         showToast('error', res?.message || 'Failed to add employee')
       }
@@ -431,16 +484,13 @@ export default function AddEmployeePage() {
     return (
       <Grid item {...gridProps} key={name}>
         <Autocomplete
+          key={name}
           ref={ref}
-          options={options}
+          options={options.filter(opt => opt?.id && opt?.label)}
           getOptionLabel={option => (typeof option === 'string' ? option : option?.label || '')}
-          isOptionEqualToValue={(option, value) => option?.id === value?.id || option?.label === value?.label}
-          value={value}
+          isOptionEqualToValue={(option, value) => option?.id === value?.id}
+          value={typeof value === 'object' ? value : null} // ✅ ensures full object binding
           onChange={(e, newValue) => handleAutocompleteChange(name, newValue, inputRef)}
-          onInputChange={(e, newValue) => {
-            const setter = stateSetters[name]
-            if (setter) setter(newValue)
-          }}
           renderInput={params => <CustomTextField {...params} label={label} inputRef={inputRef} />}
         />
       </Grid>

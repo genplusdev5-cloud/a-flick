@@ -28,7 +28,16 @@ import {
   InputAdornment
 } from '@mui/material'
 
-import { addEmployeeLeave, getEmployeeLeaveList, updateEmployeeLeave, deleteEmployeeLeave } from '@/api/employeeLeave'
+import {
+  addEmployeeLeave,
+  getEmployeeLeaveList,
+  updateEmployeeLeave,
+  deleteEmployeeLeave,
+  getEmployeeLeaveDetails
+} from '@/api/employeeLeave'
+
+import { getEmployeeList } from '@/api/employee'
+import { getLeaveTypeList } from '@/api/leaveType'
 
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
@@ -155,15 +164,21 @@ export default function EmployeeLeavePage() {
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
   const [dateError, setDateError] = useState('')
   const [unsavedAddData, setUnsavedAddData] = useState(null)
+  const [employeeList, setEmployeeList] = useState([])
+  const [leaveTypeList, setLeaveTypeList] = useState([])
 
   const [formData, setFormData] = useState({
     id: null,
-    employee_id: '', // ✅ backend needs id
-    name: '', // label for UI only
+    employee_id: '',
+    name: '',
     supervisor: '',
     leaveType: '',
-    fromDate: new Date(),
-    toDate: new Date(),
+    leave_date: new Date(),
+    to_date: new Date(),
+    start_time: '', // must be ''
+    end_time: '', // must be ''
+    from_ampm: 'AM',
+    to_ampm: 'PM',
     status: 'Pending',
     description: ''
   })
@@ -185,9 +200,9 @@ export default function EmployeeLeavePage() {
       const formatted = results.map((item, idx) => ({
         sno: idx + 1,
         id: item.id,
-        employee: item.name || '-', // 👈 from API
-        supervisor: item.supervisor || '-', // 👈 from API
-        leaveType: item.leave_type || '-', // 👈 from API
+        employee: item.employee_name || '-', // ✅ fixed key
+        supervisor: item.supervisor || '-', // ✅ same
+        leaveType: item.leave_type || '-', // ✅ same
         fromDate: item.leave_date ? new Date(item.leave_date) : '-',
         toDate: item.to_date ? new Date(item.to_date) : '-',
         status: item.is_approved === 1 ? 'Approved' : item.is_approved === 0 ? 'Rejected' : 'Pending',
@@ -201,6 +216,26 @@ export default function EmployeeLeavePage() {
       showToast('error', 'Failed to load data')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchLeaveTypes = async () => {
+    try {
+      const res = await getLeaveTypeList()
+      console.log('🧾 Leave Type API Response:', res)
+
+      // ✅ Fix deep path (same structure as employee)
+      const types = res?.data?.results || res?.results || []
+
+      if (types.length > 0) {
+        setLeaveTypeList(types)
+        console.log('✅ Leave types loaded:', types)
+      } else {
+        showToast('warning', 'No leave types found')
+      }
+    } catch (err) {
+      console.error('❌ Failed to load leave types:', err)
+      showToast('error', 'Failed to fetch leave types')
     }
   }
 
@@ -231,14 +266,21 @@ export default function EmployeeLeavePage() {
         return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
       }
 
-      // 🧩 FIXED PAYLOAD
       const payload = {
-        id: formData.id,
-        employee_id: Number(formData.employee_id), // FK integer
-        supervisor: String(formData.supervisor || '-').trim(), // text field
-        leave_type: String(formData.leaveType || '-').trim(), // text field
-        leave_date: formatDate(formData.fromDate),
-        to_date: formatDate(formData.toDate),
+        id: formData.id || null,
+        employee_id: Number(formData.employee_id),
+        supervisor_id: formData.supervisor_id ? Number(formData.supervisor_id) : null,
+        leave_type_id: Number(formData.leaveType), // ✅ changed key
+        leave_date: formatDate(formData.leave_date),
+        to_date: formatDate(formData.to_date),
+        start_time: formData.start_time
+          ? `${formData.start_time.length === 5 ? formData.start_time + ':00' : formData.start_time}`
+          : '00:00:00',
+        end_time: formData.end_time
+          ? `${formData.end_time.length === 5 ? formData.end_time + ':00' : formData.end_time}`
+          : '00:00:00',
+        from_ampm: String(formData.from_ampm || 'AM').trim(),
+        to_ampm: String(formData.to_ampm || 'PM').trim(),
         is_approved: formData.status === 'Approved' ? 1 : formData.status === 'Rejected' ? 0 : null,
         is_active: 1,
         status: 1,
@@ -246,7 +288,8 @@ export default function EmployeeLeavePage() {
         updated_by: 1
       }
 
-      console.log('🧾 Submitting payload:', payload)
+      // 👇 PASTE IT RIGHT HERE (before API call)
+      console.log('🧾 Payload before submit:', payload)
 
       if (isEdit && formData.id) {
         await updateEmployeeLeave(payload)
@@ -300,6 +343,33 @@ export default function EmployeeLeavePage() {
     }
     setDeleteDialog({ open: false, row: null })
   }
+
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      try {
+        const res = await getEmployeeList()
+        const employees = res?.data?.results || res?.results || []
+        if (employees.length > 0) setEmployeeList(employees)
+        else showToast('warning', 'No employees found')
+      } catch (err) {
+        showToast('error', 'Failed to fetch employee list')
+      }
+    }
+
+    const fetchLeaveTypes = async () => {
+      try {
+        const res = await getLeaveTypeList()
+        const types = res?.data?.results || res?.results || []
+        if (types.length > 0) setLeaveTypeList(types)
+        else showToast('warning', 'No leave types found')
+      } catch (err) {
+        showToast('error', 'Failed to fetch leave types')
+      }
+    }
+
+    fetchEmployees()
+    fetchLeaveTypes()
+  }, [])
 
   useEffect(() => {
     loadData()
@@ -361,27 +431,36 @@ export default function EmployeeLeavePage() {
     try {
       setLoading(true)
       const res = await getEmployeeLeaveDetails(row.id)
-      const data = res?.data || {}
+      const data = res?.data || res || {}
+
+      console.log('🧾 Edit Data:', data)
 
       setIsEdit(true)
+
       setFormData({
         id: data.id || row.id,
-        employee_name: data.employee_name ?? '',
-        leaveType: data.leave_type ?? '',
-        fromDate: data.leave_date ? new Date(data.leave_date) : new Date(),
-        toDate: data.to_date ? new Date(data.to_date) : new Date(),
-        status: data.is_approved === 1 ? 'Approved' : data.is_approved === 0 ? 'Rejected' : 'Pending',
-        description: data.description ?? '',
-        supervisor: data.supervisor ?? ''
+        employee_id: data.employee_id || '', // ✅ employee id
+        name: data.employee_name || '', // ✅ name fallback
+        supervisor: data.supervisor || '', // ✅ supervisor
+        leaveType: data.leave_type_id || data.leave_type || '', // ✅ ID or name fallback
+        leave_date: data.leave_date ? new Date(data.leave_date) : new Date(), // ✅ date fix
+        to_date: data.to_date ? new Date(data.to_date) : new Date(),
+        start_time: data.start_time || '', // ✅ start time
+        end_time: data.end_time || '', // ✅ end time
+        from_ampm: data.from_ampm || 'AM',
+        to_ampm: data.to_ampm || 'PM',
+        description: data.description || '',
+        status: data.is_approved === 1 ? 'Approved' : data.is_approved === 0 ? 'Rejected' : 'Pending'
       })
 
       setDrawerOpen(true)
 
+      // Focus on employee input after open
       setTimeout(() => {
         employeeRef.current?.querySelector('input')?.focus()
       }, 150)
     } catch (err) {
-      console.error(err)
+      console.error('❌ Edit Error:', err)
       showToast('error', 'Failed to load leave details')
     } finally {
       setLoading(false)
@@ -749,118 +828,121 @@ export default function EmployeeLeavePage() {
 
           <form onSubmit={handleSubmit} style={{ flexGrow: 1 }}>
             <Grid container spacing={3}>
-              {/* Employee (Dropdown sends ID, shows name) */}
+              {/* Employee Dropdown */}
               <Grid item xs={12}>
                 <CustomSelectField
-                  ref={employeeRef}
                   fullWidth
                   required
                   label='Employee'
-                  value={formData.employee_id ?? ''} // keep controlled
+                  value={formData.employee_id ?? ''} // ✅ controlled
                   onChange={e => {
-                    const selectedId = Number(e.target.value) || '' // keep types stable
-                    const selected = employeeOptions.find(emp => emp.id === selectedId)
+                    const selectedId = Number(e.target.value) || ''
+                    const selected = employeeList.find(emp => emp.id === selectedId)
                     setFormData(prev => ({
                       ...prev,
                       employee_id: selectedId,
                       name: selected ? selected.name : ''
                     }))
                   }}
-                  options={employeeOptions.map(emp => ({
+                  options={employeeList.map(emp => ({
                     value: emp.id,
-                    label: emp.name
+                    label: emp.name || emp.email || `User-${emp.id}`
                   }))}
                 />
               </Grid>
 
-              {/* Supervisor */}
-              {/* Supervisor */}
-              <Grid item xs={12}>
-                <CustomTextFieldWrapper
-                  ref={supervisorRef}
-                  fullWidth
-                  label='Supervisor'
-                  placeholder='Enter supervisor name'
-                  value={formData.supervisor || ''} // ✅ Fallback to empty string
-                  onChange={e => handleFieldChange('supervisor', e.target.value.replace(/[^a-zA-Z\s]/g, '') || '')}
-                />
-              </Grid>
-
-              {/* Leave Type */}
+              {/* Leave Type Dropdown */}
               <Grid item xs={12}>
                 <CustomSelectField
-                  ref={leaveTypeRef}
                   fullWidth
                   required
                   label='Leave Type'
-                  value={formData.leaveType || ''} // ✅ never undefined
-                  onChange={e => handleFieldChange('leaveType', e.target.value || '')}
-                  options={leaveTypeOptions.map(type => ({ value: type, label: type }))}
+                  value={formData.leaveType ?? ''} // ✅ controlled
+                  onChange={e => {
+                    const selectedId = Number(e.target.value)
+                    handleFieldChange('leaveType', selectedId) // send ID, not name
+                  }}
+                  options={leaveTypeList.map(l => ({
+                    value: l.id,
+                    label: l.name || l.leave_code || `Leave-${l.id}`
+                  }))}
                 />
               </Grid>
 
-              {/* From Date */}
+              {/* From Date + Time */}
+              {/* From Date & Time */}
               <Grid item xs={12}>
-                <AppReactDatepicker
-                  showTimeSelect
-                  timeIntervals={15}
-                  selected={formData.fromDate}
-                  onChange={date => handleDateChange(date, 'fromDate')}
-                  dateFormat='dd/MM/yyyy h:mm aa'
-                  customInput={
-                    <CustomTextFieldWrapper
-                      ref={fromDateRef}
-                      fullWidth
-                      required
-                      label='From Date & Time'
-                      placeholder='Select from date'
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position='start'>
-                            <CalendarTodayIcon />
-                          </InputAdornment>
-                        )
-                      }}
+                <Typography sx={{ mb: 1, fontWeight: 500 }}>From Date & Time</Typography>
+                <Grid container spacing={2}>
+                  {/* From Date */}
+                  <Grid item xs={6}>
+                    <AppReactDatepicker
+                      selected={formData.leave_date ? new Date(formData.leave_date) : new Date()}
+                      onChange={date => handleFieldChange('leave_date', date)}
+                      dateFormat='dd/MM/yyyy'
+                      customInput={<CustomTextFieldWrapper fullWidth label='Date' />}
                     />
-                  }
-                />
-              </Grid>
+                  </Grid>
 
-              {/* To Date */}
-              <Grid item xs={12}>
-                <AppReactDatepicker
-                  showTimeSelect
-                  timeIntervals={15}
-                  selected={formData.toDate}
-                  onChange={date => handleDateChange(date, 'toDate')}
-                  dateFormat='dd/MM/yyyy h:mm aa'
-                  customInput={
-                    <CustomTextFieldWrapper
-                      fullWidth
-                      required
-                      label='To Date & Time'
-                      placeholder='Select to date'
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position='start'>
-                            <CalendarTodayIcon />
-                          </InputAdornment>
-                        )
+                  {/* From Time */}
+                  <Grid item xs={6}>
+                    <AppReactDatepicker
+                      showTimeSelect
+                      showTimeSelectOnly
+                      timeIntervals={15}
+                      selected={formData.start_time ? new Date(`1970-01-01T${formData.start_time}`) : new Date()}
+                      onChange={time => {
+                        const formattedTime = time
+                          ? new Date(time).toLocaleTimeString('en-GB', {
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })
+                          : ''
+                        handleFieldChange('start_time', formattedTime)
                       }}
-                      inputRef={toDateRef}
+                      dateFormat='h:mm aa'
+                      customInput={<CustomTextFieldWrapper fullWidth label='Time' />}
                     />
-                  }
-                />
-              </Grid>
-
-              {/* Date Error */}
-              {dateError && (
-                <Grid item xs={12}>
-                  <Typography color='error' variant='body2'>
-                    {dateError}
-                  </Typography>
+                  </Grid>
                 </Grid>
-              )}
+              </Grid>
+
+              {/* To Date & Time */}
+              <Grid item xs={12}>
+                <Typography sx={{ mb: 1, fontWeight: 500 }}>To Date & Time</Typography>
+                <Grid container spacing={2}>
+                  {/* To Date */}
+                  <Grid item xs={6}>
+                    <AppReactDatepicker
+                      selected={formData.to_date ? new Date(formData.to_date) : new Date()}
+                      onChange={date => handleFieldChange('to_date', date)}
+                      dateFormat='dd/MM/yyyy'
+                      customInput={<CustomTextFieldWrapper fullWidth label='Date' />}
+                    />
+                  </Grid>
+
+                  {/* To Time */}
+                  <Grid item xs={6}>
+                    <AppReactDatepicker
+                      showTimeSelect
+                      showTimeSelectOnly
+                      timeIntervals={15}
+                      selected={formData.end_time ? new Date(`1970-01-01T${formData.end_time}`) : new Date()}
+                      onChange={time => {
+                        const formattedTime = time
+                          ? new Date(time).toLocaleTimeString('en-GB', {
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })
+                          : ''
+                        handleFieldChange('end_time', formattedTime)
+                      }}
+                      dateFormat='h:mm aa'
+                      customInput={<CustomTextFieldWrapper fullWidth label='Time' />}
+                    />
+                  </Grid>
+                </Grid>
+              </Grid>
 
               {/* Description */}
               <Grid item xs={12}>
@@ -868,7 +950,7 @@ export default function EmployeeLeavePage() {
                   label='Description'
                   placeholder='Add remarks or leave reason...'
                   rows={3}
-                  value={formData.description || ''}
+                  value={formData.description ?? ''} // ✅ controlled
                   onChange={e => handleFieldChange('description', e.target.value)}
                 />
               </Grid>
@@ -879,7 +961,7 @@ export default function EmployeeLeavePage() {
                   <CustomSelectField
                     fullWidth
                     label='Status'
-                    value={formData.status}
+                    value={formData.status ?? 'Pending'} // ✅ controlled
                     onChange={e => handleFieldChange('status', e.target.value)}
                     options={[
                       { value: 'Pending', label: 'Pending' },
@@ -893,7 +975,7 @@ export default function EmployeeLeavePage() {
 
             {/* Footer Buttons */}
             <Box mt={4} display='flex' gap={2}>
-              <Button type='submit' variant='contained' fullWidth disabled={loading || !!dateError}>
+              <Button type='submit' variant='contained' fullWidth disabled={loading}>
                 {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
               </Button>
               <Button variant='outlined' color='secondary' fullWidth onClick={handleCancel} disabled={loading}>

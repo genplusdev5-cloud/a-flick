@@ -4,7 +4,9 @@ import { ToastContainer, toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { Typography } from '@mui/material'
 
-// ✅ Common Toast Function
+// -------------------------------------------------------------
+// 🔥 Global Toast Helper (Unified styling like Action Drawer)
+// -------------------------------------------------------------
 export const showToast = (type, message = '') => {
   const icons = {
     success: 'tabler-circle-check',
@@ -31,6 +33,7 @@ export const showToast = (type, message = '') => {
           fontSize: '22px'
         }}
       />
+
       <Typography variant='body2' sx={{ fontWeight: 500 }}>
         {message}
       </Typography>
@@ -42,22 +45,42 @@ export const showToast = (type, message = '') => {
           : ['success', 'error', 'warning', 'info'].includes(type)
           ? type
           : 'default',
+
       autoClose: 2500,
-      pauseOnHover: true,
+      pauseOnHover: false,
       draggable: false,
-      hideProgressBar: false
+      hideProgressBar: true,
+      closeOnClick: true,
+      position: 'top-right',
+      theme: 'light',
+
+      // ⭐ Prevent default icon (important!)
+      icon: false,
+
+      // ⭐ Custom style
+      style: {
+        borderRadius: '10px',
+        padding: '8px 14px',
+        boxShadow: '0 4px 10px rgba(0,0,0,0.06)',
+        display: 'flex',
+        alignItems: 'center'
+      }
     }
   )
 }
 
-// ✅ Global Toast Container (to include once globally)
+
+// -------------------------------------------------------------
+// 🔥 Global Toast Container (Place ONLY in ClientWrapper)
+// -------------------------------------------------------------
 export const GlobalToastContainer = () => (
   <ToastContainer
     position='top-right'
     autoClose={2500}
+    hideProgressBar={true}
     newestOnTop
+    pauseOnHover={false}
     closeOnClick
-    pauseOnHover
     draggable={false}
     theme='light'
   />

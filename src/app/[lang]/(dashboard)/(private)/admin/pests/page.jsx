@@ -1,7 +1,8 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { openDB } from 'idb'
+
 import {
   Box,
   Button,
@@ -28,12 +29,30 @@ import {
   InputAdornment
 } from '@mui/material'
 
+import ActionDrawerContent from '@/components/service-pages/ActionDrawerContent'
+import FindingDrawerContent from '@/components/service-pages/FindingDrawerContent'
+import RecommendationDrawerContent from '@/components/service-pages/RecommendationDrawerContent'
+import ChecklistDrawerContent from '@/components/service-pages/ChecklistDrawerContent'
+import PestChemicalsDrawerContent from '@/components/service-pages/PestChemicalsDrawerContent'
+import UnitDrawerContent from '@/components/service-pages/UnitDrawerContent'
+
+import { getPestList, addPest, updatePest, deletePest } from '@/api/pest'
+import { getFindingList, addFinding, updateFinding, deleteFinding } from '@/api/findings'
+import { getActionList, addAction, updateAction, deleteAction } from '@/api/actions'
+import {
+  getRecommendationList,
+  addRecommendation,
+  updateRecommendation,
+  deleteRecommendation
+} from '@/api/recommendation'
+import { getChecklistList, addChecklist, updateChecklist, deleteChecklist } from '@/api/checklist'
+import { getPestChemicalsList, addPestChemical, updatePestChemical, deletePestChemical } from '@/api/pestchemicals'
+import { getUnitList, addUnit, updateUnit, deleteUnit } from '@/api/unit'
+
 // ADD THIS LINE (after other imports)
 import CustomTextFieldWrapper from '@/components/common/CustomTextField'
 import CustomTextarea from '@/components/common/CustomTextarea'
 import CustomSelectField from '@/components/common/CustomSelectField'
-
-
 
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
@@ -62,21 +81,6 @@ import {
 } from '@tanstack/react-table'
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
-
-// ───────────────────────────────────────────
-// IndexedDB
-// ───────────────────────────────────────────
-const DB_NAME = 'PestDB'
-const STORE_NAME = 'pests'
-const initDB = async () => {
-  return await openDB(DB_NAME, 1, {
-    upgrade(db) {
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true })
-      }
-    }
-  })
-}
 
 // Toast helper
 // ──────────────────────────────────────────────────────────────
@@ -132,6 +136,45 @@ const showToast = (type, message = '') => {
   )
 }
 
+const apiMap = {
+  Finding: {
+    list: getFindingList,
+    add: addFinding,
+    update: updateFinding,
+    del: deleteFinding
+  },
+  Action: {
+    list: getActionList,
+    add: addAction,
+    update: updateAction,
+    del: deleteAction
+  },
+  Recommendation: {
+    list: getRecommendationList,
+    add: addRecommendation,
+    update: updateRecommendation,
+    del: deleteRecommendation
+  },
+  Checklist: {
+    list: getChecklistList,
+    add: addChecklist,
+    update: updateChecklist,
+    del: deleteChecklist
+  },
+  Chemicals: {
+    list: getPestChemicalsList,
+    add: addPestChemical,
+    update: updatePestChemical,
+    del: deletePestChemical
+  },
+  'Pest Units': {
+    list: getUnitList,
+    add: addUnit,
+    update: updateUnit,
+    del: deleteUnit
+  }
+}
+
 // Debounced Input
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
   const [value, setValue] = useState(initialValue)
@@ -160,6 +203,8 @@ export default function PestPage() {
   const [loading, setLoading] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null, isSub: false, subId: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
+  const [subRows, setSubRows] = useState([])
+  const router = useRouter()
 
   const [mainFormData, setMainFormData] = useState({
     pest_code: '',
@@ -187,37 +232,93 @@ export default function PestPage() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const db = await initDB()
-      const all = await db.getAll(STORE_NAME)
+      const res = await getPestList()
+      console.log('Response:', res) // just check once
 
-      // 🔍 Filter by search input
-      const filtered = searchText
-        ? all.filter(r =>
-            ['pest_code', 'parent_code', 'name'].some(key =>
-              (r[key] || '').toString().toLowerCase().includes(searchText.toLowerCase())
-            )
-          )
-        : all
+      // ✅ Now res.data.data.results will work properly
+      const all =
+        res?.data?.data?.results || // Case 1: nested response
+        res?.data?.results || // Case 2: flatter response
+        res?.data ||
+        [] // Case 3: direct array
 
-      // 🔢 Sort newest first
-      const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
+      console.log('🐞 Final loaded pests:', all)
 
-      // 📄 Pagination
-      const start = pagination.pageIndex * pagination.pageSize
-      const end = start + pagination.pageSize
-      const paginated = sorted.slice(start, end)
-
-      // 🧾 Add serial number
-      const normalized = paginated.map((item, idx) => ({
+      console.log('🐞 Rows to show:', all)
+      const normalized = all.map((item, idx) => ({
         ...item,
-        sno: start + idx + 1
+        sno: idx + 1,
+        pest_code: item.pest_code || '-',
+        parent_code: item.parent_code || '-',
+        pest_value: item.pest_value || '-',
+        name: item.name || '-',
+        is_active: item.is_active,
+        status: item.is_active === 1 ? 'Active' : 'Inactive'
       }))
 
       setRows(normalized)
-      setRowCount(filtered.length)
     } catch (err) {
-      console.error(err)
-      showToast('error', 'Failed to load data')
+      console.error('❌ Pest list load failed:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const syncAllData = async () => {
+    setLoading(true)
+    showToast('info', 'Syncing all pest data...')
+    try {
+      const pestRes = await getPestList()
+
+      // ✅ This condition was wrong earlier; update to match your real API response
+      const allPests = pestRes?.data?.data?.results || []
+
+      if (allPests.length > 0) {
+        const synced = await Promise.all(
+          allPests.map(async pest => {
+            try {
+              const [findings, actions, recommendations, checklist, chemicals, units] = await Promise.all([
+                getFindingList(pest.id),
+                getActionList(pest.id),
+                getRecommendationList(pest.id),
+                getChecklistList(pest.id),
+                getPestChemicalsList(pest.id),
+                getUnitList(pest.id)
+              ])
+
+              return {
+                ...pest,
+                finding_count: findings?.data?.data?.count || findings?.data?.count || 0,
+                action_count: actions?.data?.data?.count || actions?.data?.count || 0,
+                recommendation_count: recommendations?.data?.data?.count || recommendations?.data?.count || 0,
+                checklist_count: checklist?.data?.data?.count || checklist?.data?.count || 0,
+                chemicals_count: chemicals?.data?.data?.count || chemicals?.data?.count || 0,
+                unit_count: units?.data?.data?.count || units?.data?.count || 0
+              }
+            } catch (subErr) {
+              console.warn('Submodule sync failed for pest:', pest.id, subErr)
+              return pest
+            }
+          })
+        )
+
+        // 🧾 Normalize final synced data
+        const normalized = synced.map((item, index) => ({
+          ...item,
+          sno: index + 1
+        }))
+
+        setRows(normalized)
+        setRowCount(normalized.length)
+        showToast('success', 'All pest data synced successfully')
+      } else {
+        showToast('warning', 'No pests found during sync')
+        await loadData() // ✅ reload from backend instead of clearing rows
+      }
+    } catch (err) {
+      console.error('Global sync error:', err)
+      showToast('error', 'Failed to sync pest data')
+      await loadData() // ✅ fallback to reload existing data
     } finally {
       setLoading(false)
     }
@@ -254,57 +355,101 @@ export default function PestPage() {
       pest_code: row.pest_code,
       parent_code: row.parent_code,
       name: row.name,
-      value: row.value,
+      value: row.pest_value,
       description: row.description,
-      status: row.status,
+      status: row.is_active === 1 ? 'Active' : 'Inactive', // ✅ show correct text in dropdown
       user_role: row.user_role
     })
+
     setMainDrawerOpen(true)
     setTimeout(() => {
       pestCodeRef.current?.querySelector('input')?.focus()
     }, 100)
   }
+
   const handleMainSubmit = async () => {
     if (!mainFormData.pest_code.trim() || !mainFormData.name.trim()) {
       showToast('warning', 'Pest Code and Name are required')
       return
     }
+
     setLoading(true)
     try {
-      const db = await initDB()
       const payload = {
-        ...mainFormData,
-        finding: editPest?.finding || [],
-        action: editPest?.action || [],
-        chemicals: editPest?.chemicals || [],
-        checklist: editPest?.checklist || [],
-        addDesc: editPest?.addDesc || []
+        pest_code: mainFormData.pest_code,
+        parent_code: mainFormData.parent_code,
+        name: mainFormData.name,
+        pest_value: mainFormData.value,
+        description: mainFormData.description,
+        is_active: mainFormData.status === 'Active' ? 1 : 0, // ✅ convert status to integer
+        user_role: mainFormData.user_role || 'Admin'
       }
+
+      // ✅ CALL API PROPERLY
+      let res
       if (isEdit && editPest?.id) {
-        await db.put(STORE_NAME, { ...payload, id: editPest.id })
-        showToast('success', 'Pest updated')
+        res = await updatePest({ id: editPest.id, ...payload })
       } else {
-        const id = await db.add(STORE_NAME, payload)
-        payload.id = id
-        showToast('success', 'Pest added')
+        res = await addPest(payload)
       }
-      toggleMainDrawer()
-      loadData()
-    } catch {
-      showToast('error', 'Failed to save')
+
+      if (res.status === 'success') {
+        showToast('success', isEdit ? 'Pest updated successfully' : 'Pest added successfully')
+
+        // ✅ Instantly show new pest in table
+        if (!isEdit) {
+          const newPest = res.data || res.data.data // 🧠 fix here
+
+          if (newPest) {
+            setRows(prev => [
+              ...prev,
+              {
+                ...newPest,
+                sno: prev.length + 1,
+                pest_code: newPest.pest_code || '-',
+                parent_code: newPest.parent_code || '-',
+                pest_value: newPest.pest_value || '-',
+                name: newPest.name || '-',
+                status: newPest.status === 1 ? 'Active' : 'Inactive'
+              }
+            ])
+            setRowCount(prev => prev + 1)
+          }
+        }
+
+        toggleMainDrawer()
+        setTimeout(() => loadData(), 300)
+      } else {
+        showToast('error', res.message || 'Failed to save pest')
+      }
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'Something went wrong while saving pest')
     } finally {
       setLoading(false)
     }
   }
 
   const confirmMainDelete = async () => {
-    if (deleteDialog.row) {
-      const db = await initDB()
-      await db.delete(STORE_NAME, deleteDialog.row.id)
-      showToast('delete', `${deleteDialog.row.name} deleted`)
-      loadData()
+    if (!deleteDialog.row) return
+
+    setLoading(true)
+    try {
+      const res = await deletePest(deleteDialog.row.id) // calls PATCH
+
+      if (res.status === 'success') {
+        showToast('delete', `${deleteDialog.row.name} deleted successfully`)
+        await loadData() // refresh list
+      } else {
+        showToast('error', res.message || 'Failed to delete pest')
+      }
+    } catch (err) {
+      console.error('❌ Delete (patch) error:', err)
+      showToast('error', 'Something went wrong while deleting pest')
+    } finally {
+      setLoading(false)
+      setDeleteDialog({ open: false, row: null })
     }
-    setDeleteDialog({ open: false, row: null })
   }
 
   // --- Sub Drawer ---
@@ -316,40 +461,83 @@ export default function PestPage() {
     setSubDrawerOpen(true)
   }
 
+  // 🔹 Load Sub-List (Findings, Action, Recommendation, etc.)
+  const loadSubList = async () => {
+    const apiSet = apiMap[drawerType]
+    if (!apiSet || !selectedPestId) return
+    setLoading(true)
+    try {
+      // ✅ Correct call for list (not add)
+      const res = await apiSet.list(selectedPestId)
+
+      if (res.status === 'success') {
+        const list = res?.data?.data?.results || res?.data?.results || []
+        setSubRows(list)
+        setRowCount(res?.data?.data?.count || list.length)
+      } else {
+        setSubRows([])
+      }
+    } catch (err) {
+      console.error(err)
+      showToast('error', `Failed to fetch ${drawerType} list`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (subDrawerOpen) loadSubList()
+  }, [subDrawerOpen, drawerType])
+
+  // 🔹 Add or Update sub-item (Finding, Action, etc.)
   const handleSubSubmit = async () => {
     if (!subFormData.name.trim()) {
       showToast('warning', `${drawerType} name is required`)
       return
     }
+
+    const apiSet = apiMap[drawerType]
+    if (!apiSet) return
+
     setLoading(true)
     try {
-      const db = await initDB()
-      const keyMap = {
-        Finding: 'finding',
-        Action: 'action',
-        Chemicals: 'chemicals',
-        Checklist: 'checklist',
-        'Add Description': 'addDesc'
+      const payload = {
+        name: subFormData.name,
+        pest_id: selectedPestId, // ✅ correct key name
+        is_active: subFormData.status === 'Active' ? 1 : 0
       }
-      const key = keyMap[drawerType]
-      const pest = rows.find(r => r.id === selectedPestId) || (await db.get(STORE_NAME, selectedPestId))
-      let updatedList = pest[key] || []
 
-      if (editSubRow) {
-        updatedList = updatedList.map(f => (f.id === editSubRow.id ? { ...f, ...subFormData } : f))
+      let res
+      if (editSubRow && editSubRow.id) {
+        res = await apiSet.update({ id: editSubRow.id, ...payload })
       } else {
-        const newId = updatedList.length ? Math.max(...updatedList.map(f => f.id)) + 1 : 1
-        updatedList = [...updatedList, { id: newId, ...subFormData }]
+        res = await apiSet.add(payload)
       }
 
-      const updatedPest = { ...pest, [key]: updatedList }
-      await db.put(STORE_NAME, updatedPest)
-      showToast('success', `${drawerType} ${editSubRow ? 'updated' : 'added'}`)
-      setSubFormData({ name: '', status: 'Active' })
-      setEditSubRow(null)
-      loadData()
-    } catch {
-      showToast('error', 'Failed to save')
+      if (res.status === 'success') {
+        showToast('success', `${drawerType} ${editSubRow ? 'updated' : 'added'} successfully`)
+        setSubFormData({ name: '', status: 'Active' })
+        setEditSubRow(null)
+        await loadSubList() // ✅ refresh list in drawer
+
+        // ✅ Instantly update count in main table (no need to sync)
+        if (drawerType === 'Finding') {
+          setRows(prev =>
+            prev.map(p => (p.id === selectedPestId ? { ...p, finding_count: (p.finding_count || 0) + 1 } : p))
+          )
+        }
+
+        if (drawerType === 'Action') {
+          setRows(prev =>
+            prev.map(p => (p.id === selectedPestId ? { ...p, action_count: (p.action_count || 0) + 1 } : p))
+          )
+        }
+      } else {
+        showToast('error', res.message || 'Failed to save data')
+      }
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'Something went wrong while saving')
     } finally {
       setLoading(false)
     }
@@ -360,25 +548,44 @@ export default function PestPage() {
     setEditSubRow(row)
   }
 
+  // 🔹 Delete sub-item (Finding, Action, etc.)
   const confirmSubDelete = async () => {
-    if (deleteDialog.subId) {
-      const keyMap = {
-        Finding: 'finding',
-        Action: 'action',
-        Chemicals: 'chemicals',
-        Checklist: 'checklist',
-        'Add Description': 'addDesc'
+    const apiSet = apiMap[drawerType]
+    if (!apiSet || !deleteDialog.subId) return
+
+    setLoading(true)
+    try {
+      const res = await apiSet.del(deleteDialog.subId)
+      if (res.status === 'success') {
+        showToast('delete', `${drawerType} deleted successfully`)
+        await loadSubList() // ✅ refresh drawer list
+
+        // ✅ Instantly update count in main table (no need to sync)
+        if (drawerType === 'Finding') {
+          setRows(prev =>
+            prev.map(p =>
+              p.id === selectedPestId ? { ...p, finding_count: Math.max((p.finding_count || 1) - 1, 0) } : p
+            )
+          )
+        }
+
+        if (drawerType === 'Action') {
+          setRows(prev =>
+            prev.map(p =>
+              p.id === selectedPestId ? { ...p, action_count: Math.max((p.action_count || 1) - 1, 0) } : p
+            )
+          )
+        }
+      } else {
+        showToast('error', res.message || 'Delete failed')
       }
-      const key = keyMap[drawerType]
-      const db = await initDB()
-      const pest = await db.get(STORE_NAME, selectedPestId)
-      const updatedList = (pest[key] || []).filter(f => f.id !== deleteDialog.subId)
-      const updatedPest = { ...pest, [key]: updatedList }
-      await db.put(STORE_NAME, updatedPest)
-      showToast('delete', `${drawerType} deleted`)
-      loadData()
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'Something went wrong while deleting')
+    } finally {
+      setLoading(false)
+      setDeleteDialog({ open: false, subId: null })
     }
-    setDeleteDialog({ open: false, subId: null })
   }
 
   const getSubRows = () => {
@@ -400,44 +607,51 @@ export default function PestPage() {
   const columns = useMemo(
     () => [
       columnHelper.accessor('sno', { header: 'S.No' }),
+
+      // 🟢 This one controls the edit/delete actions column
       columnHelper.display({
-        id: 'actions',
+        id: 'table_actions', // ✅ renamed
         header: 'Actions',
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
             <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
-              <EditIcon />
+              <EditIcon fontSize='small' />
             </IconButton>
             <IconButton
               size='small'
               color='error'
-              onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
+              onClick={() => setDeleteDialog({ open: true, row: info.row.original, isSub: false })}
             >
-              <DeleteIcon />
+              <DeleteIcon fontSize='small' />
             </IconButton>
           </Box>
         )
       }),
+
       columnHelper.accessor('pest_code', { header: 'Pest Code' }),
       columnHelper.accessor('parent_code', { header: 'Parent Group' }),
       columnHelper.accessor('name', { header: 'Display Pest Name' }),
-      columnHelper.accessor('value', { header: 'Value' }),
-      columnHelper.display({
-        id: 'finding',
-        header: 'Finding',
+      columnHelper.accessor('pest_value', { header: 'Pest Value' }),
+
+      columnHelper.accessor('description', {
+        header: 'Description',
         cell: info => (
-          <Button
-            variant='outlined'
-            size='small'
-            onClick={() => openSubDrawer(info.row.original, 'Finding')}
-            sx={{ borderRadius: '999px', px: 2 }}
+          <Typography
+            sx={{
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              maxWidth: 200
+            }}
           >
-            Finding({info.row.original.finding?.length || 0})
-          </Button>
+            {info.getValue() || '-'}
+          </Typography>
         )
       }),
+
+      // 🟢 This is your sub-drawer action button
       columnHelper.display({
-        id: 'action',
+        id: 'pest_action', // ✅ unique id
         header: 'Action',
         cell: info => (
           <Button
@@ -446,26 +660,43 @@ export default function PestPage() {
             onClick={() => openSubDrawer(info.row.original, 'Action')}
             sx={{ borderRadius: '999px', px: 2 }}
           >
-            Action({info.row.original.action?.length || 0})
+            Action({info.row.original.action_count || 0})
           </Button>
         )
       }),
+
       columnHelper.display({
-        id: 'chemicals',
-        header: 'Chemicals',
+        id: 'pest_finding',
+        header: 'Finding',
         cell: info => (
           <Button
             variant='outlined'
             size='small'
-            onClick={() => openSubDrawer(info.row.original, 'Chemicals')}
+            onClick={() => openSubDrawer(info.row.original, 'Finding')}
             sx={{ borderRadius: '999px', px: 2 }}
           >
-            Chemicals({info.row.original.chemicals?.length || 0})
+            Finding({info.row.original.finding_count || 0})
           </Button>
         )
       }),
+
       columnHelper.display({
-        id: 'checklist',
+        id: 'pest_recommendation', // ✅ unique id
+        header: 'Recommendation',
+        cell: info => (
+          <Button
+            variant='outlined'
+            size='small'
+            onClick={() => openSubDrawer(info.row.original, 'Recommendation')}
+            sx={{ borderRadius: '999px', px: 2 }}
+          >
+            Recommendation({info.row.original.recommendation_count || 0})
+          </Button>
+        )
+      }),
+
+      columnHelper.display({
+        id: 'pest_checklist', // ✅ unique id
         header: 'Checklist',
         cell: info => (
           <Button
@@ -474,35 +705,54 @@ export default function PestPage() {
             onClick={() => openSubDrawer(info.row.original, 'Checklist')}
             sx={{ borderRadius: '999px', px: 2 }}
           >
-            Checklist({info.row.original.checklist?.length || 0})
+            Checklist({info.row.original.checklist_count || 0})
           </Button>
         )
       }),
+
       columnHelper.display({
-        id: 'addDesc',
-        header: 'Add Description',
+        id: 'pest_chemicals', // ✅ unique id
+        header: 'Chemicals',
         cell: info => (
           <Button
             variant='outlined'
             size='small'
-            onClick={() => openSubDrawer(info.row.original, 'Add Description')}
+            onClick={() => openSubDrawer(info.row.original, 'Chemicals')}
             sx={{ borderRadius: '999px', px: 2 }}
           >
-            AddDesc({info.row.original.addDesc?.length || 0})
+            Chemicals({info.row.original.chemicals_count || 0})
           </Button>
         )
       }),
-      columnHelper.accessor('status', {
+
+      columnHelper.display({
+        id: 'pest_units', // ✅ unique id
+        header: 'Pest Units',
+        cell: info => (
+          <Button
+            variant='outlined'
+            size='small'
+            onClick={() => openSubDrawer(info.row.original, 'Pest Units')}
+            sx={{ borderRadius: '999px', px: 2 }}
+          >
+            PestUnits({info.row.original.unit_count || 0})
+          </Button>
+        )
+      }),
+
+      columnHelper.accessor('is_active', {
         header: 'Status',
         cell: info => {
-          const status = info.getValue()
+          const isActive = info.getValue()
+          const label = isActive === 1 ? 'Active' : 'Inactive'
+
           return (
             <Chip
-              label={status}
+              label={label}
               size='small'
               sx={{
                 color: '#fff',
-                bgcolor: status === 'Active' ? 'success.main' : 'error.main',
+                bgcolor: isActive === 1 ? 'success.main' : 'error.main',
                 fontWeight: 600,
                 borderRadius: '6px',
                 px: 1.5
@@ -549,8 +799,11 @@ export default function PestPage() {
       'Chemicals',
       'Checklist',
       'AddDesc',
+      'Recommendation',
+      'Pest Units',
       'Status'
     ]
+
     const csv = [
       headers.join(','),
       ...rows.map(r =>
@@ -565,6 +818,8 @@ export default function PestPage() {
           r.chemicals?.length || 0,
           r.checklist?.length || 0,
           r.addDesc?.length || 0,
+          r.recommendation?.length || 0,
+          r.pestUnits?.length || 0,
           r.status
         ].join(',')
       )
@@ -652,14 +907,10 @@ export default function PestPage() {
                   />
                 }
                 disabled={loading}
-                onClick={async () => {
-                  setLoading(true)
-                  await loadData()
-                  setTimeout(() => setLoading(false), 600)
-                }}
+                onClick={syncAllData}
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
-                {loading ? 'Refreshing...' : 'Refresh'}
+                {loading ? 'Syncing...' : 'Sync All'}
               </Button>
             </Box>
           }
@@ -933,7 +1184,8 @@ export default function PestPage() {
 
       {/* Sub Drawer */}
       <Drawer anchor='right' open={subDrawerOpen} onClose={() => setSubDrawerOpen(false)}>
-        <Box sx={{ p: 5, width: 520 }}>
+        <Box sx={{ p: 5, width: 520, height: '100vh', overflowY: 'auto' }}>
+          {/* Drawer Header */}
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
             <Typography variant='h5' fontWeight={600}>
               Manage {drawerType}
@@ -942,90 +1194,136 @@ export default function PestPage() {
               <CloseIcon />
             </IconButton>
           </Box>
-          <Grid container spacing={2}>
-            <Grid item xs={12}>
-              <CustomTextFieldWrapper
-                fullWidth
-                label={`${drawerType} Name`}
-                placeholder={`Enter ${drawerType.toLowerCase()} name`}
-                value={subFormData.name}
-                onChange={e => setSubFormData(prev => ({ ...prev, name: e.target.value }))}
-              />
-            </Grid>
 
-            <Grid item xs={12}>
-              <CustomSelectField
-                fullWidth
-                label='Status'
-                value={subFormData.status}
-                onChange={e => setSubFormData(prev => ({ ...prev, status: e.target.value }))}
-                options={[
-                  { value: 'Active', label: 'Active' },
-                  { value: 'Inactive', label: 'Inactive' }
-                ]}
-              />
-            </Grid>
-          </Grid>
-          <Button variant='contained' fullWidth sx={{ mt: 2 }} onClick={handleSubSubmit} disabled={loading}>
-            {editSubRow ? 'Update' : 'Add'} {drawerType}
-          </Button>
+          {/* Action Drawer */}
+          {drawerType === 'Action' && <ActionDrawerContent pestId={selectedPestId} />}
 
-          <Box mt={4}>
-            <Typography variant='subtitle1' mb={1}>
-              {drawerType} List
-            </Typography>
-            <div className='overflow-x-auto'>
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th>Actions</th>
-                    <th>{drawerType} Name</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {getSubRows().length ? (
-                    getSubRows().map(row => (
-                      <tr key={row.id}>
-                        <td>
-                          <Box sx={{ display: 'flex', gap: 1 }}>
-                            <IconButton size='small' onClick={() => handleSubEdit(row)}>
-                              <EditIcon />
-                            </IconButton>
-                            <IconButton
-                              size='small'
-                              color='error'
-                              onClick={() => setDeleteDialog({ open: true, isSub: true, subId: row.id })}
-                            >
-                              <DeleteIcon />
-                            </IconButton>
-                          </Box>
-                        </td>
-                        <td>{row.name}</td>
-                        <td>
-                          <Chip
-                            label={row.status}
-                            size='small'
-                            sx={{
-                              color: '#fff',
-                              bgcolor: row.status === 'Active' ? 'success.main' : 'error.main',
-                              fontWeight: 600
-                            }}
-                          />
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={3} className='text-center py-4'>
-                        No items
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </Box>
+          {/* Finding Drawer */}
+          {drawerType === 'Finding' && <FindingDrawerContent pestId={selectedPestId} />}
+
+          {/* Recommendation Drawer */}
+          {drawerType === 'Recommendation' && <RecommendationDrawerContent pestId={selectedPestId} />}
+
+          {/* Checklist Drawer */}
+          {drawerType === 'Checklist' && <ChecklistDrawerContent pestId={selectedPestId} />}
+
+          {/* Chemicals Drawer */}
+          {drawerType === 'Chemicals' && <PestChemicalsDrawerContent pestId={selectedPestId} />}
+
+          {/* Units  Drawer */}
+          {drawerType === 'Pest Units' && <UnitDrawerContent pestId={selectedPestId} />}
+
+          {/* ===================================================
+        3️⃣ OTHER MODULES (Recommendation, Checklist, etc.)
+        =================================================== */}
+          {drawerType !== 'Action' &&
+            drawerType !== 'Finding' &&
+            drawerType !== 'Recommendation' &&
+            drawerType !== 'Checklist' &&
+            drawerType !== 'Chemicals' &&
+            drawerType !== 'Pest Units' && (
+              <>
+                <Grid container spacing={2}>
+                  {/* Name Field */}
+                  <Grid item xs={12}>
+                    <CustomTextFieldWrapper
+                      fullWidth
+                      label={`${drawerType} Name`}
+                      placeholder={`Enter ${drawerType.toLowerCase()} name`}
+                      value={subFormData.name}
+                      onChange={e => setSubFormData(prev => ({ ...prev, name: e.target.value }))}
+                    />
+                  </Grid>
+
+                  {/* Status Field */}
+                  <Grid item xs={12}>
+                    <CustomSelectField
+                      fullWidth
+                      label='Status'
+                      value={subFormData.status}
+                      onChange={e => setSubFormData(prev => ({ ...prev, status: e.target.value }))}
+                      options={[
+                        { value: 'Active', label: 'Active' },
+                        { value: 'Inactive', label: 'Inactive' }
+                      ]}
+                    />
+                  </Grid>
+                </Grid>
+
+                {/* Add / Update Button */}
+                <Button variant='contained' fullWidth sx={{ mt: 2 }} onClick={handleSubSubmit} disabled={loading}>
+                  {editSubRow ? 'Update' : 'Add'} {drawerType}
+                </Button>
+
+                {/* Table Section */}
+                <Box mt={4}>
+                  <Typography variant='subtitle1' mb={1}>
+                    {drawerType} List
+                  </Typography>
+
+                  <div className='overflow-x-auto'>
+                    <table className={styles.table}>
+                      <thead>
+                        <tr>
+                          <th>Actions</th>
+                          <th>{drawerType} Name</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {subRows.length ? (
+                          subRows.map(row => (
+                            <tr key={row.id}>
+                              <td>
+                                <Box sx={{ display: 'flex', gap: 1 }}>
+                                  <IconButton size='small' onClick={() => handleSubEdit(row)}>
+                                    <EditIcon />
+                                  </IconButton>
+                                  <IconButton
+                                    size='small'
+                                    color='error'
+                                    onClick={() =>
+                                      setDeleteDialog({
+                                        open: true,
+                                        isSub: true,
+                                        subId: row.id
+                                      })
+                                    }
+                                  >
+                                    <DeleteIcon />
+                                  </IconButton>
+                                </Box>
+                              </td>
+
+                              <td>{row.name}</td>
+
+                              <td>
+                                <Chip
+                                  label={row.status}
+                                  size='small'
+                                  sx={{
+                                    color: '#fff',
+                                    bgcolor: row.status === 'Active' ? 'success.main' : 'error.main',
+                                    fontWeight: 600
+                                  }}
+                                />
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={3} className='text-center py-4'>
+                              No items
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </Box>
+              </>
+            )}
         </Box>
       </Drawer>
 
