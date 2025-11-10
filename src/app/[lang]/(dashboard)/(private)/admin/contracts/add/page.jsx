@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
+
 import {
   Box,
   Button,
@@ -16,6 +17,18 @@ import {
   Dialog, // 💡 NEW: Import Dialog and related components
   DialogContent
 } from '@mui/material'
+
+import {
+  getCustomers,
+  getAccountList,
+  getCallTypeList,
+  getIndustryList,
+  getEmployees,
+  getBillingFrequencyList,
+  getServiceFrequencyList,
+  getPestList
+} from '@/api/contract/dropdowns'
+
 import { useRouter } from 'next/navigation'
 
 import DeleteIcon from '@mui/icons-material/Delete'
@@ -27,113 +40,6 @@ import ContentLayout from '@/components/layout/ContentLayout'
 import CustomTextField from '@core/components/mui/TextField'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import { Autocomplete } from '@mui/material'
-
-// ----------------------------------------------------------------------
-// INDEXEDDB HELPER FUNCTIONS (New Implementation)
-// ----------------------------------------------------------------------
-
-const DB_NAME = 'ContractDB'
-const DB_VERSION = 1
-const STORE_NAME = 'contracts'
-
-/**
- * Opens the IndexedDB database, creating the object store if it doesn't exist.
- * @returns {Promise<IDBDatabase>} The database instance.
- */
-const openDB = () => {
-  return new Promise((resolve, reject) => {
-    if (!('indexedDB' in window)) {
-      console.error('IndexedDB not supported.')
-      reject(new Error('IndexedDB not supported.'))
-      return
-    }
-
-    const request = indexedDB.open(DB_NAME, DB_VERSION)
-
-    request.onerror = event => {
-      console.error('Database error:', event.target.error)
-      reject(event.target.error)
-    }
-
-    request.onsuccess = event => {
-      resolve(event.target.result)
-    }
-
-    request.onupgradeneeded = event => {
-      const db = event.target.result
-      // Create an object store to hold information about contracts.
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id' })
-      }
-    }
-  })
-}
-
-/**
- * Saves a new contract to the IndexedDB.
- * @param {object} contract - The contract data to save.
- */
-const saveContractWithPestItems = async contract => {
-  try {
-    const db = await openDB()
-    const transaction = db.transaction([STORE_NAME], 'readwrite')
-    const store = transaction.objectStore(STORE_NAME)
-    const request = store.add(contract)
-
-    return new Promise((resolve, reject) => {
-      request.onsuccess = () => {
-        resolve()
-      }
-      request.onerror = event => {
-        console.error('Error saving contract to IndexedDB:', event.target.error)
-        reject(event.target.error)
-      }
-    })
-  } catch (error) {
-    console.error('Failed to open DB or save contract:', error)
-  }
-}
-
-/**
- * Retrieves all contracts from IndexedDB.
- * @returns {Promise<Array<object>>} A promise that resolves to an array of contracts.
- */
-const getContractsWithPestItems = async () => {
-  try {
-    const db = await openDB()
-    const transaction = db.transaction([STORE_NAME], 'readonly')
-    const store = transaction.objectStore(STORE_NAME)
-    const request = store.getAll()
-
-    return new Promise((resolve, reject) => {
-      request.onsuccess = event => {
-        // Return contracts sorted by ID (latest first, similar to localStorage behavior)
-        resolve(event.target.result.reverse())
-      }
-      request.onerror = event => {
-        console.error('Error retrieving contracts from IndexedDB:', event.target.error)
-        reject(event.target.error)
-      }
-    })
-  } catch (error) {
-    console.error('Failed to open DB or get contracts:', error)
-    return []
-  }
-}
-
-// Function to safely get contracts (NOW USES INDEXEDDB)
-const getContracts = async () => {
-  return await getContractsWithPestItems()
-}
-
-// Function to safely save contracts (NOW USES INDEXEDDB)
-const saveContracts = async contracts => {
-  // In the real application, you would typically save ONE new contract,
-  // not the entire array. The handleSubmit function below saves one.
-  // This function is kept here for reference but is not used in the final handleSubmit.
-  console.warn('saveContracts array function called - check implementation if saving entire array is intended.')
-  // For safety, this function will do nothing or be adapted if needed.
-}
 
 export default function AddContractPage() {
   const router = useRouter()
@@ -209,6 +115,19 @@ export default function AddContractPage() {
   const [selectedFile, setSelectedFile] = useState('')
   const [isDragOver, setIsDragOver] = useState(false)
   const [openDialog, setOpenDialog] = useState(false) // 💡 NEW: For file dialog
+
+  const cleanOptions = arr => [...new Set(arr.filter(v => v !== null && v !== undefined && v !== ''))]
+
+const [dropdowns, setDropdowns] = useState({
+  customers: [],
+  accountItems: [],
+  callTypes: [],
+  industries: [],
+  employees: [],
+  billingFrequencies: [],
+  serviceFrequency: [],
+  pests: []
+})
 
   // Autocomplete Fields Definition (Unchanged)
   const autocompleteFields = [
@@ -337,6 +256,42 @@ export default function AddContractPage() {
     closeButtonRef,
     saveButtonRef
   ].filter(ref => ref)
+
+  useEffect(() => {
+    loadDropdowns()
+  }, [])
+
+  const loadDropdowns = async () => {
+    try {
+      const [customers, accounts, callTypes, industries, employees, billingFreq, serviceFreq, pests] =
+        await Promise.all([
+          getCustomers(),
+          getAccountList(),
+          getCallTypeList(),
+          getIndustryList(),
+          getEmployees(),
+          getBillingFrequencyList(),
+          getServiceFrequencyList(),
+          getPestList()
+        ])
+
+      console.log('Customers → ', customers)
+
+      // 🔥🔥 SET ALL DROPDOWN DATA HERE
+      setDropdowns({
+        customers: customers || [],
+        accountItems: accounts || [],
+        callTypes: callTypes || [],
+        industries: industries || [], // ✔ correct key
+        employees: employees || [],
+        billingFrequencies: billingFreq || [], // ✔ correct key
+        serviceFrequency: serviceFreq || [],
+        pests: pests || []
+      })
+    } catch (err) {
+      console.error('Dropdown Fetch Error → ', err)
+    }
+  }
 
   // ----------------------------------------------------------------------
   // Handlers
@@ -515,7 +470,6 @@ export default function AddContractPage() {
   // 💡 NEW: Handler to close the dialog
   const handleCloseDialog = () => setOpenDialog(false)
 
-
   // Function to load an item for editing
   const handleEditPestItem = item => {
     // Load item data into the current input state
@@ -600,30 +554,27 @@ export default function AddContractPage() {
 
   // Logic to Save to IndexedDB and Redirect
   const handleSubmit = async () => {
-    // Revoke the object URL after submission to free up memory
-    if (formData.uploadedFileURL) {
-        URL.revokeObjectURL(formData.uploadedFileURL);
-    }
-
-    const newContract = {
-      ...formData,
-      id: generateUniqueId(),
-      poExpiry: formData.poExpiry.toISOString(),
-      startDate: formData.startDate.toISOString(),
-      endDate: formData.endDate.toISOString(),
-      reminderDate: formData.reminderDate.toISOString(),
-      pestItems: pestItems, // Include the list of pest items
-      // Save only the filename and URL (if you were saving the file itself, this would change)
-      // For IndexedDB, saving the file data directly is complex. For now, we save the metadata.
-      file: null, // Don't save the large File object to DB
-    }
-
     try {
-      await saveContractWithPestItems(newContract)
-      router.push('/admin/contracts')
+      const payload = {
+        ...formData,
+        pestItems: pestItems,
+        poExpiry: formData.poExpiry?.toISOString(),
+        startDate: formData.startDate?.toISOString(),
+        endDate: formData.endDate?.toISOString(),
+        reminderDate: formData.reminderDate?.toISOString()
+      }
+
+      const res = await addContractApi(payload)
+
+      if (res?.status === 'success') {
+        alert('Contract Added Successfully!')
+        router.push('/admin/contracts')
+      } else {
+        alert('Failed to add contract')
+      }
     } catch (error) {
-      alert('Failed to save contract to database. See console for details.')
-      console.error('Submission failed:', error)
+      console.error(error)
+      alert('Error while saving contract')
     }
   }
 
@@ -644,6 +595,7 @@ export default function AddContractPage() {
           freeSolo={false}
           options={options}
           value={formData[name]}
+          getOptionLabel={option => (typeof option === 'string' ? option : option?.label || '')}
           open={isOpen}
           onFocus={() => setIsOpen(true)}
           onBlur={() => setIsOpen(false)}
@@ -683,8 +635,9 @@ export default function AddContractPage() {
           {renderAutocomplete({
             name: 'customer',
             label: 'Customer',
-            options: autocompleteFields.find(f => f.name === 'customer').options
+            options: cleanOptions(dropdowns.customers.map(c => c.customer_name))
           })}
+
           {renderAutocomplete({
             name: 'contractType',
             label: 'Contract Type',
@@ -737,8 +690,9 @@ export default function AddContractPage() {
           {renderAutocomplete({
             name: 'accountItemCode',
             label: 'Account Item Code',
-            options: autocompleteFields.find(f => f.name === 'accountItemCode').options
+            options: cleanOptions(dropdowns.accountItems.map(a => a.account_item_code))
           })}
+
           <Grid item xs={12} md={3}>
             <CustomTextField
               fullWidth
@@ -836,8 +790,9 @@ export default function AddContractPage() {
           {renderAutocomplete({
             name: 'callType',
             label: 'Call Type',
-            options: autocompleteFields.find(f => f.name === 'callType').options
+            options: cleanOptions(dropdowns.callTypes.map(c => c.call_type))
           })}
+
           <Grid item xs={12} md={3}>
             <CustomTextField
               fullWidth
@@ -885,8 +840,9 @@ export default function AddContractPage() {
           {renderAutocomplete({
             name: 'industry',
             label: 'Industry',
-            options: autocompleteFields.find(f => f.name === 'industry').options
+            options: dropdowns.industries?.map(i => i.industry_name) || []
           })}
+
           <Grid item xs={12} md={3}>
             <CustomTextField
               type='text'
@@ -901,9 +857,10 @@ export default function AddContractPage() {
           </Grid>
           {renderAutocomplete({
             name: 'technician',
-            label: 'Technicians',
-            options: autocompleteFields.find(f => f.name === 'technician').options
+            label: 'Technician',
+            options: dropdowns.employees?.filter(e => e.role === 'Technician')?.map(e => e.employee_name) || []
           })}
+
           {renderAutocomplete({
             name: 'paymentTerm',
             label: 'Payment Term',
@@ -918,14 +875,15 @@ export default function AddContractPage() {
           {renderAutocomplete({
             name: 'supervisor',
             label: 'Supervisor',
-            options: autocompleteFields.find(f => f.name === 'supervisor').options,
-            gridProps: { xs: 12, md: 6 }
+            options: dropdowns.employees?.filter(e => e.role === 'Supervisor')?.map(e => e.employee_name) || []
           })}
+
           {renderAutocomplete({
             name: 'billingFrequency',
             label: 'Billing Frequency',
-            options: autocompleteFields.find(f => f.name === 'billingFrequency').options
+            options: cleanOptions(dropdowns.billingFrequencies.map(b => b.billing_frequency))
           })}
+
           <Grid item xs={12} md={3}>
             <CustomTextField
               fullWidth
@@ -1029,7 +987,6 @@ export default function AddContractPage() {
           </Grid>
           {/* 💡 END UPDATED FILE UPLOAD SECTION */}
 
-
           {/* --- PEST ITEM INPUTS (Updated) --- */}
           <Grid item xs={12}>
             <Typography variant='h6' sx={{ mb: 4, mt: 4 }}>
@@ -1043,22 +1000,17 @@ export default function AddContractPage() {
             <Autocomplete
               ref={refs.pestRef}
               freeSolo={false}
-              options={autocompleteFields.find(f => f.name === 'pest').options}
+              options={cleanOptions(dropdowns.serviceFrequency?.map(f => f.frequency_name) || [])}
+
+              getOptionLabel={option => (typeof option === 'string' ? option : option?.label || '')}
               value={currentPestItem.pest}
               open={openStates.pestOpen}
               onFocus={() => setOpenStates.pestSetOpen(true)}
               onBlur={() => setOpenStates.pestSetOpen(false)}
               onOpen={() => setOpenStates.pestSetOpen(true)}
               onClose={() => setOpenStates.pestSetOpen(false)}
-              onInputChange={(e, newValue, reason) =>
-                handleAutocompleteInputChange(
-                  'pest',
-                  autocompleteFields.find(f => f.name === 'pest').options,
-                  newValue,
-                  reason
-                )
-              }
               onChange={(e, newValue) => handleCurrentPestItemAutocompleteChange('pest', newValue, refs.pestInputRef)}
+              onInputChange={(e, newValue) => setCurrentPestItem(prev => ({ ...prev, pest: newValue }))}
               onKeyDown={e => handleKeyDown(e, refs.pestInputRef)}
               noOptionsText='No options'
               renderInput={params => <CustomTextField {...params} label='Pest' inputRef={refs.pestInputRef} />}
@@ -1069,24 +1021,18 @@ export default function AddContractPage() {
             <Autocomplete
               ref={refs.frequencyRef}
               freeSolo={false}
-              options={autocompleteFields.find(f => f.name === 'frequency').options}
+              options={cleanOptions(dropdowns.serviceFrequency?.map(f => f.frequency_name) || [])}
+              getOptionLabel={option => (typeof option === 'string' ? option : option?.label || '')}
               value={currentPestItem.frequency}
               open={openStates.frequencyOpen}
               onFocus={() => setOpenStates.frequencySetOpen(true)}
               onBlur={() => setOpenStates.frequencySetOpen(false)}
               onOpen={() => setOpenStates.frequencySetOpen(true)}
               onClose={() => setOpenStates.frequencySetOpen(false)}
-              onInputChange={(e, newValue, reason) =>
-                handleAutocompleteInputChange(
-                  'frequency',
-                  autocompleteFields.find(f => f.name === 'frequency').options,
-                  newValue,
-                  reason
-                )
-              }
               onChange={(e, newValue) =>
                 handleCurrentPestItemAutocompleteChange('frequency', newValue, refs.frequencyInputRef)
               }
+              onInputChange={(e, newValue) => setCurrentPestItem(prev => ({ ...prev, frequency: newValue }))}
               onKeyDown={e => handleKeyDown(e, refs.frequencyInputRef)}
               noOptionsText='No options'
               renderInput={params => (
@@ -1140,6 +1086,7 @@ export default function AddContractPage() {
               ref={refs.timeRef}
               freeSolo={false}
               options={autocompleteFields.find(f => f.name === 'time').options}
+              getOptionLabel={option => (typeof option === 'string' ? option : option?.label || '')}
               value={currentPestItem.time}
               open={openStates.timeOpen}
               onFocus={() => setOpenStates.timeSetOpen(true)}
@@ -1359,17 +1306,14 @@ export default function AddContractPage() {
 
       {/* 💡 NEW: Image Dialog for file preview */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth='md' fullWidth>
-      <DialogContent sx={{ p: 0, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <DialogContent sx={{ p: 0, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           {formData.uploadedFileURL && (
             <img
               src={formData.uploadedFileURL}
               alt='Uploaded File Preview'
-                style={{ width: '100%', height: 'auto', objectFit: 'contain' }}
+              style={{ width: '100%', height: 'auto', objectFit: 'contain' }}
             />
-
-
-
-       )}
+          )}
         </DialogContent>
       </Dialog>
     </ContentLayout>

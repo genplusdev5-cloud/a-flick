@@ -1,11 +1,14 @@
 'use client'
 
+import { getCustomerDetails, updateCustomer, deleteCustomerContact } from '@/api/customer'
+import { getCustomerOrigin } from '@/api/customer/origin'
+
 import { useState, useEffect, useRef } from 'react'
 import { Box, Button, Grid, Typography, Card, IconButton, Divider } from '@mui/material'
 import { useRouter, useSearchParams, useParams } from 'next/navigation'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
-import { openDB } from 'idb'
+import { showToast } from '@/components/common/Toasts'
 
 import ContentLayout from '@/components/layout/ContentLayout'
 import CustomTextFieldWrapper from '@/components/common/CustomTextField'
@@ -45,33 +48,22 @@ const initialFormData = {
   remarks2: ''
 }
 
-async function getDB() {
-  return openDB('customerDB', 1, {
-    upgrade(db) {
-      if (!db.objectStoreNames.contains('contacts')) {
-        db.createObjectStore('contacts', { keyPath: 'id' })
-      }
-    }
-  })
-}
-
-async function getCustomerDB() {
-  return openDB('mainCustomerDB', 1, {
-    upgrade(db) {
-      if (!db.objectStoreNames.contains('customers')) {
-        db.createObjectStore('customers', { keyPath: 'id', autoIncrement: true })
-      }
-    }
-  })
-}
-
 export default function EditCustomerPage() {
   const router = useRouter()
-  const params = useParams()
   const searchParams = useSearchParams()
-  const customerIdFromPath = params?.id
-  const customerIdFromQuery = searchParams.get('id')
-  const customerId = customerIdFromPath || customerIdFromQuery
+
+  // decode base64 ID
+
+  let customerId = null
+  const encodedId = searchParams.get('id')
+
+  if (encodedId) {
+    try {
+      customerId = Number(atob(encodedId)) // IMPORTANT → convert to number
+    } catch (err) {
+      console.error('Invalid encoded ID')
+    }
+  }
 
   const [formData, setFormData] = useState(initialFormData)
   const [picEmailError, setPicEmailError] = useState(false)
@@ -83,6 +75,8 @@ export default function EditCustomerPage() {
   const [miniEmailError, setMiniEmailError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [originMap, setOriginMap] = useState({})
+  const [originOptions, setOriginOptions] = useState([])
 
   // REFS FOR FOCUS
   const originRef = useRef(null)
@@ -106,6 +100,28 @@ export default function EditCustomerPage() {
   const remarks1Ref = useRef(null)
   const remarks2Ref = useRef(null)
 
+  useEffect(() => {
+    const loadOrigins = async () => {
+      try {
+        const res = await getCustomerOrigin()
+        const list = res?.data || []
+
+        const map = {}
+        const options = list.map(o => {
+          map[o.id] = o.name
+          return { value: o.id, label: o.name }
+        })
+
+        setOriginMap(map)
+        setOriginOptions(options)
+      } catch (err) {
+        console.error('Origin load failed', err)
+      }
+    }
+
+    loadOrigins()
+  }, [])
+
   // Load Customer Data (ONLY EDIT MODE)
   useEffect(() => {
     if (!customerId) {
@@ -114,69 +130,56 @@ export default function EditCustomerPage() {
       return
     }
 
-    ;(async () => {
-      setLoading(true)
-      const contactsDb = await getDB()
-      await contactsDb.clear('contacts')
-      setContacts([])
-
-      const idAsNumber = Number(customerId)
-      if (isNaN(idAsNumber)) {
-        setNotFound(true)
-        setLoading(false)
-        return
-      }
-
+    const loadCustomer = async () => {
       try {
-        const mainDb = await getCustomerDB()
-        const customerData = await mainDb.get('customers', idAsNumber)
+        setLoading(true)
 
-        if (!customerData) {
+        const res = await getCustomerDetails(customerId)
+        const data = res?.data || res?.data?.data || res || {}
+
+        if (!data.id) {
           setNotFound(true)
-          setLoading(false)
           return
         }
 
-        setEditCustomerId(idAsNumber)
+        setEditCustomerId(data.id)
+
         setFormData({
-          ...initialFormData,
-          ...customerData,
-          commenceDate: customerData.commenceDate ? new Date(customerData.commenceDate) : new Date(),
-          customerName: customerData.customerName || customerData.name || '',
-          loginEmail: customerData.loginEmail || customerData.email || '',
-          password: customerData.password || '',
-          picName: customerData.picName || customerData.spocName || '',
-          picEmail: customerData.picEmail || customerData.spocEmail || '',
-          picPhone: customerData.picPhone || customerData.spocPhone || ''
+          origin: data.company_id || '',
+          commenceDate: data.commence_date ? new Date(data.commence_date) : new Date(),
+          companyPrefix: data.prefix || '',
+          customerName: data.name || '',
+          cardId: data.customer_code || '',
+          abssCustomerName: data.business_name || '',
+          picName: data.pic_contact_name || '',
+          picEmail: data.pic_email || '',
+          picPhone: data.pic_phone || '',
+          billingName: data.billing_contact_name || '',
+          billingEmail: data.billing_email || '',
+          billingPhone: data.billing_phone || '',
+          city: data.city || '',
+          postalCode: data.postal_code || '',
+          paymentTerms: data.payment_term || '',
+          salesperson: data.sales_person_id || '',
+          billingAddress: data.billing_address || '',
+          loginEmail: data.email || '',
+          password: data.password || '',
+          remarks1: data.short_description || '',
+          remarks2: data.description || ''
         })
 
-        const loadedContacts = customerData.contacts || []
-        setContacts(loadedContacts)
-        const tx = contactsDb.transaction('contacts', 'readwrite')
-        loadedContacts.forEach(c => tx.objectStore('contacts').put(c))
-        await tx.done
-
-        setTimeout(() => originRef.current?.querySelector('input')?.focus(), 100)
-      } catch (error) {
-        console.error('Failed to load customer:', error)
+        setContacts(data.contact || [])
+        setTimeout(() => originRef.current?.querySelector('input')?.focus(), 200)
+      } catch (err) {
+        console.error(err)
         setNotFound(true)
       } finally {
         setLoading(false)
       }
-    })()
-  }, [customerId])
+    }
 
-  // Sync contacts to temp DB
-  useEffect(() => {
-    if (!editCustomerId) return
-    ;(async () => {
-      const db = await getDB()
-      const tx = db.transaction('contacts', 'readwrite')
-      await tx.objectStore('contacts').clear()
-      contacts.forEach(c => tx.objectStore('contacts').put(c))
-      await tx.done
-    })()
-  }, [contacts, editCustomerId])
+    loadCustomer()
+  }, [customerId])
 
   const pageTitle = 'Edit Customer'
 
@@ -240,11 +243,19 @@ export default function EditCustomerPage() {
     setMiniEmailError(false)
   }
 
-  const handleDeleteContact = id => {
-    setContacts(prev => prev.filter(c => c.id !== id))
-    if (editingContact?.id === id) {
-      setEditingContact(null)
-      setContactForm({ miniName: '', miniEmail: '', miniPhone: '' })
+  const handleDeleteContact = async id => {
+    try {
+      const res = await deleteCustomerContact(id)
+
+      if (res.status === 'success') {
+        showToast('delete', 'Contact deleted successfully')
+        setContacts(prev => prev.filter(c => c.id !== id))
+      } else {
+        showToast('error', res.message || 'Failed to delete contact')
+      }
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'Delete failed')
     }
   }
 
@@ -256,30 +267,53 @@ export default function EditCustomerPage() {
 
   const handleFinalCancel = () => router.push('/admin/customers')
 
-  const handleFinalSave = async () => {
-    const customerRecord = {
-      ...formData,
-      commenceDate: formData.commenceDate?.toISOString() || new Date().toISOString(),
-      contracts: formData.companyPrefix,
-      status: 'Active',
-      contacts: contacts
-    }
+const handleFinalSave = async () => {
+  const formatDate = d => (d ? new Date(d).toISOString().split('T')[0] : null)
 
-    if (editCustomerId) {
-      customerRecord.id = editCustomerId
-    }
-
-    try {
-      const db = await getCustomerDB()
-      await db.put('customers', customerRecord)
-      const contactsDb = await getDB()
-      await contactsDb.clear('contacts')
-      router.push('/admin/customers')
-    } catch (error) {
-      console.error('Save error:', error)
-      alert('Error updating customer.')
-    }
+  const payload = {
+    name: formData.customerName,
+    business_name: formData.abssCustomerName,
+    customer_code: formData.cardId,
+    company_id: Number(formData.origin),
+    prefix: formData.companyPrefix,
+    commence_date: formatDate(formData.commenceDate),
+    pic_contact_name: formData.picName,
+    pic_email: formData.picEmail,
+    pic_phone: formData.picPhone,
+    billing_contact_name: formData.billingName,
+    billing_email: formData.billingEmail,
+    billing_phone: formData.billingPhone,
+    city: formData.city,
+    postal_code: formData.postalCode,
+    payment_term: formData.paymentTerms ? Number(formData.paymentTerms) : null,
+    sales_person_id: formData.salesperson ? Number(formData.salesperson) : null,
+    billing_address: formData.billingAddress,
+    email: formData.loginEmail,
+    password: formData.password,
+    short_description: formData.remarks1,
+    description: formData.remarks2,
+    contact: contacts.map(c => ({
+      name: c.miniName,
+      email: c.miniEmail,
+      phone: c.miniPhone
+    }))
   }
+
+  try {
+    const res = await updateCustomer({ id: editCustomerId, ...payload })
+
+    if (res.status === 'success') {
+      showToast('success', 'Customer updated successfully')
+      setTimeout(() => router.push('/admin/customers'), 600)
+    } else {
+      showToast('error', res.message || 'Update failed')
+    }
+  } catch (err) {
+    console.error(err)
+    showToast('error', 'Error saving customer')
+  }
+}
+
 
   const contactManualColumns = [
     {
@@ -345,8 +379,7 @@ export default function EditCustomerPage() {
                   label='Origin'
                   value={formData.origin}
                   onChange={e => setFormData(prev => ({ ...prev, origin: e.target.value }))}
-                  options={['India', 'USA'].map(v => ({ value: v, label: v }))}
-                  onKeyDown={e => handleEnterFocus(e, companyPrefixRef)}
+                  options={originOptions}
                 />
               </Grid>
 
@@ -638,7 +671,11 @@ export default function EditCustomerPage() {
               <Card sx={{ p: 2, boxShadow: 'none' }} elevation={0}>
                 <CustomTextFieldWrapper
                   fullWidth
-                  label={<span>Name <span style={{ color: 'red' }}>*</span></span>}
+                  label={
+                    <span>
+                      Name <span style={{ color: 'red' }}>*</span>
+                    </span>
+                  }
                   name='miniName'
                   value={contactForm.miniName}
                   onChange={e => setContactForm(prev => ({ ...prev, miniName: e.target.value }))}
@@ -690,14 +727,21 @@ export default function EditCustomerPage() {
               </Card>
 
               <Card sx={{ mt: 4, p: 2, boxShadow: 'none' }} elevation={0}>
-                <Typography variant='h6' sx={{ mt: 1, mb: 2 }}>Team List</Typography>
+                <Typography variant='h6' sx={{ mt: 1, mb: 2 }}>
+                  Team List
+                </Typography>
                 <Box sx={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'auto' }}>
                     <thead>
                       <tr style={{ textAlign: 'left', borderBottom: '1px solid #E5E7EB' }}>
                         {contactManualColumns.map(col => (
-                          <th key={col.key} style={{ padding: '12px', width: col.width || 'auto', textAlign: col.align }}>
-                            <Box display='flex' alignItems='center'>{col.header}</Box>
+                          <th
+                            key={col.key}
+                            style={{ padding: '12px', width: col.width || 'auto', textAlign: col.align }}
+                          >
+                            <Box display='flex' alignItems='center'>
+                              {col.header}
+                            </Box>
                           </th>
                         ))}
                       </tr>
@@ -723,8 +767,12 @@ export default function EditCustomerPage() {
 
                 <Divider sx={{ mt: 4 }} />
                 <Box mt={2} p={2} display='flex' gap={2} justifyContent='flex-end'>
-                  <Button variant='outlined' onClick={handleFinalCancel}>Cancel</Button>
-                  <Button variant='contained' onClick={handleFinalSave}>Update Customer</Button>
+                  <Button variant='outlined' onClick={handleFinalCancel}>
+                    Cancel
+                  </Button>
+                  <Button variant='contained' onClick={handleFinalSave}>
+                    Update Customer
+                  </Button>
                 </Box>
               </Card>
             </Grid>

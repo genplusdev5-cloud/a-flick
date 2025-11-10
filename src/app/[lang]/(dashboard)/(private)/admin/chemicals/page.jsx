@@ -307,39 +307,38 @@ export default function ChemicalsPage() {
 
   const handleSubmit = async e => {
     e.preventDefault()
+
+    // ⭐⭐⭐ Paste Here ⭐⭐⭐
+    console.log('FINAL FORM DATA FILE:', formData.file)
+    console.log('IS FILE INSTANCE:', formData.file instanceof File)
+
     if (!formData.name) {
       showToast('warning', 'Please enter chemical name')
       return
     }
 
+    const form = new FormData()
+    form.append('name', formData.name)
+    form.append('description', formData.ingredients || '')
+    form.append('uom', formData.unit || '')
+    form.append('unit_value', formData.dosage || '')
+    form.append('is_active', formData.status === 'Active' ? 1 : 0)
+
+    if (formData.file instanceof File) {
+      form.append('file_name', formData.file)
+    } else {
+      console.log('❌ File is NOT a File Object:', formData.file)
+    }
+
+    console.log('🚀 FINAL FORMDATA:', form.get('file_name'))
+
     setLoading(true)
     try {
-      const payload = {
-        id: formData.id,
-        name: formData.name,
-        description: formData.ingredients || null,
-        uom: formData.unit || null,
-        unit_value: formData.dosage || null,
-        file_name: formData.file || null,
-        is_active: formData.status === 'Active' ? 1 : 0
-      }
-
-      const result = isEdit ? await updateChemical(payload) : await addChemical(payload)
-
+      const result = await addChemical(form)
       if (result.success) {
         showToast('success', result.message)
         setDrawerOpen(false)
         loadData()
-        setFormData({
-          id: null,
-          name: '',
-          unit: '',
-          dosage: '',
-          ingredients: '',
-          status: 'Active',
-          file: ''
-        })
-        setIsEdit(false)
       } else {
         showToast('error', result.message)
       }
@@ -364,11 +363,14 @@ export default function ChemicalsPage() {
   }
 
   const handleFileChange = e => {
-    const file = e.target.files[0]
-    if (file) {
-      setSelectedFile(file.name)
-      setFormData(prev => ({ ...prev, file: file.name }))
+    const f = e.target.files[0]
+    console.log('🔥 FILE SELECTED:', f)
+    if (!f) {
+      console.log('❌ File is undefined')
+      return
     }
+    setSelectedFile(f.name)
+    setFormData(prev => ({ ...prev, file: f }))
   }
 
   const handleFileDrop = e => {
@@ -748,36 +750,85 @@ export default function ChemicalsPage() {
 
               {/* File Upload */}
               <Grid item xs={12}>
-                <Box
-                  sx={{
-                    border: '1px dashed',
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                    p: 2,
-                    textAlign: 'center',
-                    cursor: 'pointer',
-                    bgcolor: 'background.paper',
-                    '&:hover': { bgcolor: 'action.hover' }
-                  }}
-                  onClick={() => fileInputRef.current?.click()}
-                  onDragOver={e => e.preventDefault()}
-                  onDrop={e => {
-                    e.preventDefault()
-                    const file = e.dataTransfer.files[0]
-                    if (file) {
-                      setSelectedFile(file.name)
-                      handleFieldChange('file', file.name)
-                    }
-                  }}
-                >
-                  <UploadFileIcon sx={{ fontSize: 40, color: 'text.secondary', mb: 1 }} />
-                  <Typography variant='body2' color={selectedFile ? 'text.primary' : 'text.disabled'}>
-                    {selectedFile || 'Choose File or Drag & Drop Here'}
-                  </Typography>
-                  <Typography variant='caption' color='primary'>
-                    Browse
-                  </Typography>
-                </Box>
+                <Grid item xs={12}>
+                  <Box
+                    sx={{
+                      border: '1px dashed #ccc',
+                      borderRadius: '8px',
+                      p: 3,
+                      textAlign: 'center',
+                      bgcolor: '#fafafa',
+                      transition: '0.2s',
+                      '&:hover': { borderColor: 'primary.main' }
+                    }}
+                    onDragOver={e => e.preventDefault()}
+                    onDrop={e => {
+                      e.preventDefault()
+                      const file = e.dataTransfer.files[0]
+                      if (file) {
+                        setSelectedFile(file.name)
+                        setFormData(prev => ({ ...prev, file })) // REAL FILE
+                      }
+                    }}
+                  >
+                    <UploadFileIcon sx={{ fontSize: 45, color: 'primary.main', mb: 1 }} />
+
+                    <Typography sx={{ fontWeight: 600, color: '#5e5873', mb: 1 }}>
+                      Drag & Drop your file here
+                    </Typography>
+
+                    <Typography sx={{ fontSize: '0.85rem', color: '#6e6b7b', mb: 2 }}>or</Typography>
+
+                    {/* CLICKABLE BROWSE BUTTON — SAME LOGIC AS OLD WORKING CODE */}
+                    <Button
+                      variant='contained'
+                      sx={{
+                        textTransform: 'none',
+                        backgroundColor: 'primary.main',
+                        borderRadius: '6px',
+                        px: 3,
+                        py: 1,
+                        '&:hover': { backgroundColor: 'primary.dark' }
+                      }}
+                      onClick={() => {
+                        console.log('🔥 BROWSE CLICKED')
+                        fileInputRef.current?.click()
+                      }}
+                    >
+                      Browse
+                    </Button>
+
+                    {/* SHOW SELECTED FILE */}
+                    {selectedFile && (
+                      <Typography
+                        sx={{
+                          mt: 2,
+                          fontSize: '0.85rem',
+                          fontWeight: 500,
+                          color: 'primary.main'
+                        }}
+                      >
+                        {selectedFile}
+                      </Typography>
+                    )}
+
+                    {/* HIDDEN INPUT (DO NOT TOUCH) */}
+                    <input
+                      type='file'
+                      ref={fileInputRef}
+                      style={{ display: 'none' }}
+                      onChange={e => {
+                        const file = e.target.files[0]
+                        console.log('🔥 FILE SELECTED:', file)
+                        if (file) {
+                          setSelectedFile(file.name)
+                          setFormData(prev => ({ ...prev, file })) // REAL FILE OBJECT
+                        }
+                      }}
+                    />
+                  </Box>
+                </Grid>
+
                 <input
                   type='file'
                   ref={fileInputRef}

@@ -27,6 +27,10 @@ import {
   InputAdornment
 } from '@mui/material'
 
+import { getCustomerList, deleteCustomer } from '@/api/customer'
+import { getCustomerOrigin } from '@/api/customer/origin'
+
+import { showToast } from '@/components/common/Toasts'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
@@ -71,59 +75,8 @@ const getCustomerDB = async () => {
   })
 }
 
-// Toast helper
-// ──────────────────────────────────────────────────────────────
-// Toast (Custom Styled, Global, with Icons & Colors)
-// ──────────────────────────────────────────────────────────────
-const showToast = (type, message = '') => {
-  const icons = {
-    success: 'tabler-circle-check',
-    delete: 'tabler-trash',
-    error: 'tabler-alert-triangle',
-    warning: 'tabler-info-circle',
-    info: 'tabler-refresh'
-  }
 
-  toast(
-    <div className='flex items-center gap-2'>
-      <i
-        className={icons[type]}
-        style={{
-          color:
-            type === 'success'
-              ? '#16a34a'
-              : type === 'error'
-                ? '#dc2626'
-                : type === 'delete'
-                  ? '#dc2626'
-                  : type === 'warning'
-                    ? '#f59e0b'
-                    : '#2563eb',
-          fontSize: '22px'
-        }}
-      />
-      <Typography variant='body2' sx={{ fontSize: '0.9rem', color: '#111' }}>
-        {message}
-      </Typography>
-    </div>,
-    {
-      position: 'top-right',
-      autoClose: 2000,
-      hideProgressBar: true,
-      closeOnClick: true,
-      pauseOnHover: false,
-      draggable: false,
-      theme: 'light',
-      style: {
-        borderRadius: '10px',
-        padding: '8px 14px',
-        boxShadow: '0 4px 10px rgba(0,0,0,0.06)',
-        display: 'flex',
-        alignItems: 'center'
-      }
-    }
-  )
-}
+
 // Debounced Input
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
   const [value, setValue] = useState(initialValue)
@@ -147,54 +100,35 @@ export default function CustomersPage() {
   const [loading, setLoading] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
+  const [originMap, setOriginMap] = useState({})
 
   // Load data
   const loadData = async () => {
     setLoading(true)
     try {
-      const db = await getCustomerDB()
-      const all = await db.getAll('customers')
+      const res = await getCustomerList()
 
-      const valid = (all || [])
-        .filter(c => c && typeof c === 'object')
-        .map(c => ({
-          id: c.id,
-          name: c.customerName || c.name || '',
-          email: c.loginEmail || c.email || '',
-          phone: c.picPhone || c.billingPhone || '',
-          address: c.billingAddress || '',
-          commenceDate: c.commenceDate || '',
-          origin: c.origin || '',
-          projectStatus: c.projectStatus || 'Active'
-        }))
+      const list = res?.data?.results || res?.data?.data?.results || res?.data?.data || res?.data || []
 
-      // 🔍 Search Filter
-      const filtered = searchText
-        ? valid.filter(r =>
-            ['name', 'email', 'phone', 'address', 'origin'].some(key =>
-              (r[key] || '').toString().toLowerCase().includes(searchText.toLowerCase())
-            )
-          )
-        : valid
-
-      // 🔢 Sort newest first
-      const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
-
-      // 📄 Pagination
-      const start = pagination.pageIndex * pagination.pageSize
-      const end = start + pagination.pageSize
-      const paginated = sorted.slice(start, end)
-
-      // 🧾 Add serial numbers
-      const normalized = paginated.map((item, idx) => ({
-        ...item,
-        sno: start + idx + 1
+      const normalized = list.map((item, index) => ({
+        sno: index + 1,
+        id: item.id,
+        cardId: item.customer_code || '',
+        abssName: item.business_name || '',
+        myobStatus: item.myob_status || 'Not Exported',
+        status: item.status || 'Active', // NEW
+        name: item.name,
+        email: item.billing_email || item.email || '',
+        phone: item.billing_phone || item.pic_phone || '',
+        address: item.billing_address || '',
+        commenceDate: item.commence_date || '',
+        origin: originMap[item.company_id] || item.company_name || '-',
+        contacts: item.contact || []
       }))
 
       setRows(normalized)
-      setRowCount(filtered.length)
+      setRowCount(normalized.length)
     } catch (err) {
-      console.error(err)
       showToast('error', 'Failed to load customers')
     } finally {
       setLoading(false)
@@ -202,25 +136,55 @@ export default function CustomersPage() {
   }
 
   useEffect(() => {
+    const loadOrigins = async () => {
+      const res = await getCustomerOrigin()
+      const list = res?.data || []
+
+      const map = {}
+      list.forEach(item => {
+        map[item.id] = item.name
+      })
+
+      setOriginMap(map)
+    }
+
+    loadOrigins()
+  }, [])
+
+  useEffect(() => {
     loadData()
   }, [pagination.pageIndex, pagination.pageSize, searchText])
 
-  const handleEdit = id => router.push(`/admin/customers/${id}/edit`)
+  const handleEdit = id => {
+    const encodedId = btoa(id.toString())
+    router.push(`/en/admin/customers/edit?id=${encodedId}`)
+  }
+
   const confirmDelete = async () => {
-    if (deleteDialog.row) {
-      const db = await getCustomerDB()
-      await db.delete('customers', deleteDialog.row.id)
-      showToast('delete', `${deleteDialog.row.name} deleted`)
-      loadData()
+    try {
+      const res = await deleteCustomer(deleteDialog.row.id)
+
+      if (res.status === 'success') {
+        showToast('delete', 'Customer deleted successfully')
+        loadData()
+      } else {
+        showToast('error', res.message || 'Delete failed')
+      }
+    } catch (err) {
+      showToast('error', 'Delete failed')
+    } finally {
+      setDeleteDialog({ open: false, row: null })
     }
-    setDeleteDialog({ open: false, row: null })
   }
 
   // --- Table ---
   const columnHelper = createColumnHelper()
   const columns = useMemo(
     () => [
+      // 1) S.No
       columnHelper.accessor('sno', { header: 'S.No' }),
+
+      // 2) ACTION (keep it here always)
       columnHelper.display({
         id: 'actions',
         header: 'Action',
@@ -229,6 +193,7 @@ export default function CustomersPage() {
             <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original.id)}>
               <EditIcon />
             </IconButton>
+
             <IconButton
               size='small'
               color='error'
@@ -239,10 +204,14 @@ export default function CustomersPage() {
           </Box>
         )
       }),
+
       columnHelper.accessor('origin', { header: 'Origin' }),
-      columnHelper.accessor('email', { header: 'Contact Email' }),
-      columnHelper.accessor('address', { header: 'Billing Address' }),
-      columnHelper.accessor('name', { header: 'Customer Name' }),
+
+      // 3) NEW — Card ID
+      columnHelper.accessor('cardId', {
+        header: 'Card ID'
+      }),
+
       columnHelper.accessor('commenceDate', {
         header: 'Commence Date',
         cell: info => {
@@ -250,22 +219,84 @@ export default function CustomersPage() {
           return date ? new Date(date).toLocaleDateString('en-GB') : '-'
         }
       }),
-      columnHelper.accessor('phone', { header: 'Contact Phone' }),
+
+      columnHelper.accessor('name', { header: 'Customer Name' }),
+
+      // 4) NEW — ABSS Customer Name
+      columnHelper.accessor('abssName', {
+        header: 'ABSS Customer Name'
+      }),
+
       columnHelper.display({
         id: 'contracts',
         header: 'Contract',
-        cell: () => (
+        cell: info => (
           <Button
             size='small'
             variant='outlined'
             color='success'
-            sx={{ borderRadius: '5px', textTransform: 'none', fontWeight: 500, py: 0.5 }}
+            sx={{
+              borderRadius: '5px',
+              textTransform: 'none',
+              fontWeight: 500,
+              py: 0.5
+            }}
             onClick={() => router.push('/en/admin/contracts')}
           >
             Contracts
           </Button>
         )
+      }),
+
+      columnHelper.accessor('email', { header: 'Contact Email' }),
+      columnHelper.accessor('phone', { header: 'Contact Phone' }),
+      columnHelper.accessor('address', { header: 'Billing Address' }),
+
+      // 5) NEW — MYOB STATUS
+      columnHelper.accessor('myobStatus', {
+        header: 'MYOB',
+        cell: info => {
+          const status = info.getValue()
+          return (
+            <Chip
+              label={status}
+              color={status === 'Exported' ? 'success' : 'error'}
+              size='small'
+              sx={{ fontWeight: 600, color: '#fff', borderRadius: '6px' }}
+            />
+          )
+        }
+      }),
+
+      // 6) NEW — GENERAL STATUS
+      columnHelper.accessor('status', {
+        header: 'Status',
+        cell: info => {
+          const raw = info.getValue()
+
+          // Convert 1/0 to text
+          const value = raw === 1 ? 'Active' : 'Inactive'
+
+          // Red/Green color
+          const color = value === 'Active' ? 'success' : 'error'
+
+          return (
+            <Chip
+              label={value}
+              color={color}
+              size='small'
+              sx={{
+                fontWeight: 600,
+                color: '#fff',
+                borderRadius: '6px',
+                textTransform: 'capitalize'
+              }}
+            />
+          )
+        }
       })
+
+      // 7) Existing Columns
     ],
     []
   )

@@ -1,11 +1,14 @@
 'use client'
 
+import { addCustomer } from '@/api/customer'
 import { useState, useEffect, useRef } from 'react'
 import { Box, Button, Grid, Typography, Card, Autocomplete, IconButton, Divider } from '@mui/material'
 import { useRouter, useSearchParams } from 'next/navigation'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
-import { openDB } from 'idb'
+
+import { getCustomerOrigin } from '@/api/customer/origin'
+import { showToast } from '@/components/common/Toasts'
 
 import ContentLayout from '@/components/layout/ContentLayout'
 import CustomTextFieldWrapper from '@/components/common/CustomTextField'
@@ -47,27 +50,6 @@ const initialFormData = {
   remarks2: ''
 }
 
-// IndexedDB helpers
-async function getDB() {
-  return openDB('customerDB', 1, {
-    upgrade(db) {
-      if (!db.objectStoreNames.contains('contacts')) {
-        db.createObjectStore('contacts', { keyPath: 'id' })
-      }
-    }
-  })
-}
-
-async function getCustomerDB() {
-  return openDB('mainCustomerDB', 1, {
-    upgrade(db) {
-      if (!db.objectStoreNames.contains('customers')) {
-        db.createObjectStore('customers', { keyPath: 'id', autoIncrement: true })
-      }
-    }
-  })
-}
-
 export default function AddCustomerPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -106,66 +88,28 @@ export default function AddCustomerPage() {
   const remarks1Ref = useRef(null)
   const remarks2Ref = useRef(null)
 
-  // Load data on mount
+  const [originOptions, setOriginOptions] = useState([])
+
   useEffect(() => {
-    ;(async () => {
-      const contactsDb = await getDB()
-      await contactsDb.clear('contacts')
-      setContacts([])
+    const loadOrigins = async () => {
+      try {
+        const res = await getCustomerOrigin()
+        const list = res?.data || []
 
-      if (customerId) {
-        const idAsNumber = Number(customerId)
-        if (isNaN(idAsNumber)) return
+        const formatted = list.map(item => ({
+          value: item.id,
+          label: item.name
+        }))
 
-        try {
-          const mainDb = await getCustomerDB()
-          const customerData = await mainDb.get('customers', idAsNumber)
-
-          if (customerData) {
-            setEditCustomerId(idAsNumber)
-            setFormData({
-              ...customerData,
-              commenceDate: customerData.commenceDate ? new Date(customerData.commenceDate) : new Date(),
-              customerName: customerData.customerName || customerData.name || '',
-              loginEmail: customerData.loginEmail || customerData.email || '',
-              password: customerData.password || ''
-            })
-
-            const loadedContacts = customerData.contacts || []
-            setContacts(loadedContacts)
-            const tx = contactsDb.transaction('contacts', 'readwrite')
-            loadedContacts.forEach(c => tx.objectStore('contacts').put(c))
-            await tx.done
-
-            setTimeout(() => companyPrefixRef.current?.querySelector('input')?.focus(), 100)
-          } else {
-            setEditCustomerId(null)
-            setTimeout(() => companyPrefixRef.current?.querySelector('input')?.focus(), 100)
-          }
-        } catch (error) {
-          console.error('Failed to load customer:', error)
-          setEditCustomerId(null)
-          setTimeout(() => companyPrefixRef.current?.querySelector('input')?.focus(), 100)
-        }
-      } else {
-        setEditCustomerId(null)
-        setTimeout(() => companyPrefixRef.current?.querySelector('input')?.focus(), 100)
+        setOriginOptions(formatted)
+      } catch (err) {
+        console.error('Origin load failed', err)
+        setOriginOptions([])
       }
-    })()
-  }, [customerId])
+    }
 
-  // Sync contacts to temp DB
-  useEffect(() => {
-    ;(async () => {
-      if (!isEditMode && contacts.length === 0) return
-      const db = await getDB()
-      const tx = db.transaction('contacts', 'readwrite')
-      const store = tx.objectStore('contacts')
-      await store.clear()
-      contacts.forEach(c => store.put(c))
-      await tx.done
-    })()
-  }, [contacts, isEditMode])
+    loadOrigins()
+  }, [])
 
   const pageTitle = isEditMode ? 'Edit Customer' : 'Add Customer'
 
@@ -248,32 +192,52 @@ export default function AddCustomerPage() {
   const handleFinalCancel = () => router.push('/admin/customers')
 
   const handleFinalSave = async () => {
-    const customerRecord = {
-      ...formData,
-      commenceDate: formData.commenceDate?.toISOString() || new Date().toISOString(),
-      contracts: formData.companyPrefix,
-      status: 'Active',
-      contacts: contacts
-    }
+    const formatDate = d => d.toISOString().split('T')[0]
 
-    if (isEditMode && editCustomerId) {
-      customerRecord.id = editCustomerId
+    const payload = {
+      name: formData.customerName,
+      business_name: formData.abssCustomerName,
+      customer_code: formData.cardId,
+      company_id: formData.origin,
+      prefix: formData.companyPrefix,
+      commence_date: formatDate(formData.commenceDate),
+      pic_contact_name: formData.picName,
+      pic_email: formData.picEmail,
+      pic_phone: formData.picPhone,
+      billing_contact_name: formData.billingName,
+      billing_email: formData.billingEmail,
+      billing_phone: formData.billingPhone,
+      city: formData.city,
+      state: formData.state || '',
+      postal_code: formData.postalCode,
+      payment_term: Number(formData.paymentTerms),
+      sales_person_id: Number(formData.salesperson),
+      billing_address: formData.billingAddress,
+      email: formData.loginEmail,
+      password: formData.password,
+      short_description: formData.remarks1,
+      description: formData.remarks2,
+      contact: contacts.map(c => ({
+        name: c.miniName,
+        email: c.miniEmail,
+        phone: c.miniPhone
+      }))
     }
 
     try {
-      const db = await getCustomerDB()
-      await db.put('customers', customerRecord)
+      const res = await addCustomer(payload)
 
-      const contactsDb = await getDB()
-      await contactsDb.clear('contacts')
-
-      router.push('/admin/customers')
-    } catch (error) {
-      console.error('Save failed:', error)
-      alert('Error saving customer.')
+      if (res.status === 'success') {
+        showToast('success', 'Customer added successfully')
+        setTimeout(() => router.push('/admin/customers'), 600)
+      } else {
+        showToast('error', res.message || 'Failed to create customer')
+      }
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'Error creating customer')
     }
   }
-
   const contactManualColumns = [
     {
       key: 'actions',
@@ -311,23 +275,14 @@ export default function AddCustomerPage() {
           <Card sx={{ p: 4, boxShadow: 'none' }}>
             <Grid container spacing={4}>
               {/* Origin */}
-              {/* Origin */}
+
               <Grid item xs={12} md={4}>
                 <CustomSelectField
                   fullWidth
                   label='Origin'
                   value={formData.origin}
                   onChange={e => setFormData(prev => ({ ...prev, origin: e.target.value }))}
-                  options={[
-                    { value: 'India', label: 'India' },
-                    { value: 'USA', label: 'USA' }
-                  ]}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      document.querySelector('[name="companyPrefix"]')?.focus()
-                    }
-                  }}
+                  options={originOptions}
                 />
               </Grid>
 

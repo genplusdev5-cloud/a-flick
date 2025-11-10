@@ -24,6 +24,7 @@ import {
   InputAdornment
 } from '@mui/material'
 
+import { getContractList, deleteContractApi } from '@/api/contract'
 
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
@@ -51,49 +52,6 @@ import {
 } from '@tanstack/react-table'
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
-
-// ───────────────────────────────────────────
-// IndexedDB Helpers
-// ───────────────────────────────────────────
-const DB_NAME = 'ContractDB'
-const STORE_NAME = 'contracts'
-
-const openDB = () => {
-  return new Promise((resolve, reject) => {
-    if (!('indexedDB' in window)) return reject(new Error('IndexedDB not supported'))
-    const request = indexedDB.open(DB_NAME, 1)
-    request.onerror = () => reject(request.error)
-    request.onsuccess = () => resolve(request.result)
-    request.onupgradeneeded = e => {
-      const db = e.target.result
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id' })
-      }
-    }
-  })
-}
-
-const getContracts = async () => {
-  const db = await openDB()
-  const tx = db.transaction(STORE_NAME, 'readonly')
-  const store = tx.objectStore(STORE_NAME)
-  const request = store.getAll()
-  return new Promise((resolve, reject) => {
-    request.onsuccess = () => resolve(request.result.reverse())
-    request.onerror = () => reject(request.error)
-  })
-}
-
-const deleteContract = async id => {
-  const db = await openDB()
-  const tx = db.transaction(STORE_NAME, 'readwrite')
-  const store = tx.objectStore(STORE_NAME)
-  const request = store.delete(id)
-  return new Promise((resolve, reject) => {
-    request.onsuccess = () => resolve()
-    request.onerror = () => reject(request.error)
-  })
-}
 
 // Toast helper
 // ──────────────────────────────────────────────────────────────
@@ -176,7 +134,7 @@ export default function ContractsPage() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const all = await getContracts()
+      const all = await getContractList()
 
       // 🔍 Filter contracts by search input
       const filtered = searchText
@@ -200,8 +158,25 @@ export default function ContractsPage() {
       const normalized = paginated.map((item, idx) => ({
         ...item,
         sno: start + idx + 1,
-        pestList: item.pestItems?.map(p => p.pest).join(', ') || 'N/A',
-        date: item.startDate ? new Date(item.startDate).toLocaleDateString('en-GB') : ''
+
+        customer: item.customer_id || '',
+        contractCode: item.contract_code || '',
+        serviceAddress: item.service_address || '',
+        contractType: item.contract_type || '',
+        postalCode: item.postal_address || '',
+        contractValue: item.contract_value || 0,
+
+        contactName: item.contact_person_name || '',
+        contactPhone: item.phone || '',
+        mobile: item.mobile || '',
+
+        pestList: item.pest_items?.map(p => p.pest_id).join(', ') || 'N/A',
+
+        startDate: item.start_date ? new Date(item.start_date).toLocaleDateString('en-GB') : '',
+
+        endDate: item.end_date ? new Date(item.end_date).toLocaleDateString('en-GB') : '',
+
+        status: item.is_active === 1 ? 'Active' : 'Inactive'
       }))
 
       setRows(normalized)
@@ -224,7 +199,8 @@ export default function ContractsPage() {
   const handleEdit = id => router.push(`/admin/contracts/${id}/edit`)
   const confirmDelete = async () => {
     if (deleteDialog.row) {
-      await deleteContract(deleteDialog.row.id)
+      await deleteContractApi(deleteDialog.row.id)
+
       showToast('delete', `Contract ${deleteDialog.row.contractCode} deleted`)
       loadData()
     }
@@ -236,6 +212,8 @@ export default function ContractsPage() {
   const columns = useMemo(
     () => [
       columnHelper.accessor('sno', { header: 'S.No' }),
+
+      // 🔥 ACTIONS
       columnHelper.display({
         id: 'actions',
         header: 'Actions',
@@ -254,26 +232,50 @@ export default function ContractsPage() {
           </Box>
         )
       }),
+
+      // 🔥 BASIC INFO
       columnHelper.accessor('customer', { header: 'Customer' }),
       columnHelper.accessor('contractCode', { header: 'Code' }),
       columnHelper.accessor('serviceAddress', { header: 'Address' }),
       columnHelper.accessor('contractType', { header: 'Type' }),
-      columnHelper.accessor('date', { header: 'Date' }),
-      columnHelper.accessor('pestList', { header: 'Pests' }),
-      columnHelper.display({
-        id: 'services',
-        header: 'Services',
-        cell: () => (
-          <Button
-            size='small'
-            variant='outlined'
-            color='info'
-            sx={{ borderRadius: '5px', textTransform: 'none', fontWeight: 500, p: '4px 8px' }}
-          >
-            Services
-          </Button>
-        )
+
+      // 🔥 NEW DATES
+      columnHelper.accessor('startDate', { header: 'Start Date' }),
+      columnHelper.accessor('endDate', { header: 'End Date' }),
+
+      // 🔥 POSTAL CODE
+      columnHelper.accessor('postalCode', {
+        header: 'Postal Code',
+        cell: info => info.getValue() || '—'
       }),
+
+      // 🔥 PRODUCT VALUE
+      columnHelper.accessor('productValue', {
+        header: 'Product Value',
+        cell: info => `₹ ${info.getValue() || 0}`
+      }),
+
+      // 🔥 CONTRACT VALUE
+      columnHelper.accessor('contractValue', {
+        header: 'Contract Value',
+        cell: info => `₹ ${info.getValue() || 0}`
+      }),
+
+      // 🔥 CONTACT PERSON DETAILS
+      columnHelper.accessor('contactName', { header: 'Contact Person' }),
+      columnHelper.accessor('contactPhone', { header: 'Phone' }),
+      columnHelper.accessor('mobile', { header: 'Mobile' }),
+
+      // 🔥 SERVICES LIST
+      columnHelper.accessor('services', {
+        header: 'Services',
+        cell: info => info.getValue()?.join(', ') || 'N/A'
+      }),
+
+      // 🔥 PEST LIST
+      columnHelper.accessor('pestList', { header: 'Pests' }),
+
+      // 🔥 STATUS
       columnHelper.accessor('status', {
         header: 'Status',
         cell: info => {

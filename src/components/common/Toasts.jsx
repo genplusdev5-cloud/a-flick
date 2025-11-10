@@ -34,24 +34,19 @@ export const showToast = (type, message = '') => {
         }}
       />
 
-      <Typography variant='body2' sx={{ fontWeight: 500 }}>
+      <Typography variant='body2' sx={{ fontSize: '0.9rem', color: '#111' }}>
         {message}
       </Typography>
     </div>,
     {
-      type:
-        type === 'delete'
-          ? 'error'
-          : ['success', 'error', 'warning', 'info'].includes(type)
-          ? type
-          : 'default',
+      type: type === 'delete' ? 'error' : ['success', 'error', 'warning', 'info'].includes(type) ? type : 'default',
 
-      autoClose: 2500,
-      pauseOnHover: false,
-      draggable: false,
+      position: 'top-right',
+      autoClose: 2000,
       hideProgressBar: true,
       closeOnClick: true,
-      position: 'top-right',
+      pauseOnHover: false,
+      draggable: false,
       theme: 'light',
 
       // ⭐ Prevent default icon (important!)
@@ -68,7 +63,6 @@ export const showToast = (type, message = '') => {
     }
   )
 }
-
 
 // -------------------------------------------------------------
 // 🔥 Global Toast Container (Place ONLY in ClientWrapper)
