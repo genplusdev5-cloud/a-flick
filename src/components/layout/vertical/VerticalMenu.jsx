@@ -141,7 +141,7 @@ const VerticalMenu = ({ scrollMenu }) => {
 
         {/* ✅ Stock Dropdown */}
         <SubMenu label='Stock' icon={<i className='tabler-package' />}>
-          <MenuItem href={`/${locale}/admin/stock/chemicals`}>Chemicals</MenuItem>
+          {/* <MenuItem href={`/${locale}/admin/stock/chemicals`}>Chemicals</MenuItem> */}
           <MenuItem href={`/${locale}/admin/stock/material-request`}>Material Request</MenuItem>
           <MenuItem href={`/${locale}/admin/stock/report`}>Stock Report</MenuItem>
           <MenuItem href={`/${locale}/admin/stock/usage-report`}>Usage Report</MenuItem>
