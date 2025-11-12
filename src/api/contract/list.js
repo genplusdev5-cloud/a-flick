@@ -1,18 +1,31 @@
 import api from '@/utils/axiosInstance'
 
-export const getContractList = async () => {
-  const res = await api.get('contract-list/')
+/**
+ * Fetch contract list with optional filters
+ * Example: { customer_id: 5, contract_type: 'job', customer_name: 'current' }
+ */
+export const getContractList = async (filters = {}) => {
+  try {
+    // Build query params correctly for backend
+    const params = new URLSearchParams()
 
-  console.log("🔥 RAW CONTRACT LIST → ", res.data)
+    if (filters.customer_id) params.append('customer_id', filters.customer_id)
+    if (filters.contract_type) params.append('contract_type', filters.contract_type)
+    if (filters.customer_name) params.append('customer_name', filters.customer_name)
 
-  // API structure:
-  // res.data.data.results = []
+    const query = params.toString()
+    const url = query ? `contract-list/?${query}` : 'contract-list/'
 
-  const results = res.data?.data?.results
+    console.log('📡 Fetching contract list from:', url)
 
-  if (Array.isArray(results)) {
-    return results
+    const res = await api.get(url)
+
+    console.log('🔥 Contract API Response →', res.data)
+
+    const results = res.data?.data?.results
+    return Array.isArray(results) ? results : []
+  } catch (error) {
+    console.error('❌ Contract list API error:', error)
+    return []
   }
-
-  return []
 }

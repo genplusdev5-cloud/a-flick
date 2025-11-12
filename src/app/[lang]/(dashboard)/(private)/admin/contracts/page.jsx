@@ -26,6 +26,11 @@ import {
 
 import { getContractList, deleteContractApi } from '@/api/contract'
 
+// Custom Autocomplete + TextField
+import CustomAutocomplete from '@core/components/mui/Autocomplete'
+import CustomTextField from '@core/components/mui/TextField'
+import { getCustomerNamesForList } from '@/api/contract/listDropdowns'
+
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
@@ -130,57 +135,49 @@ export default function ContractsPage() {
   const [loading, setLoading] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
+  const [customerOptions, setCustomerOptions] = useState([])
+
+  const [customerFilter, setCustomerFilter] = useState(null)
+  const [typeFilter, setTypeFilter] = useState(null)
+  const [statusFilter, setStatusFilter] = useState(null)
 
   const loadData = async () => {
     setLoading(true)
     try {
-      const all = await getContractList()
+      const filters = {}
 
-      // 🔍 Filter contracts by search input
-      const filtered = searchText
-        ? all.filter(
-            r =>
-              ['customer', 'contractCode', 'serviceAddress', 'contractType'].some(key =>
-                (r[key] || '').toString().toLowerCase().includes(searchText.toLowerCase())
-              ) || (r.pestItems || []).some(p => (p.pest || '').toLowerCase().includes(searchText.toLowerCase()))
-          )
-        : all
+      if (customerFilter) filters.customer_id = customerFilter // ✅ send customer ID
+      if (typeFilter) filters.contract_type = typeFilter?.toLowerCase() // ✅ backend expects lowercase
+      if (statusFilter) filters.customer_name = statusFilter?.toLowerCase() // ✅ matches your Postman param
 
-      // 🔢 Sort newest first
-      const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
+      const all = await getContractList(filters)
 
-      // 📄 Pagination logic
+      const sorted = all.sort((a, b) => (b.id || 0) - (a.id || 0))
+
       const start = pagination.pageIndex * pagination.pageSize
       const end = start + pagination.pageSize
       const paginated = sorted.slice(start, end)
 
-      // 🧾 Normalize and add serial numbers
       const normalized = paginated.map((item, idx) => ({
         ...item,
         sno: start + idx + 1,
-
         customer: item.customer_id || '',
         contractCode: item.contract_code || '',
         serviceAddress: item.service_address || '',
         contractType: item.contract_type || '',
         postalCode: item.postal_address || '',
         contractValue: item.contract_value || 0,
-
         contactName: item.contact_person_name || '',
         contactPhone: item.phone || '',
         mobile: item.mobile || '',
-
         pestList: item.pest_items?.map(p => p.pest_id).join(', ') || 'N/A',
-
         startDate: item.start_date ? new Date(item.start_date).toLocaleDateString('en-GB') : '',
-
         endDate: item.end_date ? new Date(item.end_date).toLocaleDateString('en-GB') : '',
-
         status: item.is_active === 1 ? 'Active' : 'Inactive'
       }))
 
       setRows(normalized)
-      setRowCount(filtered.length)
+      setRowCount(all.length)
     } catch (err) {
       console.error(err)
       showToast('error', 'Failed to load contracts')
@@ -189,8 +186,35 @@ export default function ContractsPage() {
     }
   }
 
+  const loadCustomers = async () => {
+    try {
+      const names = await getCustomerNamesForList()
+
+      // ✅ Remove duplicates based on name
+      const uniqueCustomers = Array.from(new Map(names.map(item => [item.name, item])).values())
+
+      setCustomerOptions(uniqueCustomers)
+    } catch (error) {
+      console.error('Error loading customers:', error)
+      setCustomerOptions([])
+    }
+  }
+
+  useEffect(() => {
+  if (customerFilter || typeFilter || statusFilter) {
+    loadData()
+  }
+}, [customerFilter, typeFilter, statusFilter])
+
+
   useEffect(() => {
     loadData()
+    const loadCustomers = async () => {
+      const names = await getCustomerNamesForList()
+      setCustomerOptions(names)
+    }
+    loadCustomers()
+
     const handleFocus = () => loadData()
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
@@ -482,20 +506,83 @@ export default function ContractsPage() {
           </Box>
         )}
 
-        <Divider sx={{ mb: 2 }} />
-        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-          <FormControl size='small' sx={{ width: 140 }}>
-            <Select
-              value={pagination.pageSize}
-              onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
-            >
-              {[10, 25, 50, 100].map(s => (
-                <MenuItem key={s} value={s}>
-                  {s} entries
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+        <Divider sx={{ mb: 6 }} />
+        <Box
+          sx={{
+            mb: 6,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 2
+          }}
+        >
+          {/* 🔥 LEFT SIDE: Entries + Filters */}
+
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            {/* Entries per page */}
+            <FormControl size='small' sx={{ width: 120 }}>
+              <Select
+                value={pagination.pageSize}
+                onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
+              >
+                {[10, 25, 50, 100].map(s => (
+                  <MenuItem key={s} value={s}>
+                    {s} entries
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            {/* Customer Filter (AutoComplete) */}
+            {/* Customer Filter (AutoComplete) */}
+            <CustomAutocomplete
+              fullWidth
+              id='customer-filter'
+              options={customerOptions}
+              getOptionLabel={option => option?.name || ''}
+              renderOption={(props, option) => (
+                <li {...props} key={`${option.id}-${option.name}`}>
+                  {option.name}
+                </li>
+              )}
+              isOptionEqualToValue={(option, value) => option.id === value.id}
+              value={customerOptions.find(c => c.id === customerFilter) || null}
+              onChange={(e, newVal) => setCustomerFilter(newVal?.id || null)} // ✅ store ID here
+              renderInput={params => (
+                <CustomTextField {...params} label='Customer' placeholder='Select Customer' size='small' />
+              )}
+              sx={{ width: 300 }}
+            />
+
+            {/* Contract Type (AutoComplete) */}
+            <CustomAutocomplete
+              fullWidth
+              id='contract-type-filter'
+              options={['Limited Contract', 'Job', 'Continuous Contract', 'Continuous Job', 'Warranty']}
+              value={typeFilter}
+              onChange={(e, newVal) => setTypeFilter(newVal)}
+              renderInput={params => (
+                <CustomTextField {...params} label='Contract Type' placeholder='Select Type' size='small' />
+              )}
+              sx={{ width: 220 }}
+            />
+
+            {/* Contract Status (AutoComplete) */}
+            <CustomAutocomplete
+              fullWidth
+              id='contract-status-filter'
+              options={['Current', 'Renewed', 'Hold', 'Terminated', 'Expired']}
+              value={statusFilter}
+              onChange={(e, newVal) => setStatusFilter(newVal)}
+              renderInput={params => (
+                <CustomTextField {...params} label='Contract Status' placeholder='Select Status' size='small' />
+              )}
+              sx={{ width: 220 }}
+            />
+          </Box>
+
+          {/* 🔍 RIGHT SIDE: Search */}
           <DebouncedInput
             value={searchText}
             onChange={v => {
@@ -503,7 +590,7 @@ export default function ContractsPage() {
               setPagination(p => ({ ...p, pageIndex: 0 }))
             }}
             placeholder='Search customer, code, address, pests...'
-            sx={{ width: 420 }}
+            sx={{ width: 340 }}
             variant='outlined'
             size='small'
             slotProps={{
@@ -517,6 +604,7 @@ export default function ContractsPage() {
             }}
           />
         </Box>
+
         <div className='overflow-x-auto'>
           <table className={styles.table}>
             <thead>

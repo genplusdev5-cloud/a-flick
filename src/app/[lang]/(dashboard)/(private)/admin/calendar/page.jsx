@@ -1,75 +1,20 @@
 'use client'
 
-import { useTheme } from '@mui/material/styles'
-// React Imports
-import { useState } from 'react'
+import Card from '@mui/material/Card'
+import CalendarWrapper from '@views/apps/calendar/CalendarWrapper'
+import AppFullCalendar from '@/libs/styles/AppFullCalendar'
 
-// Redux Imports
-import { useDispatch, useSelector } from 'react-redux'
+// ✅ Import Vuexy Calendar SCSS for layout + design
 
-// Component Imports
-import Calendar from './Calendar'
-import SidebarLeft from './SidebarLeft'
-import AddEventSidebar from './AddEventSidebar'
 
-// Calendar Color Configuration
-const calendarsColor = {
-  Personal: 'error',
-  Business: 'primary',
-  Family: 'warning',
-  Holiday: 'success',
-  ETC: 'info'
-}
-
-export default function Page() {
-  // State Management
-  const [calendarApi, setCalendarApi] = useState(null)
-  const [leftSidebarOpen, setLeftSidebarOpen] = useState(false)
-  const [addEventSidebarOpen, setAddEventSidebarOpen] = useState(false)
-
-  // Redux Setup
-  const dispatch = useDispatch()
-  const calendarStore = useSelector(state => state.calendarReducer) // ✅ check reducer key
-
-  // Handlers
-  const handleLeftSidebarToggle = () => setLeftSidebarOpen(!leftSidebarOpen)
-  const handleAddEventSidebarToggle = () => setAddEventSidebarOpen(!addEventSidebarOpen)
-
+const CalendarApp = () => {
   return (
-    <div className='app-calendar flex flex-grow overflow-hidden bg-backgroundPaper rounded'>
-      {/* Left Sidebar */}
-      <SidebarLeft
-        mdAbove
-        dispatch={dispatch}
-        calendarApi={calendarApi}
-        calendarStore={calendarStore}
-        calendarsColor={calendarsColor}
-        leftSidebarOpen={leftSidebarOpen}
-        handleLeftSidebarToggle={handleLeftSidebarToggle}
-        handleAddEventSidebarToggle={handleAddEventSidebarToggle}
-      />
-
-      {/* Calendar Main View */}
-      <div className='calendar-content p-6 flex-grow overflow-visible'>
-        <Calendar
-          dispatch={dispatch}
-          calendarApi={calendarApi}
-          calendarStore={calendarStore}
-          setCalendarApi={setCalendarApi}
-          calendarsColor={calendarsColor}
-          handleLeftSidebarToggle={handleLeftSidebarToggle}
-          handleAddEventSidebarToggle={handleAddEventSidebarToggle}
-        />
-      </div>
-
-      {/* Add Event Sidebar */}
-      <AddEventSidebar
-        dispatch={dispatch}
-        calendarApi={calendarApi}
-        calendarStore={calendarStore}
-        addEventSidebarOpen={addEventSidebarOpen}
-        handleAddEventSidebarToggle={handleAddEventSidebarToggle}
-      />
-    </div>
+    <Card>
+      <AppFullCalendar className='app-calendar'>
+        <CalendarWrapper />
+      </AppFullCalendar>
+    </Card>
   )
 }
+
+export default CalendarApp

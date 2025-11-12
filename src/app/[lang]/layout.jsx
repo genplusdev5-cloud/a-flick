@@ -1,13 +1,18 @@
-// ✅ FIXED VERSION
+// ✅ FIXED VERSION (Vuexy Calendar Support Enabled)
 
 import { headers } from 'next/headers'
 import InitColorSchemeScript from '@mui/material/InitColorSchemeScript'
+
+// ✅ Import Global Styles (Add this 👇)
+
 import 'react-perfect-scrollbar/dist/css/styles.css'
+import '@/app/globals.css'
+import '@assets/iconify-icons/generated-icons.css'
+
+// ✅ Vuexy theme & translation imports
 import TranslationWrapper from '@/hocs/TranslationWrapper'
 import { i18n } from '@configs/i18n'
 import { getSystemMode } from '@core/utils/serverHelpers'
-import '@/app/globals.css'
-import '@assets/iconify-icons/generated-icons.css'
 
 export const metadata = {
   title: 'A-flick Pest Control Management'
@@ -25,7 +30,8 @@ const RootLayout = async props => {
     <html id='__next' lang={params.lang} dir={direction} suppressHydrationWarning>
       <body className='flex is-full min-bs-full flex-auto flex-col'>
         <InitColorSchemeScript attribute='data' defaultMode={systemMode} />
-        {/* ✅ Move TranslationWrapper inside body */}
+
+        {/* ✅ Wrap app in TranslationWrapper */}
         <TranslationWrapper headersList={headersList} lang={params.lang}>
           {children}
         </TranslationWrapper>

@@ -4,7 +4,8 @@
 import Grid from '@mui/material/Grid2'
 import { useState, useEffect } from 'react'
 
-import { getDashboardData } from '@/api/dashboard'
+import { getFullDashboardData } from '@/api/dashboard'
+
 
 // ✅ Component Imports
 import CardStatVertical from '@/components/card-statistics/Vertical'
@@ -25,12 +26,30 @@ const DashboardCRM = () => {
     loadDashboard()
   }, [])
 
-  const loadDashboard = async () => {
-    const response = await getDashboardData()
-    if (response?.status === 'success') {
-      setDashboard(response.data)
-    }
+const loadDashboard = async () => {
+  const response = await getFullDashboardData()
+  if (response?.status === 'success') {
+    const cardData = response.cards || {}
+    setDashboard({
+      customers: cardData.customers || 0,
+      active_contracts: cardData.active_contracts || 0,
+      active_jobs: cardData.active_jobs || 0,
+      active_warranties: cardData.active_warranties || 0,
+      due_for_renewal: cardData.due_for_renewal || 0,
+      yearly_terminations: cardData.yearly_terminations || 0
+    })
+  } else {
+    setDashboard({
+      customers: 0,
+      active_contracts: 0,
+      active_jobs: 0,
+      active_warranties: 0,
+      due_for_renewal: 0,
+      yearly_terminations: 0
+    })
   }
+}
+
 
   return (
     <Grid container spacing={6}>
