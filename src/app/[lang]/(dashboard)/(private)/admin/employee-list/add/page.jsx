@@ -18,9 +18,10 @@ import {
 import { getDepartmentList } from '../../../../../../../api/departments/list'
 import { getDesignationList } from '../../../../../../../api/designations/list'
 import { getUserRoleList } from '../../../../../../../api/userRole/list'
+import { getSchedulerList, getSupervisorList } from '@/api/employee'
 
 import { addEmployee } from '@/api/employee'
-
+import { showToast } from '@/components/common/Toasts'
 import { useRouter } from 'next/navigation'
 
 import { toast } from 'react-toastify'
@@ -43,14 +44,15 @@ export default function AddEmployeePage() {
   // ----------------------------------------------------------------------
 
   // Autocomplete/Text Fields
-  const [employeeRole, setEmployeeRole] = useState('')
+
   const [nickname, setNickname] = useState('')
   const [name, setName] = useState('')
-  const [department, setDepartment] = useState('')
-  const [designation, setDesignation] = useState('')
-  const [userRole, setUserRole] = useState('')
-  const [scheduler, setScheduler] = useState('')
-  const [supervisor, setSupervisor] = useState('')
+  const [department, setDepartment] = useState(null)
+  const [designation, setDesignation] = useState(null)
+  const [userRole, setUserRole] = useState(null)
+  const [scheduler, setScheduler] = useState(null)
+  const [supervisor, setSupervisor] = useState(null)
+  const [employeeRole, setEmployeeRole] = useState(null)
   const [lunchTime, setLunchTime] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -86,6 +88,21 @@ export default function AddEmployeePage() {
   const [isSales, setIsSales] = useState(false)
   const [isTechnician, setIsTechnician] = useState(false)
 
+  const [schedulerList, setSchedulerList] = useState([])
+  const [supervisorList, setSupervisorList] = useState([])
+
+  const [fingerPrintId, setFingerPrintId] = useState('')
+  const [employeeCode, setEmployeeCode] = useState('')
+  const [nationality, setNationality] = useState('')
+  const [signatureFile, setSignatureFile] = useState(null)
+
+  const [isSupervisorFlag, setIsSupervisorFlag] = useState(false)
+  const [isForeigner, setIsForeigner] = useState(false)
+  const [isGps, setIsGps] = useState(false)
+  const [isPhoto, setIsPhoto] = useState(false)
+  const [isQr, setIsQr] = useState(false)
+  const [isSign, setIsSign] = useState(false)
+
   // Map state keys to their setter functions
   const stateSetters = {
     employeeRole: setEmployeeRole,
@@ -105,7 +122,7 @@ export default function AddEmployeePage() {
     targetSaturday: setTargetSaturday,
     vehicleNumber: setVehicleNumber,
     description: setDescription,
-    // color field logic is handled separately below due to the 'color' type
+    color: setColor, // <-- ADD THIS
     dob: setDob
   }
 
@@ -120,7 +137,7 @@ export default function AddEmployeePage() {
     },
     {
       name: 'department',
-      options: departmentList // ✅ use directly — already sanitized
+      options: departmentList
     },
     {
       name: 'designation',
@@ -132,17 +149,11 @@ export default function AddEmployeePage() {
     },
     {
       name: 'scheduler',
-      options: [
-        { id: 1, label: 'User A' },
-        { id: 2, label: 'User B' }
-      ]
+      options: schedulerList // ⭐ FIXED
     },
     {
       name: 'supervisor',
-      options: [
-        { id: 1, label: 'Supervisor 1' },
-        { id: 2, label: 'Supervisor 2' }
-      ]
+      options: supervisorList // ⭐ FIXED
     }
   ]
 
@@ -213,10 +224,10 @@ export default function AddEmployeePage() {
           getUserRoleList()
         ])
 
+        // Extract backend results correctly
         const extractResults = res => {
           if (res?.data?.data?.results) return res.data.data.results
           if (res?.data?.results) return res.data.results
-          if (Array.isArray(res?.data?.data)) return res.data.data
           if (Array.isArray(res?.data)) return res.data
           return []
         }
@@ -225,24 +236,20 @@ export default function AddEmployeePage() {
         const designationData = extractResults(desigRes)
         const userRoleData = extractResults(roleRes)
 
-        // ✅ Utility function to sanitize list data
-        const sanitizeOptions = (list, labelKey, prefix) => {
-          const seen = new Set()
-          return list.map((item, index) => {
-            let safeId = item?.id ?? `${prefix}-${index}`
-            if (seen.has(safeId)) safeId = `${prefix}-${index}-${Math.random().toString(36).slice(2, 7)}`
-            seen.add(safeId)
-            return {
-              id: safeId,
-              label: item?.[labelKey] || item?.name || item?.title || `${prefix} ${index + 1}`
-            }
-          })
-        }
+        console.log('Dept Data:', departmentData)
+        console.log('Desig Data:', designationData)
+        console.log('User Role Data:', userRoleData)
 
-        // ✅ Apply to all dropdowns
-        setDepartmentList(sanitizeOptions(departmentData, 'department_name', 'dept'))
-        setDesignationList(sanitizeOptions(designationData, 'designation_name', 'desig'))
-        setUserRoleList(sanitizeOptions(userRoleData, 'role_name', 'role'))
+        // Convert to dropdown format
+        const sanitizeOptions = list =>
+          list.map(item => ({
+            id: item.id,
+            label: item.name || '-'
+          }))
+
+        setDepartmentList(sanitizeOptions(departmentData))
+        setDesignationList(sanitizeOptions(designationData))
+        setUserRoleList(sanitizeOptions(userRoleData))
       } catch (error) {
         console.error('❌ Dropdown fetch failed:', error)
         showToast('error', 'Failed to load dropdown data')
@@ -250,6 +257,36 @@ export default function AddEmployeePage() {
     }
 
     fetchDropdowns()
+  }, [])
+
+  useEffect(() => {
+    const loadFlags = async () => {
+      try {
+        const schedulers = await getSchedulerList()
+        const supervisors = await getSupervisorList()
+
+        setSchedulerList(
+          schedulers?.data?.map(x => ({
+            id: x.id,
+            label: x.name
+          })) || []
+        )
+
+        setSupervisorList(
+          supervisors?.data?.map(x => ({
+            id: x.id,
+            label: x.name
+          })) || []
+        )
+
+        console.log('Scheduler List:', schedulers?.data)
+        console.log('Supervisor List:', supervisors?.data)
+      } catch (error) {
+        console.error('Error loading scheduler/supervisor:', error)
+      }
+    }
+
+    loadFlags()
   }, [])
 
   // ----------------------------------------------------------------------
@@ -264,58 +301,6 @@ export default function AddEmployeePage() {
     }
   }
 
-  // ──────────────────────────────────────────────────────────────
-  // Toast (Custom Styled, Global, with Icons & Colors)
-  // ──────────────────────────────────────────────────────────────
-  const showToast = (type, message = '') => {
-    const icons = {
-      success: 'tabler-circle-check',
-      delete: 'tabler-trash',
-      error: 'tabler-alert-triangle',
-      warning: 'tabler-info-circle',
-      info: 'tabler-refresh'
-    }
-
-    toast(
-      <div className='flex items-center gap-2'>
-        <i
-          className={icons[type]}
-          style={{
-            color:
-              type === 'success'
-                ? '#16a34a'
-                : type === 'error'
-                  ? '#dc2626'
-                  : type === 'delete'
-                    ? '#dc2626'
-                    : type === 'warning'
-                      ? '#f59e0b'
-                      : '#2563eb',
-            fontSize: '22px'
-          }}
-        />
-        <Typography variant='body2' sx={{ fontSize: '0.9rem', color: '#111' }}>
-          {message}
-        </Typography>
-      </div>,
-      {
-        position: 'top-right',
-        autoClose: 2000,
-        hideProgressBar: true,
-        closeOnClick: true,
-        pauseOnHover: false,
-        draggable: false,
-        theme: 'light',
-        style: {
-          borderRadius: '10px',
-          padding: '8px 14px',
-          boxShadow: '0 4px 10px rgba(0,0,0,0.06)',
-          display: 'flex',
-          alignItems: 'center'
-        }
-      }
-    )
-  }
 
   const focusNextElement = useCallback(
     currentRef => {
@@ -363,23 +348,10 @@ export default function AddEmployeePage() {
 
   const handleAutocompleteChange = (name, newValue, currentInputRef) => {
     const setter = stateSetters[name]
-    if (setter) {
-      // ✅ Always store the entire selected object, not just text
-      setter(newValue)
-    }
+    if (setter) setter(newValue ?? null) // store object
     const setStateFunc = setOpenStates[name + 'SetOpen']
     if (setStateFunc) setStateFunc(false)
     focusNextElement(currentInputRef)
-  }
-
-  const handleAutocompleteInputChange = (name, options, newValue, reason) => {
-    if (reason === 'input' && !options.includes(newValue) && !autocompleteFields.find(f => f.name === name).freeSolo) {
-      return
-    }
-    const setter = stateSetters[name]
-    if (setter) {
-      setter(newValue)
-    }
   }
 
   const handleDateChange = (name, date, currentInputRef) => {
@@ -399,64 +371,93 @@ export default function AddEmployeePage() {
 
   const handleSubmit = async () => {
     try {
+      console.log('CHECK_SELECTED_VALUES >>>', {
+        department,
+        designation,
+        userRole,
+        scheduler,
+        supervisor,
+        employeeRole
+      })
+
       if (!name || !email || !password) {
         showToast('warning', 'Please fill Name, Email, and Password')
         return
       }
 
-      // ✅ Final backend-ready payload (snake_case)
-      const newEmployee = {
-        company_name: '-', // optional but keeps backend consistent
-        user_role: userRole?.label || '-', // ✅ backend expects string, not object
-        department: department?.label || '-',
-        designation: designation?.label || '-',
-        scheduler: scheduler?.label || '-',
-        supervisor: supervisor?.label || '-',
+      // -------------------------------
+      // ✅ FORMAT VALUES
+      // -------------------------------
+      const formatLunch = lunchTime ? (lunchTime.length === 5 ? `${lunchTime}:00` : lunchTime) : ''
 
-        // ✅ plain fields
-        name: name?.trim(),
-        email: email?.trim(),
-        password: password?.trim(),
-        phone: phone || null,
-        description: description || '-',
+      const formatDob = dob ? new Date(dob).toISOString().slice(0, 10) : ''
 
-        // ✅ relational IDs (if backend maps them)
-        department_id: department?.id || null,
-        designation_id: designation?.id || null,
-        user_role_id: userRole?.id || null,
-        scheduler_id: scheduler?.id || null,
-        supervisor_id: supervisor?.id || null,
+      // -------------------------------
+      // ✅ INIT FORMDATA
+      // -------------------------------
+      const formData = new FormData()
 
-        // ✅ numbers & flags
-        target_day: targetDay || null,
-        target_night: targetNight || null,
-        target_saturday: targetSaturday || null,
-        lunch_time: lunchTime || null,
-        vehicle_no: vehicleNumber || null,
-        color_code: color || '#000000',
-        dob: dob ? new Date(dob).toISOString().split('T')[0] : null,
+      // Basic Fields
+      formData.append('name', name || '')
+      formData.append('email', email || '')
+      formData.append('password', password || '')
+      formData.append('phone', phone || '')
+      formData.append('nick_name', nickname || '')
+      formData.append('description', description || '')
 
-        // ✅ boolean flags as numeric
-        is_scheduler: isScheduler ? 1 : 0,
-        is_sales: isSales ? 1 : 0,
-        is_technician: isTechnician ? 1 : 0,
-        is_active: 1,
+      // -------------------------------
+      // 🔥 Foreign Key IDs (ONLY append if selected)
+      // -------------------------------
+      if (department?.id) formData.append('department_id', Number(department.id))
+      if (designation?.id) formData.append('designation_id', Number(designation.id))
+      if (userRole?.id) formData.append('user_role_id', Number(userRole.id))
+      if (scheduler?.id) formData.append('scheduler_id', Number(scheduler.id))
+      if (supervisor?.id) formData.append('supervisor_id', Number(supervisor.id))
 
-        // ✅ audit fields
-        created_by: 1,
-        updated_by: 1
+      // Extra Fields
+      formData.append('finger_print_id', fingerPrintId || '')
+      formData.append('employee_code', employeeCode || '')
+      formData.append('nationality', nationality || '')
+
+      // Signature file
+      if (signatureFile) {
+        formData.append('signature', signatureFile)
       }
 
-      console.log('🚀 Final Payload Sent to API:', newEmployee)
+      // Flags
+      formData.append('is_supervisor', isSupervisorFlag ? 1 : 0)
+      formData.append('is_foreigner', isForeigner ? 1 : 0)
+      formData.append('is_gps', isGps ? 1 : 0)
+      formData.append('is_photo', isPhoto ? 1 : 0)
+      formData.append('is_qr', isQr ? 1 : 0)
+      formData.append('is_sign', isSign ? 1 : 0)
 
-      const res = await addEmployee(newEmployee)
+      formData.append('is_sales', isSales ? 1 : 0)
+      formData.append('is_scheduler', isScheduler ? 1 : 0)
+      formData.append('is_technician', isTechnician ? 1 : 0)
+
+      // Lunch, Targets, DOB
+      formData.append('lunch_time', formatLunch)
+      formData.append('target_day', targetDay || '')
+      formData.append('target_night', targetNight || '')
+      formData.append('target_saturday', targetSaturday || '')
+      formData.append('vehicle_no', vehicleNumber || '')
+      formData.append('color_code', color || '')
+      formData.append('dob', formatDob)
+
+      // Meta
+      formData.append('created_by', 1)
+      formData.append('updated_by', 1)
+      formData.append('is_active', 1)
+
+      // -------------------------------
+      // 🔥 API CALL
+      // -------------------------------
+      const res = await addEmployee(formData)
 
       if (res?.status === 'success') {
         showToast('success', 'Employee added successfully!')
-
-        // Trigger list refresh
         sessionStorage.setItem('reloadAfterAdd', 'true')
-
         setTimeout(() => router.push('/admin/employee-list'), 1000)
       } else {
         showToast('error', res?.message || 'Failed to add employee')
@@ -467,29 +468,28 @@ export default function AddEmployeePage() {
     }
   }
 
-  // ----------------------------------------------------------------------
-  // Render Helper for Autocomplete (UPDATED TO md=4)
-  // ----------------------------------------------------------------------
+  const stateValues = {
+    employeeRole,
+    department,
+    designation,
+    userRole,
+    scheduler,
+    supervisor
+  }
 
   const renderAutocomplete = ({ name, label, options, gridProps = { xs: 12, md: 4 } }) => {
-    // ⬅️ md: 4 for 3 columns per row
     const ref = refs[name + 'Ref']
     const inputRef = refs[name + 'InputRef']
     const isOpen = openStates[name + 'Open']
     const setIsOpen = setOpenStates[name + 'SetOpen']
 
-    // eslint-disable-next-line
-    const value = eval(name)
-
     return (
       <Grid item {...gridProps} key={name}>
         <Autocomplete
-          key={name}
-          ref={ref}
-          options={options.filter(opt => opt?.id && opt?.label)}
-          getOptionLabel={option => (typeof option === 'string' ? option : option?.label || '')}
-          isOptionEqualToValue={(option, value) => option?.id === value?.id}
-          value={typeof value === 'object' ? value : null} // ✅ ensures full object binding
+          options={options}
+          getOptionLabel={o => (typeof o === 'string' ? o : (o?.label ?? ''))}
+          isOptionEqualToValue={(o, v) => o?.id === v?.id}
+          value={stateValues[name] || null} // ✅ Correct mapping
           onChange={(e, newValue) => handleAutocompleteChange(name, newValue, inputRef)}
           renderInput={params => <CustomTextField {...params} label={label} inputRef={inputRef} />}
         />
@@ -561,16 +561,46 @@ export default function AddEmployeePage() {
             options: autocompleteFields.find(f => f.name === 'userRole').options
           })}
 
+          <Grid item xs={12} md={4}>
+            <CustomTextField
+              fullWidth
+              label='Finger Print ID'
+              name='finger_print_id'
+              value={fingerPrintId}
+              onChange={e => setFingerPrintId(e.target.value)}
+            />
+          </Grid>
+
+          <Grid item xs={12} md={4}>
+            <CustomTextField
+              fullWidth
+              label='Employee Code'
+              name='employee_code'
+              value={employeeCode}
+              onChange={e => setEmployeeCode(e.target.value)}
+            />
+          </Grid>
+
+          <Grid item xs={12} md={4}>
+            <CustomTextField
+              fullWidth
+              label='Nationality'
+              name='nationality'
+              value={nationality}
+              onChange={e => setNationality(e.target.value)}
+            />
+          </Grid>
+
           {/* Row 3: Scheduler (4), Supervisor (4), Lunch Time (4) */}
           {renderAutocomplete({
             name: 'scheduler',
             label: 'Scheduler',
-            options: autocompleteFields.find(f => f.name === 'scheduler').options
+            options: schedulerList
           })}
           {renderAutocomplete({
             name: 'supervisor',
             label: 'Supervisor',
-            options: autocompleteFields.find(f => f.name === 'supervisor').options
+            options: supervisorList
           })}
           <Grid item xs={12} md={4}>
             {' '}
@@ -603,6 +633,48 @@ export default function AddEmployeePage() {
               sx={{ mt: 1 }}
             />
           </Grid>
+          <Grid item xs={12} md={4}>
+            <FormControlLabel
+              control={<Checkbox checked={isSupervisorFlag} onChange={e => setIsSupervisorFlag(e.target.checked)} />}
+              label='Is Supervisor'
+            />
+          </Grid>
+
+          <Grid item xs={12} md={4}>
+            <FormControlLabel
+              control={<Checkbox checked={isForeigner} onChange={e => setIsForeigner(e.target.checked)} />}
+              label='Is Foreigner'
+            />
+          </Grid>
+
+          <Grid item xs={12} md={4}>
+            <FormControlLabel
+              control={<Checkbox checked={isGps} onChange={e => setIsGps(e.target.checked)} />}
+              label='GPS'
+            />
+          </Grid>
+
+          <Grid item xs={12} md={4}>
+            <FormControlLabel
+              control={<Checkbox checked={isPhoto} onChange={e => setIsPhoto(e.target.checked)} />}
+              label='Photo'
+            />
+          </Grid>
+
+          <Grid item xs={12} md={4}>
+            <FormControlLabel
+              control={<Checkbox checked={isQr} onChange={e => setIsQr(e.target.checked)} />}
+              label='QR'
+            />
+          </Grid>
+
+          <Grid item xs={12} md={4}>
+            <FormControlLabel
+              control={<Checkbox checked={isSign} onChange={e => setIsSign(e.target.checked)} />}
+              label='Signature'
+            />
+          </Grid>
+
           <Grid item xs={12} md={4}>
             <FormControlLabel
               control={

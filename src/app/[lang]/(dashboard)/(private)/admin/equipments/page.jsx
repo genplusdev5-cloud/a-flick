@@ -388,8 +388,15 @@ export default function EquipmentsPage() {
     return itemRank.passed
   }
 
+  const paginatedRows = useMemo(() => {
+    const start = pagination.pageIndex * pagination.pageSize
+    const end = start + pagination.pageSize
+    return rows.slice(start, end)
+  }, [rows, pagination])
+
   const table = useReactTable({
-    data: rows,
+    data: paginatedRows,
+
     columns,
     manualPagination: true,
     pageCount: Math.ceil(rowCount / pagination.pageSize),
@@ -482,8 +489,19 @@ export default function EquipmentsPage() {
                 disabled={loading}
                 onClick={async () => {
                   setLoading(true)
-                  await loadData()
-                  setTimeout(() => setLoading(false), 600)
+
+                  // Reset page size to 25 BEFORE refresh
+                  setPagination(prev => ({
+                    ...prev,
+                    pageSize: 25,
+                    pageIndex: 0
+                  }))
+
+                  // Load data after pagination updates
+                  setTimeout(async () => {
+                    await loadData()
+                    setLoading(false)
+                  }, 50)
                 }}
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >

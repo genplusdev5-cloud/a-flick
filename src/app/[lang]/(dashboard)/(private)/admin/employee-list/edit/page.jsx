@@ -1,57 +1,74 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Box,
   Button,
   Grid,
   Card,
-  Dialog,
-  DialogContent,
   Checkbox,
   FormControlLabel,
   Autocomplete,
+  Dialog,
+  DialogContent,
   Typography
 } from '@mui/material'
+
 import { useRouter, useSearchParams } from 'next/navigation'
 import { decryptId } from '@/utils/encryption'
-
 import { toast } from 'react-toastify'
 
-import { getEmployeeDetails, updateEmployee } from '@/api/employee'
+import { showToast } from '@/components/common/Toasts'
+
+// API
+import { getEmployeeDetails, updateEmployee, getSchedulerList, getSupervisorList } from '@/api/employee'
+
+import { getDepartmentList } from '@/api/departments/list'
+import { getDesignationList } from '@/api/designations/list'
+import { getUserRoleList } from '@/api/userRole/list'
+
+// UI
 import ContentLayout from '@/components/layout/ContentLayout'
 import CustomTextField from '@core/components/mui/TextField'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 
-// ----------------------------------------------------------------------
-// MAIN COMPONENT
-// ----------------------------------------------------------------------
-
 export default function EditEmployeePage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const encodedId = searchParams.get('id')
+  const params = useSearchParams()
+
+  const encodedId = params.get('id')
   const id = decryptId(encodedId)
 
-  // ✅ States
+  console.log('Encoded ID =', encodedId)
+  console.log('Decrypted ID =', id)
+
+  // ⬇️ State
   const [loading, setLoading] = useState(false)
   const [openDialog, setOpenDialog] = useState(false)
   const [uploadedFileURL, setUploadedFileURL] = useState('')
   const [emailError, setEmailError] = useState(false)
 
-  // Core data states
-  const [employeeData, setEmployeeData] = useState({
-    employeeRole: '',
+  // ⬇️ Dropdown lists
+  const [departmentList, setDepartmentList] = useState([])
+  const [designationList, setDesignationList] = useState([])
+  const [userRoleList, setUserRoleList] = useState([])
+  const [schedulerList, setSchedulerList] = useState([])
+  const [supervisorList, setSupervisorList] = useState([])
+
+  const findOption = (list, id) => list.find(item => item.id === id) || null
+
+  // ⬇️ Employee data
+  const [form, setForm] = useState({
+    employeeRole: null,
     nickname: '',
     name: '',
-    department: '',
-    designation: '',
-    userRole: '',
-    scheduler: '',
-    supervisor: '',
+    department: null,
+    designation: null,
+    userRole: null,
+    scheduler: null,
+    supervisor: null,
     lunchTime: '',
     email: '',
-    password: '',
     phone: '',
     targetDay: '',
     targetNight: '',
@@ -60,364 +77,392 @@ export default function EditEmployeePage() {
     description: '',
     color: '#000000',
     dob: new Date(),
+
+    // flags
     isScheduler: false,
+    isSupervisorFlag: false,
     isSales: false,
-    isTechnician: false
+    isTechnician: false,
+    isForeigner: false,
+    isGps: false,
+    isPhoto: false,
+    isQr: false,
+    isSign: false
   })
 
-  // Autocomplete field options
-  const autocompleteFields = [
-    { name: 'employeeRole', options: ['Confirmed Sales', 'Quotation'] },
-    { name: 'department', options: ['GP Industries Pvt Ltd', 'Marketing', 'IT'] },
-    { name: 'designation', options: ['Manager', 'Senior Developer', 'Sales Executive'] },
-    { name: 'userRole', options: ['Admin', 'Standard User', 'Technician'] },
-    { name: 'scheduler', options: ['User A', 'User B'] },
-    { name: 'supervisor', options: ['Supervisor 1', 'Supervisor 2'] }
-  ]
+  // -----------------------------------------------------
+  // FETCH DROPDOWNS (Same as Add Page)
+  // -----------------------------------------------------
+  const extractResults = res => {
+    if (res?.data?.data?.results) return res.data.data.results
+    if (res?.data?.results) return res.data.results
+    if (Array.isArray(res?.data)) return res.data
+    return []
+  }
 
-  // Fetch employee details
+  const sanitizeOptions = list =>
+    list.map(item => ({
+      id: item.id,
+      label: item.name || '-'
+    }))
+
+  useEffect(() => {
+    const loadDropdowns = async () => {
+      try {
+        const [deptRes, desigRes, roleRes, schedRes, superRes] = await Promise.all([
+          getDepartmentList(),
+          getDesignationList(),
+          getUserRoleList(),
+          getSchedulerList(),
+          getSupervisorList()
+        ])
+
+        setDepartmentList(sanitizeOptions(extractResults(deptRes)))
+        setDesignationList(sanitizeOptions(extractResults(desigRes)))
+        setUserRoleList(sanitizeOptions(extractResults(roleRes)))
+
+        // scheduler & supervisor special format
+        setSchedulerList(schedRes?.data?.results?.map(x => ({ id: x.id, label: x.name })) || [])
+        setSupervisorList(superRes?.data?.results?.map(x => ({ id: x.id, label: x.name })) || [])
+      } catch (error) {
+        console.error(error)
+        toast.error('Dropdown loading failed')
+      }
+    }
+
+    loadDropdowns()
+  }, [])
+
+  // -----------------------------------------------------
+  // FETCH EMPLOYEE DETAILS (FINAL WORKING VERSION)
+  // -----------------------------------------------------
   useEffect(() => {
     if (!id) return
-    const fetchEmployee = async () => {
+
+    // Wait until REQUIRED lists are loaded
+    if (departmentList.length === 0 || designationList.length === 0 || userRoleList.length === 0) {
+      return
+    }
+
+    const loadDetails = async () => {
       setLoading(true)
       try {
         const res = await getEmployeeDetails(id)
-        const data = res?.data || {}
-        setEmployeeData({
-          employeeRole: data.employee_role || '',
-          nickname: data.nick_name || '',
-          name: data.name || '',
-          department: data.department || '',
-          designation: data.designation || '',
-          userRole: data.user_role || '',
-          scheduler: data.scheduler || '',
-          supervisor: data.supervisor || '',
-          lunchTime: data.lunch_time || '',
-          email: data.email || '',
-          password: '',
-          phone: data.phone || '',
-          targetDay: data.target_day || '',
-          targetNight: data.target_night || '',
-          targetSaturday: data.target_saturday || '',
-          vehicleNumber: data.vehicle_no || '',
-          description: data.description || '',
-          color: data.color_code || '#000000',
-          dob: data.dob ? new Date(data.dob) : new Date(),
-          isScheduler: data.is_scheduler === 1,
-          isSales: data.is_sales === 1,
-          isTechnician: data.is_technician === 1
-        })
-      } catch (error) {
-        console.error('❌ Fetch Employee Error:', error)
+        const d = res?.data || {}
+
+        const match = (list, id) => list.find(x => Number(x.id) === Number(id)) || null
+
+        setForm(prev => ({
+          ...prev,
+
+          employeeRole:
+            [
+              { id: 1, label: 'Confirmed Sales' },
+              { id: 2, label: 'Quotation' }
+            ].find(x => x.label === d.employee_role) || null,
+
+          nickname: d.nick_name || '',
+          name: d.name || '',
+
+          department: match(departmentList, d.department_id),
+          designation: match(designationList, d.designation_id),
+          userRole: match(userRoleList, d.user_role_id),
+          scheduler: match(schedulerList, d.scheduler_id),
+          supervisor: match(supervisorList, d.supervisor_id),
+
+          lunchTime: d.lunch_time || '',
+          email: d.email || '',
+          phone: d.phone || '',
+          targetDay: d.target_day || '',
+          targetNight: d.target_night || '',
+          targetSaturday: d.target_saturday || '',
+          vehicleNumber: d.vehicle_no || '',
+          description: d.description || '',
+          color: d.color_code || '#000000',
+          dob: d.dob && d.dob !== '0000-00-00' ? new Date(d.dob) : null,
+
+          isScheduler: d.is_scheduler == 1,
+          isSupervisorFlag: d.is_supervisor == 1,
+          isSales: d.is_sales == 1,
+          isTechnician: d.is_technician == 1,
+          isForeigner: d.is_foreigner == 1,
+          isGps: d.is_gps == 1,
+          isPhoto: d.is_photo == 1,
+          isQr: d.is_qr == 1,
+          isSign: d.is_sign == 1
+        }))
+      } catch (err) {
+        console.error(err)
         toast.error('Failed to load employee details')
       } finally {
         setLoading(false)
       }
     }
-    fetchEmployee()
-  }, [id])
 
-  // Input change handler
-  const handleChange = e => {
-    const { name, value } = e.target
-    setEmployeeData(prev => ({ ...prev, [name]: value }))
-  }
+    loadDetails()
+  }, [id, departmentList, designationList, userRoleList, schedulerList, supervisorList])
 
-  // Toast helper
-  const showToast = (type, message = '') => {
-    const icons = {
-      success: 'tabler-circle-check',
-      error: 'tabler-alert-triangle',
-      warning: 'tabler-info-circle'
-    }
+  // -----------------------------------------------------
+  // HANDLE INPUTS
+  // -----------------------------------------------------
+  const setField = (name, value) => setForm(prev => ({ ...prev, [name]: value }))
 
-    toast(
-      <div className='flex items-center gap-2'>
-        <i
-          className={icons[type]}
-          style={{
-            color: type === 'success' ? '#16a34a' : type === 'error' ? '#dc2626' : '#f59e0b',
-            fontSize: '22px'
-          }}
-        />
-        <Typography variant='body2' sx={{ fontSize: '0.9rem', color: '#111' }}>
-          {message}
-        </Typography>
-      </div>,
-      {
-        position: 'top-right',
-        autoClose: 2000,
-        hideProgressBar: true,
-        theme: 'light',
-        style: {
-          borderRadius: '10px',
-          padding: '8px 14px',
-          boxShadow: '0 4px 10px rgba(0,0,0,0.06)'
-        }
-      }
-    )
-  }
-
-  // Handle submit (update employee)
-  const handleSubmit = async () => {
+  // -----------------------------------------------------
+  // SUBMIT UPDATE
+  const handleSave = async () => {
     try {
       setLoading(true)
-      if (!employeeData.name || !employeeData.email) {
-        showToast('warning', 'Please fill required fields')
-        return
+
+      const fd = new FormData()
+
+      fd.append('id', id)
+      fd.append('name', form.name || '')
+      fd.append('nick_name', form.nickname || '')
+      fd.append('email', form.email || '')
+      fd.append('phone', form.phone || '')
+
+      if (form.department?.id) fd.append('department_id', form.department.id)
+      if (form.designation?.id) fd.append('designation_id', form.designation.id)
+      if (form.userRole?.id) fd.append('user_role_id', form.userRole.id)
+      if (form.scheduler?.id) fd.append('scheduler_id', form.scheduler.id)
+      if (form.supervisor?.id) fd.append('supervisor_id', form.supervisor.id)
+
+      fd.append('lunch_time', form.lunchTime || '')
+      fd.append('target_day', form.targetDay || '')
+      fd.append('target_night', form.targetNight || '')
+      fd.append('target_saturday', form.targetSaturday || '')
+      fd.append('vehicle_no', form.vehicleNumber || '')
+      fd.append('description', form.description || '')
+      fd.append('color_code', form.color || '')
+
+      fd.append('is_scheduler', form.isScheduler ? 1 : 0)
+      fd.append('is_supervisor', form.isSupervisorFlag ? 1 : 0)
+      fd.append('is_sales', form.isSales ? 1 : 0)
+      fd.append('is_technician', form.isTechnician ? 1 : 0)
+      fd.append('is_foreigner', form.isForeigner ? 1 : 0)
+      fd.append('is_gps', form.isGps ? 1 : 0)
+      fd.append('is_photo', form.isPhoto ? 1 : 0)
+      fd.append('is_qr', form.isQr ? 1 : 0)
+      fd.append('is_sign', form.isSign ? 1 : 0)
+
+      if (form.dob) {
+        fd.append('dob', new Date(form.dob).toISOString().slice(0, 10))
       }
 
-      const payload = {
-        id,
-        name: employeeData.name,
-        email: employeeData.email,
-        phone: employeeData.phone,
-        department: employeeData.department,
-        designation: employeeData.designation,
-        user_role: employeeData.userRole,
-        scheduler: employeeData.scheduler,
-        supervisor: employeeData.supervisor,
-        lunch_time: employeeData.lunchTime,
-        description: employeeData.description,
-        target_day: employeeData.targetDay,
-        target_night: employeeData.targetNight,
-        target_saturday: employeeData.targetSaturday,
-        vehicle_no: employeeData.vehicleNumber,
-        color_code: employeeData.color,
-        is_scheduler: employeeData.isScheduler ? 1 : 0,
-        is_sales: employeeData.isSales ? 1 : 0,
-        is_technician: employeeData.isTechnician ? 1 : 0,
-        dob: employeeData.dob ? new Date(employeeData.dob).toISOString().split('T')[0] : null
-      }
+      const res = await updateEmployee(fd)
 
-      const res = await updateEmployee(payload)
       if (res?.status === 'success') {
         showToast('success', 'Employee updated successfully!')
         router.push('/admin/employee-list')
       } else {
-        showToast('error', res?.message || 'Failed to update employee')
+        showToast('error', res?.message || 'Update failed')
       }
     } catch (error) {
-      console.error('❌ Update Error:', error)
-      showToast('error', 'Error updating employee')
+      console.error(error)
+      showToast('error', 'Update failed')
     } finally {
       setLoading(false)
     }
   }
 
-  // Autocomplete renderer
-  const renderAutocomplete = ({ name, label, options }) => (
+  // -----------------------------------------------------
+  // RENDER AUTOCOMPLETE
+  // -----------------------------------------------------
+  const renderAC = (name, label, list) => (
     <Grid item xs={12} md={4} key={name}>
       <Autocomplete
-        options={options.map(o => ({ label: o }))}
-        getOptionLabel={option => option.label || ''}
-        value={options.includes(employeeData[name]) ? { label: employeeData[name] } : null}
-        onChange={(e, newValue) => setEmployeeData(prev => ({ ...prev, [name]: newValue ? newValue.label : '' }))}
+        options={list}
+        getOptionLabel={o => o.label || ''}
+        isOptionEqualToValue={(a, b) => a.id === b.id}
+        value={form[name] || null}
+        onChange={(e, v) => setField(name, v)}
         renderInput={params => <CustomTextField {...params} label={label} fullWidth />}
       />
     </Grid>
   )
 
+  // -----------------------------------------------------
+  // UI
+  // -----------------------------------------------------
   return (
     <ContentLayout
-      title={<Box sx={{ m: 2 }}>{'Edit Employee'}</Box>}
+      title={<Box sx={{ m: 2 }}>Edit Employee</Box>}
       breadcrumbs={[
         { label: 'Dashboard', href: '/admin/dashboards' },
         { label: 'Employee', href: '/admin/employee-list' },
         { label: 'Edit Employee' }
       ]}
     >
-      <Card sx={{ p: 4, boxShadow: 'none' }} elevation={0}>
+      <Card sx={{ p: 4 }}>
         <Grid container spacing={6}>
-          {/* Row 1 */}
-          {renderAutocomplete({
-            name: 'employeeRole',
-            label: 'Employee Role',
-            options: autocompleteFields.find(f => f.name === 'employeeRole').options
-          })}
+          {/* Employee Role */}
+          {renderAC('employeeRole', 'Employee Role', [
+            { id: 1, label: 'Confirmed Sales' },
+            { id: 2, label: 'Quotation' }
+          ])}
+
+          {/* Basic Fields */}
           <Grid item xs={12} md={4}>
             <CustomTextField
-              label='Nick name'
-              name='nickname'
-              value={employeeData.nickname}
-              onChange={handleChange}
+              label='Nick Name'
+              value={form.nickname}
+              onChange={e => setField('nickname', e.target.value)}
               fullWidth
             />
           </Grid>
-          <Grid item xs={12} md={4}>
-            <CustomTextField label='Name' name='name' value={employeeData.name} onChange={handleChange} fullWidth />
-          </Grid>
 
-          {/* Row 2 */}
-          {renderAutocomplete({
-            name: 'department',
-            label: 'Department',
-            options: autocompleteFields.find(f => f.name === 'department').options
-          })}
-          {renderAutocomplete({
-            name: 'designation',
-            label: 'Designation',
-            options: autocompleteFields.find(f => f.name === 'designation').options
-          })}
-          {renderAutocomplete({
-            name: 'userRole',
-            label: 'User Role',
-            options: autocompleteFields.find(f => f.name === 'userRole').options
-          })}
-
-          {/* Row 3 */}
-          {renderAutocomplete({
-            name: 'scheduler',
-            label: 'Scheduler',
-            options: autocompleteFields.find(f => f.name === 'scheduler').options
-          })}
-          {renderAutocomplete({
-            name: 'supervisor',
-            label: 'Supervisor',
-            options: autocompleteFields.find(f => f.name === 'supervisor').options
-          })}
           <Grid item xs={12} md={4}>
             <CustomTextField
-              label='Lunch Time'
-              name='lunchTime'
+              label='Name'
+              value={form.name}
+              onChange={e => setField('name', e.target.value)}
+              fullWidth
+            />
+          </Grid>
+
+          {/* Dynamic Dropdowns */}
+          {renderAC('department', 'Department', departmentList)}
+          {renderAC('designation', 'Designation', designationList)}
+          {renderAC('userRole', 'User Role', userRoleList)}
+          {renderAC('scheduler', 'Scheduler', schedulerList)}
+          {renderAC('supervisor', 'Supervisor', supervisorList)}
+
+          {/* Lunch */}
+          <Grid item xs={12} md={4}>
+            <CustomTextField
               type='time'
-              value={employeeData.lunchTime}
-              onChange={handleChange}
+              label='Lunch Time'
+              value={form.lunchTime}
+              onChange={e => setField('lunchTime', e.target.value)}
               fullWidth
             />
           </Grid>
 
-          {/* Checkboxes */}
-          <Grid item xs={12} md={4}>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={employeeData.isScheduler}
-                  onChange={e => setEmployeeData(prev => ({ ...prev, isScheduler: e.target.checked }))}
-                />
-              }
-              label='Scheduler'
-            />
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={employeeData.isSales}
-                  onChange={e => setEmployeeData(prev => ({ ...prev, isSales: e.target.checked }))}
-                />
-              }
-              label='Is Sales'
-            />
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={employeeData.isTechnician}
-                  onChange={e => setEmployeeData(prev => ({ ...prev, isTechnician: e.target.checked }))}
-                />
-              }
-              label='Is Technician'
-            />
-          </Grid>
+          {/* Flags */}
+          {[
+            ['isScheduler', 'Scheduler'],
+            ['isSupervisorFlag', 'Is Supervisor'],
+            ['isSales', 'Is Sales'],
+            ['isTechnician', 'Is Technician'],
+            ['isForeigner', 'Is Foreigner'],
+            ['isGps', 'GPS'],
+            ['isPhoto', 'Photo'],
+            ['isQr', 'QR'],
+            ['isSign', 'Signature']
+          ].map(([key, label]) => (
+            <Grid item xs={12} md={4} key={key}>
+              <FormControlLabel
+                control={<Checkbox checked={form[key]} onChange={e => setField(key, e.target.checked)} />}
+                label={label}
+              />
+            </Grid>
+          ))}
 
-          {/* Row 4 */}
+          {/* Email */}
           <Grid item xs={12} md={4}>
             <CustomTextField
               label='Email'
-              name='email'
-              value={employeeData.email}
+              value={form.email}
               onChange={e => {
                 const val = e.target.value
-                setEmployeeData(prev => ({ ...prev, email: val }))
+                setField('email', val)
                 setEmailError(val && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val))
               }}
               error={emailError}
-              helperText={emailError ? 'Invalid email' : ''}
+              helperText={emailError ? 'Invalid Email!' : ''}
               fullWidth
             />
           </Grid>
+
+          {/* Phone */}
           <Grid item xs={12} md={4}>
-            <CustomTextField label='Phone' name='phone' value={employeeData.phone} onChange={handleChange} fullWidth />
+            <CustomTextField
+              label='Phone'
+              value={form.phone}
+              onChange={e => setField('phone', e.target.value)}
+              fullWidth
+            />
           </Grid>
+
+          {/* DOB */}
           <Grid item xs={12} md={4}>
             <AppReactDatepicker
-              selected={employeeData.dob}
-              onChange={date => setEmployeeData(prev => ({ ...prev, dob: date }))}
+              selected={form.dob}
+              onChange={date => setField('dob', date)}
               customInput={<CustomTextField label='DOB' fullWidth />}
             />
           </Grid>
 
-          {/* Row 5 */}
+          {/* Target fields */}
           <Grid item xs={12} md={4}>
             <CustomTextField
-              label='Target Day ($)'
-              name='targetDay'
-              value={employeeData.targetDay}
-              onChange={handleChange}
-              fullWidth
-            />
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <CustomTextField
-              label='Target Night ($)'
-              name='targetNight'
-              value={employeeData.targetNight}
-              onChange={handleChange}
-              fullWidth
-            />
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <CustomTextField
-              label='Target Saturday ($)'
-              name='targetSaturday'
-              value={employeeData.targetSaturday}
-              onChange={handleChange}
+              label='Target Day'
+              value={form.targetDay}
+              onChange={e => setField('targetDay', e.target.value)}
               fullWidth
             />
           </Grid>
 
-          {/* Row 6 */}
           <Grid item xs={12} md={4}>
             <CustomTextField
-              label='Vehicle Number'
-              name='vehicleNumber'
-              value={employeeData.vehicleNumber}
-              onChange={handleChange}
+              label='Target Night'
+              value={form.targetNight}
+              onChange={e => setField('targetNight', e.target.value)}
               fullWidth
             />
           </Grid>
+
+          <Grid item xs={12} md={4}>
+            <CustomTextField
+              label='Target Saturday'
+              value={form.targetSaturday}
+              onChange={e => setField('targetSaturday', e.target.value)}
+              fullWidth
+            />
+          </Grid>
+
+          {/* Vehicle Number */}
+          <Grid item xs={12} md={4}>
+            <CustomTextField
+              label='Vehicle Number'
+              value={form.vehicleNumber}
+              onChange={e => setField('vehicleNumber', e.target.value)}
+              fullWidth
+            />
+          </Grid>
+
+          {/* Color */}
           <Grid item xs={12} md={4}>
             <CustomTextField
               type='color'
               label='Color'
-              name='color'
-              value={employeeData.color}
-              onChange={e => setEmployeeData(prev => ({ ...prev, color: e.target.value }))}
+              value={form.color}
               InputLabelProps={{ shrink: true }}
+              onChange={e => setField('color', e.target.value)}
               fullWidth
             />
           </Grid>
+
+          {/* Description */}
           <Grid item xs={12} md={4}>
             <CustomTextField
               label='Description'
-              name='description'
-              value={employeeData.description}
-              onChange={handleChange}
+              value={form.description}
+              onChange={e => setField('description', e.target.value)}
               multiline
               rows={2}
               fullWidth
             />
           </Grid>
 
-          {/* Actions */}
-          <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 4, pt: 8 }}>
-            <Button variant='outlined' onClick={() => router.push('/admin/employee-list')}>
+          {/* Buttons */}
+          <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
+            <Button variant='outlined' onClick={() => router.back()}>
               Cancel
             </Button>
-            <Button variant='contained' onClick={handleSubmit} disabled={loading}>
-              {loading ? 'Updating...' : 'Update'}
+
+            <Button variant='contained' onClick={handleSave} disabled={loading}>
+              {loading ? 'Saving...' : 'Update'}
             </Button>
           </Grid>
         </Grid>
@@ -425,9 +470,9 @@ export default function EditEmployeePage() {
 
       {/* Image Dialog */}
       <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth='md' fullWidth>
-        <DialogContent sx={{ p: 0, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <DialogContent>
           {uploadedFileURL && (
-            <img src={uploadedFileURL} alt='Uploaded Preview' style={{ width: '100%', height: 'auto' }} />
+            <img src={uploadedFileURL} alt='File Preview' style={{ width: '100%', height: 'auto' }} />
           )}
         </DialogContent>
       </Dialog>

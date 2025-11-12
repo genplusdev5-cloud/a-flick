@@ -28,6 +28,7 @@ import {
 
 import { getEmployeeList, addEmployee, updateEmployee, deleteEmployee, getEmployeeDetails } from '@/api/employee'
 
+import { showToast } from '@/components/common/Toasts'
 import { encryptId } from '@/utils/encryption'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
@@ -60,60 +61,6 @@ const getEmployees = async () => {
   return db.getAll(STORE_NAME)
 }
 
-// Toast helper
-// ──────────────────────────────────────────────────────────────
-// Toast (Custom Styled, Global, with Icons & Colors)
-// ──────────────────────────────────────────────────────────────
-const showToast = (type, message = '') => {
-  const icons = {
-    success: 'tabler-circle-check',
-    delete: 'tabler-trash',
-    error: 'tabler-alert-triangle',
-    warning: 'tabler-info-circle',
-    info: 'tabler-refresh'
-  }
-
-  toast(
-    <div className='flex items-center gap-2'>
-      <i
-        className={icons[type]}
-        style={{
-          color:
-            type === 'success'
-              ? '#16a34a'
-              : type === 'error'
-                ? '#dc2626'
-                : type === 'delete'
-                  ? '#dc2626'
-                  : type === 'warning'
-                    ? '#f59e0b'
-                    : '#2563eb',
-          fontSize: '22px'
-        }}
-      />
-      <Typography variant='body2' sx={{ fontSize: '0.9rem', color: '#111' }}>
-        {message}
-      </Typography>
-    </div>,
-    {
-      position: 'top-right',
-      autoClose: 2000,
-      hideProgressBar: true,
-      closeOnClick: true,
-      pauseOnHover: false,
-      draggable: false,
-      theme: 'light',
-      style: {
-        borderRadius: '10px',
-        padding: '8px 14px',
-        boxShadow: '0 4px 10px rgba(0,0,0,0.06)',
-        display: 'flex',
-        alignItems: 'center'
-      }
-    }
-  )
-}
-
 // Debounced Input
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
   const [value, setValue] = useState(initialValue)
@@ -138,52 +85,72 @@ export default function EmployeePage() {
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
 
-const loadData = async () => {
-  setLoading(true)
-  try {
-    // ✅ API returns { message, status, count, data: { results: [...] } }
-    const res = await getEmployeeList()
-    const results = res?.results || []
+  const loadData = async () => {
+    setLoading(true)
+    try {
+      // ✅ API returns { message, status, count, data: { results: [...] } }
+      const res = await getEmployeeList(
+        pagination.pageSize,
+        pagination.pageIndex + 1, // page number
+        searchText
+      )
 
-    console.log('✅ API Full Response:', res)
-    console.log('✅ Extracted Results:', results)
+      const results = res?.results || []
 
-    // ✅ Correct mapping — match backend field names
-    const formatted = results.map((item, index) => ({
-      sno: index + 1,
-      id: item.id,
-      name: item.name || '-',               // ✅ backend key: name
-      email: item.email || '-',             // ✅ backend key: email
-      phone: item.phone || '-',             // ✅ backend key: phone
-      department: item.department || '-',   // ✅ backend key: department
-      designation: item.designation || '-', // ✅ backend key: designation
-      user_role: item.user_role || '-',     // ✅ backend key: user_role
-      scheduler: item.scheduler || '-',     // ✅ backend key: scheduler
-      supervisor: item.supervisor || '-',   // ✅ backend key: supervisor
-      vehicle_no: item.vehicle_no || '-',   // ✅ backend key: vehicle_no
-      lunch_time: item.lunch_time || '-',   // ✅ backend key: lunch_time
-      target_day: item.target_day || '-',   // ✅ backend key: target_day
-      target_night: item.target_night || '-', // ✅ backend key: target_night
-      target_saturday: item.target_saturday || '-', // ✅ backend key: target_saturday
-      description: item.description || '-', // ✅ backend key: description
-      is_scheduler: item.is_scheduler === 1 ? 'Yes' : 'No',
-      is_sales: item.is_sales === 1 ? 'Yes' : 'No',
-      is_technician: item.is_technician === 1 ? 'Yes' : 'No',
-      created_on: item.created_on || '-',
-      status: item.is_active === 1 ? 'Active' : 'Inactive'
-    }))
+      console.log('✅ API Full Response:', res)
+      console.log('✅ Extracted Results:', results)
 
-    console.log('✅ Formatted Data for Table:', formatted)
+      // ✅ Correct mapping — match backend field names
+      const formatted = results.map((item, index) => ({
+        sno: pagination.pageIndex * pagination.pageSize + index + 1, // <-- FIXED
+        id: item.id,
 
-    setRows(formatted)
-    setRowCount(formatted.length)
-  } catch (error) {
-    console.error('❌ Employee List Error:', error)
-    showToast('error', 'Failed to load employees')
-  } finally {
-    setLoading(false)
+        name: item.name ?? '-',
+        email: item.email ?? '-',
+        phone: item.phone ?? '-',
+
+        department: item.department ?? item.department_name ?? '-',
+        designation: item.designation ?? item.designation_name ?? '-',
+        user_role: item.user_role ?? item.user_role_name ?? '-',
+        supervisor: item.supervisor ?? item.supervisor_name ?? '-',
+        scheduler: item.scheduler ?? item.scheduler_name ?? '-',
+
+        vehicle_no: item.vehicle_no ?? '-',
+        lunch_time: item.lunch_time ?? '-',
+        target_day: item.target_day ?? '-',
+        target_night: item.target_night ?? '-',
+        target_saturday: item.target_saturday ?? '-',
+        description: item.description ?? '-',
+
+        finger_print_id: item.finger_print_id ?? '-',
+        employee_code: item.employee_code ?? '-',
+        nationality: item.nationality ?? '-',
+
+        is_supervisor: item.is_supervisor ? 'Yes' : 'No',
+        is_foreigner: item.is_foreigner ? 'Yes' : 'No',
+        is_gps: item.is_gps ? 'Yes' : 'No',
+        is_photo: item.is_photo ? 'Yes' : 'No',
+        is_qr: item.is_qr ? 'Yes' : 'No',
+        is_sign: item.is_sign ? 'Yes' : 'No',
+
+        is_scheduler: item.is_scheduler ? 'Yes' : 'No',
+        is_sales: item.is_sales ? 'Yes' : 'No',
+        is_technician: item.is_technician ? 'Yes' : 'No',
+
+        status: item.is_active ? 'Active' : 'Inactive'
+      }))
+
+      console.log('✅ Formatted Data for Table:', formatted)
+
+      setRows(formatted)
+      setRowCount(res.count) // ✔ backend count — correct pagination
+    } catch (error) {
+      console.error('❌ Employee List Error:', error)
+      showToast('error', 'Failed to load employees')
+    } finally {
+      setLoading(false)
+    }
   }
-}
 
   useEffect(() => {
     // ✅ Auto refresh after adding new employee
@@ -195,10 +162,14 @@ const loadData = async () => {
 
   useEffect(() => {
     loadData()
+  }, [pagination.pageIndex, pagination.pageSize, searchText])
+
+  useEffect(() => {
     const handleFocus = () => loadData()
     window.addEventListener('focus', handleFocus)
+
     return () => window.removeEventListener('focus', handleFocus)
-  }, [pagination.pageIndex, pagination.pageSize, searchText])
+  }, [])
 
   const handleEdit = id => {
     const encodedId = encryptId(id)
@@ -255,6 +226,9 @@ const loadData = async () => {
       columnHelper.accessor('user_role', { header: 'User Role' }),
       columnHelper.accessor('scheduler', { header: 'Scheduler' }),
       columnHelper.accessor('supervisor', { header: 'Supervisor' }),
+      columnHelper.accessor('finger_print_id', { header: 'Fingerprint ID' }),
+      columnHelper.accessor('employee_code', { header: 'Employee Code' }),
+      columnHelper.accessor('nationality', { header: 'Nationality' }),
       columnHelper.accessor('vehicle_no', { header: 'Vehicle No' }),
       columnHelper.accessor('lunch_time', { header: 'Lunch Time' }),
       columnHelper.accessor('target_day', { header: 'Target Day' }),
@@ -306,6 +280,103 @@ const loadData = async () => {
           />
         )
       }),
+
+      columnHelper.accessor('is_supervisor', {
+        header: 'Supervisor Flag',
+        cell: info => (
+          <Chip
+            label={info.getValue()}
+            size='small'
+            sx={{
+              color: '#fff',
+              bgcolor: info.getValue() === 'Yes' ? 'success.main' : 'error.main',
+              fontWeight: 600,
+              borderRadius: '6px'
+            }}
+          />
+        )
+      }),
+
+      columnHelper.accessor('is_foreigner', {
+        header: 'Foreigner',
+        cell: info => (
+          <Chip
+            label={info.getValue()}
+            size='small'
+            sx={{
+              color: '#fff',
+              bgcolor: info.getValue() === 'Yes' ? 'success.main' : 'error.main',
+              fontWeight: 600,
+              borderRadius: '6px'
+            }}
+          />
+        )
+      }),
+
+      columnHelper.accessor('is_gps', {
+        header: 'GPS',
+        cell: info => (
+          <Chip
+            label={info.getValue()}
+            size='small'
+            sx={{
+              color: '#fff',
+              bgcolor: info.getValue() === 'Yes' ? 'success.main' : 'error.main',
+              fontWeight: 600,
+              borderRadius: '6px'
+            }}
+          />
+        )
+      }),
+
+      columnHelper.accessor('is_photo', {
+        header: 'Photo',
+        cell: info => (
+          <Chip
+            label={info.getValue()}
+            size='small'
+            sx={{
+              color: '#fff',
+              bgcolor: info.getValue() === 'Yes' ? 'success.main' : 'error.main',
+              fontWeight: 600,
+              borderRadius: '6px'
+            }}
+          />
+        )
+      }),
+
+      columnHelper.accessor('is_qr', {
+        header: 'QR',
+        cell: info => (
+          <Chip
+            label={info.getValue()}
+            size='small'
+            sx={{
+              color: '#fff',
+              bgcolor: info.getValue() === 'Yes' ? 'success.main' : 'error.main',
+              fontWeight: 600,
+              borderRadius: '6px'
+            }}
+          />
+        )
+      }),
+
+      columnHelper.accessor('is_sign', {
+        header: 'Sign',
+        cell: info => (
+          <Chip
+            label={info.getValue()}
+            size='small'
+            sx={{
+              color: '#fff',
+              bgcolor: info.getValue() === 'Yes' ? 'success.main' : 'error.main',
+              fontWeight: 600,
+              borderRadius: '6px'
+            }}
+          />
+        )
+      }),
+
       // ✅ Status same as your old setup
       columnHelper.accessor('status', {
         header: 'Status',
@@ -441,9 +512,8 @@ const loadData = async () => {
                 }
                 disabled={loading}
                 onClick={async () => {
-                  setLoading(true)
+                  setPagination(p => ({ ...p, pageIndex: 0 })) // Reset to page 1
                   await loadData()
-                  setTimeout(() => setLoading(false), 600)
                 }}
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >

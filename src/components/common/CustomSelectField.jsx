@@ -1,28 +1,46 @@
 'use client'
 
-import { FormControl, InputLabel, Select, MenuItem } from '@mui/material'
+import { FormControl } from '@mui/material'
+import Autocomplete from '@mui/material/Autocomplete'
+import CustomTextField from '@core/components/mui/TextField'
 
-const CustomSelectField = ({ label, value, onChange, options = [], ...props }) => {
+const CustomSelectField = ({
+  label,
+  value,
+  onChange,
+  options = [],
+  placeholder = '',
+  ...props
+}) => {
+  // Normalize options (support id/value + label)
+  const normalizedOptions = options.map(opt => ({
+    id: opt?.id ?? opt?.value,
+    label: opt?.label ?? opt?.name ?? String(opt)
+  }))
+
   return (
-    <FormControl fullWidth variant='outlined' {...props}>
-      <InputLabel>{label}</InputLabel>
-      <Select
-        label={label}
-        value={value}
-        onChange={onChange}
+    <FormControl fullWidth {...props}>
+      <Autocomplete
+        options={normalizedOptions}
+        value={normalizedOptions.find(o => o.id === value) || null}
+        getOptionLabel={option => option.label || ''}
+        isOptionEqualToValue={(o, v) => o.id === v.id}
+        onChange={(e, newVal) => onChange(newVal?.id ?? '')}
+        renderInput={params => (
+          <CustomTextField
+            {...params}
+            label={label}
+            placeholder={placeholder}
+            InputLabelProps={{ shrink: true }}
+          />
+        )}
         sx={{
-          borderRadius: '10px',
-          '& .MuiSelect-select': {
-            padding: '12px 14px'
+          '& .MuiAutocomplete-inputRoot': {
+            padding: '6px 8px',
+            borderRadius: '10px'
           }
         }}
-      >
-        {options.map(opt => (
-          <MenuItem key={opt.value} value={opt.value}>
-            {opt.label}
-          </MenuItem>
-        ))}
-      </Select>
+      />
     </FormControl>
   )
 }

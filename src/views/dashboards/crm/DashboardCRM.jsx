@@ -2,82 +2,105 @@
 
 // ✅ MUI Imports
 import Grid from '@mui/material/Grid2'
+import { useState, useEffect } from 'react'
+
+import { getDashboardData } from '@/api/dashboard'
 
 // ✅ Component Imports
-import DistributedBarChartOrder from '@views/dashboards/crm/DistributedBarChartOrder'
-import LineAreaYearlySalesChart from '@views/dashboards/crm/LineAreaYearlySalesChart'
 import CardStatVertical from '@/components/card-statistics/Vertical'
-import BarChartRevenueGrowth from '@views/dashboards/crm/BarChartRevenueGrowth'
-import EarningReportsWithTabs from '@views/dashboards/crm/EarningReportsWithTabs'
-import RadarSalesChart from '@views/dashboards/crm/RadarSalesChart'
-import SalesByCountries from '@views/dashboards/crm/SalesByCountries'
-import ProjectStatus from '@views/dashboards/crm/ProjectStatus'
-import ActiveProjects from '@views/dashboards/crm/ActiveProjects'
-import LastTransaction from '@views/dashboards/crm/LastTransaction'
-import ActivityTimeline from '@views/dashboards/crm/ActivityTimeline'
+import DashboardList from '@/components/dashboard/DashboardList'
 
-// ✅ Non-async component (client-safe)
 const DashboardCRM = () => {
+  // ✅ hooks MUST BE INSIDE COMPONENT
+  const [dashboard, setDashboard] = useState({
+    customers: 0,
+    active_contracts: 0,
+    active_jobs: 0,
+    active_warranties: 0,
+    due_for_renewal: 0,
+    yearly_terminations: 0
+  })
+
+  useEffect(() => {
+    loadDashboard()
+  }, [])
+
+  const loadDashboard = async () => {
+    const response = await getDashboardData()
+    if (response?.status === 'success') {
+      setDashboard(response.data)
+    }
+  }
+
   return (
     <Grid container spacing={6}>
       <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2 }}>
-        <DistributedBarChartOrder />
-      </Grid>
-      <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2 }}>
-        <LineAreaYearlySalesChart />
-      </Grid>
-      <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2 }}>
         <CardStatVertical
-          title="Total Profit"
-          subtitle="Last Week"
-          stats="1.28k"
-          avatarColor="error"
-          avatarIcon="tabler-credit-card"
-          avatarSkin="light"
-          avatarSize={44}
-          chipText="-12.2%"
-          chipColor="error"
-          chipVariant="tonal"
+          title='Customers'
+          subtitle='Total'
+          stats={dashboard.customers}
+          avatarColor='primary'
+          avatarIcon='tabler-users'
+          avatarSkin='light'
         />
       </Grid>
+
       <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2 }}>
         <CardStatVertical
-          title="Total Sales"
-          subtitle="Last Week"
-          stats="24.67k"
-          avatarColor="success"
-          avatarIcon="tabler-currency-dollar"
-          avatarSkin="light"
-          avatarSize={44}
-          chipText="+24.67%"
-          chipColor="success"
-          chipVariant="tonal"
+          title='Active Contracts'
+          subtitle='Total'
+          stats={dashboard.active_contracts}
+          avatarColor='info'
+          avatarIcon='tabler-file-text'
+          avatarSkin='light'
         />
       </Grid>
-      <Grid size={{ xs: 12, md: 8, lg: 4 }}>
-        <BarChartRevenueGrowth />
+
+      <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2 }}>
+        <CardStatVertical
+          title='Active Jobs'
+          subtitle='Total'
+          stats={dashboard.active_jobs}
+          avatarColor='success'
+          avatarIcon='tabler-briefcase'
+          avatarSkin='light'
+        />
       </Grid>
-      <Grid size={{ xs: 12, lg: 8 }}>
-        <EarningReportsWithTabs />
+
+      <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2 }}>
+        <CardStatVertical
+          title='Active Warranties'
+          subtitle='Total'
+          stats={dashboard.active_warranties}
+          avatarColor='warning'
+          avatarIcon='tabler-shield-check'
+          avatarSkin='light'
+        />
       </Grid>
-      <Grid size={{ xs: 12, md: 6, lg: 4 }}>
-        <RadarSalesChart />
+
+      <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2 }}>
+        <CardStatVertical
+          title='Due For Renewal'
+          subtitle='Total'
+          stats={dashboard.due_for_renewal}
+          avatarColor='error'
+          avatarIcon='tabler-refresh'
+          avatarSkin='light'
+        />
       </Grid>
-      <Grid size={{ xs: 12, md: 6, lg: 4 }}>
-        <SalesByCountries />
+
+      <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2 }}>
+        <CardStatVertical
+          title='Yearly Terminations'
+          subtitle='Total'
+          stats={dashboard.yearly_terminations}
+          avatarColor='secondary'
+          avatarIcon='tabler-calendar-x'
+          avatarSkin='light'
+        />
       </Grid>
-      <Grid size={{ xs: 12, md: 6, lg: 4 }}>
-        <ProjectStatus />
-      </Grid>
-      <Grid size={{ xs: 12, md: 6, lg: 4 }}>
-        <ActiveProjects />
-      </Grid>
-      {/* ✅ Remove serverMode (not needed in client) */}
-      <Grid size={{ xs: 12, md: 6 }}>
-        <LastTransaction />
-      </Grid>
-      <Grid size={{ xs: 12, md: 6 }}>
-        <ActivityTimeline />
+      <Grid size={{ xs: 12 }}>
+        <DashboardList data={dashboard} />
       </Grid>
     </Grid>
   )

@@ -194,54 +194,49 @@ export default function ServiceFrequencyPage() {
   }
 
   // Load rows
-const loadData = async () => {
-  setLoading(true)
-  try {
-    const res = await getServiceFrequencyList()
-    console.log('📥 Full Service Frequency Response:', res)
+  const loadData = async () => {
+    setLoading(true)
+    try {
+      const res = await getServiceFrequencyList()
+      console.log('📥 Full Service Frequency Response:', res)
 
-    // ✅ Safely handle your backend structure
-    const results =
-      res?.data?.data?.results ||
-      res?.data?.results ||
-      res?.results ||
-      []
+      // ✅ Safely handle your backend structure
+      const results = res?.data?.data?.results || res?.data?.results || res?.results || []
 
-    console.log('📦 Extracted Results:', results)
+      console.log('📦 Extracted Results:', results)
 
-    if (Array.isArray(results) && results.length > 0) {
-      const formatted = results.map((item, index) => ({
-        sno: index + 1,
-        id: item.id,
-        serviceFrequency: item.name || '—',
-        displayFrequency: item.name || '—',
-        frequencyCode: item.frequency_code || '—',
-        incrementType: item.frequency || '—',
-        noOfIncrements: item.times || '—',
-        backlogAge: item.backlog_age || '—',
-        sortOrder: item.sort_order || '—',
-        description: item.description || '—',
-        is_active: item.is_active,
-        status: item.is_active === 1 ? 'Active' : 'Inactive'
-      }))
+      if (Array.isArray(results) && results.length > 0) {
+        const formatted = results.map((item, index) => ({
+          sno: index + 1,
+          id: item.id,
+          serviceFrequency: item.name || '—',
+          displayFrequency: item.name || '—',
+          frequencyCode: item.frequency_code || '—',
+          incrementType: item.frequency || '—',
+          noOfIncrements: item.times || '—',
+          backlogAge: item.backlog_age || '—',
+          sortOrder: item.sort_order || '—',
+          description: item.description || '—',
+          is_active: item.is_active,
+          status: item.is_active === 1 ? 'Active' : 'Inactive'
+        }))
 
-      console.log('✅ Formatted Table Data:', formatted)
+        console.log('✅ Formatted Table Data:', formatted)
 
-      setRows(formatted)
-      setRowCount(formatted.length)
-    } else {
-      console.warn('⚠️ No results found in API response')
-      setRows([])
-      setRowCount(0)
+        setRows(formatted)
+        setRowCount(formatted.length)
+      } else {
+        console.warn('⚠️ No results found in API response')
+        setRows([])
+        setRowCount(0)
+      }
+    } catch (err) {
+      console.error('❌ Error loading service frequency list:', err)
+      showToast('error', 'Something went wrong while loading data')
+    } finally {
+      setLoading(false)
     }
-  } catch (err) {
-    console.error('❌ Error loading service frequency list:', err)
-    showToast('error', 'Something went wrong while loading data')
-  } finally {
-    setLoading(false)
   }
-}
-
 
   useEffect(() => {
     loadData()
@@ -403,8 +398,14 @@ const loadData = async () => {
     return itemRank.passed
   }
 
+  const paginatedRows = useMemo(() => {
+    const start = pagination.pageIndex * pagination.pageSize
+    const end = start + pagination.pageSize
+    return rows.slice(start, end)
+  }, [rows, pagination])
+
   const table = useReactTable({
-    data: rows,
+    data: paginatedRows,
     columns,
     manualPagination: true,
     pageCount: Math.ceil(rowCount / pagination.pageSize),
@@ -522,8 +523,19 @@ const loadData = async () => {
                 disabled={loading}
                 onClick={async () => {
                   setLoading(true)
-                  await loadData()
-                  setTimeout(() => setLoading(false), 600)
+
+                  // FIRST reset pageSize to 25
+                  setPagination(prev => ({
+                    ...prev,
+                    pageSize: 25,
+                    pageIndex: 0
+                  }))
+
+                  // THEN reload AFTER resetting pagination
+                  setTimeout(async () => {
+                    await loadData()
+                    setLoading(false)
+                  }, 50)
                 }}
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >

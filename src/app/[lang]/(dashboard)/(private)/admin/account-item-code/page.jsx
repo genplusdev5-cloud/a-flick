@@ -157,6 +157,8 @@ export default function AccountItemCodePage() {
 
   const nameRef = useRef(null)
 
+
+
   // ──────────────────────────────────────────────────────────────
   const loadItems = async () => {
     setLoading(true)
@@ -378,8 +380,15 @@ export default function AccountItemCodePage() {
     return itemRank.passed
   }
 
+  const paginatedRows = useMemo(() => {
+  const start = pagination.pageIndex * pagination.pageSize
+  const end = start + pagination.pageSize
+  return rows.slice(start, end)
+}, [rows, pagination])
+
+
   const table = useReactTable({
-    data: rows,
+    data: paginatedRows,
     columns,
     manualPagination: true,
     pageCount: Math.ceil(rowCount / pagination.pageSize) || 0,
@@ -513,6 +522,14 @@ export default function AccountItemCodePage() {
                 onClick={async () => {
                   setLoading(true)
                   await loadItems()
+
+                  // reset entries also back to 25
+                  setPagination(p => ({
+                    ...p,
+                    pageSize: 25,
+                    pageIndex: 0
+                  }))
+
                   setTimeout(() => setLoading(false), 600)
                 }}
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
@@ -635,7 +652,14 @@ export default function AccountItemCodePage() {
             <FormControl size='small' sx={{ width: 140 }}>
               <Select
                 value={pagination.pageSize}
-                onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
+                defaultValue={25}
+                onChange={e =>
+                  setPagination(prev => ({
+                    ...prev,
+                    pageSize: Number(e.target.value),
+                    pageIndex: 0
+                  }))
+                }
               >
                 {[5, 10, 25, 50, 100].map(s => (
                   <MenuItem key={s} value={s}>

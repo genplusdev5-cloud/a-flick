@@ -230,38 +230,37 @@ export default function HolidayPage() {
     })
   }
 
-const handleEdit = async row => {
-  try {
-    setLoading(true)
-    setIsEdit(true)
+  const handleEdit = async row => {
+    try {
+      setLoading(true)
+      setIsEdit(true)
 
-    const result = await getHolidayDetails(row.id)
+      const result = await getHolidayDetails(row.id)
 
-    if (result.success && result.data) {
-      const data = result.data
-      const formattedDate = data.date ? data.date.split('-').reverse().join('/') : ''
+      if (result.success && result.data) {
+        const data = result.data
+        const formattedDate = data.date ? data.date.split('-').reverse().join('/') : ''
 
-      setFormData({
-        id: data.id, // ✅ ensures update API gets the correct ID
-        name: data.name || '',
-        date: formattedDate,
-        year: data.year || '',
-        status: data.is_active === 1 ? 'Active' : 'Inactive'
-      })
+        setFormData({
+          id: data.id, // ✅ ensures update API gets the correct ID
+          name: data.name || '',
+          date: formattedDate,
+          year: data.year || '',
+          status: data.is_active === 1 ? 'Active' : 'Inactive'
+        })
 
-      console.log('🧩 Holiday Edit Data:', data)
-      setDrawerOpen(true)
-    } else {
-      showToast('error', result.message)
+        console.log('🧩 Holiday Edit Data:', data)
+        setDrawerOpen(true)
+      } else {
+        showToast('error', result.message)
+      }
+    } catch (err) {
+      console.error('❌ Error fetching holiday details:', err)
+      showToast('error', 'Failed to fetch holiday details')
+    } finally {
+      setLoading(false)
     }
-  } catch (err) {
-    console.error('❌ Error fetching holiday details:', err)
-    showToast('error', 'Failed to fetch holiday details')
-  } finally {
-    setLoading(false)
   }
-}
-
 
   const confirmDelete = async () => {
     if (!deleteDialog.row) return
@@ -283,44 +282,44 @@ const handleEdit = async row => {
     }
   }
 
-const handleSubmit = async e => {
-  e.preventDefault()
+  const handleSubmit = async e => {
+    e.preventDefault()
 
-  console.log('🧠 handleSubmit formData:', formData)
+    console.log('🧠 handleSubmit formData:', formData)
 
-  if (!formData.name || !formData.date) {
-    showToast('warning', 'Holiday name and date are required')
-    return
-  }
-
-  setLoading(true)
-  try {
-    const payload = {
-      id: formData.id, // ✅ keep it here
-      name: formData.name,
-      date: formData.date.split('/').reverse().join('-'), // convert DD/MM/YYYY → YYYY-MM-DD
-      year: formData.year || formData.date.split('/')[2],
-      is_active: formData.status === 'Active' ? 1 : 0
+    if (!formData.name || !formData.date) {
+      showToast('warning', 'Holiday name and date are required')
+      return
     }
 
-    const result = isEdit ? await updateHoliday(payload) : await addHoliday(payload)
+    setLoading(true)
+    try {
+      const payload = {
+        id: formData.id, // ✅ keep it here
+        name: formData.name,
+        date: formData.date.split('/').reverse().join('-'), // convert DD/MM/YYYY → YYYY-MM-DD
+        year: formData.year || formData.date.split('/')[2],
+        is_active: formData.status === 'Active' ? 1 : 0
+      }
 
-    if (result.success) {
-      showToast('success', result.message)
-      setDrawerOpen(false)
-      loadData()
-      setFormData({ id: null, name: '', date: '', year: '', status: 'Active' })
-      setIsEdit(false)
-    } else {
-      showToast('error', result.message)
+      const result = isEdit ? await updateHoliday(payload) : await addHoliday(payload)
+
+      if (result.success) {
+        showToast('success', result.message)
+        setDrawerOpen(false)
+        loadData()
+        setFormData({ id: null, name: '', date: '', year: '', status: 'Active' })
+        setIsEdit(false)
+      } else {
+        showToast('error', result.message)
+      }
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'Failed to save holiday')
+    } finally {
+      setLoading(false)
     }
-  } catch (err) {
-    console.error(err)
-    showToast('error', 'Failed to save holiday')
-  } finally {
-    setLoading(false)
   }
-}
 
   const handleStatusChange = async e => {
     const newStatus = e.target.value
@@ -385,9 +384,17 @@ const handleSubmit = async e => {
     addMeta({ itemRank })
     return itemRank.passed
   }
+  const paginatedRows = useMemo(() => {
+    const start = pagination.pageIndex * pagination.pageSize
+    const end = start + pagination.pageSize
+    return rows.slice(start, end)
+  }, [rows, pagination])
+
+
 
   const table = useReactTable({
-    data: rows,
+    data: paginatedRows,
+
     columns,
     manualPagination: true,
     pageCount: Math.ceil(rowCount / pagination.pageSize),
@@ -480,8 +487,19 @@ const handleSubmit = async e => {
                 disabled={loading}
                 onClick={async () => {
                   setLoading(true)
-                  await loadData()
-                  setTimeout(() => setLoading(false), 600)
+
+                  // Reset page size to 25 BEFORE refresh
+                  setPagination(prev => ({
+                    ...prev,
+                    pageSize: 25,
+                    pageIndex: 0
+                  }))
+
+                  // Load data after pagination updates
+                  setTimeout(async () => {
+                    await loadData()
+                    setLoading(false)
+                  }, 50)
                 }}
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >

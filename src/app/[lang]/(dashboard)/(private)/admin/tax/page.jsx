@@ -163,6 +163,20 @@ export default function TaxPage() {
     status: 1
   })
 
+  const filteredRows = useMemo(() => {
+    if (!searchText) return rows
+
+    return rows.filter(
+      r => r.name?.toLowerCase().includes(searchText.toLowerCase()) || String(r.tax).includes(searchText)
+    )
+  }, [rows, searchText])
+
+  const paginatedRows = useMemo(() => {
+    const start = pagination.pageIndex * pagination.pageSize
+    const end = start + pagination.pageSize
+    return filteredRows.slice(start, end)
+  }, [filteredRows, pagination])
+
   const nameRef = useRef(null)
 
   const loadTaxes = async () => {
@@ -365,18 +379,17 @@ export default function TaxPage() {
     addMeta({ itemRank })
     return itemRank.passed
   }
-
   const table = useReactTable({
-    data: rows,
+    data: paginatedRows,
     columns,
     manualPagination: true,
-    pageCount: Math.ceil(rowCount / pagination.pageSize),
+    pageCount: Math.ceil(filteredRows.length / pagination.pageSize),
+
     state: { globalFilter: searchText, pagination },
     onGlobalFilterChange: setSearchText,
     onPaginationChange: setPagination,
-    globalFilterFn: fuzzyFilter,
+
     getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel()
   })
 
@@ -487,6 +500,7 @@ export default function TaxPage() {
                 disabled={loading}
                 onClick={async () => {
                   setLoading(true)
+                  setPagination({ pageIndex: 0, pageSize: 25 }) // 🔥 ADD THIS
                   await loadTaxes()
                   setTimeout(() => setLoading(false), 800)
                 }}
@@ -656,7 +670,7 @@ export default function TaxPage() {
                 </tr>
               ))}
             </thead>
-            {rows.length === 0 ? (
+            {paginatedRows.length === 0 ? (
               <tbody>
                 <tr>
                   <td colSpan={columns.length} className='text-center py-4'>
@@ -678,7 +692,11 @@ export default function TaxPage() {
           </table>
         </div>
 
-        <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+        <TablePaginationComponent
+          totalCount={filteredRows.length}
+          pagination={pagination}
+          setPagination={setPagination}
+        />
       </Card>
 
       <Drawer
