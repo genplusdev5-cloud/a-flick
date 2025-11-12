@@ -323,10 +323,10 @@ export default function PestPage() {
       setLoading(false)
     }
   }
-
   useEffect(() => {
-    loadData()
-  }, [pagination.pageIndex, pagination.pageSize, searchText])
+    // auto call syncAllData on page load
+    syncAllData()
+  }, [])
 
   // --- Main Drawer ---
   const toggleMainDrawer = () => setMainDrawerOpen(p => !p)
@@ -910,7 +910,7 @@ export default function PestPage() {
                 onClick={syncAllData}
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
-                {loading ? 'Syncing...' : 'Sync All'}
+                {loading ? 'Refreshing...' : 'Refresh'}
               </Button>
             </Box>
           }
