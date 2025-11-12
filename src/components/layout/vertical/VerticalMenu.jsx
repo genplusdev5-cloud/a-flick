@@ -43,7 +43,7 @@ const VerticalMenu = ({ scrollMenu }) => {
   const SectionHeader = ({ label }) => (
     <MenuItem
       disabled
-      className="uppercase tracking-wider"
+      className='uppercase tracking-wider'
       style={{
         fontSize: '11px',
         fontWeight: 600,
@@ -62,20 +62,18 @@ const VerticalMenu = ({ scrollMenu }) => {
     <ScrollWrapper
       {...(isBreakpointReached
         ? {
-            className: 'bs-full overflow-y-auto overflow-x-hidden',
+            className: 'bs-full overflow-y-auto overflow-x-hidden'
             // onScroll: container => scrollMenu(container, false)
           }
         : {
-            options: { wheelPropagation: false, suppressScrollX: true },
+            options: { wheelPropagation: false, suppressScrollX: true }
             // onScrollY: container => scrollMenu(container, true)
           })}
     >
       <Menu
         popoutMenuOffset={{ mainAxis: 23 }}
         menuItemStyles={menuItemStyles(verticalNavOptions, theme)}
-        renderExpandIcon={({ open }) => (
-          <RenderExpandIcon open={open} transitionDuration={transitionDuration} />
-        )}
+        renderExpandIcon={({ open }) => <RenderExpandIcon open={open} transitionDuration={transitionDuration} />}
         renderExpandedMenuItemIcon={{ icon: <i className='tabler-circle text-xs' /> }}
         menuSectionStyles={menuSectionStyles(verticalNavOptions, theme)}
       >
@@ -86,7 +84,7 @@ const VerticalMenu = ({ scrollMenu }) => {
 
         {/* ✅ Master */}
 
-        <SubMenu label="Master" icon={<i className='tabler-database' />}>
+        <SubMenu label='Master' icon={<i className='tabler-database' />}>
           <MenuItem href={`/${locale}/admin/tax`}>Tax</MenuItem>
           <MenuItem href={`/${locale}/admin/company-origin`}>Company Origin</MenuItem>
           <MenuItem href={`/${locale}/admin/account-item-code`}>Account Item Code</MenuItem>
@@ -104,7 +102,7 @@ const VerticalMenu = ({ scrollMenu }) => {
         </SubMenu>
 
         {/* ✅ Employee */}
-        <SubMenu label="Employee" icon={<i className='tabler-user' />}>
+        <SubMenu label='Employee' icon={<i className='tabler-user' />}>
           <MenuItem href={`/${locale}/admin/department`}>Department</MenuItem>
           <MenuItem href={`/${locale}/admin/designation`}>Designation</MenuItem>
           <MenuItem href={`/${locale}/admin/employee-list`}>Employee List</MenuItem>
@@ -142,12 +140,103 @@ const VerticalMenu = ({ scrollMenu }) => {
         </MenuItem>
 
         {/* ✅ Stock Dropdown */}
-        <SubMenu label="Stock" icon={<i className='tabler-package' />}>
+        <SubMenu label='Stock' icon={<i className='tabler-package' />}>
           <MenuItem href={`/${locale}/admin/stock/chemicals`}>Chemicals</MenuItem>
           <MenuItem href={`/${locale}/admin/stock/material-request`}>Material Request</MenuItem>
           <MenuItem href={`/${locale}/admin/stock/report`}>Stock Report</MenuItem>
           <MenuItem href={`/${locale}/admin/stock/usage-report`}>Usage Report</MenuItem>
         </SubMenu>
+
+        {/* ✅ Calendar */}
+        <MenuItem href={`/${locale}/admin/calendar`} icon={<i className='tabler-calendar' />}>
+          Calendar
+        </MenuItem>
+
+        {/* ✅ Invoice */}
+        <MenuItem href={`/${locale}/admin/invoice`} icon={<i className='tabler-receipt-2' />}>
+          Invoice
+        </MenuItem>
+
+        {/* ✅ Map */}
+        <MenuItem href={`/${locale}/admin/map`} icon={<i className='tabler-map' />}>
+          Map
+        </MenuItem>
+
+        {/* ==================== FINDER ==================== */}
+        {showHeadings && <SectionHeader label='Finder' />}
+
+        <MenuItem href={`/${locale}/admin/non-pre-schedule`} icon={<i className='tabler-chart-line' />}>
+          Non Pre-Schedule
+        </MenuItem>
+
+        <MenuItem href={`/${locale}/admin/backlog-finder`} icon={<i className='tabler-trending-up' />}>
+          Backlog Finder
+        </MenuItem>
+
+        <MenuItem href={`/${locale}/admin/followup-finder`} icon={<i className='tabler-chart-line' />}>
+          Followup Finder
+        </MenuItem>
+
+        <MenuItem href={`/${locale}/admin/kiv-finder`} icon={<i className='tabler-trending-up-2' />}>
+          KIV Finder
+        </MenuItem>
+
+        <MenuItem href={`/${locale}/admin/productivity-finder`} icon={<i className='tabler-activity' />}>
+          Productivity Finder
+        </MenuItem>
+
+        {/* ==================== REPORTS ==================== */}
+        {showHeadings && <SectionHeader label='Reports' />}
+
+        <MenuItem href={`/${locale}/admin/service-summary-report`} icon={<i className='tabler-report' />}>
+          Service Summary Report
+        </MenuItem>
+
+        <MenuItem href={`/${locale}/admin/ric-followup-report`} icon={<i className='tabler-report-analytics' />}>
+          RIC / Follow-up Report
+        </MenuItem>
+
+        <MenuItem href={`/${locale}/admin/productivity-summary`} icon={<i className='tabler-chart-bar' />}>
+          Productivity Summary
+        </MenuItem>
+
+        <MenuItem href={`/${locale}/admin/scdf-report`} icon={<i className='tabler-file-analytics' />}>
+          SCDF Report
+        </MenuItem>
+
+        <MenuItem href={`/${locale}/admin/sales-report`} icon={<i className='tabler-report-money' />}>
+          Sales Report
+        </MenuItem>
+
+        <MenuItem href={`/${locale}/admin/pest-trending`} icon={<i className='tabler-trending-up' />}>
+          Pest Trending
+        </MenuItem>
+
+        {/* ==================== AUDIT TRIAL ==================== */}
+        {showHeadings && <SectionHeader label='Audit Trial' />}
+
+        <MenuItem href={`/${locale}/admin/customer-audit`} icon={<i className='tabler-archive' />}>
+          Customer Audit
+        </MenuItem>
+
+        <MenuItem href={`/${locale}/admin/contracts-audit`} icon={<i className='tabler-archive' />}>
+          Contracts Audit
+        </MenuItem>
+
+        {/* ==================== SERVICE REQUESTS ==================== */}
+        {showHeadings && <SectionHeader label='Service Requests' />}
+
+        <MenuItem href={`/${locale}/admin/service-request`} icon={<i className='tabler-clipboard-plus' />}>
+          New Request
+        </MenuItem>
+
+        <MenuItem href={`/${locale}/admin/pending-requests`} icon={<i className='tabler-hourglass' />}>
+          Pending Requests
+        </MenuItem>
+
+        <MenuItem href={`/${locale}/admin/completed-requests`} icon={<i className='tabler-checks' />}>
+          Completed Requests
+        </MenuItem>
       </Menu>
     </ScrollWrapper>
   )
