@@ -82,59 +82,7 @@ import {
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
 
-// Toast helper
-// ──────────────────────────────────────────────────────────────
-// Toast (Custom Styled, Global, with Icons & Colors)
-// ──────────────────────────────────────────────────────────────
-const showToast = (type, message = '') => {
-  const icons = {
-    success: 'tabler-circle-check',
-    delete: 'tabler-trash',
-    error: 'tabler-alert-triangle',
-    warning: 'tabler-info-circle',
-    info: 'tabler-refresh'
-  }
-
-  toast(
-    <div className='flex items-center gap-2'>
-      <i
-        className={icons[type]}
-        style={{
-          color:
-            type === 'success'
-              ? '#16a34a'
-              : type === 'error'
-                ? '#dc2626'
-                : type === 'delete'
-                  ? '#dc2626'
-                  : type === 'warning'
-                    ? '#f59e0b'
-                    : '#2563eb',
-          fontSize: '22px'
-        }}
-      />
-      <Typography variant='body2' sx={{ fontSize: '0.9rem', color: '#111' }}>
-        {message}
-      </Typography>
-    </div>,
-    {
-      position: 'top-right',
-      autoClose: 2000,
-      hideProgressBar: true,
-      closeOnClick: true,
-      pauseOnHover: false,
-      draggable: false,
-      theme: 'light',
-      style: {
-        borderRadius: '10px',
-        padding: '8px 14px',
-        boxShadow: '0 4px 10px rgba(0,0,0,0.06)',
-        display: 'flex',
-        alignItems: 'center'
-      }
-    }
-  )
-}
+import { showToast } from '@/components/common/Toasts'
 
 const apiMap = {
   Finding: {
@@ -266,7 +214,7 @@ export default function PestPage() {
 
   const syncAllData = async () => {
     setLoading(true)
-    showToast('info', 'Syncing all pest data...')
+    // showToast('info', 'Syncing all pest data...')
     try {
       const pestRes = await getPestList()
 
