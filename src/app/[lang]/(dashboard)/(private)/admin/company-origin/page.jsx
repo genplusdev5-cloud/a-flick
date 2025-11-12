@@ -10,32 +10,22 @@ import {
   Typography,
   InputAdornment,
   IconButton,
-  CardHeader,
   Dialog,
   DialogContent,
   Breadcrumbs
 } from '@mui/material'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { openDB } from 'idb'
+
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import RefreshIcon from '@mui/icons-material/Refresh'
+
 import CustomTextField from '@core/components/mui/TextField'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import { Autocomplete } from '@mui/material'
 
-// IndexedDB setup function
-const getCompanyDB = async () => {
-  return openDB('companyDB', 1, {
-    upgrade(db) {
-      if (!db.objectStoreNames.contains('companies')) {
-        db.createObjectStore('companies', { keyPath: 'id', autoIncrement: true })
-      }
-    }
-  })
-}
+import { getCompanyList, getCompanyDetails, updateCompany } from '@/api/company'
+import { useRouter } from 'next/navigation'
 
-// Initial form data
 const initialCompanyFormData = {
   companyCode: '',
   companyName: '',
@@ -66,17 +56,14 @@ const initialCompanyFormData = {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-export default function EditCompanyPage() {
+export default function CompanyOriginPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const fileInputRef = useRef(null)
-  const dbId = searchParams.get('dbId')
-
   const [formData, setFormData] = useState(initialCompanyFormData)
-  const [editCompanyId, setEditCompanyId] = useState(null)
   const [selectedFile, setSelectedFile] = useState('')
   const [openDialog, setOpenDialog] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [companyId, setCompanyId] = useState(null)
 
   const taxNumberRef = useRef(null)
   const [taxNumberOpen, setTaxNumberOpen] = useState(false)
@@ -84,31 +71,59 @@ export default function EditCompanyPage() {
 
   const pageTitle = 'Company Origin'
 
-  // Fetch and pre-fill data
   useEffect(() => {
     ;(async () => {
-      if (!dbId) return
-      const numericDbId = Number(dbId)
       try {
-        const db = await getCompanyDB()
-        const existing = await db.get('companies', numericDbId)
-        if (existing) {
+        const list = await getCompanyList()
+        if (list.length > 0) {
+          const firstCompany = list[0]
+          setCompanyId(firstCompany.id)
+
+          // ✅ Fetch details first
+          const details = await getCompanyDetails(firstCompany.id)
+          console.log('✅ Company details:', details)
+
+          // ✅ Now safely map the backend → frontend keys
           setFormData({
             ...initialCompanyFormData,
-            ...existing,
-            accountingDate: existing.accountingDate ? new Date(existing.accountingDate) : null,
-            uploadedFileName: existing.uploadedFileName || '',
-            uploadedFileURL: existing.uploadedFileURL || ''
+            companyCode: details.company_code || '',
+            companyName: details.name || '',
+            phone: details.phone || '',
+            email: details.email || '',
+            taxNumber: details.tax_id || '',
+            addressLine1: details.address_line_1 || '',
+            addressLine2: details.address_line_2 || '',
+            city: details.city || '',
+            glContractAccount: details.gl_contract || '',
+            glJobAccount: details.gl_job || '',
+            glContJobAccount: details.gl_continuous_job || '',
+            glWarrantyAccount: details.gl_warranty || '',
+            uenNumber: details.uen_number || '',
+            gstNumber: details.gst_number || '',
+            invoicePrefixCode: details.invoice_prefix || '',
+            invoiceStartNumber: details.invoice_start_number || '',
+            contractPrefixCode: details.contract_prefix || '',
+            status: details.is_active === 1 ? 'Active' : 'Inactive',
+            bankName: details.bank_name || '',
+            bankAccountNumber: details.bank_account || '',
+            bankCode: details.bank_code || '',
+            swiftCode: details.swift_code || '',
+            accountingDate: details.bill_start_date ? new Date(details.bill_start_date) : null,
+            uploadedFileName: details.image_name || '',
+            uploadedFileURL: details.logo || ''
           })
-          setSelectedFile(existing.uploadedFileName || '')
-          setEditCompanyId(existing.id)
+
+          setSelectedFile(details.image_name || '')
+        } else {
+          console.warn('No company found in list.')
         }
-      } catch (err) {
-        console.error('Failed to load company:', err)
+      } catch (error) {
+        console.error('Failed to load company:', error)
       }
     })()
-  }, [dbId])
+  }, [])
 
+  // ✅ Handle Input Changes
   const handleChange = e => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
@@ -140,6 +155,7 @@ export default function EditCompanyPage() {
     setFormData(prev => ({ ...prev, accountingDate: date }))
   }
 
+  // ✅ File Upload Handling
   const handleFileChange = e => {
     const file = e.target.files[0]
     if (file) {
@@ -175,6 +191,7 @@ export default function EditCompanyPage() {
     }))
   }
 
+  // ✅ Save / Update Company
   const handleSave = async () => {
     if (!formData.companyName || !formData.email || !EMAIL_REGEX.test(formData.email)) {
       alert('Please fill in a valid Name and Email.')
@@ -182,21 +199,46 @@ export default function EditCompanyPage() {
     }
 
     try {
-      const db = await getCompanyDB()
-      const dataToSave = {
-        ...formData,
-        id: editCompanyId,
-        accountingDate: formData.accountingDate ? formData.accountingDate.toISOString() : null,
-        updatedAt: new Date().toISOString()
+      if (!companyId) {
+        alert('No company found to update.')
+        return
       }
 
-      await db.put('companies', dataToSave)
+      const payload = {
+        ...formData,
+        accountingDate: formData.accountingDate ? formData.accountingDate.toISOString() : null
+      }
 
-      // Navigate back to list page
-      router.push('/admin/company-origin')
+      const response = await updateCompany(companyId, payload)
+      console.log('✅ Update success:', response)
+      alert('Company details updated successfully.')
+    } catch (error) {
+      console.error('❌ Error updating company:', error)
+      alert('Failed to update company data.')
+    }
+  }
+
+  // ✅ Refresh
+  const handleRefresh = async () => {
+    setLoading(true)
+    try {
+      const list = await getCompanyList()
+      if (list.length > 0) {
+        const firstCompany = list[0]
+        const details = await getCompanyDetails(firstCompany.id)
+
+        setFormData({
+          ...initialCompanyFormData,
+          ...details,
+          accountingDate: details.accountingDate ? new Date(details.accountingDate) : null
+        })
+        setCompanyId(firstCompany.id)
+        setSelectedFile(details.uploadedFileName || '')
+      }
     } catch (err) {
-      console.error('Error saving company:', err)
-      alert('Failed to save company data.')
+      console.error('Error refreshing company data:', err)
+    } finally {
+      setTimeout(() => setLoading(false), 800)
     }
   }
 
@@ -207,42 +249,9 @@ export default function EditCompanyPage() {
 
   const handleCloseDialog = () => setOpenDialog(false)
 
-  const handleRefresh = async () => {
-    setLoading(true)
-
-    try {
-      if (!dbId) {
-        // If new company (not editing), just reset form fields
-        setFormData(initialCompanyFormData)
-        setSelectedFile('')
-      } else {
-        // Reload only the company data from IndexedDB
-        const db = await getCompanyDB()
-        const numericDbId = Number(dbId)
-        const existing = await db.get('companies', numericDbId)
-
-        if (existing) {
-          setFormData({
-            ...initialCompanyFormData,
-            ...existing,
-            accountingDate: existing.accountingDate ? new Date(existing.accountingDate) : null,
-            uploadedFileName: existing.uploadedFileName || '',
-            uploadedFileURL: existing.uploadedFileURL || ''
-          })
-          setSelectedFile(existing.uploadedFileName || '')
-          setEditCompanyId(existing.id)
-        }
-      }
-    } catch (err) {
-      console.error('Error refreshing company data:', err)
-    } finally {
-      setTimeout(() => setLoading(false), 800)
-    }
-  }
-
   return (
     <Box>
-      {/* Breadcrumb + Header */}
+      {/* Breadcrumb */}
       <Box sx={{ mb: 2 }}>
         <Breadcrumbs aria-label='breadcrumb'>
           <Typography
@@ -261,9 +270,9 @@ export default function EditCompanyPage() {
         </Breadcrumbs>
       </Box>
 
+      {/* Main Card */}
       <Card sx={{ p: 3 }}>
-        {/* Header Title + Refresh */}
-
+        {/* Header */}
         <Box display='flex' alignItems='center' gap={2} mb={3}>
           <Typography variant='h5' sx={{ fontWeight: 600 }}>
             {pageTitle}
@@ -291,53 +300,31 @@ export default function EditCompanyPage() {
           </Button>
         </Box>
 
-        {/* Company Form */}
+        {/* Form Fields */}
         <Grid container spacing={6}>
-          {/* Code */}
-          <Grid item xs={12} md={3}>
-            <CustomTextField
-              fullWidth
-              label='Code'
-              name='companyCode'
-              value={formData.companyCode || ''}
-              onChange={handleChange}
-            />
-          </Grid>
-
-          {/* Name */}
-          <Grid item xs={12} md={3}>
-            <CustomTextField
-              fullWidth
-              label='Name'
-              name='companyName'
-              value={formData.companyName || ''}
-              onChange={handleCompanyNameChange}
-            />
-          </Grid>
-
-          {/* Phone */}
-          <Grid item xs={12} md={3}>
-            <CustomTextField
-              fullWidth
-              label='Phone'
-              name='phone'
-              value={formData.phone || ''}
-              onChange={handlePhoneChange}
-            />
-          </Grid>
-
-          {/* Email */}
-          <Grid item xs={12} md={3}>
-            <CustomTextField
-              fullWidth
-              label='Email'
-              name='email'
-              value={formData.email || ''}
-              onChange={handleChange}
-              error={formData.email !== '' && !EMAIL_REGEX.test(formData.email)}
-              helperText={formData.email !== '' && !EMAIL_REGEX.test(formData.email) ? 'Enter a valid email' : ''}
-            />
-          </Grid>
+          {/* Basic Fields */}
+          {[
+            { label: 'Code', name: 'companyCode' },
+            { label: 'Name', name: 'companyName', onChange: handleCompanyNameChange },
+            { label: 'Phone', name: 'phone', onChange: handlePhoneChange },
+            { label: 'Email', name: 'email' }
+          ].map((field, i) => (
+            <Grid item xs={12} md={3} key={i}>
+              <CustomTextField
+                fullWidth
+                label={field.label}
+                name={field.name}
+                value={formData[field.name] || ''}
+                onChange={field.onChange || handleChange}
+                error={field.name === 'email' && formData.email !== '' && !EMAIL_REGEX.test(formData.email)}
+                helperText={
+                  field.name === 'email' && formData.email !== '' && !EMAIL_REGEX.test(formData.email)
+                    ? 'Enter a valid email'
+                    : ''
+                }
+              />
+            </Grid>
+          ))}
 
           {/* Tax Number */}
           <Grid item xs={12} md={3}>
@@ -345,7 +332,9 @@ export default function EditCompanyPage() {
               ref={taxNumberRef}
               freeSolo={false}
               options={taxNumberOptions}
-              value={formData.taxNumber || null}
+              value={formData.taxNumber?.toString() || null}
+              getOptionLabel={option => option?.toString() || ''}
+              isOptionEqualToValue={(option, value) => option?.toString() === value?.toString()}
               open={taxNumberOpen}
               onOpen={() => setTaxNumberOpen(true)}
               onClose={() => setTaxNumberOpen(false)}
@@ -356,38 +345,18 @@ export default function EditCompanyPage() {
             />
           </Grid>
 
-          {/* Address Line 1 */}
-          <Grid item xs={12} md={3}>
-            <CustomTextField
-              fullWidth
-              label='Address Line 1'
-              name='addressLine1'
-              value={formData.addressLine1 || ''}
-              onChange={handleChange}
-            />
-          </Grid>
-
-          {/* Address Line 2 */}
-          <Grid item xs={12} md={3}>
-            <CustomTextField
-              fullWidth
-              label='Address Line 2'
-              name='addressLine2'
-              value={formData.addressLine2 || ''}
-              onChange={handleChange}
-            />
-          </Grid>
-
-          {/* City */}
-          <Grid item xs={12} md={3}>
-            <CustomTextField
-              fullWidth
-              label='City'
-              name='city'
-              value={formData.city || ''}
-              onChange={handleCityChange}
-            />
-          </Grid>
+          {/* Address */}
+          {['addressLine1', 'addressLine2', 'city'].map((name, i) => (
+            <Grid item xs={12} md={3} key={i}>
+              <CustomTextField
+                fullWidth
+                label={name === 'addressLine1' ? 'Address Line 1' : name === 'addressLine2' ? 'Address Line 2' : 'City'}
+                name={name}
+                value={formData[name] || ''}
+                onChange={name === 'city' ? handleCityChange : handleChange}
+              />
+            </Grid>
+          ))}
 
           {/* GL Fields */}
           {[
@@ -395,76 +364,40 @@ export default function EditCompanyPage() {
             { label: 'GL-Job', name: 'glJobAccount' },
             { label: 'GL-Cont.Job', name: 'glContJobAccount' },
             { label: 'GL-Warranty', name: 'glWarrantyAccount' }
-          ].map((field, i) => (
+          ].map((f, i) => (
             <Grid item xs={12} md={3} key={i}>
               <CustomTextField
                 fullWidth
-                label={field.label}
-                name={field.name}
-                value={formData[field.name] || ''}
+                label={f.label}
+                name={f.name}
+                value={formData[f.name] || ''}
                 onChange={handleChange}
               />
             </Grid>
           ))}
 
-          {/* UEN Number */}
-          <Grid item xs={12} md={3}>
-            <CustomTextField
-              fullWidth
-              label='UEN Number'
-              name='uenNumber'
-              value={formData.uenNumber || ''}
-              onChange={handleChange}
-            />
-          </Grid>
-
-          {/* GST Reg. Number */}
-          <Grid item xs={12} md={3}>
-            <CustomTextField
-              fullWidth
-              label='GST Reg. Number'
-              name='gstNumber'
-              value={formData.gstNumber || ''}
-              onChange={handleChange}
-            />
-          </Grid>
-
-          {/* Invoice Prefix */}
-          <Grid item xs={12} md={3}>
-            <CustomTextField
-              fullWidth
-              label='Invoice Prefix'
-              name='invoicePrefixCode'
-              value={formData.invoicePrefixCode || ''}
-              onChange={handleChange}
-            />
-          </Grid>
-
-          {/* Invoice Start No. */}
-          <Grid item xs={12} md={3}>
-            <CustomTextField
-              fullWidth
-              label='Invoice Start No.'
-              name='invoiceStartNumber'
-              value={formData.invoiceStartNumber || ''}
-              onChange={handleInvoiceStartNumberChange}
-            />
-          </Grid>
-
-          {/* Contract Prefix */}
-          <Grid item xs={12} md={3}>
-            <CustomTextField
-              fullWidth
-              label='Contract Prefix'
-              name='contractPrefixCode'
-              value={formData.contractPrefixCode || ''}
-              onChange={handleChange}
-            />
-          </Grid>
+          {/* Other Fields */}
+          {[
+            { label: 'UEN Number', name: 'uenNumber' },
+            { label: 'GST Reg. Number', name: 'gstNumber' },
+            { label: 'Invoice Prefix', name: 'invoicePrefixCode' },
+            { label: 'Invoice Start No.', name: 'invoiceStartNumber' },
+            { label: 'Contract Prefix', name: 'contractPrefixCode' }
+          ].map((f, i) => (
+            <Grid item xs={12} md={3} key={i}>
+              <CustomTextField
+                fullWidth
+                label={f.label}
+                name={f.name}
+                value={formData[f.name] || ''}
+                onChange={f.name === 'invoiceStartNumber' ? handleInvoiceStartNumberChange : handleChange}
+              />
+            </Grid>
+          ))}
         </Grid>
 
+        {/* Bank Section */}
         <Grid container spacing={6} sx={{ mt: 4 }}>
-          {/* Bank Details */}
           {[
             { label: 'Bank Name', name: 'bankName' },
             { label: 'Bank Account Number', name: 'bankAccountNumber' },
@@ -570,12 +503,12 @@ export default function EditCompanyPage() {
             </Box>
           </Grid>
 
-          {/* Action Buttons */}
+          {/* Buttons */}
           <Grid item xs={12} sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 4 }}>
-            <Button variant='outlined' onClick={() => router.push('/admin/company-origin')}>
+            <Button variant='outlined' onClick={handleRefresh}>
               Cancel
             </Button>
-            <Button variant='contained' onClick={handleSave}>
+            <Button variant='contained' color='primary' onClick={handleSave}>
               Update
             </Button>
           </Grid>

@@ -147,6 +147,11 @@ const VerticalMenu = ({ scrollMenu }) => {
           <MenuItem href={`/${locale}/admin/stock/usage-report`}>Usage Report</MenuItem>
         </SubMenu>
 
+           {/* ✅ Calendar */}
+        <MenuItem href={`/${locale}/admin/service-request`} icon={<i className='tabler-calendar' />}>
+          Service Request
+        </MenuItem>
+
         {/* ✅ Calendar */}
         <MenuItem href={`/${locale}/admin/calendar`} icon={<i className='tabler-calendar' />}>
           Calendar

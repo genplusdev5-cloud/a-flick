@@ -1,10 +1,12 @@
 'use client'
 
-import { useTheme } from '@mui/material/styles'
 // React Imports
 import { useState } from 'react'
 
-// Redux Imports
+// MUI Imports
+import { useMediaQuery } from '@mui/material'
+
+// Third-party Imports
 import { useDispatch, useSelector } from 'react-redux'
 
 // Component Imports
@@ -12,7 +14,7 @@ import Calendar from './Calendar'
 import SidebarLeft from './SidebarLeft'
 import AddEventSidebar from './AddEventSidebar'
 
-// Calendar Color Configuration
+// CalendarColors Object
 const calendarsColor = {
   Personal: 'error',
   Business: 'primary',
@@ -21,25 +23,23 @@ const calendarsColor = {
   ETC: 'info'
 }
 
-export default function Page() {
-  // State Management
+const AppCalendar = () => {
+  // States
   const [calendarApi, setCalendarApi] = useState(null)
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(false)
   const [addEventSidebarOpen, setAddEventSidebarOpen] = useState(false)
 
-  // Redux Setup
+  // Hooks
   const dispatch = useDispatch()
-  const calendarStore = useSelector(state => state.calendarReducer) // ✅ check reducer key
-
-  // Handlers
+  const calendarStore = useSelector(state => state.calendarReducer)
+  const mdAbove = useMediaQuery(theme => theme.breakpoints.up('md'))
   const handleLeftSidebarToggle = () => setLeftSidebarOpen(!leftSidebarOpen)
   const handleAddEventSidebarToggle = () => setAddEventSidebarOpen(!addEventSidebarOpen)
 
   return (
-    <div className='app-calendar flex flex-grow overflow-hidden bg-backgroundPaper rounded'>
-      {/* Left Sidebar */}
+    <>
       <SidebarLeft
-        mdAbove
+        mdAbove={mdAbove}
         dispatch={dispatch}
         calendarApi={calendarApi}
         calendarStore={calendarStore}
@@ -48,9 +48,7 @@ export default function Page() {
         handleLeftSidebarToggle={handleLeftSidebarToggle}
         handleAddEventSidebarToggle={handleAddEventSidebarToggle}
       />
-
-      {/* Calendar Main View */}
-      <div className='calendar-content p-6 flex-grow overflow-visible'>
+      <div className='p-6 pbe-0 flex-grow overflow-visible bg-backgroundPaper rounded'>
         <Calendar
           dispatch={dispatch}
           calendarApi={calendarApi}
@@ -61,8 +59,6 @@ export default function Page() {
           handleAddEventSidebarToggle={handleAddEventSidebarToggle}
         />
       </div>
-
-      {/* Add Event Sidebar */}
       <AddEventSidebar
         dispatch={dispatch}
         calendarApi={calendarApi}
@@ -70,6 +66,8 @@ export default function Page() {
         addEventSidebarOpen={addEventSidebarOpen}
         handleAddEventSidebarToggle={handleAddEventSidebarToggle}
       />
-    </div>
+    </>
   )
 }
+
+export default AppCalendar
