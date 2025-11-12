@@ -131,8 +131,9 @@ export default function AddEmployeePage() {
     {
       name: 'employeeRole',
       options: [
-        { id: 1, label: 'Confirmed Sales' },
-        { id: 2, label: 'Quotation' }
+        { id: 1, label: 'Admin' },
+        { id: 2, label: 'Sales' },
+        { id: 2, label: 'Technician' }
       ]
     },
     {

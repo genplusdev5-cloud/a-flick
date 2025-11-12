@@ -24,7 +24,7 @@ const DashboardList = ({ data }) => {
     console.log('Filter Type:', filterType)
     console.log('Keyword:', keyword)
     console.log('Radio Filter:', radioFilter)
-    alert("Filter event triggered bro! Now connect API here.")
+
   }
 
   return (

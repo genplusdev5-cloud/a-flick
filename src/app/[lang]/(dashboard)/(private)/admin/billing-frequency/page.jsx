@@ -177,14 +177,15 @@ export default function BillingFrequencyPage() {
           .map((item, index) => ({
             sno: index + 1,
             id: item.id,
-            billingFrequency: item.name || '',
+            displayFrequency: item.name || '—', // ✅ this line added
+            billingFrequency: item.name || '', // still keep for form usage
             incrementType: item.frequency || '—',
             noOfIncrements: item.times || '—',
-            frequencyCode: item.frequency_code || '—',
             backlogAge: item.backlog_age || '—',
+            frequencyCode: item.frequency_code || '—',
             sortOrder: item.sort_order || '—',
             description: item.description || '—',
-            is_active: item.is_active // ✅ add this field
+            is_active: item.is_active
           }))
 
         setRows(formatted)

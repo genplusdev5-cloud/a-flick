@@ -227,21 +227,6 @@ const VerticalMenu = ({ scrollMenu }) => {
         <MenuItem href={`/${locale}/admin/contracts-audit`} icon={<i className='tabler-archive' />}>
           Contracts Audit
         </MenuItem>
-
-        {/* ==================== SERVICE REQUESTS ==================== */}
-        {showHeadings && <SectionHeader label='Service Requests' />}
-
-        <MenuItem href={`/${locale}/admin/service-request`} icon={<i className='tabler-clipboard-plus' />}>
-          New Request
-        </MenuItem>
-
-        <MenuItem href={`/${locale}/admin/pending-requests`} icon={<i className='tabler-hourglass' />}>
-          Pending Requests
-        </MenuItem>
-
-        <MenuItem href={`/${locale}/admin/completed-requests`} icon={<i className='tabler-checks' />}>
-          Completed Requests
-        </MenuItem>
       </Menu>
     </ScrollWrapper>
   )
