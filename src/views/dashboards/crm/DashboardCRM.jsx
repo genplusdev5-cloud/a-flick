@@ -1,18 +1,13 @@
 'use client'
 
-// ✅ MUI Imports
 import Grid from '@mui/material/Grid2'
 import { useState, useEffect } from 'react'
 
-import { getFullDashboardData } from '@/api/dashboard'
-
-
-// ✅ Component Imports
+import { getDashboardCards } from '@/api/dashboard'
 import CardStatVertical from '@/components/card-statistics/Vertical'
 import DashboardList from '@/components/dashboard/DashboardList'
 
 const DashboardCRM = () => {
-  // ✅ hooks MUST BE INSIDE COMPONENT
   const [dashboard, setDashboard] = useState({
     customers: 0,
     active_contracts: 0,
@@ -23,33 +18,24 @@ const DashboardCRM = () => {
   })
 
   useEffect(() => {
-    loadDashboard()
+    loadCards()
   }, [])
 
-const loadDashboard = async () => {
-  const response = await getFullDashboardData()
-  if (response?.status === 'success') {
-    const cardData = response.cards || {}
-    setDashboard({
-      customers: cardData.customers || 0,
-      active_contracts: cardData.active_contracts || 0,
-      active_jobs: cardData.active_jobs || 0,
-      active_warranties: cardData.active_warranties || 0,
-      due_for_renewal: cardData.due_for_renewal || 0,
-      yearly_terminations: cardData.yearly_terminations || 0
-    })
-  } else {
-    setDashboard({
-      customers: 0,
-      active_contracts: 0,
-      active_jobs: 0,
-      active_warranties: 0,
-      due_for_renewal: 0,
-      yearly_terminations: 0
-    })
-  }
-}
+  const loadCards = async () => {
+    const res = await getDashboardCards()
 
+    if (res.status === 'success') {
+      const d = res.data
+      setDashboard({
+        customers: d.customers || 0,
+        active_contracts: d.active_contracts || 0,
+        active_jobs: d.active_jobs || 0,
+        active_warranties: d.active_warranties || 0,
+        due_for_renewal: d.due_for_renewal || 0,
+        yearly_terminations: d.yearly_terminations || 0
+      })
+    }
+  }
 
   return (
     <Grid container spacing={6}>
@@ -118,8 +104,10 @@ const loadDashboard = async () => {
           avatarSkin='light'
         />
       </Grid>
+
+      {/* LIST */}
       <Grid size={{ xs: 12 }}>
-        <DashboardList data={dashboard} />
+        <DashboardList />
       </Grid>
     </Grid>
   )

@@ -145,10 +145,11 @@ export default function ContractsPage() {
     setLoading(true)
     try {
       const filters = {}
+      if (customerFilter) filters.customer_id = customerFilter
+      if (typeFilter) filters.contract_type = typeFilter
+      if (statusFilter) filters.contract_status = statusFilter // ✅ correct key
 
-      if (customerFilter) filters.customer_id = customerFilter // ✅ send customer ID
-      if (typeFilter) filters.contract_type = typeFilter?.toLowerCase() // ✅ backend expects lowercase
-      if (statusFilter) filters.customer_name = statusFilter?.toLowerCase() // ✅ matches your Postman param
+      console.log('🧠 Filters Sent →', filters)
 
       const all = await getContractList(filters)
 
@@ -201,11 +202,10 @@ export default function ContractsPage() {
   }
 
   useEffect(() => {
-  if (customerFilter || typeFilter || statusFilter) {
-    loadData()
-  }
-}, [customerFilter, typeFilter, statusFilter])
-
+    if (customerFilter || typeFilter || statusFilter) {
+      loadData()
+    }
+  }, [customerFilter, typeFilter, statusFilter])
 
   useEffect(() => {
     loadData()
@@ -214,10 +214,6 @@ export default function ContractsPage() {
       setCustomerOptions(names)
     }
     loadCustomers()
-
-    const handleFocus = () => loadData()
-    window.addEventListener('focus', handleFocus)
-    return () => window.removeEventListener('focus', handleFocus)
   }, [pagination.pageIndex, pagination.pageSize, searchText])
 
   const handleEdit = id => router.push(`/admin/contracts/${id}/edit`)
