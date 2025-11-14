@@ -64,6 +64,15 @@ import CustomTextFieldWrapper from '@/components/common/CustomTextField'
 import CustomTextarea from '@/components/common/CustomTextarea'
 import CustomSelectField from '@/components/common/CustomSelectField'
 
+
+// 🔥 Global UI Components (use everywhere)
+import GlobalButton from '@/components/common/GlobalButton'
+import GlobalTextField from '@/components/common/GlobalTextField'
+import GlobalTextarea from '@/components/common/GlobalTextarea'
+import GlobalSelect from '@/components/common/GlobalSelect'
+import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
+import { showToast } from '@/components/common/Toasts'
+
 import {
   useReactTable,
   getCoreRowModel,
@@ -84,59 +93,6 @@ const employeeOptions = [
 // Default Leave Types
 const DEFAULT_LEAVE_OPTIONS = ['Annual Leave', 'Sick Leave', 'Casual Leave', 'Maternity Leave', 'Paternity Leave']
 
-// Toast helper
-// ──────────────────────────────────────────────────────────────
-// Toast (Custom Styled, Global, with Icons & Colors)
-// ──────────────────────────────────────────────────────────────
-const showToast = (type, message = '') => {
-  const icons = {
-    success: 'tabler-circle-check',
-    delete: 'tabler-trash',
-    error: 'tabler-alert-triangle',
-    warning: 'tabler-info-circle',
-    info: 'tabler-refresh'
-  }
-
-  toast(
-    <div className='flex items-center gap-2'>
-      <i
-        className={icons[type]}
-        style={{
-          color:
-            type === 'success'
-              ? '#16a34a'
-              : type === 'error'
-                ? '#dc2626'
-                : type === 'delete'
-                  ? '#dc2626'
-                  : type === 'warning'
-                    ? '#f59e0b'
-                    : '#2563eb',
-          fontSize: '22px'
-        }}
-      />
-      <Typography variant='body2' sx={{ fontSize: '0.9rem', color: '#111' }}>
-        {message}
-      </Typography>
-    </div>,
-    {
-      position: 'top-right',
-      autoClose: 2000,
-      hideProgressBar: true,
-      closeOnClick: true,
-      pauseOnHover: false,
-      draggable: false,
-      theme: 'light',
-      style: {
-        borderRadius: '10px',
-        padding: '8px 14px',
-        boxShadow: '0 4px 10px rgba(0,0,0,0.06)',
-        display: 'flex',
-        alignItems: 'center'
-      }
-    }
-  )
-}
 
 // Debounced Input
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
@@ -646,7 +602,7 @@ export default function EmployeeLeavePage() {
               <Typography variant='h5' sx={{ fontWeight: 600 }}>
                 Leave Management
               </Typography>
-              <Button
+              <GlobalButton
                 variant='contained'
                 color='primary'
                 startIcon={
@@ -669,12 +625,12 @@ export default function EmployeeLeavePage() {
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
                 {loading ? 'Refreshing...' : 'Refresh'}
-              </Button>
+              </GlobalButton>
             </Box>
           }
           action={
             <Box display='flex' alignItems='center' gap={2}>
-              <Button
+              <GlobalButton
                 variant='outlined'
                 color='secondary'
                 endIcon={<ArrowDropDownIcon />}
@@ -682,7 +638,7 @@ export default function EmployeeLeavePage() {
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
                 Export
-              </Button>
+              </GlobalButton>
               <Menu anchorEl={exportAnchorEl} open={exportOpen} onClose={() => setExportAnchorEl(null)}>
                 <MenuItem onClick={exportPrint}>
                   <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
@@ -691,14 +647,14 @@ export default function EmployeeLeavePage() {
                   <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
                 </MenuItem>
               </Menu>
-              <Button
+              <GlobalButton
                 variant='contained'
                 startIcon={<AddIcon />}
                 onClick={handleAdd}
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
                 Add Leave
-              </Button>
+              </GlobalButton>
             </Box>
           }
         />
@@ -830,7 +786,7 @@ export default function EmployeeLeavePage() {
             <Grid container spacing={3}>
               {/* Employee Dropdown */}
               <Grid item xs={12}>
-                <CustomSelectField
+                <GlobalAutocomplete
                   fullWidth
                   required
                   label='Employee'
@@ -853,7 +809,7 @@ export default function EmployeeLeavePage() {
 
               {/* Leave Type Dropdown */}
               <Grid item xs={12}>
-                <CustomSelectField
+                <GlobalAutocomplete
                   fullWidth
                   required
                   label='Leave Type'
@@ -880,7 +836,7 @@ export default function EmployeeLeavePage() {
                       selected={formData.leave_date ? new Date(formData.leave_date) : new Date()}
                       onChange={date => handleFieldChange('leave_date', date)}
                       dateFormat='dd/MM/yyyy'
-                      customInput={<CustomTextFieldWrapper fullWidth label='Date' />}
+                      customInput={<GlobalTextField fullWidth label='Date' />}
                     />
                   </Grid>
 
@@ -901,7 +857,7 @@ export default function EmployeeLeavePage() {
                         handleFieldChange('start_time', formattedTime)
                       }}
                       dateFormat='h:mm aa'
-                      customInput={<CustomTextFieldWrapper fullWidth label='Time' />}
+                      customInput={<GlobalTextField fullWidth label='Time' />}
                     />
                   </Grid>
                 </Grid>
@@ -917,7 +873,7 @@ export default function EmployeeLeavePage() {
                       selected={formData.to_date ? new Date(formData.to_date) : new Date()}
                       onChange={date => handleFieldChange('to_date', date)}
                       dateFormat='dd/MM/yyyy'
-                      customInput={<CustomTextFieldWrapper fullWidth label='Date' />}
+                      customInput={<GlobalTextField fullWidth label='Date' />}
                     />
                   </Grid>
 
@@ -938,7 +894,7 @@ export default function EmployeeLeavePage() {
                         handleFieldChange('end_time', formattedTime)
                       }}
                       dateFormat='h:mm aa'
-                      customInput={<CustomTextFieldWrapper fullWidth label='Time' />}
+                      customInput={<GlobalTextField fullWidth label='Time' />}
                     />
                   </Grid>
                 </Grid>
@@ -946,7 +902,7 @@ export default function EmployeeLeavePage() {
 
               {/* Description */}
               <Grid item xs={12}>
-                <CustomTextarea
+                <GlobalTextarea
                   label='Description'
                   placeholder='Add remarks or leave reason...'
                   rows={3}
@@ -958,7 +914,7 @@ export default function EmployeeLeavePage() {
               {/* Status (Edit Mode Only) */}
               {isEdit && (
                 <Grid item xs={12}>
-                  <CustomSelectField
+                  <GlobalSelect
                     fullWidth
                     label='Status'
                     value={formData.status ?? 'Pending'} // ✅ controlled
@@ -975,12 +931,12 @@ export default function EmployeeLeavePage() {
 
             {/* Footer Buttons */}
             <Box mt={4} display='flex' gap={2}>
-              <Button type='submit' variant='contained' fullWidth disabled={loading}>
+              <GlobalButton type='submit' variant='contained' fullWidth disabled={loading}>
                 {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
-              </Button>
-              <Button variant='outlined' color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
+              </GlobalButton>
+              <GlobalButton variant='outlined' color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
                 Cancel
-              </Button>
+              </GlobalButton>
             </Box>
           </form>
         </Box>
@@ -1036,22 +992,22 @@ export default function EmployeeLeavePage() {
 
         {/* Buttons */}
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-          <Button
+          <GlobalButton
             onClick={() => setDeleteDialog({ open: false, row: null })}
             variant='tonal'
             color='secondary'
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
           >
             Cancel
-          </Button>
-          <Button
+          </GlobalButton>
+          <GlobalButton
             onClick={confirmDelete}
             variant='contained'
             color='error'
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
           >
             Delete
-          </Button>
+          </GlobalButton>
         </DialogActions>
       </Dialog>
     </Box>

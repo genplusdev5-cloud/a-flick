@@ -10,6 +10,14 @@ import EditIcon from '@mui/icons-material/Edit'
 import { getCustomerOrigin } from '@/api/customer/origin'
 import { showToast } from '@/components/common/Toasts'
 
+
+// 🔥 Global UI Components (use everywhere)
+import GlobalButton from '@/components/common/GlobalButton'
+import GlobalTextField from '@/components/common/GlobalTextField'
+import GlobalTextarea from '@/components/common/GlobalTextarea'
+import GlobalSelect from '@/components/common/GlobalSelect'
+import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
+
 import ContentLayout from '@/components/layout/ContentLayout'
 import CustomTextFieldWrapper from '@/components/common/CustomTextField'
 import CustomTextarea from '@/components/common/CustomTextarea'
@@ -277,7 +285,7 @@ export default function AddCustomerPage() {
               {/* Origin */}
 
               <Grid item xs={12} md={4}>
-                <CustomSelectField
+                <GlobalAutocomplete
                   fullWidth
                   label='Origin'
                   value={formData.origin}
@@ -292,13 +300,13 @@ export default function AddCustomerPage() {
                   selected={formData.commenceDate}
                   onChange={date => setFormData(prev => ({ ...prev, commenceDate: date }))}
                   dateFormat='dd/MM/yyyy'
-                  customInput={<CustomTextFieldWrapper fullWidth label='Commence Date' />}
+                  customInput={<GlobalTextField fullWidth label='Commence Date' />}
                 />
               </Grid>
 
               {/* Company Prefix */}
               <Grid item xs={12} md={4}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   ref={companyPrefixRef}
                   fullWidth
                   label='Company Prefix'
@@ -311,7 +319,7 @@ export default function AddCustomerPage() {
 
               {/* Customer Name */}
               <Grid item xs={12} md={4}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   ref={customerNameRef}
                   fullWidth
                   label='Customer Name'
@@ -324,7 +332,7 @@ export default function AddCustomerPage() {
 
               {/* ABSS Customer Name */}
               <Grid item xs={12} md={4}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   ref={abssCustomerNameRef}
                   fullWidth
                   label='ABSS Customer Name'
@@ -337,7 +345,7 @@ export default function AddCustomerPage() {
 
               {/* Card ID */}
               <Grid item xs={12} md={4}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   ref={cardIdRef}
                   fullWidth
                   label='Card ID'
@@ -350,7 +358,7 @@ export default function AddCustomerPage() {
 
               {/* PIC Name */}
               <Grid item xs={12} md={4}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   ref={picNameRef}
                   fullWidth
                   label='PIC Name'
@@ -363,7 +371,7 @@ export default function AddCustomerPage() {
 
               {/* PIC Email */}
               <Grid item xs={12} md={4}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   ref={picEmailRef}
                   fullWidth
                   label='PIC Email'
@@ -382,7 +390,7 @@ export default function AddCustomerPage() {
 
               {/* PIC Phone */}
               <Grid item xs={12} md={4}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   ref={picPhoneRef}
                   fullWidth
                   label='PIC Phone'
@@ -395,7 +403,7 @@ export default function AddCustomerPage() {
 
               {/* Billing Name */}
               <Grid item xs={12} md={4}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   ref={billingNameRef}
                   fullWidth
                   label='Billing Contact Name'
@@ -408,7 +416,7 @@ export default function AddCustomerPage() {
 
               {/* Billing Email */}
               <Grid item xs={12} md={4}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   ref={billingEmailRef}
                   fullWidth
                   label='Billing Email'
@@ -427,7 +435,7 @@ export default function AddCustomerPage() {
 
               {/* Billing Phone */}
               <Grid item xs={12} md={4}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   ref={billingPhoneRef}
                   fullWidth
                   label='Billing Phone'
@@ -440,7 +448,7 @@ export default function AddCustomerPage() {
 
               {/* City */}
               <Grid item xs={12} md={4}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   ref={cityRef}
                   fullWidth
                   label='City'
@@ -453,7 +461,7 @@ export default function AddCustomerPage() {
 
               {/* Postal Code */}
               <Grid item xs={12} md={4}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   ref={postalCodeRef}
                   fullWidth
                   label='Postal Code'
@@ -466,7 +474,7 @@ export default function AddCustomerPage() {
 
               {/* Payment Terms */}
               <Grid item xs={12} md={4}>
-                <CustomSelectField
+                <GlobalAutocomplete
                   ref={paymentTermsRef}
                   fullWidth
                   label='Payment Terms'
@@ -481,7 +489,7 @@ export default function AddCustomerPage() {
 
               {/* Sales Person */}
               <Grid item xs={12} md={4}>
-                <CustomSelectField
+                <GlobalAutocomplete
                   ref={salespersonRef}
                   fullWidth
                   label='Sales Person'
@@ -496,7 +504,7 @@ export default function AddCustomerPage() {
 
               {/* Login Email */}
               <Grid item xs={12} md={4}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   ref={loginEmailRef}
                   fullWidth
                   label='Login Email'
@@ -515,7 +523,7 @@ export default function AddCustomerPage() {
 
               {/* Password */}
               <Grid item xs={12} md={4}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   ref={passwordRef}
                   fullWidth
                   type='password'
@@ -529,7 +537,7 @@ export default function AddCustomerPage() {
 
               {/* Billing Address */}
               <Grid item xs={12} md={4}>
-                <CustomTextarea
+                <GlobalTextarea
                   ref={billingAddressRef}
                   fullWidth
                   label='Billing Address'
@@ -543,7 +551,7 @@ export default function AddCustomerPage() {
 
               {/* Remarks 1 */}
               <Grid item xs={12} md={4}>
-                <CustomTextarea
+                <GlobalTextarea
                   ref={remarks1Ref}
                   fullWidth
                   label='Remarks 1'
@@ -557,7 +565,7 @@ export default function AddCustomerPage() {
 
               {/* Remarks 2 */}
               <Grid item xs={12} md={4}>
-                <CustomTextarea
+                <GlobalTextarea
                   ref={remarks2Ref}
                   fullWidth
                   label='Remarks 2'
@@ -620,11 +628,11 @@ export default function AddCustomerPage() {
 
                 <Box mt={3} display='flex' gap={2}>
                   {editingContact && (
-                    <Button variant='outlined' color='secondary' fullWidth onClick={handleCancelEdit}>
+                    <GlobalButton variant='outlined' color='secondary' fullWidth onClick={handleCancelEdit}>
                       Cancel
-                    </Button>
+                    </GlobalButton>
                   )}
-                  <Button
+                  <GlobalButton
                     variant='contained'
                     fullWidth
                     color={editingContact ? 'success' : 'primary'}
@@ -632,7 +640,7 @@ export default function AddCustomerPage() {
                     disabled={contactForm.miniEmail && miniEmailError}
                   >
                     {editingContact ? 'Update Member' : 'Add Member'}
-                  </Button>
+                  </GlobalButton>
                 </Box>
 
                 <Typography variant='h6' sx={{ mt: 5, p: 2 }}>
@@ -676,12 +684,12 @@ export default function AddCustomerPage() {
 
                 <Divider sx={{ mt: 4 }} />
                 <Box mt={2} p={2} display='flex' gap={2} justifyContent='flex-end'>
-                  <Button variant='outlined' onClick={handleFinalCancel}>
+                  <GlobalButton variant='outlined' onClick={handleFinalCancel}>
                     Cancel
-                  </Button>
-                  <Button variant='contained' onClick={handleFinalSave}>
+                  </GlobalButton>
+                  <GlobalButton variant='contained' onClick={handleFinalSave}>
                     {isEditMode ? 'Update Customer' : 'Save'}
-                  </Button>
+                  </GlobalButton>
                 </Box>
               </Box>
             </Grid>

@@ -31,6 +31,15 @@ import CustomAutocomplete from '@core/components/mui/Autocomplete'
 import CustomTextField from '@core/components/mui/TextField'
 import { getCustomerNamesForList } from '@/api/contract/listDropdowns'
 
+
+// 🔥 Global UI Components (use everywhere)
+import GlobalButton from '@/components/common/GlobalButton'
+import GlobalTextField from '@/components/common/GlobalTextField'
+import GlobalTextarea from '@/components/common/GlobalTextarea'
+import GlobalSelect from '@/components/common/GlobalSelect'
+import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
+import { showToast } from '@/components/common/Toasts'
+
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
@@ -58,59 +67,7 @@ import {
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
 
-// Toast helper
-// ──────────────────────────────────────────────────────────────
-// Toast (Custom Styled, Global, with Icons & Colors)
-// ──────────────────────────────────────────────────────────────
-const showToast = (type, message = '') => {
-  const icons = {
-    success: 'tabler-circle-check',
-    delete: 'tabler-trash',
-    error: 'tabler-alert-triangle',
-    warning: 'tabler-info-circle',
-    info: 'tabler-refresh'
-  }
 
-  toast(
-    <div className='flex items-center gap-2'>
-      <i
-        className={icons[type]}
-        style={{
-          color:
-            type === 'success'
-              ? '#16a34a'
-              : type === 'error'
-                ? '#dc2626'
-                : type === 'delete'
-                  ? '#dc2626'
-                  : type === 'warning'
-                    ? '#f59e0b'
-                    : '#2563eb',
-          fontSize: '22px'
-        }}
-      />
-      <Typography variant='body2' sx={{ fontSize: '0.9rem', color: '#111' }}>
-        {message}
-      </Typography>
-    </div>,
-    {
-      position: 'top-right',
-      autoClose: 2000,
-      hideProgressBar: true,
-      closeOnClick: true,
-      pauseOnHover: false,
-      draggable: false,
-      theme: 'light',
-      style: {
-        borderRadius: '10px',
-        padding: '8px 14px',
-        boxShadow: '0 4px 10px rgba(0,0,0,0.06)',
-        display: 'flex',
-        alignItems: 'center'
-      }
-    }
-  )
-}
 
 // Debounced Input
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
@@ -423,7 +380,7 @@ export default function ContractsPage() {
               <Typography variant='h5' sx={{ fontWeight: 600 }}>
                 Contracts List
               </Typography>
-              <Button
+              <GlobalButton
                 variant='contained'
                 color='primary'
                 startIcon={
@@ -446,12 +403,12 @@ export default function ContractsPage() {
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
                 {loading ? 'Refreshing...' : 'Refresh'}
-              </Button>
+              </GlobalButton>
             </Box>
           }
           action={
             <Box display='flex' alignItems='center' gap={2}>
-              <Button
+              <GlobalButton
                 variant='outlined'
                 color='secondary'
                 endIcon={<ArrowDropDownIcon />}
@@ -460,7 +417,7 @@ export default function ContractsPage() {
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
                 Export
-              </Button>
+              </GlobalButton>
               <Menu anchorEl={exportAnchorEl} open={exportOpen} onClose={() => setExportAnchorEl(null)}>
                 <MenuItem onClick={exportPrint}>
                   <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
@@ -469,14 +426,14 @@ export default function ContractsPage() {
                   <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
                 </MenuItem>
               </Menu>
-              <Button
+              <GlobalButton
                 variant='contained'
                 startIcon={<AddIcon />}
                 onClick={() => router.push('/admin/contracts/add')}
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
                 Add Contract
-              </Button>
+              </GlobalButton>
             </Box>
           }
         />
@@ -531,8 +488,8 @@ export default function ContractsPage() {
             </FormControl>
 
             {/* Customer Filter (AutoComplete) */}
-            {/* Customer Filter (AutoComplete) */}
-            <CustomAutocomplete
+
+            <GlobalAutocomplete
               fullWidth
               id='customer-filter'
               options={customerOptions}
@@ -546,33 +503,33 @@ export default function ContractsPage() {
               value={customerOptions.find(c => c.id === customerFilter) || null}
               onChange={(e, newVal) => setCustomerFilter(newVal?.id || null)} // ✅ store ID here
               renderInput={params => (
-                <CustomTextField {...params} label='Customer' placeholder='Select Customer' size='small' />
+                <GlobalTextField {...params} label='Customer' placeholder='Select Customer' size='small' />
               )}
               sx={{ width: 300 }}
             />
 
             {/* Contract Type (AutoComplete) */}
-            <CustomAutocomplete
+            <GlobalAutocomplete
               fullWidth
               id='contract-type-filter'
               options={['Limited Contract', 'Job', 'Continuous Contract', 'Continuous Job', 'Warranty']}
               value={typeFilter}
               onChange={(e, newVal) => setTypeFilter(newVal)}
               renderInput={params => (
-                <CustomTextField {...params} label='Contract Type' placeholder='Select Type' size='small' />
+                <GlobalTextField {...params} label='Contract Type' placeholder='Select Type' size='small' />
               )}
               sx={{ width: 220 }}
             />
 
             {/* Contract Status (AutoComplete) */}
-            <CustomAutocomplete
+            <GlobalAutocomplete
               fullWidth
               id='contract-status-filter'
               options={['Current', 'Renewed', 'Hold', 'Terminated', 'Expired']}
               value={statusFilter}
               onChange={(e, newVal) => setStatusFilter(newVal)}
               renderInput={params => (
-                <CustomTextField {...params} label='Contract Status' placeholder='Select Status' size='small' />
+                <GlobalTextField {...params} label='Contract Status' placeholder='Select Status' size='small' />
               )}
               sx={{ width: 220 }}
             />
@@ -699,22 +656,22 @@ export default function ContractsPage() {
 
         {/* ⚙️ Buttons */}
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-          <Button
+          <GlobalButton
             onClick={() => setDeleteDialog({ open: false })}
             variant='tonal'
             color='secondary'
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
           >
             Cancel
-          </Button>
-          <Button
+          </GlobalButton>
+          <GlobalButton
             onClick={confirmDelete}
             variant='contained'
             color='error'
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
           >
             Delete
-          </Button>
+          </GlobalButton>
         </DialogActions>
       </Dialog>
     </Box>

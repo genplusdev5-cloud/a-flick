@@ -44,6 +44,12 @@ import TablePaginationComponent from '@/components/TablePaginationComponent'
 import classnames from 'classnames'
 import { rankItem } from '@tanstack/match-sorter-utils'
 
+import GlobalButton from '@/components/common/GlobalButton'
+import GlobalTextField from '@/components/common/GlobalTextField'
+import GlobalTextarea from '@/components/common/GlobalTextarea'
+import GlobalSelect from '@/components/common/GlobalSelect'
+import { showToast } from '@/components/common/Toasts'
+
 import CustomTextFieldWrapper from '@/components/common/CustomTextField'
 import CustomTextarea from '@/components/common/CustomTextarea'
 import CustomSelectField from '@/components/common/CustomSelectField'
@@ -59,60 +65,6 @@ import {
 } from '@tanstack/react-table'
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
-
-// Toast helper
-// ──────────────────────────────────────────────────────────────
-// Toast (Custom Styled, Global, with Icons & Colors)
-// ──────────────────────────────────────────────────────────────
-const showToast = (type, message = '') => {
-  const icons = {
-    success: 'tabler-circle-check',
-    delete: 'tabler-trash',
-    error: 'tabler-alert-triangle',
-    warning: 'tabler-info-circle',
-    info: 'tabler-refresh'
-  }
-
-  toast(
-    <div className='flex items-center gap-2'>
-      <i
-        className={icons[type]}
-        style={{
-          color:
-            type === 'success'
-              ? '#16a34a'
-              : type === 'error'
-                ? '#dc2626'
-                : type === 'delete'
-                  ? '#dc2626'
-                  : type === 'warning'
-                    ? '#f59e0b'
-                    : '#2563eb',
-          fontSize: '22px'
-        }}
-      />
-      <Typography variant='body2' sx={{ fontSize: '0.9rem', color: '#111' }}>
-        {message}
-      </Typography>
-    </div>,
-    {
-      position: 'top-right',
-      autoClose: 2000,
-      hideProgressBar: true,
-      closeOnClick: true,
-      pauseOnHover: false,
-      draggable: false,
-      theme: 'light',
-      style: {
-        borderRadius: '10px',
-        padding: '8px 14px',
-        boxShadow: '0 4px 10px rgba(0,0,0,0.06)',
-        display: 'flex',
-        alignItems: 'center'
-      }
-    }
-  )
-}
 
 // Debounced Input
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
@@ -151,7 +103,11 @@ export default function CallTypePage() {
   const handleFieldChange = (field, value) => {
     setFormData(prev => {
       const updated = { ...prev, [field]: value }
-      if (!isEdit) setUnsavedAddData(updated)
+
+      if (!isEdit) {
+        setUnsavedAddData(updated) // 🔥 store unsaved Add Mode data
+      }
+
       return updated
     })
   }
@@ -165,7 +121,8 @@ export default function CallTypePage() {
       description: '',
       status: 'Active'
     })
-    setUnsavedAddData(null)
+
+    setUnsavedAddData(null) // 🔥 remove cached data
     setDrawerOpen(false)
   }
 
@@ -215,11 +172,27 @@ export default function CallTypePage() {
   }, [pagination.pageIndex, pagination.pageSize, searchText])
 
   // Drawer
-  const toggleDrawer = () => setDrawerOpen(p => !p)
+  const toggleDrawer = () => {
+    setDrawerOpen(prev => {
+      if (prev && isEdit) {
+        // 🔴 Edit close → clear
+        setFormData({
+          id: null,
+          name: '',
+          sortOrder: '',
+          description: '',
+          status: 'Active'
+        })
+        setIsEdit(false)
+      }
+      return !prev
+    })
+  }
+
   const handleAdd = () => {
     setIsEdit(false)
 
-    // ✅ Only load unsavedAddData if it exists and the drawer is NOT in edit mode
+    // 🔥 Restore unsaved add data if exists
     if (unsavedAddData) {
       setFormData(unsavedAddData)
     } else {
@@ -260,8 +233,21 @@ export default function CallTypePage() {
     try {
       const result = await deleteCallType(deleteDialog.row.id)
       if (result.success) {
-        showToast('delete', result.message)
+        showToast('success', result.message)
+
+        setUnsavedAddData(null) // 🔥 REMOVE old cached add data
+
+        setDrawerOpen(false)
         loadData()
+
+        setFormData({
+          id: null,
+          name: '',
+          sortOrder: '',
+          description: '',
+          status: 'Active'
+        })
+        setIsEdit(false)
       } else {
         showToast('error', result.message)
       }
@@ -296,8 +282,12 @@ export default function CallTypePage() {
 
       if (result.success) {
         showToast('success', result.message)
+
+        setUnsavedAddData(null) // 🔥🔥 FIX: clear previous add cache
+
         setDrawerOpen(false)
         loadData()
+
         setFormData({
           id: null,
           name: '',
@@ -470,7 +460,7 @@ export default function CallTypePage() {
               <Typography variant='h5' sx={{ fontWeight: 600 }}>
                 Call Type Management
               </Typography>
-              <Button
+              <GlobalButton
                 variant='contained'
                 color='primary'
                 startIcon={
@@ -504,12 +494,12 @@ export default function CallTypePage() {
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
                 {loading ? 'Refreshing...' : 'Refresh'}
-              </Button>
+              </GlobalButton>
             </Box>
           }
           action={
             <Box display='flex' alignItems='center' gap={2}>
-              <Button
+              <GlobalButton
                 variant='outlined'
                 color='secondary'
                 endIcon={<ArrowDropDownIcon />}
@@ -517,7 +507,7 @@ export default function CallTypePage() {
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
                 Export
-              </Button>
+              </GlobalButton>
               <Menu anchorEl={exportAnchorEl} open={exportOpen} onClose={() => setExportAnchorEl(null)}>
                 <MenuItem onClick={exportPrint}>
                   <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
@@ -526,14 +516,14 @@ export default function CallTypePage() {
                   <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
                 </MenuItem>
               </Menu>
-              <Button
+              <GlobalButton
                 variant='contained'
                 startIcon={<AddIcon />}
                 onClick={handleAdd}
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
                 Add Call Type
-              </Button>
+              </GlobalButton>
             </Box>
           }
         />
@@ -654,7 +644,7 @@ export default function CallTypePage() {
           <form onSubmit={handleSubmit} style={{ flexGrow: 1 }}>
             <Grid container spacing={3}>
               <Grid item xs={12}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   fullWidth
                   required
                   label='Call Type Name'
@@ -666,7 +656,7 @@ export default function CallTypePage() {
               </Grid>
 
               <Grid item xs={12}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   fullWidth
                   required
                   label='Sort Order'
@@ -678,7 +668,7 @@ export default function CallTypePage() {
               </Grid>
 
               <Grid item xs={12}>
-                <CustomTextarea
+                <GlobalTextarea
                   label='Description'
                   placeholder='Enter description...'
                   rows={3}
@@ -689,7 +679,7 @@ export default function CallTypePage() {
 
               {isEdit && (
                 <Grid item xs={12}>
-                  <CustomSelectField
+                  <GlobalSelect
                     label='Status'
                     value={formData.status}
                     onChange={e => handleFieldChange('status', e.target.value)}
@@ -703,12 +693,12 @@ export default function CallTypePage() {
             </Grid>
 
             <Box mt={4} display='flex' gap={2}>
-              <Button type='submit' variant='contained' fullWidth disabled={loading}>
+              <GlobalButton type='submit' variant='contained' fullWidth disabled={loading}>
                 {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
-              </Button>
-              <Button variant='outlined' color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
+              </GlobalButton>
+              <GlobalButton variant='outlined' color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
                 Cancel
-              </Button>
+              </GlobalButton>
             </Box>
           </form>
         </Box>
@@ -765,22 +755,22 @@ export default function CallTypePage() {
 
         {/* Centered buttons */}
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-          <Button
+          <GlobalButton
             onClick={() => setDeleteDialog({ open: false, row: null })}
             variant='tonal'
             color='secondary'
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
           >
             Cancel
-          </Button>
-          <Button
+          </GlobalButton>
+          <GlobalButton
             onClick={confirmDelete}
             variant='contained'
             color='error'
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
           >
             Delete
-          </Button>
+          </GlobalButton>
         </DialogActions>
       </Dialog>
     </Box>

@@ -42,6 +42,13 @@ import FileCopyIcon from '@mui/icons-material/FileCopy'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import RefreshIcon from '@mui/icons-material/Refresh'
 
+import GlobalTextField from '@/components/common/GlobalTextField'
+import GlobalTextarea from '@/components/common/GlobalTextarea'
+import GlobalSelect from '@/components/common/GlobalSelect'
+import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
+import GlobalDateRange from '@/components/common/GlobalDateRange'
+import GlobalButton from '@/components/common/GlobalButton'
+
 //import custom
 import CustomTextFieldWrapper from '@/components/common/CustomTextField'
 import CustomTextarea from '@/components/common/CustomTextarea'
@@ -64,6 +71,7 @@ import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
 
 import { toast } from 'react-toastify'
+import { showToast } from '@/components/common/Toasts'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 
 // ✅ Paste your API imports here 👇
@@ -73,59 +81,6 @@ import { addTax, getTaxList, updateTax, deleteTax } from '@/api/tax'
 const formatTax = v => {
   const n = parseFloat(v)
   return isNaN(n) ? '' : n.toFixed(2)
-}
-
-// ──────────────────────────────────────────────────────────────
-// Toast (Custom Styled, Global, with Icons & Colors)
-// ──────────────────────────────────────────────────────────────
-const showToast = (type, message = '') => {
-  const icons = {
-    success: 'tabler-circle-check',
-    delete: 'tabler-trash',
-    error: 'tabler-alert-triangle',
-    warning: 'tabler-info-circle',
-    info: 'tabler-refresh'
-  }
-
-  toast(
-    <div className='flex items-center gap-2'>
-      <i
-        className={icons[type]}
-        style={{
-          color:
-            type === 'success'
-              ? '#16a34a'
-              : type === 'error'
-                ? '#dc2626'
-                : type === 'delete'
-                  ? '#dc2626'
-                  : type === 'warning'
-                    ? '#f59e0b'
-                    : '#2563eb',
-          fontSize: '22px'
-        }}
-      />
-      <Typography variant='body2' sx={{ fontSize: '0.9rem', color: '#111' }}>
-        {message}
-      </Typography>
-    </div>,
-    {
-      position: 'top-right',
-      autoClose: 2000,
-      hideProgressBar: true,
-      closeOnClick: true,
-      pauseOnHover: false,
-      draggable: false,
-      theme: 'light',
-      style: {
-        borderRadius: '10px',
-        padding: '8px 14px',
-        boxShadow: '0 4px 10px rgba(0,0,0,0.06)',
-        display: 'flex',
-        alignItems: 'center'
-      }
-    }
-  )
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -155,6 +110,8 @@ export default function TaxPage() {
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
   const [unsavedAddData, setUnsavedAddData] = useState(null)
+
+  const [originalData, setOriginalData] = useState(null) // for validation
 
   const [formData, setFormData] = useState({
     id: null,
@@ -199,8 +156,8 @@ export default function TaxPage() {
         name: item.name,
         tax: Number(item.percent ?? 0),
         description: item.description ?? '',
-        is_active: item.is_active ?? 1, // ✅ from backend
-        status: item.status ?? 1
+        is_active: item.is_active ?? 1 // idhu mattum use pannu
+        // status: item.status remove pannu or ignore pannu
       }))
 
       setRows(normalized)
@@ -228,20 +185,26 @@ export default function TaxPage() {
 
   const handleAdd = () => {
     setIsEdit(false)
+
+    // reopen – restore unsaved data
     if (unsavedAddData) {
       setFormData(unsavedAddData)
     } else {
       setFormData({ id: null, name: '', tax_value: '', description: '', status: 1 })
     }
+
     setDrawerOpen(true)
     setTimeout(() => nameRef.current?.focus(), 100)
   }
-
   const handleFieldChange = (field, value) => {
     setFormData(prev => {
       const updated = { ...prev, [field]: value }
-      // only cache for Add Drawer (not Edit)
-      if (!isEdit) setUnsavedAddData(updated)
+
+      // only cache for Add, not Edit
+      if (!isEdit) {
+        setUnsavedAddData(updated)
+      }
+
       return updated
     })
   }
@@ -252,8 +215,10 @@ export default function TaxPage() {
       id: row.id,
       name: row.name,
       tax_value: row.tax,
-      status: row.status || 1
+      description: row.description,
+      status: row.is_active // idhu correct dhaan
     })
+
     setDrawerOpen(true)
   }
 
@@ -288,19 +253,34 @@ export default function TaxPage() {
 
   const handleSubmit = async e => {
     e.preventDefault()
+
+    // 🔥 Duplicate validation (SAFE here)
+    const duplicate = rows.find(
+      r =>
+        r.name.trim().toLowerCase() === formData.name.trim().toLowerCase() &&
+        Number(r.tax) === Number(formData.tax_value)
+    )
+
+    if (!isEdit && duplicate) {
+      showToast('warning', 'This tax already exists')
+      return
+    }
+
+    // Required validation
     if (!formData.name || !formData.tax_value) {
       showToast('warning', 'Please fill all fields')
       return
     }
 
     setLoading(true)
+
     try {
       const payload = {
         id: formData.id,
         name: formData.name.trim(),
-        percent: formData.tax_value ? Number(formData.tax_value) : 0, // ✅ correctly mapped
+        percent: Number(formData.tax_value),
         description: formData.description?.trim() || '',
-        status: Number(formData.status ?? 1)
+        is_active: Number(formData.status) // ← idhu dhaan correct field!
       }
 
       let res
@@ -312,10 +292,13 @@ export default function TaxPage() {
 
       if (res.status === 'success') {
         showToast('success', isEdit ? 'Tax updated successfully' : 'Tax added successfully')
+
+        // 🔥 Reset cached Add Drawer data
+        setUnsavedAddData(null)
+        setOriginalData(null)
+
         setDrawerOpen(false)
         await loadTaxes()
-      } else {
-        showToast('error', res.message || 'Failed to save tax')
       }
     } catch (err) {
       console.error('❌ TAX SAVE ERROR:', err.response?.data || err.message)
@@ -352,16 +335,17 @@ export default function TaxPage() {
       columnHelper.accessor('name', { header: 'Tax Name' }),
       columnHelper.accessor('tax', { header: 'Tax (%)' }),
       columnHelper.accessor('is_active', {
+        // <-- status illa, is_active
         header: 'Status',
         cell: info => {
-          const val = info.row.original.is_active // ✅ correctly maps backend key
+          const val = info.row.original.is_active // <-- idhuvum change pannu
           return (
             <Chip
-              label={val === 1 ? 'Active' : 'Inactive'}
+              label={val == 1 ? 'Active' : 'Inactive'}
               size='small'
               sx={{
                 color: '#fff',
-                bgcolor: val === 1 ? 'success.main' : 'error.main', // ✅ Green for active, red for inactive
+                bgcolor: val == 1 ? 'success.main' : 'error.main',
                 fontWeight: 600,
                 borderRadius: '6px',
                 px: 1.5
@@ -409,7 +393,14 @@ export default function TaxPage() {
       <table><thead><tr>
         <th>S.No</th><th>Tax Name</th><th>Tax (%)</th><th>Status</th>
       </tr></thead><tbody>
-      ${rows.map(r => `<tr><td>${r.sno}</td><td>${r.name}</td><td>${r.tax}</td><td>${r.status === 1 ? 'Active' : 'Inactive'}</td></tr>`).join('')}
+      ${rows
+        .map(
+          r =>
+            `<tr><td>${r.sno}</td><td>${r.name}</td><td>${r.tax}</td><td>${
+              r.is_active === 1 ? 'Active' : 'Inactive'
+            }</td></tr>`
+        )
+        .join('')}
       </tbody></table></body></html>`
     w?.document.write(html)
     w?.document.close()
@@ -420,7 +411,7 @@ export default function TaxPage() {
     const headers = ['S.No', 'Tax Name', 'Tax (%)', 'Status']
     const csv = [
       headers.join(','),
-      ...rows.map(r => [r.sno, r.name, r.tax, r.status === 1 ? 'Active' : 'Inactive'].join(','))
+      ...rows.map(r => [r.sno, r.name, r.tax, r.is_active === 1 ? 'Active' : 'Inactive'].join(','))
     ].join('\n')
     const link = document.createElement('a')
     link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
@@ -436,7 +427,7 @@ export default function TaxPage() {
         'S.No': r.sno,
         'Tax Name': r.name,
         'Tax (%)': r.tax,
-        Status: r.status === 1 ? 'Active' : 'Inactive'
+        Status: r.is_active === 1 ? 'Active' : 'Inactive'
       }))
     )
     const wb = XLSX.utils.book_new()
@@ -453,14 +444,16 @@ export default function TaxPage() {
     autoTable(doc, {
       startY: 25,
       head: [['S.No', 'Tax Name', 'Tax (%)', 'Status']],
-      body: rows.map(r => [r.sno, r.name, r.tax, r.status === 1 ? 'Active' : 'Inactive'])
+      body: rows.map(r => [r.sno, r.name, r.tax, r.is_active === 1 ? 'Active' : 'Inactive'])
     })
     doc.save('Tax_List.pdf')
     showToast('success', 'PDF exported')
   }
 
   const exportCopy = () => {
-    const text = rows.map(r => `${r.sno}. ${r.name} | ${r.tax}% | ${r.status === 1 ? 'Active' : 'Inactive'}`).join('\n')
+    const text = rows
+      .map(r => `${r.sno}. ${r.name} | ${r.tax}% | ${r.is_active === 1 ? 'Active' : 'Inactive'}`)
+      .join('\n')
     navigator.clipboard.writeText(text)
     showToast('info', 'Copied to clipboard')
   }
@@ -483,9 +476,7 @@ export default function TaxPage() {
               <Typography variant='h5' sx={{ fontWeight: 600 }}>
                 Tax Management
               </Typography>
-              <Button
-                variant='contained'
-                color='primary'
+              <GlobalButton
                 startIcon={
                   <RefreshIcon
                     sx={{
@@ -500,27 +491,25 @@ export default function TaxPage() {
                 disabled={loading}
                 onClick={async () => {
                   setLoading(true)
-                  setPagination({ pageIndex: 0, pageSize: 25 }) // 🔥 ADD THIS
+                  setPagination({ pageIndex: 0, pageSize: 25 })
                   await loadTaxes()
                   setTimeout(() => setLoading(false), 800)
                 }}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
                 {loading ? 'Refreshing...' : 'Refresh'}
-              </Button>
+              </GlobalButton>
             </Box>
           }
           action={
             <Box display='flex' alignItems='center' gap={2}>
-              <Button
+              <GlobalButton
                 variant='outlined'
                 color='secondary'
                 endIcon={<ArrowDropDownIcon />}
                 onClick={e => setExportAnchorEl(e.currentTarget)}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
                 Export
-              </Button>
+              </GlobalButton>
 
               <Menu anchorEl={exportAnchorEl} open={exportOpen} onClose={() => setExportAnchorEl(null)}>
                 <MenuItem
@@ -565,14 +554,9 @@ export default function TaxPage() {
                 </MenuItem>
               </Menu>
 
-              <Button
-                variant='contained'
-                startIcon={<AddIcon />}
-                onClick={handleAdd}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-              >
+              <GlobalButton startIcon={<AddIcon />} onClick={handleAdd}>
                 Add Tax
-              </Button>
+              </GlobalButton>
             </Box>
           }
           sx={{
@@ -719,61 +703,55 @@ export default function TaxPage() {
           <form onSubmit={handleSubmit} style={{ flexGrow: 1 }}>
             <Grid container spacing={4}>
               <Grid item xs={12}>
-                <CustomTextFieldWrapper
-                  fullWidth
-                  required
+                <GlobalTextField
                   label='Tax Name'
                   placeholder='Enter tax name'
                   value={formData.name}
                   inputRef={nameRef}
+                  required
                   onChange={e => handleFieldChange('name', e.target.value)}
                 />
               </Grid>
 
               <Grid item xs={12}>
-                <CustomTextFieldWrapper
-                  fullWidth
-                  required
+                <GlobalTextField
                   label='Tax Value (%)'
                   placeholder='e.g. 5.00'
                   value={formData.tax_value}
+                  required
                   onChange={e => handleFieldChange('tax_value', e.target.value.replace(/[^0-9.]/g, ''))}
                 />
               </Grid>
 
-              {/* Optional: Add a remarks/description field */}
               <Grid item xs={12}>
-                <CustomTextarea
+                <GlobalTextarea
                   label='Description'
                   placeholder='Enter additional details...'
-                  value={formData.description || ''}
-                  onChange={e => handleFieldChange('description', e.target.value)}
                   rows={3}
+                  value={formData.description}
+                  onChange={e => handleFieldChange('description', e.target.value)}
                 />
               </Grid>
 
               {isEdit && (
                 <Grid item xs={12}>
-                  <CustomSelectField
+                  <GlobalSelect
                     label='Status'
-                    value={formData.status}
-                    onChange={e => setFormData(p => ({ ...p, status: Number(e.target.value) }))}
-                    options={[
-                      { value: 1, label: 'Active' },
-                      { value: 0, label: 'Inactive' }
-                    ]}
+                    defaultValue={formData.status}
+                    onChange={value => setFormData(p => ({ ...p, status: Number(value) }))}
                   />
                 </Grid>
               )}
             </Grid>
 
             <Box mt={4} display='flex' gap={2}>
-              <Button type='submit' variant='contained' fullWidth disabled={loading}>
+              <GlobalButton type='submit' fullWidth disabled={loading}>
                 {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
-              </Button>
-              <Button variant='outlined' color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
+              </GlobalButton>
+
+              <GlobalButton variant='outlined' color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
                 Cancel
-              </Button>
+              </GlobalButton>
             </Box>
           </form>
         </Box>
@@ -830,22 +808,17 @@ export default function TaxPage() {
 
         {/* Centered buttons */}
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-          <Button
-            onClick={() => setDeleteDialog({ open: false, row: null })}
-            variant='tonal'
+          <GlobalButton
+            variant='outlined'
             color='secondary'
-            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+            onClick={() => setDeleteDialog({ open: false, row: null })}
           >
             Cancel
-          </Button>
-          <Button
-            onClick={confirmDelete}
-            variant='contained'
-            color='error'
-            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
-          >
+          </GlobalButton>
+
+          <GlobalButton variant='contained' color='error' onClick={confirmDelete}>
             Delete
-          </Button>
+          </GlobalButton>
         </DialogActions>
       </Dialog>
 

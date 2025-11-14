@@ -29,6 +29,8 @@ import {
 
 import { getCustomerList, deleteCustomer } from '@/api/customer'
 import { getCustomerOrigin } from '@/api/customer/origin'
+import GlobalButton from '@/components/common/GlobalButton'
+
 
 import { showToast } from '@/components/common/Toasts'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
@@ -62,18 +64,7 @@ import {
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
 
-// ───────────────────────────────────────────
-// IndexedDB
-// ───────────────────────────────────────────
-const getCustomerDB = async () => {
-  return await openDB('mainCustomerDB', 1, {
-    upgrade(db) {
-      if (!db.objectStoreNames.contains('customers')) {
-        db.createObjectStore('customers', { keyPath: 'id', autoIncrement: true })
-      }
-    }
-  })
-}
+
 
 
 
@@ -231,7 +222,7 @@ export default function CustomersPage() {
         id: 'contracts',
         header: 'Contract',
         cell: info => (
-          <Button
+          <GlobalButton
             size='small'
             variant='outlined'
             color='success'
@@ -244,7 +235,7 @@ export default function CustomersPage() {
             onClick={() => router.push('/en/admin/contracts')}
           >
             Contracts
-          </Button>
+          </GlobalButton>
         )
       }),
 
@@ -453,7 +444,7 @@ export default function CustomersPage() {
               <Typography variant='h5' sx={{ fontWeight: 600 }}>
                 Customer List
               </Typography>
-              <Button
+              <GlobalButton
                 variant='contained'
                 color='primary'
                 startIcon={
@@ -476,12 +467,12 @@ export default function CustomersPage() {
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
                 {loading ? 'Refreshing...' : 'Refresh'}
-              </Button>
+              </GlobalButton>
             </Box>
           }
           action={
             <Box display='flex' alignItems='center' gap={2}>
-              <Button
+              <GlobalButton
                 variant='outlined'
                 color='secondary'
                 endIcon={<ArrowDropDownIcon />}
@@ -489,7 +480,7 @@ export default function CustomersPage() {
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
                 Export
-              </Button>
+              </GlobalButton>
               <Menu anchorEl={exportAnchorEl} open={exportOpen} onClose={() => setExportAnchorEl(null)}>
                 <MenuItem onClick={exportPrint}>
                   <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
@@ -498,14 +489,14 @@ export default function CustomersPage() {
                   <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
                 </MenuItem>
               </Menu>
-              <Button
+              <GlobalButton
                 variant='contained'
                 startIcon={<AddIcon />}
                 onClick={() => router.push('/admin/customers/add')}
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
                 Add Customer
-              </Button>
+              </GlobalButton>
             </Box>
           }
         />
@@ -664,22 +655,22 @@ export default function CustomersPage() {
 
         {/* ⚙️ Buttons */}
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-          <Button
+          <GlobalButton
             onClick={() => setDeleteDialog({ open: false })}
             variant='tonal'
             color='secondary'
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
           >
             Cancel
-          </Button>
-          <Button
+          </GlobalButton>
+          <GlobalButton
             onClick={confirmDelete}
             variant='contained'
             color='error'
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
           >
             Delete
-          </Button>
+          </GlobalButton>
         </DialogActions>
       </Dialog>
     </Box>

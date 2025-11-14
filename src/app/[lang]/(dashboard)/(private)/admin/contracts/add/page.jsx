@@ -33,7 +33,16 @@ import { useRouter } from 'next/navigation'
 
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
-import VisibilityIcon from '@mui/icons-material/Visibility' // 💡 NEW: Import VisibilityIcon
+import VisibilityIcon from '@mui/icons-material/Visibility'
+
+
+// 🔥 Global UI Components (use everywhere)
+import GlobalButton from '@/components/common/GlobalButton'
+import GlobalTextField from '@/components/common/GlobalTextField'
+import GlobalTextarea from '@/components/common/GlobalTextarea'
+import GlobalSelect from '@/components/common/GlobalSelect'
+import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
+import { showToast } from '@/components/common/Toasts'
 
 // Layout + Inputs (Assuming these paths are correct)
 import ContentLayout from '@/components/layout/ContentLayout'
@@ -942,7 +951,7 @@ const [dropdowns, setDropdowns] = useState({
                 name='file'
                 onChange={handleNativeFileChange}
               />
-              <Button
+              <GlobalButton
                 variant='outlined'
                 fullWidth
                 onClick={() => fileInputRef.current?.click()}
@@ -970,7 +979,7 @@ const [dropdowns, setDropdowns] = useState({
                 >
                   {formData.uploadedFileName || 'Choose File or Drag & Drop Here'}
                 </Typography>
-              </Button>
+              </GlobalButton>
 
               {/* View Button, visible if a file URL exists */}
               {formData.uploadedFileURL && (
@@ -1133,7 +1142,7 @@ const [dropdowns, setDropdowns] = useState({
             />
           </Grid>
           <Grid item xs={12} md={3} sx={{ display: 'flex', alignItems: 'flex-end' }}>
-            <Button
+            <GlobalButton
               variant='contained'
               fullWidth
               onClick={handleSavePestItem} // Use the new save handler
@@ -1145,7 +1154,7 @@ const [dropdowns, setDropdowns] = useState({
               // -------------------------
             >
               {editingItemId ? 'UPDATE PEST' : 'ADD PEST'} {/* Change text based on mode */}
-            </Button>
+            </GlobalButton>
           </Grid>
 
           {/* ---------------------------------------------------- */}
@@ -1294,12 +1303,12 @@ const [dropdowns, setDropdowns] = useState({
 
           {/* Actions */}
           <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 4, pt: 8 }}>
-            <Button variant='outlined' onClick={() => router.push('/admin/contracts')} ref={closeButtonRef}>
+            <GlobalButton variant='outlined' onClick={() => router.push('/admin/contracts')} ref={closeButtonRef}>
               Close
-            </Button>
-            <Button variant='contained' onClick={handleSubmit} ref={saveButtonRef}>
+            </GlobalButton>
+            <GlobalButton variant='contained' onClick={handleSubmit} ref={saveButtonRef}>
               Save
-            </Button>
+            </GlobalButton>
           </Grid>
         </Grid>
       </Card>

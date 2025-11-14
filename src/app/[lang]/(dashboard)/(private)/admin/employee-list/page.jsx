@@ -28,6 +28,15 @@ import {
 
 import { getEmployeeList, addEmployee, updateEmployee, deleteEmployee, getEmployeeDetails } from '@/api/employee'
 
+
+// 🔥 Global UI Components (use everywhere)
+import GlobalButton from '@/components/common/GlobalButton'
+import GlobalTextField from '@/components/common/GlobalTextField'
+import GlobalTextarea from '@/components/common/GlobalTextarea'
+import GlobalSelect from '@/components/common/GlobalSelect'
+import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
+
+
 import { showToast } from '@/components/common/Toasts'
 import { encryptId } from '@/utils/encryption'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
@@ -41,7 +50,6 @@ import FileDownloadIcon from '@mui/icons-material/FileDownload'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
-import { toast } from 'react-toastify'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 import classnames from 'classnames'
 import { rankItem } from '@tanstack/match-sorter-utils'
@@ -496,7 +504,7 @@ export default function EmployeePage() {
               <Typography variant='h5' sx={{ fontWeight: 600 }}>
                 Employee List
               </Typography>
-              <Button
+              <GlobalButton
                 variant='contained'
                 color='primary'
                 startIcon={
@@ -518,12 +526,12 @@ export default function EmployeePage() {
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
                 {loading ? 'Refreshing...' : 'Refresh'}
-              </Button>
+              </GlobalButton>
             </Box>
           }
           action={
             <Box display='flex' alignItems='center' gap={2}>
-              <Button
+              <GlobalButton
                 variant='outlined'
                 color='secondary'
                 endIcon={<ArrowDropDownIcon />}
@@ -532,7 +540,7 @@ export default function EmployeePage() {
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
                 Export
-              </Button>
+              </GlobalButton>
               <Menu anchorEl={exportAnchorEl} open={exportOpen} onClose={() => setExportAnchorEl(null)}>
                 <MenuItem onClick={exportPrint}>
                   <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
@@ -541,14 +549,14 @@ export default function EmployeePage() {
                   <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
                 </MenuItem>
               </Menu>
-              <Button
+              <GlobalButton
                 variant='contained'
                 startIcon={<AddIcon />}
                 onClick={() => router.push('/admin/employee-list/add')}
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
                 Add Employee
-              </Button>
+              </GlobalButton>
             </Box>
           }
         />
@@ -698,22 +706,22 @@ export default function EmployeePage() {
           </Typography>
         </DialogContent>
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-          <Button
+          <GlobalButton
             onClick={() => setDeleteDialog({ open: false })}
             variant='tonal'
             color='secondary'
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
           >
             Cancel
-          </Button>
-          <Button
+          </GlobalButton>
+          <GlobalButton
             onClick={confirmDelete}
             variant='contained'
             color='error'
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
           >
             Delete
-          </Button>
+          </GlobalButton>
         </DialogActions>
       </Dialog>
     </Box>

@@ -23,6 +23,14 @@ import {
   FormControlLabel
 } from '@mui/material'
 
+// 🔥 Global UI Components (use everywhere)
+import GlobalButton from '@/components/common/GlobalButton'
+import GlobalTextField from '@/components/common/GlobalTextField'
+import GlobalTextarea from '@/components/common/GlobalTextarea'
+import GlobalSelect from '@/components/common/GlobalSelect'
+import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
+import { showToast } from '@/components/common/Toasts'
+
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import RefreshIcon from '@mui/icons-material/Refresh'
@@ -107,59 +115,6 @@ const mockData = [
 
 const getContracts = async () => {
   return new Promise(resolve => setTimeout(() => resolve(mockData), 300))
-}
-
-// ──────────────────────────────────────────────────────────────
-// Toast (Custom Styled, Global, with Icons & Colors)
-// ──────────────────────────────────────────────────────────────
-const showToast = (type, message = '') => {
-  const icons = {
-    success: 'tabler-circle-check',
-    delete: 'tabler-trash',
-    error: 'tabler-alert-triangle',
-    warning: 'tabler-info-circle',
-    info: 'tabler-refresh'
-  }
-
-  toast(
-    <div className='flex items-center gap-2'>
-      <i
-        className={icons[type]}
-        style={{
-          color:
-            type === 'success'
-              ? '#16a34a'
-              : type === 'error'
-                ? '#dc2626'
-                : type === 'delete'
-                  ? '#dc2626'
-                  : type === 'warning'
-                    ? '#f59e0b'
-                    : '#2563eb',
-          fontSize: '22px'
-        }}
-      />
-      <Typography variant='body2' sx={{ fontSize: '0.9rem', color: '#111' }}>
-        {message}
-      </Typography>
-    </div>,
-    {
-      position: 'top-right',
-      autoClose: 2000,
-      hideProgressBar: true,
-      closeOnClick: true,
-      pauseOnHover: false,
-      draggable: false,
-      theme: 'light',
-      style: {
-        borderRadius: '10px',
-        padding: '8px 14px',
-        boxShadow: '0 4px 10px rgba(0,0,0,0.06)',
-        display: 'flex',
-        alignItems: 'center'
-      }
-    }
-  )
 }
 
 // Debounced Input
@@ -255,6 +210,39 @@ export default function ContractStatusPage() {
       setLoading(false)
     }
   }
+
+  // 🔥 Autocomplete Options (Required by GlobalAutocomplete)
+  const originOptions = [
+    { label: 'Genplus Innovations', value: 'Genplus Innovations' },
+    { label: 'Pest Masters', value: 'Pest Masters' }
+  ]
+
+  const customerOptions = [
+    { label: 'GP Industries Pvt Ltd', value: 'GP Industries Pvt Ltd' },
+    { label: 'Acme Corp', value: 'Acme Corp' }
+  ]
+
+  const contractTypeOptions = [
+    { label: 'Limited Contract', value: 'Limited Contract' },
+    { label: 'Annual Contract', value: 'Annual Contract' }
+  ]
+
+  const invoiceOptions = [
+    { label: 'Monthly', value: 'Monthly' },
+    { label: 'Yearly', value: 'Yearly' }
+  ]
+
+  const contractStatusOptions = [
+    { label: 'Current', value: 'Current' },
+    { label: 'Expired', value: 'Expired' },
+    { label: 'Hold', value: 'Hold' },
+    { label: 'Terminated', value: 'Terminated' }
+  ]
+
+  const renewalOptions = [
+    { label: 'New', value: 'New' },
+    { label: 'Renewed', value: 'Renewed' }
+  ]
 
   useEffect(() => {
     loadData()
@@ -454,177 +442,111 @@ export default function ContractStatusPage() {
       </Breadcrumbs>
 
       {/* Filters */}
-      <Card sx={{ mb: 4, boxShadow: 'none' }} elevation={0}>
-        <CardContent>
-          <Grid container spacing={3}>
+
+      {/* Table */}
+      <Card sx={{ p: 4 }}>
+
+        <Box sx={{ mb: 6 }}>
+          <Grid container spacing={2}>
+            {/* Date Filter */}
             <Grid item xs={12} md={4}>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <FormControlLabel
-                  control={<Checkbox checked={filterByDate} onChange={e => setFilterByDate(e.target.checked)} />}
-                  label='Date Filter'
-                  sx={{ ml: 0.5, '& .MuiFormControlLabel-label': { fontWeight: 500 } }}
-                />
+              <Box display='flex' flexDirection='column' sx={{ width: '100%' }}>
+                {/* Label + Checkbox (UPPER) */}
+                <Box display='flex' alignItems='center' gap={1}>
+                  <Checkbox
+                    checked={filterByDate}
+                    onChange={e => setFilterByDate(e.target.checked)}
+                    size='small'
+                    sx={{ padding: '0px' }}
+                  />
+                  <Typography sx={{ fontSize: '0.85rem', color: '#444' }}>Date</Typography>
+                </Box>
+
+                {/* Date Input Box (DOWN) */}
                 <AppReactDatepicker
                   selected={dateFilter}
                   onChange={setDateFilter}
                   dateFormat='dd/MM/yyyy'
-                  customInput={<TextField fullWidth size='small' disabled={!filterByDate} />}
+                  customInput={<TextField fullWidth size='small' disabled={!filterByDate} placeholder='Select Date' />}
                 />
               </Box>
             </Grid>
-            <Grid item xs={12} md={4}>
-              <Autocomplete
-                options={['Genplus Innovations', 'Pest Masters']}
-                value={originFilter}
-                onChange={(_, v) => setOriginFilter(v)}
-                renderInput={p => <TextField {...p} label='Origin' inputRef={originRef} size='small' />}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Autocomplete
-                options={['GP Industries Pvt Ltd', 'Acme Corp']}
-                value={customerFilter}
-                onChange={(_, v) => setCustomerFilter(v)}
-                renderInput={p => <TextField {...p} label='Customer' inputRef={customerRef} size='small' />}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Autocomplete
-                options={['Limited Contract', 'Annual Contract']}
-                value={contractTypeFilter}
-                onChange={(_, v) => setContractTypeFilter(v)}
-                renderInput={p => <TextField {...p} label='Contract Type' inputRef={contractTypeRef} size='small' />}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Autocomplete
-                options={['Monthly', 'Yearly']}
-                value={invoiceFrequencyFilter}
-                onChange={(_, v) => setInvoiceFrequencyFilter(v)}
-                renderInput={p => (
-                  <TextField {...p} label='Invoice Frequency' inputRef={invoiceFrequencyRef} size='small' />
-                )}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Autocomplete
-                options={['Current', 'Expired', 'Hold', 'Terminated']}
-                value={contractStatusFilter}
-                onChange={(_, v) => setContractStatusFilter(v)}
-                renderInput={p => (
-                  <TextField {...p} label='Contract Status' inputRef={contractStatusRef} size='small' />
-                )}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Autocomplete
-                options={['New', 'Renewed']}
-                value={renewalFilter}
-                onChange={(_, v) => setRenewalFilter(v)}
-                renderInput={p => <TextField {...p} label='New / Renewed' inputRef={renewalRef} size='small' />}
-              />
-            </Grid>
-          </Grid>
-          <Grid container spacing={2} sx={{ mt: 2 }}>
-            <Grid item>
-              <Button variant='contained' size='small' onClick={loadData}>
-                Refresh
-              </Button>
-            </Grid>
-            <Grid item>
-              <Button variant='contained' size='small' onClick={exportPrint}>
-                Print Agreement
-              </Button>
-            </Grid>
-            <Grid item>
-              <Button variant='contained' size='small'>
-                Auto Review
-              </Button>
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
 
-      {/* Table */}
-      <Card sx={{ p: 3 }}>
-        <CardHeader
-          sx={{ pb: 1.5, pt: 1.5, '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' } }}
-          title={
-            <Box display='flex' alignItems='center' gap={2}>
-              <Typography variant='h5' sx={{ fontWeight: 600 }}>
-                Contract List
-              </Typography>
-              <Button variant='contained' startIcon={<RefreshIcon />} disabled={loading} onClick={loadData}>
-                {loading ? 'Refreshing...' : 'Refresh'}
-              </Button>
-            </Box>
-          }
-          action={
-            <Box display='flex' alignItems='center' gap={1}>
-              {['Copy', 'CSV', 'Excel', 'PDF', 'Print'].map(btn => (
-                <Button
-                  key={btn}
-                  variant='contained'
-                  size='small'
-                  onClick={
-                    btn === 'CSV'
-                      ? exportCSV
-                      : btn === 'Print'
-                        ? exportPrint
-                        : () => showToast('info', `${btn} coming soon`)
-                  }
-                  sx={{
-                    bgcolor: '#6c757d', // Gray background
-                    color: '#fff',
-                    fontWeight: 500,
-                    textTransform: 'none',
-                    borderRadius: '8px', // Rounded corners
-                    px: 2,
-                    py: 1.25,
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.15)', // Subtle shadow
-                    '&:hover': {
-                      bgcolor: '#5a6268', // Darker on hover
-                      boxShadow: '0 3px 6px rgba(0,0,0,0.2)'
-                    },
-                    '&:active': {
-                      boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
-                      transform: 'translateY(1px)'
-                    }
-                  }}
-                >
-                  {btn}
-                </Button>
-              ))}
-              <Button variant='contained' startIcon={<AddIcon />} onClick={() => router.push('/admin/contracts/add')}>
-                Add Contract
-              </Button>
-            </Box>
-          }
-        />
-        {loading && (
-          <Box
-            sx={{
-              position: 'fixed',
-              inset: 0,
-              bgcolor: 'rgba(255,255,255,0.7)',
-              backdropFilter: 'blur(2px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 2000
-            }}
-          >
-            <Box textAlign='center'>
-              <ProgressCircularCustomization size={60} thickness={5} />
-              <Typography mt={2} fontWeight={600} color='primary'>
-                Loading Contracts...
-              </Typography>
-            </Box>
-          </Box>
-        )}
+            {/* Origin */}
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete
+                label='Origin'
+                options={originOptions}
+                value={originFilter}
+                onChange={v => setOriginFilter(v)}
+              />
+            </Grid>
+
+            {/* Customer */}
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete
+                label='Customer'
+                options={customerOptions}
+                value={customerFilter}
+                onChange={v => setCustomerFilter(v)}
+              />
+            </Grid>
+
+            {/* Contract Type */}
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete
+                label='Contract Type'
+                options={contractTypeOptions}
+                value={contractTypeFilter}
+                onChange={v => setContractTypeFilter(v)}
+              />
+            </Grid>
+
+            {/* Invoice Frequency */}
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete
+                label='Invoice Frequency'
+                options={invoiceOptions}
+                value={invoiceFrequencyFilter}
+                onChange={v => setInvoiceFrequencyFilter(v)}
+              />
+            </Grid>
+
+            {/* Contract Status */}
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete
+                label='Contract Status'
+                options={contractStatusOptions}
+                value={contractStatusFilter}
+                onChange={v => setContractStatusFilter(v)}
+              />
+            </Grid>
+
+            {/* New / Renewed */}
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete
+                label='New / Renewed'
+                options={renewalOptions}
+                value={renewalFilter}
+                onChange={v => setRenewalFilter(v)}
+              />
+            </Grid>
+          </Grid>
+        </Box>
 
         <Divider sx={{ mb: 2 }} />
-        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+
+        <Box
+          sx={{
+            mb: 3,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 2,
+            flexWrap: 'wrap'
+          }}
+        >
+          {/* Left: Entries Dropdown */}
           <FormControl size='small' sx={{ width: 140 }}>
             <Select
               value={pagination.pageSize}
@@ -637,6 +559,37 @@ export default function ContractStatusPage() {
               ))}
             </Select>
           </FormControl>
+
+          {/* Center: Export Buttons */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {['Copy', 'CSV', 'Excel', 'PDF', 'Print'].map(btn => (
+              <GlobalButton
+                key={btn}
+                variant='contained'
+                size='small'
+                onClick={
+                  btn === 'CSV'
+                    ? exportCSV
+                    : btn === 'Print'
+                      ? exportPrint
+                      : () => showToast('info', `${btn} coming soon`)
+                }
+                sx={{
+                  bgcolor: '#6c757d',
+                  color: '#fff',
+                  textTransform: 'none',
+                  borderRadius: '8px',
+                  px: 2,
+                  py: 1,
+                  '&:hover': { bgcolor: '#5a6268' }
+                }}
+              >
+                {btn}
+              </GlobalButton>
+            ))}
+          </Box>
+
+          {/* Right: Search */}
           <DebouncedInput
             value={searchText}
             onChange={v => {
@@ -644,7 +597,7 @@ export default function ContractStatusPage() {
               setPagination(p => ({ ...p, pageIndex: 0 }))
             }}
             placeholder='Search any field...'
-            sx={{ width: 420 }}
+            sx={{ width: 350 }}
             size='small'
             slotProps={{
               input: {

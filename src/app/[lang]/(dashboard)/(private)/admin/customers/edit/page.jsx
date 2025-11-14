@@ -10,6 +10,13 @@ import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
 import { showToast } from '@/components/common/Toasts'
 
+
+import GlobalButton from '@/components/common/GlobalButton'
+import GlobalTextField from '@/components/common/GlobalTextField'
+import GlobalTextarea from '@/components/common/GlobalTextarea'
+import GlobalSelect from '@/components/common/GlobalSelect'
+import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
+
 import ContentLayout from '@/components/layout/ContentLayout'
 import CustomTextFieldWrapper from '@/components/common/CustomTextField'
 import CustomTextarea from '@/components/common/CustomTextarea'
@@ -373,7 +380,7 @@ const handleFinalSave = async () => {
             <Grid container spacing={4}>
               {/* Origin */}
               <Grid item xs={12} md={4}>
-                <CustomSelectField
+                <GlobalAutocomplete
                   ref={originRef}
                   fullWidth
                   label='Origin'
@@ -389,13 +396,13 @@ const handleFinalSave = async () => {
                   selected={formData.commenceDate}
                   onChange={date => setFormData(prev => ({ ...prev, commenceDate: date }))}
                   dateFormat='dd/MM/yyyy'
-                  customInput={<CustomTextFieldWrapper fullWidth label='Commence Date' />}
+                  customInput={<GlobalTextField fullWidth label='Commence Date' />}
                 />
               </Grid>
 
               {/* Company Prefix */}
               <Grid item xs={12} md={4}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   ref={companyPrefixRef}
                   fullWidth
                   label='Company Prefix'
@@ -408,7 +415,7 @@ const handleFinalSave = async () => {
 
               {/* Customer Name */}
               <Grid item xs={12} md={4}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   ref={customerNameRef}
                   fullWidth
                   label='Customer Name'
@@ -421,7 +428,7 @@ const handleFinalSave = async () => {
 
               {/* ABSS Customer Name */}
               <Grid item xs={12} md={4}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   ref={abssCustomerNameRef}
                   fullWidth
                   label='ABSS Customer Name'
@@ -434,7 +441,7 @@ const handleFinalSave = async () => {
 
               {/* Card ID */}
               <Grid item xs={12} md={4}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   ref={cardIdRef}
                   fullWidth
                   label='Card ID'
@@ -447,7 +454,7 @@ const handleFinalSave = async () => {
 
               {/* PIC Name */}
               <Grid item xs={12} md={4}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   ref={picNameRef}
                   fullWidth
                   label='PIC Name'
@@ -460,7 +467,7 @@ const handleFinalSave = async () => {
 
               {/* PIC Email */}
               <Grid item xs={12} md={4}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   ref={picEmailRef}
                   fullWidth
                   label='PIC Email'
@@ -479,7 +486,7 @@ const handleFinalSave = async () => {
 
               {/* PIC Phone */}
               <Grid item xs={12} md={4}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   ref={picPhoneRef}
                   fullWidth
                   label='PIC Phone'
@@ -492,7 +499,7 @@ const handleFinalSave = async () => {
 
               {/* Billing Name */}
               <Grid item xs={12} md={4}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   ref={billingNameRef}
                   fullWidth
                   label='Billing Contact Name'
@@ -505,7 +512,7 @@ const handleFinalSave = async () => {
 
               {/* Billing Email */}
               <Grid item xs={12} md={4}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   ref={billingEmailRef}
                   fullWidth
                   label='Billing Email'
@@ -524,7 +531,7 @@ const handleFinalSave = async () => {
 
               {/* Billing Phone */}
               <Grid item xs={12} md={4}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   ref={billingPhoneRef}
                   fullWidth
                   label='Billing Phone'
@@ -537,7 +544,7 @@ const handleFinalSave = async () => {
 
               {/* City */}
               <Grid item xs={12} md={4}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   ref={cityRef}
                   fullWidth
                   label='City'
@@ -550,7 +557,7 @@ const handleFinalSave = async () => {
 
               {/* Postal Code */}
               <Grid item xs={12} md={4}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   ref={postalCodeRef}
                   fullWidth
                   label='Postal Code'
@@ -563,7 +570,7 @@ const handleFinalSave = async () => {
 
               {/* Payment Terms */}
               <Grid item xs={12} md={4}>
-                <CustomSelectField
+                <GlobalAutocomplete
                   ref={paymentTermsRef}
                   fullWidth
                   label='Payment Terms'
@@ -578,7 +585,7 @@ const handleFinalSave = async () => {
 
               {/* Sales Person */}
               <Grid item xs={12} md={4}>
-                <CustomSelectField
+                <GlobalAutocomplete
                   ref={salespersonRef}
                   fullWidth
                   label='Sales Person'
@@ -593,7 +600,7 @@ const handleFinalSave = async () => {
 
               {/* Login Email */}
               <Grid item xs={12} md={4}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   ref={loginEmailRef}
                   fullWidth
                   label='Login Email'
@@ -606,7 +613,7 @@ const handleFinalSave = async () => {
 
               {/* Password */}
               <Grid item xs={12} md={4}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   ref={passwordRef}
                   fullWidth
                   type='password'
@@ -620,42 +627,42 @@ const handleFinalSave = async () => {
 
               {/* Billing Address */}
               <Grid item xs={12} md={4}>
-                <CustomTextarea
+                <GlobalTextarea
                   ref={billingAddressRef}
                   fullWidth
                   label='Billing Address'
                   name='billingAddress'
                   value={formData.billingAddress}
                   onChange={handleChange}
-                  rows={2}
+                  rows={3}
                   onKeyDown={e => handleEnterFocus(e, remarks1Ref)}
                 />
               </Grid>
 
               {/* Remarks 1 */}
               <Grid item xs={12} md={4}>
-                <CustomTextarea
+                <GlobalTextarea
                   ref={remarks1Ref}
                   fullWidth
                   label='Remarks 1'
                   name='remarks1'
                   value={formData.remarks1}
                   onChange={handleChange}
-                  rows={2}
+                  rows={3}
                   onKeyDown={e => handleEnterFocus(e, remarks2Ref)}
                 />
               </Grid>
 
               {/* Remarks 2 */}
               <Grid item xs={12} md={4}>
-                <CustomTextarea
+                <GlobalTextarea
                   ref={remarks2Ref}
                   fullWidth
                   label='Remarks 2'
                   name='remarks2'
                   value={formData.remarks2}
                   onChange={handleChange}
-                  rows={2}
+                  rows={3}
                 />
               </Grid>
             </Grid>
@@ -669,7 +676,7 @@ const handleFinalSave = async () => {
           <Grid container spacing={1}>
             <Grid item xs={12}>
               <Card sx={{ p: 2, boxShadow: 'none' }} elevation={0}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   fullWidth
                   label={
                     <span>
@@ -681,7 +688,7 @@ const handleFinalSave = async () => {
                   onChange={e => setContactForm(prev => ({ ...prev, miniName: e.target.value }))}
                 />
                 <Box mt={3} />
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   fullWidth
                   label='Email'
                   name='miniEmail'
@@ -695,7 +702,7 @@ const handleFinalSave = async () => {
                   helperText={miniEmailError ? 'Invalid email' : ''}
                 />
                 <Box mt={3} />
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   fullWidth
                   label='Phone'
                   name='miniPhone'
@@ -710,11 +717,11 @@ const handleFinalSave = async () => {
 
                 <Box mt={3} display='flex' gap={2}>
                   {editingContact && (
-                    <Button variant='outlined' color='secondary' fullWidth onClick={handleCancelEdit}>
+                    <GlobalButton variant='outlined' color='secondary' fullWidth onClick={handleCancelEdit}>
                       Cancel
-                    </Button>
+                    </GlobalButton>
                   )}
-                  <Button
+                  <GlobalButton
                     variant='contained'
                     fullWidth
                     color={editingContact ? 'success' : 'primary'}
@@ -722,7 +729,7 @@ const handleFinalSave = async () => {
                     disabled={contactForm.miniEmail && miniEmailError}
                   >
                     {editingContact ? 'Update Member' : 'Add Member'}
-                  </Button>
+                  </GlobalButton>
                 </Box>
               </Card>
 
@@ -767,12 +774,12 @@ const handleFinalSave = async () => {
 
                 <Divider sx={{ mt: 4 }} />
                 <Box mt={2} p={2} display='flex' gap={2} justifyContent='flex-end'>
-                  <Button variant='outlined' onClick={handleFinalCancel}>
+                  <GlobalButton variant='outlined' onClick={handleFinalCancel}>
                     Cancel
-                  </Button>
-                  <Button variant='contained' onClick={handleFinalSave}>
+                  </GlobalButton>
+                  <GlobalButton variant='contained' onClick={handleFinalSave}>
                     Update Customer
-                  </Button>
+                  </GlobalButton>
                 </Box>
               </Card>
             </Grid>

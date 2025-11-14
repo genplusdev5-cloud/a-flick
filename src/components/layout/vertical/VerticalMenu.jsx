@@ -87,7 +87,7 @@ const VerticalMenu = ({ scrollMenu }) => {
         <SubMenu label='Master' icon={<i className='tabler-database' />}>
           <MenuItem href={`/${locale}/admin/tax`}>Tax</MenuItem>
           <MenuItem href={`/${locale}/admin/company-origin`}>Company Origin</MenuItem>
-          <MenuItem href={`/${locale}/admin/account-item-code`}>Account Item Code</MenuItem>
+          {/* <MenuItem href={`/${locale}/admin/account-item-code`}>Account Item Code</MenuItem> */}
           <MenuItem href={`/${locale}/admin/service-frequency`}>Service Frequency</MenuItem>
           <MenuItem href={`/${locale}/admin/billing-frequency`}>Billing Frequency</MenuItem>
           <MenuItem href={`/${locale}/admin/uom`}>Unit Of Measurement</MenuItem>
@@ -107,9 +107,11 @@ const VerticalMenu = ({ scrollMenu }) => {
           <MenuItem href={`/${locale}/admin/designation`}>Designation</MenuItem>
           <MenuItem href={`/${locale}/admin/employee-list`}>Employee List</MenuItem>
           <MenuItem href={`/${locale}/admin/employee-leave-type`}>Employee Leave Type</MenuItem>
-          <MenuItem href={`/${locale}/admin/employee-leave`}>Employee Leaves</MenuItem>
           <MenuItem href={`/${locale}/admin/user-privilege`}>User Privilege</MenuItem>
         </SubMenu>
+        <MenuItem href={`/${locale}/admin/employee-leave`} icon={<i className='tabler-calendar-time' />}>
+          Employee Leaves
+        </MenuItem>
 
         {/* ✅ Service Type (Pest) */}
         <MenuItem href={`/${locale}/admin/pests`} icon={PestIcon}>
@@ -147,7 +149,7 @@ const VerticalMenu = ({ scrollMenu }) => {
           <MenuItem href={`/${locale}/admin/stock/usage-report`}>Usage Report</MenuItem>
         </SubMenu>
 
-           {/* ✅ Calendar */}
+        {/* ✅ Calendar */}
         <MenuItem href={`/${locale}/admin/service-request`} icon={<i className='tabler-calendar' />}>
           Service Request
         </MenuItem>

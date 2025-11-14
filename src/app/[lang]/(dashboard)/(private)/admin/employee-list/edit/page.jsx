@@ -20,6 +20,14 @@ import { toast } from 'react-toastify'
 
 import { showToast } from '@/components/common/Toasts'
 
+
+// 🔥 Global UI Components (use everywhere)
+import GlobalButton from '@/components/common/GlobalButton'
+import GlobalTextField from '@/components/common/GlobalTextField'
+import GlobalTextarea from '@/components/common/GlobalTextarea'
+import GlobalSelect from '@/components/common/GlobalSelect'
+import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
+
 // API
 import { getEmployeeDetails, updateEmployee, getSchedulerList, getSupervisorList } from '@/api/employee'
 
@@ -270,13 +278,13 @@ export default function EditEmployeePage() {
   // -----------------------------------------------------
   const renderAC = (name, label, list) => (
     <Grid item xs={12} md={4} key={name}>
-      <Autocomplete
+      <GlobalAutocomplete
         options={list}
         getOptionLabel={o => o.label || ''}
         isOptionEqualToValue={(a, b) => a.id === b.id}
         value={form[name] || null}
         onChange={(e, v) => setField(name, v)}
-        renderInput={params => <CustomTextField {...params} label={label} fullWidth />}
+        renderInput={params => <GlobalTextField {...params} label={label} fullWidth />}
       />
     </Grid>
   )
@@ -303,7 +311,7 @@ export default function EditEmployeePage() {
 
           {/* Basic Fields */}
           <Grid item xs={12} md={4}>
-            <CustomTextField
+            <GlobalTextField
               label='Nick Name'
               value={form.nickname}
               onChange={e => setField('nickname', e.target.value)}
@@ -312,7 +320,7 @@ export default function EditEmployeePage() {
           </Grid>
 
           <Grid item xs={12} md={4}>
-            <CustomTextField
+            <GlobalTextField
               label='Name'
               value={form.name}
               onChange={e => setField('name', e.target.value)}
@@ -329,7 +337,7 @@ export default function EditEmployeePage() {
 
           {/* Lunch */}
           <Grid item xs={12} md={4}>
-            <CustomTextField
+            <GlobalTextField
               type='time'
               label='Lunch Time'
               value={form.lunchTime}
@@ -360,7 +368,7 @@ export default function EditEmployeePage() {
 
           {/* Email */}
           <Grid item xs={12} md={4}>
-            <CustomTextField
+            <GlobalTextField
               label='Email'
               value={form.email}
               onChange={e => {
@@ -376,7 +384,7 @@ export default function EditEmployeePage() {
 
           {/* Phone */}
           <Grid item xs={12} md={4}>
-            <CustomTextField
+            <GlobalTextField
               label='Phone'
               value={form.phone}
               onChange={e => setField('phone', e.target.value)}
@@ -389,13 +397,13 @@ export default function EditEmployeePage() {
             <AppReactDatepicker
               selected={form.dob}
               onChange={date => setField('dob', date)}
-              customInput={<CustomTextField label='DOB' fullWidth />}
+              customInput={<GlobalTextField label='DOB' fullWidth />}
             />
           </Grid>
 
           {/* Target fields */}
           <Grid item xs={12} md={4}>
-            <CustomTextField
+            <GlobalTextField
               label='Target Day'
               value={form.targetDay}
               onChange={e => setField('targetDay', e.target.value)}
@@ -404,7 +412,7 @@ export default function EditEmployeePage() {
           </Grid>
 
           <Grid item xs={12} md={4}>
-            <CustomTextField
+            <GlobalTextField
               label='Target Night'
               value={form.targetNight}
               onChange={e => setField('targetNight', e.target.value)}
@@ -413,7 +421,7 @@ export default function EditEmployeePage() {
           </Grid>
 
           <Grid item xs={12} md={4}>
-            <CustomTextField
+            <GlobalTextField
               label='Target Saturday'
               value={form.targetSaturday}
               onChange={e => setField('targetSaturday', e.target.value)}
@@ -423,7 +431,7 @@ export default function EditEmployeePage() {
 
           {/* Vehicle Number */}
           <Grid item xs={12} md={4}>
-            <CustomTextField
+            <GlobalTextField
               label='Vehicle Number'
               value={form.vehicleNumber}
               onChange={e => setField('vehicleNumber', e.target.value)}
@@ -433,7 +441,7 @@ export default function EditEmployeePage() {
 
           {/* Color */}
           <Grid item xs={12} md={4}>
-            <CustomTextField
+            <GlobalTextField
               type='color'
               label='Color'
               value={form.color}
@@ -445,25 +453,25 @@ export default function EditEmployeePage() {
 
           {/* Description */}
           <Grid item xs={12} md={4}>
-            <CustomTextField
+            <GlobalTextarea
               label='Description'
               value={form.description}
               onChange={e => setField('description', e.target.value)}
               multiline
-              rows={2}
+              rows={3}
               fullWidth
             />
           </Grid>
 
           {/* Buttons */}
           <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
-            <Button variant='outlined' onClick={() => router.back()}>
+            <GlobalButton variant='outlined' onClick={() => router.back()}>
               Cancel
-            </Button>
+            </GlobalButton>
 
-            <Button variant='contained' onClick={handleSave} disabled={loading}>
+            <GlobalButton variant='contained' onClick={handleSave} disabled={loading}>
               {loading ? 'Saving...' : 'Update'}
-            </Button>
+            </GlobalButton>
           </Grid>
         </Grid>
       </Card>

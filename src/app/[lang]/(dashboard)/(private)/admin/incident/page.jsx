@@ -47,6 +47,14 @@ import TablePaginationComponent from '@/components/TablePaginationComponent'
 import classnames from 'classnames'
 import { rankItem } from '@tanstack/match-sorter-utils'
 
+// 🔥 Global UI Components (use everywhere)
+import GlobalButton from '@/components/common/GlobalButton'
+import GlobalTextField from '@/components/common/GlobalTextField'
+import GlobalTextarea from '@/components/common/GlobalTextarea'
+import GlobalSelect from '@/components/common/GlobalSelect'
+import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
+import { showToast } from '@/components/common/Toasts'
+
 // ✅ Custom reusable form components
 import CustomTextFieldWrapper from '@/components/common/CustomTextField'
 import CustomTextarea from '@/components/common/CustomTextarea'
@@ -62,60 +70,6 @@ import {
 } from '@tanstack/react-table'
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
-
-// Toast helper
-// ──────────────────────────────────────────────────────────────
-// Toast (Custom Styled, Global, with Icons & Colors)
-// ──────────────────────────────────────────────────────────────
-const showToast = (type, message = '') => {
-  const icons = {
-    success: 'tabler-circle-check',
-    delete: 'tabler-trash',
-    error: 'tabler-alert-triangle',
-    warning: 'tabler-info-circle',
-    info: 'tabler-refresh'
-  }
-
-  toast(
-    <div className='flex items-center gap-2'>
-      <i
-        className={icons[type]}
-        style={{
-          color:
-            type === 'success'
-              ? '#16a34a'
-              : type === 'error'
-                ? '#dc2626'
-                : type === 'delete'
-                  ? '#dc2626'
-                  : type === 'warning'
-                    ? '#f59e0b'
-                    : '#2563eb',
-          fontSize: '22px'
-        }}
-      />
-      <Typography variant='body2' sx={{ fontSize: '0.9rem', color: '#111' }}>
-        {message}
-      </Typography>
-    </div>,
-    {
-      position: 'top-right',
-      autoClose: 2000,
-      hideProgressBar: true,
-      closeOnClick: true,
-      pauseOnHover: false,
-      draggable: false,
-      theme: 'light',
-      style: {
-        borderRadius: '10px',
-        padding: '8px 14px',
-        boxShadow: '0 4px 10px rgba(0,0,0,0.06)',
-        display: 'flex',
-        alignItems: 'center'
-      }
-    }
-  )
-}
 
 // Debounced Input
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
@@ -142,6 +96,8 @@ export default function IncidentPage() {
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
   const [unsavedAddData, setUnsavedAddData] = useState(null)
+  const [closeReason, setCloseReason] = useState(null)
+
   const [formData, setFormData] = useState({
     id: null,
     name: '',
@@ -193,16 +149,36 @@ export default function IncidentPage() {
   }
 
   useEffect(() => {
+    if (!drawerOpen) {
+      if (closeReason === 'save' || closeReason === 'cancel') {
+        // clear form on save / cancel
+        setFormData({
+          id: null,
+          name: '',
+          description: '',
+          status: 'Active'
+        })
+      }
+      // manual close → keep data (do nothing)
+    }
+  }, [drawerOpen])
+
+  useEffect(() => {
     loadData()
   }, [pagination.pageIndex, pagination.pageSize, searchText])
 
   // Drawer
-  const toggleDrawer = () => setDrawerOpen(p => !p)
+  const toggleDrawer = () => {
+    setCloseReason('manual')
+    setDrawerOpen(false)
+  }
+
   const handleAdd = () => {
-    setIsEdit(false)
-    if (unsavedAddData) {
-      setFormData(unsavedAddData)
+    // If manual close → DO NOT clear
+    if (closeReason === null || closeReason === 'manual') {
+      // keep existing formData
     } else {
+      // Save / Cancel happened → clear
       setFormData({
         id: null,
         name: '',
@@ -210,19 +186,16 @@ export default function IncidentPage() {
         status: 'Active'
       })
     }
+
+    setIsEdit(false)
     setDrawerOpen(true)
+    setCloseReason(null) // reset
     setTimeout(() => nameRef.current?.focus(), 100)
   }
 
   // 🔹 Cancel drawer + reset
   const handleCancel = () => {
-    setFormData({
-      id: null,
-      name: '',
-      description: '',
-      status: 'Active'
-    })
-    setUnsavedAddData(null)
+    setCloseReason('cancel')
     setDrawerOpen(false)
   }
 
@@ -288,6 +261,7 @@ export default function IncidentPage() {
 
   const handleSubmit = async e => {
     e.preventDefault()
+    setCloseReason('save')
 
     if (!formData.name.trim()) {
       showToast('warning', 'Incident name is required')
@@ -309,6 +283,7 @@ export default function IncidentPage() {
         showToast('success', result.message)
         setDrawerOpen(false)
         setFormData({ id: null, name: '', description: '', status: 'Active' })
+        setUnsavedAddData(null) // VERY IMPORTANT
         setIsEdit(false)
         loadData()
       } else {
@@ -469,7 +444,7 @@ export default function IncidentPage() {
               <Typography variant='h5' sx={{ fontWeight: 600 }}>
                 Incident Management
               </Typography>
-              <Button
+              <GlobalButton
                 variant='contained'
                 color='primary'
                 startIcon={
@@ -503,12 +478,12 @@ export default function IncidentPage() {
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
                 {loading ? 'Refreshing...' : 'Refresh'}
-              </Button>
+              </GlobalButton>
             </Box>
           }
           action={
             <Box display='flex' alignItems='center' gap={2}>
-              <Button
+              <GlobalButton
                 variant='outlined'
                 color='secondary'
                 endIcon={<ArrowDropDownIcon />}
@@ -516,7 +491,7 @@ export default function IncidentPage() {
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
                 Export
-              </Button>
+              </GlobalButton>
               <Menu anchorEl={exportAnchorEl} open={exportOpen} onClose={() => setExportAnchorEl(null)}>
                 <MenuItem onClick={exportPrint}>
                   <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
@@ -525,14 +500,14 @@ export default function IncidentPage() {
                   <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
                 </MenuItem>
               </Menu>
-              <Button
+              <GlobalButton
                 variant='contained'
                 startIcon={<AddIcon />}
                 onClick={handleAdd}
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
                 Add Incident
-              </Button>
+              </GlobalButton>
             </Box>
           }
         />
@@ -663,7 +638,7 @@ export default function IncidentPage() {
             <Grid container spacing={3}>
               {/* Incident Name */}
               <Grid item xs={12}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   fullWidth
                   required
                   label='Incident Name'
@@ -676,7 +651,7 @@ export default function IncidentPage() {
 
               {/* Description */}
               <Grid item xs={12}>
-                <CustomTextarea
+                <GlobalTextarea
                   label='Description'
                   placeholder='Enter description or details...'
                   rows={3}
@@ -688,7 +663,7 @@ export default function IncidentPage() {
               {/* Status - only on edit */}
               {isEdit && (
                 <Grid item xs={12}>
-                  <CustomSelectField
+                  <GlobalSelect
                     label='Status'
                     value={formData.status}
                     onChange={e => handleFieldChange('status', e.target.value)}
@@ -703,12 +678,12 @@ export default function IncidentPage() {
 
             {/* Drawer Footer */}
             <Box mt={4} display='flex' gap={2}>
-              <Button type='submit' variant='contained' fullWidth disabled={loading}>
+              <GlobalButton type='submit' variant='contained' fullWidth disabled={loading}>
                 {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
-              </Button>
-              <Button variant='outlined' color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
+              </GlobalButton>
+              <GlobalButton variant='outlined' color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
                 Cancel
-              </Button>
+              </GlobalButton>
             </Box>
           </form>
         </Box>
@@ -765,22 +740,22 @@ export default function IncidentPage() {
 
         {/* Centered Buttons */}
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-          <Button
+          <GlobalButton
             onClick={() => setDeleteDialog({ open: false, row: null })}
             variant='tonal'
             color='secondary'
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
           >
             Cancel
-          </Button>
-          <Button
+          </GlobalButton>
+          <GlobalButton
             onClick={confirmDelete}
             variant='contained'
             color='error'
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
           >
             Delete
-          </Button>
+          </GlobalButton>
         </DialogActions>
       </Dialog>
     </Box>

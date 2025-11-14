@@ -43,12 +43,13 @@ import DeleteIcon from '@mui/icons-material/Delete'
 import CloseIcon from '@mui/icons-material/Close'
 import PrintIcon from '@mui/icons-material/Print'
 import FileDownloadIcon from '@mui/icons-material/FileDownload'
-import TableChartIcon from '@mui/icons-material/TableChart'
-import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
-import FileCopyIcon from '@mui/icons-material/FileCopy'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import RefreshIcon from '@mui/icons-material/Refresh'
-import Autocomplete from '@mui/material/Autocomplete'
+
+import GlobalButton from '@/components/common/GlobalButton'
+import GlobalTextField from '@/components/common/GlobalTextField'
+import GlobalTextarea from '@/components/common/GlobalTextarea'
+import GlobalSelect from '@/components/common/GlobalSelect'
 
 import CustomTextFieldWrapper from '@/components/common/CustomTextField'
 import CustomTextarea from '@/components/common/CustomTextarea'
@@ -151,6 +152,7 @@ export default function ServiceFrequencyPage() {
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
   const [unsavedAddData, setUnsavedAddData] = useState(null)
+  const [closedByX, setClosedByX] = useState(false)
 
   const [formData, setFormData] = useState({
     id: null,
@@ -170,10 +172,12 @@ export default function ServiceFrequencyPage() {
   const handleFieldChange = (field, value) => {
     setFormData(prev => {
       const updated = { ...prev, [field]: value }
-      if (!isEdit) setUnsavedAddData(updated) // cache unsaved Add Drawer data
+      if (!isEdit) setUnsavedAddData(updated) // keep draft
       return updated
     })
   }
+
+  // ❌ DO NOT clear unsavedAddData here
 
   const handleCancel = () => {
     setFormData({
@@ -183,13 +187,12 @@ export default function ServiceFrequencyPage() {
       backlogAge: '',
       frequencyCode: '',
       displayFrequency: '',
-      serviceFrequency: '', // ✅ add this line here too
+      serviceFrequency: '',
       sortOrder: '',
       description: '',
       status: 'Active'
     })
 
-    setUnsavedAddData(null)
     setDrawerOpen(false)
   }
 
@@ -245,35 +248,36 @@ export default function ServiceFrequencyPage() {
   // Drawer
   const toggleDrawer = () => setDrawerOpen(p => !p)
 
-  const handleAdd = () => {
-    setIsEdit(false)
-    if (unsavedAddData) {
-      setFormData(unsavedAddData)
-    } else {
-      setFormData({
-        id: null,
-        incrementType: '',
-        noOfIncrements: '',
-        backlogAge: '',
-        frequencyCode: '',
-        displayFrequency: '',
-        serviceFrequency: '', // ✅ add this line here too
-        sortOrder: '',
-        description: '',
-        status: 'Active'
-      })
-    }
-    setDrawerOpen(true)
-    setTimeout(() => incrementTypeRef.current?.focus(), 100)
+ const handleAdd = () => {
+  setIsEdit(false)
+
+  if (unsavedAddData) {
+    setFormData(unsavedAddData)  // restore ONLY if outside click
+  } else {
+    setFormData({
+      id: null,
+      incrementType: '',
+      noOfIncrements: '',
+      backlogAge: '',
+      frequencyCode: '',
+      displayFrequency: '',
+      serviceFrequency: '',
+      sortOrder: '',
+      description: '',
+      status: 'Active'
+    })
   }
+
+  setDrawerOpen(true)
+}
+
 
   const handleEdit = row => {
     setIsEdit(true)
 
-    // ✅ Prevent null values & fix uncontrolled input warning
     setFormData({
-      id: row.id || null,
-      serviceFrequency: row.serviceFrequency || row.name || '',
+      id: row.id, // ✅ IMPORTANT → do NOT use null fallback!
+      serviceFrequency: row.serviceFrequency || '',
       incrementType: row.incrementType || '',
       noOfIncrements: row.noOfIncrements || '',
       backlogAge: row.backlogAge || '',
@@ -329,6 +333,9 @@ export default function ServiceFrequencyPage() {
 
       if (res?.status === 'success') {
         showToast('success', isEdit ? 'Frequency updated successfully' : 'Frequency added successfully')
+
+        setUnsavedAddData(null) // 🔥 Remove old draft ONLY on save
+
         setDrawerOpen(false)
         await loadData()
       } else {
@@ -506,9 +513,7 @@ export default function ServiceFrequencyPage() {
               <Typography variant='h5' sx={{ fontWeight: 600 }}>
                 Service Frequency Management
               </Typography>
-              <Button
-                variant='contained'
-                color='primary'
+              <GlobalButton
                 startIcon={
                   <RefreshIcon
                     sx={{
@@ -523,37 +528,31 @@ export default function ServiceFrequencyPage() {
                 disabled={loading}
                 onClick={async () => {
                   setLoading(true)
-
-                  // FIRST reset pageSize to 25
                   setPagination(prev => ({
                     ...prev,
                     pageSize: 25,
                     pageIndex: 0
                   }))
-
-                  // THEN reload AFTER resetting pagination
                   setTimeout(async () => {
                     await loadData()
                     setLoading(false)
                   }, 50)
                 }}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
                 {loading ? 'Refreshing...' : 'Refresh'}
-              </Button>
+              </GlobalButton>
             </Box>
           }
           action={
             <Box display='flex' alignItems='center' gap={2}>
-              <Button
+              <GlobalButton
                 variant='outlined'
                 color='secondary'
                 endIcon={<ArrowDropDownIcon />}
                 onClick={e => setExportAnchorEl(e.currentTarget)}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
                 Export
-              </Button>
+              </GlobalButton>
 
               <Menu anchorEl={exportAnchorEl} open={exportOpen} onClose={() => setExportAnchorEl(null)}>
                 <MenuItem onClick={exportPrint}>
@@ -564,14 +563,9 @@ export default function ServiceFrequencyPage() {
                 </MenuItem>
               </Menu>
 
-              <Button
-                variant='contained'
-                startIcon={<AddIcon />}
-                onClick={handleAdd}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-              >
+              <GlobalButton startIcon={<AddIcon />} onClick={handleAdd}>
                 Add Frequency
-              </Button>
+              </GlobalButton>
             </Box>
           }
         />
@@ -687,7 +681,14 @@ export default function ServiceFrequencyPage() {
             <Typography variant='h5' fontWeight={600}>
               {isEdit ? 'Edit Frequency' : 'Add Frequency'}
             </Typography>
-            <IconButton onClick={toggleDrawer} size='small'>
+            <IconButton
+              onClick={() => {
+                setUnsavedAddData(null)
+                setClosedByX(false) // not outside click
+                handleCancel()
+              }}
+              size='small'
+            >
               <CloseIcon />
             </IconButton>
           </Box>
@@ -697,12 +698,12 @@ export default function ServiceFrequencyPage() {
           <form onSubmit={handleSubmit} style={{ flexGrow: 1 }}>
             <Grid container spacing={3}>
               <Grid item xs={12}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   fullWidth
                   required
                   label='Service Frequency Name'
                   placeholder='Enter service frequency name'
-                  value={formData.serviceFrequency || ''} // ✅ ensures it never becomes undefined
+                  value={formData.serviceFrequency}
                   onChange={e => handleFieldChange('serviceFrequency', e.target.value)}
                 />
               </Grid>
@@ -775,7 +776,7 @@ export default function ServiceFrequencyPage() {
               </Grid>
 
               <Grid item xs={12}>
-                <CustomTextarea
+                <GlobalTextarea
                   label='Description'
                   placeholder='Enter description...'
                   value={formData.description}
@@ -786,9 +787,9 @@ export default function ServiceFrequencyPage() {
 
               {isEdit && (
                 <Grid item xs={12}>
-                  <CustomSelectField
+                  <GlobalSelect
                     label='Status'
-                    value={formData.status}
+                    defaultValue={formData.status}
                     onChange={e => handleFieldChange('status', e.target.value)}
                     options={[
                       { value: 'Active', label: 'Active' },
@@ -800,12 +801,12 @@ export default function ServiceFrequencyPage() {
             </Grid>
 
             <Box mt={4} display='flex' gap={2}>
-              <Button type='submit' variant='contained' fullWidth disabled={loading}>
+              <GlobalButton type='submit' variant='contained' fullWidth disabled={loading}>
                 {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
-              </Button>
-              <Button variant='outlined' color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
+              </GlobalButton>
+              <GlobalButton variant='outlined' color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
                 Cancel
-              </Button>
+              </GlobalButton>
             </Box>
           </form>
         </Box>
@@ -862,22 +863,21 @@ export default function ServiceFrequencyPage() {
 
         {/* Centered buttons */}
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-          <Button
-            onClick={() => setDeleteDialog({ open: false, row: null })}
-            variant='tonal'
+          <GlobalButton
+            variant='outlined'
             color='secondary'
-            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+            onClick={() => setDeleteDialog({ open: false, row: null })}
           >
             Cancel
-          </Button>
-          <Button
-            onClick={confirmDelete}
+          </GlobalButton>
+
+          <GlobalButton
             variant='contained'
             color='error'
-            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+            onClick={confirmDelete} // 🔥 the missing line!
           >
             Delete
-          </Button>
+          </GlobalButton>
         </DialogActions>
       </Dialog>
     </Box>

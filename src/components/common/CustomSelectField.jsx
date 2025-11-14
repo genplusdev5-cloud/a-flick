@@ -12,7 +12,7 @@ const CustomSelectField = ({
   placeholder = '',
   ...props
 }) => {
-  // Normalize options (support id/value + label)
+
   const normalizedOptions = options.map(opt => ({
     id: opt?.id ?? opt?.value,
     label: opt?.label ?? opt?.name ?? String(opt)
@@ -25,7 +25,14 @@ const CustomSelectField = ({
         value={normalizedOptions.find(o => o.id === value) || null}
         getOptionLabel={option => option.label || ''}
         isOptionEqualToValue={(o, v) => o.id === v.id}
-        onChange={(e, newVal) => onChange(newVal?.id ?? '')}
+
+        // ✅ FIXED: sends event-like object
+        onChange={(e, newVal) =>
+          onChange({
+            target: { value: newVal?.id ?? '' }
+          })
+        }
+
         renderInput={params => (
           <CustomTextField
             {...params}

@@ -62,59 +62,13 @@ import CustomTextFieldWrapper from '@/components/common/CustomTextField'
 import CustomTextarea from '@/components/common/CustomTextarea'
 import CustomSelectField from '@/components/common/CustomSelectField'
 
-// Toast helper
-// ──────────────────────────────────────────────────────────────
-// Toast (Custom Styled, Global, with Icons & Colors)
-// ──────────────────────────────────────────────────────────────
-const showToast = (type, message = '') => {
-  const icons = {
-    success: 'tabler-circle-check',
-    delete: 'tabler-trash',
-    error: 'tabler-alert-triangle',
-    warning: 'tabler-info-circle',
-    info: 'tabler-refresh'
-  }
-
-  toast(
-    <div className='flex items-center gap-2'>
-      <i
-        className={icons[type]}
-        style={{
-          color:
-            type === 'success'
-              ? '#16a34a'
-              : type === 'error'
-                ? '#dc2626'
-                : type === 'delete'
-                  ? '#dc2626'
-                  : type === 'warning'
-                    ? '#f59e0b'
-                    : '#2563eb',
-          fontSize: '22px'
-        }}
-      />
-      <Typography variant='body2' sx={{ fontSize: '0.9rem', color: '#111' }}>
-        {message}
-      </Typography>
-    </div>,
-    {
-      position: 'top-right',
-      autoClose: 2000,
-      hideProgressBar: true,
-      closeOnClick: true,
-      pauseOnHover: false,
-      draggable: false,
-      theme: 'light',
-      style: {
-        borderRadius: '10px',
-        padding: '8px 14px',
-        boxShadow: '0 4px 10px rgba(0,0,0,0.06)',
-        display: 'flex',
-        alignItems: 'center'
-      }
-    }
-  )
-}
+// 🔥 Global UI Components (use everywhere)
+import GlobalButton from '@/components/common/GlobalButton'
+import GlobalTextField from '@/components/common/GlobalTextField'
+import GlobalTextarea from '@/components/common/GlobalTextarea'
+import GlobalSelect from '@/components/common/GlobalSelect'
+import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
+import { showToast } from '@/components/common/Toasts'
 
 // Debounced Input
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
@@ -253,9 +207,9 @@ export default function ChemicalsPage() {
       setIsEdit(true)
 
       const result = await getChemicalDetails(row.id)
-
       if (result.success && result.data) {
         const data = result.data
+
         setFormData({
           id: data.id,
           name: data.name || '',
@@ -265,6 +219,17 @@ export default function ChemicalsPage() {
           file: data.file_name || '',
           status: data.is_active === 1 ? 'Active' : 'Inactive'
         })
+
+        console.log('🔥 AFTER EDIT → FORMDATA:', {
+          id: data.id,
+          name: data.name,
+          unit: data.uom,
+          dosage: data.unit_value,
+          ingredients: data.description,
+          file: data.file_name,
+          status: data.is_active === 1 ? 'Active' : 'Inactive'
+        })
+
         setSelectedFile(data.file_name || '')
         setDrawerOpen(true)
         setTimeout(() => nameRef.current?.focus(), 100)
@@ -308,10 +273,6 @@ export default function ChemicalsPage() {
   const handleSubmit = async e => {
     e.preventDefault()
 
-    // ⭐⭐⭐ Paste Here ⭐⭐⭐
-    console.log('FINAL FORM DATA FILE:', formData.file)
-    console.log('IS FILE INSTANCE:', formData.file instanceof File)
-
     if (!formData.name) {
       showToast('warning', 'Please enter chemical name')
       return
@@ -326,19 +287,28 @@ export default function ChemicalsPage() {
 
     if (formData.file instanceof File) {
       form.append('file_name', formData.file)
-    } else {
-      console.log('❌ File is NOT a File Object:', formData.file)
     }
 
-    console.log('🚀 FINAL FORMDATA:', form.get('file_name'))
-
     setLoading(true)
+
     try {
-      const result = await addChemical(form)
+      let result
+      if (isEdit) {
+        console.log('🚨 BEFORE UPDATE API → ID:', formData.id)
+        console.log('🚨 FULL FORMDATA BEFORE UPDATE:', JSON.stringify(formData, null, 2))
+
+        result = await updateChemical(formData.id, form)
+      } else {
+        result = await addChemical(form)
+      }
+
       if (result.success) {
         showToast('success', result.message)
         setDrawerOpen(false)
         loadData()
+
+        // Clear unsaved add data
+        setUnsavedAddData(null)
       } else {
         showToast('error', result.message)
       }
@@ -378,7 +348,7 @@ export default function ChemicalsPage() {
     const file = e.dataTransfer.files[0]
     if (file) {
       setSelectedFile(file.name)
-      setFormData(prev => ({ ...prev, file: file.name }))
+      setFormData(prev => ({ ...prev, file }))
     }
   }
 
@@ -716,7 +686,7 @@ export default function ChemicalsPage() {
             <Grid container spacing={3}>
               {/* Chemical Name */}
               <Grid item xs={12}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   fullWidth
                   required
                   label='Chemical Name'
@@ -729,10 +699,15 @@ export default function ChemicalsPage() {
 
               {/* Unit */}
               <Grid item xs={12}>
-                <CustomSelectField
+                <GlobalAutocomplete
                   label='Unit'
                   value={formData.unit}
-                  onChange={e => handleFieldChange('unit', e.target.value)}
+                  onChange={(event, newValue) => {
+                    setFormData(prev => ({
+                      ...prev,
+                      unit: newValue?.value || prev.unit
+                    }))
+                  }}
                   options={[
                     { value: 'kg', label: 'Kg' },
                     { value: 'litre', label: 'Litre' },
@@ -745,7 +720,7 @@ export default function ChemicalsPage() {
 
               {/* Dosage */}
               <Grid item xs={12}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   fullWidth
                   required
                   label='Dosage'
@@ -757,7 +732,7 @@ export default function ChemicalsPage() {
 
               {/* Ingredients */}
               <Grid item xs={12}>
-                <CustomTextarea
+                <GlobalTextarea
                   label='Ingredients'
                   placeholder='Enter ingredients or remarks...'
                   rows={3}
@@ -798,7 +773,7 @@ export default function ChemicalsPage() {
                     <Typography sx={{ fontSize: '0.85rem', color: '#6e6b7b', mb: 2 }}>or</Typography>
 
                     {/* CLICKABLE BROWSE BUTTON — SAME LOGIC AS OLD WORKING CODE */}
-                    <Button
+                    <GlobalButton
                       variant='contained'
                       sx={{
                         textTransform: 'none',
@@ -814,7 +789,7 @@ export default function ChemicalsPage() {
                       }}
                     >
                       Browse
-                    </Button>
+                    </GlobalButton>
 
                     {/* SHOW SELECTED FILE */}
                     {selectedFile && (
@@ -831,19 +806,6 @@ export default function ChemicalsPage() {
                     )}
 
                     {/* HIDDEN INPUT (DO NOT TOUCH) */}
-                    <input
-                      type='file'
-                      ref={fileInputRef}
-                      style={{ display: 'none' }}
-                      onChange={e => {
-                        const file = e.target.files[0]
-                        console.log('🔥 FILE SELECTED:', file)
-                        if (file) {
-                          setSelectedFile(file.name)
-                          setFormData(prev => ({ ...prev, file })) // REAL FILE OBJECT
-                        }
-                      }}
-                    />
                   </Box>
                 </Grid>
 
@@ -855,7 +817,7 @@ export default function ChemicalsPage() {
                     const file = e.target.files[0]
                     if (file) {
                       setSelectedFile(file.name)
-                      handleFieldChange('file', file.name)
+                      setFormData(prev => ({ ...prev, file })) // REAL FILE OBJECT
                     }
                   }}
                 />
@@ -864,7 +826,7 @@ export default function ChemicalsPage() {
               {/* Status (only on edit) */}
               {isEdit && (
                 <Grid item xs={12}>
-                  <CustomSelectField
+                  <GlobalSelect
                     label='Status'
                     value={formData.status}
                     onChange={e => handleFieldChange('status', e.target.value)}
@@ -879,12 +841,12 @@ export default function ChemicalsPage() {
 
             {/* Footer Buttons */}
             <Box mt={4} display='flex' gap={2}>
-              <Button type='submit' variant='contained' fullWidth disabled={loading}>
+              <GlobalButton type='submit' variant='contained' fullWidth disabled={loading}>
                 {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
-              </Button>
-              <Button variant='outlined' color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
+              </GlobalButton>
+              <GlobalButton variant='outlined' color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
                 Cancel
-              </Button>
+              </GlobalButton>
             </Box>
           </form>
         </Box>

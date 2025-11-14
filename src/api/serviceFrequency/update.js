@@ -4,8 +4,8 @@ export const updateServiceFrequency = async payload => {
   const body = {
     id: payload.id,
     name: payload.serviceFrequency || payload.displayFrequency || '',
-    frequency: payload.incrementType || null, // ✅ backend key
-    times: payload.noOfIncrements?.toString() || null, // ✅ backend key
+    frequency: payload.incrementType || null,
+    times: payload.noOfIncrements?.toString() || null,
     frequency_code: payload.frequencyCode || '',
     frequency_count: payload.noOfIncrements?.toString() || '0',
     backlog_age: payload.backlogAge?.toString() || '0',
@@ -17,8 +17,9 @@ export const updateServiceFrequency = async payload => {
 
   console.log('📤 UPDATE SERVICE FREQUENCY PAYLOAD:', body)
 
-  const { data } = await api.put('servicefrequency-update/', body)
-  console.log('📥 UPDATE SERVICE FREQUENCY RESPONSE:', data)
+  // ⭐ ID added in query params
+  const { data } = await api.put(`servicefrequency-update/?id=${payload.id}`, body)
 
+  console.log('📥 UPDATE SERVICE FREQUENCY RESPONSE:', data)
   return data
 }

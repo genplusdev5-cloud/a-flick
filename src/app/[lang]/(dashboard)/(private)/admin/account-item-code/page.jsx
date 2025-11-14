@@ -157,8 +157,6 @@ export default function AccountItemCodePage() {
 
   const nameRef = useRef(null)
 
-
-
   // ──────────────────────────────────────────────────────────────
   const loadItems = async () => {
     setLoading(true)
@@ -174,8 +172,8 @@ export default function AccountItemCodePage() {
           name: item.name,
           itemNumber: item.item_number,
           description: item.description || '',
-          status: item.status === 1 ? 'Active' : 'Inactive',
-          is_active: item.is_active
+          is_active: item.is_active ?? 0,
+          status_label: item.is_active === 1 ? 'Active' : 'Inactive'
         }))
 
         setRows(formatted)
@@ -234,10 +232,10 @@ export default function AccountItemCodePage() {
       name: row.name || '',
       itemNumber: row.itemNumber || '',
       description: row.description || '',
-      status: row.status || 'Active'
+      status: row.is_active === 1 ? 'Active' : 'Inactive',
+      is_active: row.is_active
     })
     setDrawerOpen(true)
-    setTimeout(() => nameRef.current?.focus(), 100)
   }
 
   const handleDelete = async row => {
@@ -283,42 +281,48 @@ export default function AccountItemCodePage() {
     }
   }
 
-  // 💾 Add / Update Account
-  // ─────────────────────────────────────────────
   const handleSubmit = async e => {
-    e.preventDefault()
-    if (!formData.name || !formData.itemNumber) {
-      showToast('warning', 'Please fill all required fields')
-      return
-    }
+  e.preventDefault()
 
-    setLoading(true)
-    try {
-      const payload = {
-        id: formData.id,
-        name: formData.name,
-        itemNumber: formData.itemNumber,
-        description: formData.description,
-        status: formData.status
-      }
-
-      if (isEdit) {
-        const res = await updateAccount(payload)
-        if (res.status === 'success') showToast('success', 'Account updated successfully')
-      } else {
-        const res = await addAccount(payload)
-        if (res.status === 'success') showToast('success', 'Account added successfully')
-      }
-
-      setDrawerOpen(false)
-      await loadItems()
-    } catch (err) {
-      console.error('❌ Error saving account:', err)
-      showToast('error', 'Failed to save account')
-    } finally {
-      setLoading(false)
-    }
+  if (!formData.name || !formData.itemNumber) {
+    showToast('warning', 'Please fill all required fields')
+    return
   }
+
+  setLoading(true)
+
+  try {
+    const payload = {
+      id: formData.id,
+      name: formData.name,
+      itemNumber: formData.itemNumber,
+      description: formData.description,
+      status: formData.status === 'Active' ? 1 : 0   // ✔ ONLY use status
+    }
+
+    let res
+
+    if (isEdit) {
+      res = await updateAccount(payload)
+    } else {
+      res = await addAccount(payload)
+    }
+
+    if (res.status === 'success') {
+      showToast('success', isEdit ? 'Account updated successfully' : 'Account added successfully')
+    }
+
+    setDrawerOpen(false)
+    await loadItems()
+
+  } catch (err) {
+    console.error('❌ Error saving account:', err)
+    showToast('error', 'Failed to save account')
+  } finally {
+    setLoading(false)
+  }
+}
+
 
   // ──────────────────────────────────────────────────────────────
   // Table Setup (TanStack)
@@ -354,7 +358,22 @@ export default function AccountItemCodePage() {
         header: 'Status',
         cell: info => {
           const row = info.row.original
-          const isActive = row.is_active === 1
+          const isActive = Number(row.is_active) === 1
+
+          return (
+            <Chip
+              label={isActive ? 'Active' : 'Inactive'}
+              size='small'
+              sx={{
+                color: '#fff',
+                bgcolor: isActive ? 'success.main' : 'error.main',
+                fontWeight: 600,
+                borderRadius: '6px',
+                px: 1.5
+              }}
+            />
+          )
+
           return (
             <Chip
               label={isActive ? 'Active' : 'Inactive'}
@@ -381,11 +400,10 @@ export default function AccountItemCodePage() {
   }
 
   const paginatedRows = useMemo(() => {
-  const start = pagination.pageIndex * pagination.pageSize
-  const end = start + pagination.pageSize
-  return rows.slice(start, end)
-}, [rows, pagination])
-
+    const start = pagination.pageIndex * pagination.pageSize
+    const end = start + pagination.pageSize
+    return rows.slice(start, end)
+  }, [rows, pagination])
 
   const table = useReactTable({
     data: paginatedRows,
@@ -454,7 +472,7 @@ export default function AccountItemCodePage() {
         Name: r.name,
         'Item Number': r.itemNumber,
         Description: r.description,
-        Status: r.status
+        Status: r.is_active === 1 ? 'Active' : 'Inactive'
       }))
     )
     const wb = XLSX.utils.book_new()
@@ -791,7 +809,7 @@ export default function AccountItemCodePage() {
                   <CustomSelectField
                     label='Status'
                     value={formData.status}
-                    onChange={e => setFormData(p => ({ ...p, status: e.target.value }))}
+                    onChange={value => setFormData(p => ({ ...p, status: value }))}
                     options={[
                       { value: 'Active', label: 'Active' },
                       { value: 'Inactive', label: 'Inactive' }

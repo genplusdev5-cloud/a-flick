@@ -51,6 +51,14 @@ import CustomTextFieldWrapper from '@/components/common/CustomTextField'
 import CustomTextarea from '@/components/common/CustomTextarea'
 import CustomSelectField from '@/components/common/CustomSelectField'
 
+// 🔥 Global UI Components (use everywhere)
+import GlobalButton from '@/components/common/GlobalButton'
+import GlobalTextField from '@/components/common/GlobalTextField'
+import GlobalTextarea from '@/components/common/GlobalTextarea'
+import GlobalSelect from '@/components/common/GlobalSelect'
+import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
+import { showToast } from '@/components/common/Toasts'
+
 import { rankItem } from '@tanstack/match-sorter-utils'
 import {
   useReactTable,
@@ -62,60 +70,6 @@ import {
 } from '@tanstack/react-table'
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
-
-// Toast helper
-// ──────────────────────────────────────────────────────────────
-// Toast (Custom Styled, Global, with Icons & Colors)
-// ──────────────────────────────────────────────────────────────
-const showToast = (type, message = '') => {
-  const icons = {
-    success: 'tabler-circle-check',
-    delete: 'tabler-trash',
-    error: 'tabler-alert-triangle',
-    warning: 'tabler-info-circle',
-    info: 'tabler-refresh'
-  }
-
-  toast(
-    <div className='flex items-center gap-2'>
-      <i
-        className={icons[type]}
-        style={{
-          color:
-            type === 'success'
-              ? '#16a34a'
-              : type === 'error'
-                ? '#dc2626'
-                : type === 'delete'
-                  ? '#dc2626'
-                  : type === 'warning'
-                    ? '#f59e0b'
-                    : '#2563eb',
-          fontSize: '22px'
-        }}
-      />
-      <Typography variant='body2' sx={{ fontSize: '0.9rem', color: '#111' }}>
-        {message}
-      </Typography>
-    </div>,
-    {
-      position: 'top-right',
-      autoClose: 2000,
-      hideProgressBar: true,
-      closeOnClick: true,
-      pauseOnHover: false,
-      draggable: false,
-      theme: 'light',
-      style: {
-        borderRadius: '10px',
-        padding: '8px 14px',
-        boxShadow: '0 4px 10px rgba(0,0,0,0.06)',
-        display: 'flex',
-        alignItems: 'center'
-      }
-    }
-  )
-}
 
 // Debounced Input
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
@@ -142,6 +96,8 @@ export default function TodoItemsPage() {
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
   const [unsavedAddData, setUnsavedAddData] = useState(null)
+  const [closeReason, setCloseReason] = useState(null)
+
   const [formData, setFormData] = useState({
     id: null,
     title: '',
@@ -190,36 +146,44 @@ export default function TodoItemsPage() {
   }
 
   useEffect(() => {
+  if (!drawerOpen) {
+    if (closeReason === "save" || closeReason === "cancel") {
+      // clear form
+      setFormData({
+        id: null,
+        title: "",
+        status: "Active"
+      })
+    }
+    // if manual close → DO NOTHING (keep data)
+  }
+}, [drawerOpen])
+
+
+  useEffect(() => {
     loadData()
   }, [pagination.pageIndex, pagination.pageSize, searchText])
 
   // Drawer
   const toggleDrawer = () => setDrawerOpen(p => !p)
-  const handleAdd = () => {
-    setIsEdit(false)
-    if (unsavedAddData) {
-      setFormData(unsavedAddData)
-    } else {
-      setFormData({
-        id: null,
-        title: '',
-        status: 'Active'
-      })
-    }
-    setDrawerOpen(true)
-    setTimeout(() => titleRef.current?.focus(), 100)
-  }
-
-  // 🔹 Cancel drawer + reset form
-  const handleCancel = () => {
+const handleAdd = () => {
+  // If closed manually (outside click), keep data
+  if (closeReason === null) {
+    // keep formData
+  } else {
+    // If save or cancel → clear form
     setFormData({
       id: null,
-      title: '',
-      status: 'Active'
+      title: "",
+      status: "Active"
     })
-    setUnsavedAddData(null)
-    setDrawerOpen(false)
   }
+
+  setIsEdit(false)
+  setDrawerOpen(true)
+  setCloseReason(null) // reset after opening
+}
+
 
   // 🔹 Handle field change + cache unsaved draft
   const handleFieldChange = (field, value) => {
@@ -280,8 +244,15 @@ export default function TodoItemsPage() {
     }
   }
 
+ const handleCancel = () => {
+  setCloseReason("cancel")   // mark CANCEL
+  setDrawerOpen(false)
+}
+
+
   const handleSubmit = async e => {
     e.preventDefault()
+    setCloseReason('save') // mark save action
 
     if (!formData.title.trim()) {
       showToast('warning', 'Todo title is required')
@@ -458,7 +429,7 @@ export default function TodoItemsPage() {
               <Typography variant='h5' sx={{ fontWeight: 600 }}>
                 Todo Management
               </Typography>
-              <Button
+              <GlobalButton
                 variant='contained'
                 color='primary'
                 startIcon={
@@ -492,12 +463,12 @@ export default function TodoItemsPage() {
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
                 {loading ? 'Refreshing...' : 'Refresh'}
-              </Button>
+              </GlobalButton>
             </Box>
           }
           action={
             <Box display='flex' alignItems='center' gap={2}>
-              <Button
+              <GlobalButton
                 variant='outlined'
                 color='secondary'
                 endIcon={<ArrowDropDownIcon />}
@@ -505,7 +476,7 @@ export default function TodoItemsPage() {
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
                 Export
-              </Button>
+              </GlobalButton>
               <Menu anchorEl={exportAnchorEl} open={exportOpen} onClose={() => setExportAnchorEl(null)}>
                 <MenuItem onClick={exportPrint}>
                   <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
@@ -514,14 +485,14 @@ export default function TodoItemsPage() {
                   <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
                 </MenuItem>
               </Menu>
-              <Button
+              <GlobalButton
                 variant='contained'
                 startIcon={<AddIcon />}
                 onClick={handleAdd}
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
                 Add Todo
-              </Button>
+              </GlobalButton>
             </Box>
           }
         />
@@ -652,7 +623,7 @@ export default function TodoItemsPage() {
             <Grid container spacing={3}>
               {/* Todo Title */}
               <Grid item xs={12}>
-                <CustomTextFieldWrapper
+                <GlobalTextField
                   fullWidth
                   required
                   label='Todo Title'
@@ -666,7 +637,7 @@ export default function TodoItemsPage() {
               {/* Status — only in edit mode */}
               {isEdit && (
                 <Grid item xs={12}>
-                  <CustomSelectField
+                  <GlobalSelect
                     label='Status'
                     value={formData.status}
                     onChange={e => handleFieldChange('status', e.target.value)}
@@ -681,12 +652,12 @@ export default function TodoItemsPage() {
 
             {/* Footer buttons */}
             <Box mt={4} display='flex' gap={2}>
-              <Button type='submit' variant='contained' fullWidth disabled={loading}>
+              <GlobalButton type='submit' variant='contained' fullWidth disabled={loading}>
                 {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
-              </Button>
-              <Button variant='outlined' color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
+              </GlobalButton>
+              <GlobalButton variant='outlined' color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
                 Cancel
-              </Button>
+              </GlobalButton>
             </Box>
           </form>
         </Box>
@@ -743,22 +714,22 @@ export default function TodoItemsPage() {
 
         {/* Centered Buttons */}
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-          <Button
+          <GlobalButton
             onClick={() => setDeleteDialog({ open: false, row: null })}
             variant='tonal'
             color='secondary'
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
           >
             Cancel
-          </Button>
-          <Button
+          </GlobalButton>
+          <GlobalButton
             onClick={confirmDelete}
             variant='contained'
             color='error'
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
           >
             Delete
-          </Button>
+          </GlobalButton>
         </DialogActions>
       </Dialog>
     </Box>

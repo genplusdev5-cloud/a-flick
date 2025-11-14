@@ -15,6 +15,15 @@ import {
   FormControlLabel
 } from '@mui/material'
 
+
+// 🔥 Global UI Components (use everywhere)
+import GlobalButton from '@/components/common/GlobalButton'
+import GlobalTextField from '@/components/common/GlobalTextField'
+import GlobalTextarea from '@/components/common/GlobalTextarea'
+import GlobalSelect from '@/components/common/GlobalSelect'
+import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
+
+
 import { getDepartmentList } from '../../../../../../../api/departments/list'
 import { getDesignationList } from '../../../../../../../api/designations/list'
 import { getUserRoleList } from '../../../../../../../api/userRole/list'
@@ -486,13 +495,13 @@ export default function AddEmployeePage() {
 
     return (
       <Grid item {...gridProps} key={name}>
-        <Autocomplete
+        <GlobalAutocomplete
           options={options}
           getOptionLabel={o => (typeof o === 'string' ? o : (o?.label ?? ''))}
           isOptionEqualToValue={(o, v) => o?.id === v?.id}
           value={stateValues[name] || null} // ✅ Correct mapping
           onChange={(e, newValue) => handleAutocompleteChange(name, newValue, inputRef)}
-          renderInput={params => <CustomTextField {...params} label={label} inputRef={inputRef} />}
+          renderInput={params => <GlobalTextField {...params} label={label} inputRef={inputRef} />}
         />
       </Grid>
     )
@@ -522,11 +531,12 @@ export default function AddEmployeePage() {
           <Grid item xs={12} md={4}>
             {' '}
             {/* ⬅️ CHANGED to md={4} */}
-            <CustomTextField
+            <GlobalTextField
               fullWidth
               label='Nick name'
               name='nickname'
               value={nickname}
+              placeholder='Nick name'
               onChange={handleChange}
               inputRef={nicknameRef}
               onKeyDown={e => handleKeyDown(e, nicknameRef)}
@@ -535,7 +545,7 @@ export default function AddEmployeePage() {
           <Grid item xs={12} md={4}>
             {' '}
             {/* ⬅️ CHANGED to md={4} */}
-            <CustomTextField
+            <GlobalTextField
               fullWidth
               label='Name'
               name='name'
@@ -563,7 +573,7 @@ export default function AddEmployeePage() {
           })}
 
           <Grid item xs={12} md={4}>
-            <CustomTextField
+            <GlobalTextField
               fullWidth
               label='Finger Print ID'
               name='finger_print_id'
@@ -573,7 +583,7 @@ export default function AddEmployeePage() {
           </Grid>
 
           <Grid item xs={12} md={4}>
-            <CustomTextField
+            <GlobalTextField
               fullWidth
               label='Employee Code'
               name='employee_code'
@@ -583,7 +593,7 @@ export default function AddEmployeePage() {
           </Grid>
 
           <Grid item xs={12} md={4}>
-            <CustomTextField
+            <GlobalTextField
               fullWidth
               label='Nationality'
               name='nationality'
@@ -606,7 +616,7 @@ export default function AddEmployeePage() {
           <Grid item xs={12} md={4}>
             {' '}
             {/* ⬅️ CHANGED to md={4} */}
-            <CustomTextField
+            <GlobalTextField
               type='time'
               fullWidth
               label='Lunch Time'
@@ -710,7 +720,7 @@ export default function AddEmployeePage() {
           <Grid item xs={12} md={4}>
             {' '}
             {/* ⬅️ CHANGED to md={4} */}
-            <CustomTextField
+            <GlobalTextField
               fullWidth
               label='Email'
               name='email'
@@ -730,7 +740,7 @@ export default function AddEmployeePage() {
           <Grid item xs={12} md={4}>
             {' '}
             {/* ⬅️ CHANGED to md={4} */}
-            <CustomTextField
+            <GlobalTextField
               fullWidth
               label='Password'
               name='password'
@@ -743,7 +753,7 @@ export default function AddEmployeePage() {
           <Grid item xs={12} md={4}>
             {' '}
             {/* ⬅️ CHANGED to md={4} */}
-            <CustomTextField
+            <GlobalTextField
               fullWidth
               label='Phone'
               name='phone'
@@ -768,13 +778,13 @@ export default function AddEmployeePage() {
               onChange={date => handleDateChange('dob', date, dobRef)}
               placeholderText='Select DOB'
               dateFormat='dd/MM/yyyy'
-              customInput={<CustomTextField label='DOB' fullWidth inputRef={dobRef} />}
+              customInput={<GlobalTextField label='DOB' fullWidth inputRef={dobRef} />}
             />
           </Grid>
           <Grid item xs={12} md={4}>
             {' '}
             {/* ⬅️ CHANGED to md={4} */}
-            <CustomTextField
+            <GlobalTextField
               type='text'
               fullWidth
               label='Target Day ($)'
@@ -788,7 +798,7 @@ export default function AddEmployeePage() {
           <Grid item xs={12} md={4}>
             {' '}
             {/* ⬅️ CHANGED to md={4} */}
-            <CustomTextField
+            <GlobalTextField
               fullWidth
               label='Target Night ($)'
               name='targetNight'
@@ -803,7 +813,7 @@ export default function AddEmployeePage() {
           <Grid item xs={12} md={4}>
             {' '}
             {/* ⬅️ CHANGED to md={4} */}
-            <CustomTextField
+            <GlobalTextField
               fullWidth
               label='Target Saturday ($)'
               name='targetSaturday'
@@ -816,7 +826,7 @@ export default function AddEmployeePage() {
           <Grid item xs={12} md={4}>
             {' '}
             {/* ⬅️ CHANGED to md={4} */}
-            <CustomTextField
+            <GlobalTextField
               fullWidth
               label='Vehile Number'
               name='vehicleNumber'
@@ -829,9 +839,9 @@ export default function AddEmployeePage() {
           <Grid item xs={12} md={4}>
             {' '}
             {/* ⬅️ ADJUSTED for 3-column layout */}
-            <CustomTextField
+            <GlobalTextarea
               multiline
-              rows={2}
+              rows={3}
               fullWidth
               label='Description'
               name='description'
@@ -846,7 +856,7 @@ export default function AddEmployeePage() {
           <Grid item xs={12} md={4}>
             {' '}
             {/* ⬅️ ADJUSTED for 3-column layout */}
-            <CustomTextField
+            <GlobalTextField
               // 👇 SET TYPE TO 'COLOR'
               type='color'
               // Removed multiline/rows as it's not applicable for type='color'
@@ -871,12 +881,12 @@ export default function AddEmployeePage() {
 
           {/* Actions */}
           <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 4, pt: 8 }}>
-            <Button variant='outlined' onClick={() => router.push('/admin/employee-list')} ref={closeButtonRef}>
+            <GlobalButton variant='outlined' onClick={() => router.push('/admin/employee-list')} ref={closeButtonRef}>
               Close
-            </Button>
-            <Button variant='contained' onClick={handleSubmit} ref={saveButtonRef}>
+            </GlobalButton>
+            <GlobalButton variant='contained' onClick={handleSubmit} ref={saveButtonRef}>
               Save
-            </Button>
+            </GlobalButton>
           </Grid>
         </Grid>
       </Card>

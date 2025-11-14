@@ -1,9 +1,9 @@
 import api from '@/utils/axiosInstance'
 
-export const updateChemical = async payload => {
+export const updateChemical = async (id, payload) => {
   try {
-    // Ensure ID is passed in query param as your backend expects (?id=)
-    const response = await api.put(`chemicals-update/?id=${payload.id}`, payload)
+    // Backend expects id from query param
+    const response = await api.put(`chemicals-update/?id=${id}`, payload)
 
     if (response?.data?.status === 'success') {
       return {
