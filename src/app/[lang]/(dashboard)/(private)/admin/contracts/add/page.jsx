@@ -18,23 +18,14 @@ import {
   DialogContent
 } from '@mui/material'
 
-import {
-  getCustomers,
-  getAccountList,
-  getCallTypeList,
-  getIndustryList,
-  getEmployees,
-  getBillingFrequencyList,
-  getServiceFrequencyList,
-  getPestList
-} from '@/api/contract/dropdowns'
+import { getAllDropdowns } from '@/api/contract/dropdowns'
+import { addContractApi } from '@/api/contract/add'
 
 import { useRouter } from 'next/navigation'
 
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
 import VisibilityIcon from '@mui/icons-material/Visibility'
-
 
 // 🔥 Global UI Components (use everywhere)
 import GlobalButton from '@/components/common/GlobalButton'
@@ -62,13 +53,12 @@ export default function AddContractPage() {
   const [formData, setFormData] = useState({
     // Initializing all fields to sensible defaults
     salesMode: '',
-    customer: '',
+    contractName: '', // ⭐ ADD THIS
     contractType: '',
     coveredLocation: '',
     contractCode: '',
     serviceAddress: '',
     postalCode: '',
-    accountItemCode: '',
     poNumber: '',
     poExpiry: new Date(),
     preferredTime: '',
@@ -124,36 +114,40 @@ export default function AddContractPage() {
   const [selectedFile, setSelectedFile] = useState('')
   const [isDragOver, setIsDragOver] = useState(false)
   const [openDialog, setOpenDialog] = useState(false) // 💡 NEW: For file dialog
+  const dropdownLoaded = useRef(false)
 
   const cleanOptions = arr => [...new Set(arr.filter(v => v !== null && v !== undefined && v !== ''))]
 
-const [dropdowns, setDropdowns] = useState({
-  customers: [],
-  accountItems: [],
-  callTypes: [],
-  industries: [],
-  employees: [],
-  billingFrequencies: [],
-  serviceFrequency: [],
-  pests: []
-})
+  const [dropdowns, setDropdowns] = useState({
+    customers: [],
+    callTypes: [],
+    industries: [],
+    employees: [],
+    billingFrequencies: [],
+    serviceFrequency: [],
+    pests: [],
+    chemicals: []
+  })
 
   // Autocomplete Fields Definition (Unchanged)
+  // ALL autocomplete fields (static + backend)
   const autocompleteFields = [
     { name: 'salesMode', options: ['Confirmed Sales', 'Quotation'] },
-    { name: 'customer', options: ['GP Industries Pvt Ltd'] },
     { name: 'contractType', options: ['Continuous Contract', 'Limited Contract', 'Continuous Job', 'Job', 'Warranty'] },
-    { name: 'accountItemCode', options: ['1001 Insect Monitoring Traps', 'A-CA/FL', 'A-CA/MQ', 'A-ST/CR/RD/CA'] },
-    { name: 'callType', options: ['Call & Fix', 'Schedule', 'SMS', 'E-mail'] },
-    { name: 'industry', options: ['Commercial', 'Food And Beverages', 'Residential'] },
-    { name: 'technician', options: ['Admin', 'Tech'] },
     { name: 'paymentTerm', options: ['0 days', '30 days'] },
     { name: 'salesPerson', options: ['Admin'] },
-    { name: 'supervisor', options: ['Admin'] },
-    { name: 'billingFrequency', options: ['Monthly-X12', 'Yearly-X1'] },
-    { name: 'pest', options: ['Bats', '1ILT'] },
-    { name: 'frequency', options: ['Monthly', 'Weekly'] },
-    { name: 'time', options: ['0:05', '0:10', '0:15'] }
+    { name: 'time', options: ['0:05', '0:10', '0:15'] },
+
+    // BACKEND-DRIVEN DROPDOWNS
+    { name: 'customer', options: [] },
+    { name: 'callType', options: [] },
+    { name: 'industry', options: [] },
+    { name: 'technician', options: [] },
+    { name: 'supervisor', options: [] },
+    { name: 'billingFrequency', options: [] },
+    { name: 'pest', options: [] },
+    { name: 'chemicals', options: [] },
+    { name: 'frequency', options: [] }
   ]
 
   // Dynamic Refs and Open States for Autocomplete (Unchanged)
@@ -164,8 +158,9 @@ const [dropdowns, setDropdowns] = useState({
   autocompleteFields.forEach(({ name }) => {
     refs[name + 'Ref'] = useRef(null)
     refs[name + 'InputRef'] = useRef(null)
-    // eslint-disable-next-line react-hooks/rules-of-hooks
+
     const [isOpen, setIsOpen] = useState(false)
+
     openStates[name + 'Open'] = isOpen
     setOpenStates[name + 'SetOpen'] = setIsOpen
   })
@@ -219,7 +214,6 @@ const [dropdowns, setDropdowns] = useState({
     contractCodeRef,
     serviceAddressRef,
     postalCodeRef,
-    refs.accountItemCodeInputRef,
     poNumberRef,
     poExpiryRef,
     preferredTimeRef,
@@ -267,38 +261,57 @@ const [dropdowns, setDropdowns] = useState({
   ].filter(ref => ref)
 
   useEffect(() => {
-    loadDropdowns()
+    if (!dropdownLoaded.current) {
+      loadDropdowns()
+      dropdownLoaded.current = true
+    }
   }, [])
 
   const loadDropdowns = async () => {
     try {
-      const [customers, accounts, callTypes, industries, employees, billingFreq, serviceFreq, pests] =
-        await Promise.all([
-          getCustomers(),
-          getAccountList(),
-          getCallTypeList(),
-          getIndustryList(),
-          getEmployees(),
-          getBillingFrequencyList(),
-          getServiceFrequencyList(),
-          getPestList()
-        ])
+      const data = await getAllDropdowns()
 
-      console.log('Customers → ', customers)
+      console.log('✔ ALL DROPDOWNS:', data)
 
-      // 🔥🔥 SET ALL DROPDOWN DATA HERE
       setDropdowns({
-        customers: customers || [],
-        accountItems: accounts || [],
-        callTypes: callTypes || [],
-        industries: industries || [], // ✔ correct key
-        employees: employees || [],
-        billingFrequencies: billingFreq || [], // ✔ correct key
-        serviceFrequency: serviceFreq || [],
-        pests: pests || []
+        customers: data.customers,
+        callTypes: data.callTypes,
+        industries: data.industries,
+        employees: data.employees,
+        billingFrequencies: data.billingFreq,
+        serviceFrequency: data.serviceFreq,
+        pests: data.pests,
+        chemicals: data.chemicals
       })
-    } catch (err) {
-      console.error('Dropdown Fetch Error → ', err)
+
+      // UPDATE AUTO COMPLETE OPTIONS
+
+      autocompleteFields.find(f => f.name === 'customer').options = data.customers?.map(c => c.name) || []
+
+      autocompleteFields.find(f => f.name === 'callType').options = data.callTypes?.map(c => c.name) || []
+
+      autocompleteFields.find(f => f.name === 'industry').options = data.industries?.map(i => i.name) || []
+
+      autocompleteFields.find(f => f.name === 'technician').options =
+        data.employees?.filter(e => e.designation === 'Technician')?.map(e => e.nick_name || e.name) || []
+
+      autocompleteFields.find(f => f.name === 'supervisor').options =
+        data.employees?.filter(e => e.designation?.toLowerCase() === 'supervisor')?.map(e => e.nick_name || e.name) ||
+        []
+
+      autocompleteFields.find(f => f.name === 'billingFrequency').options = data.billingFreq?.map(b => b.name) || []
+
+      autocompleteFields.find(f => f.name === 'pest').options = data.pests?.map(p => p.name) || []
+
+      autocompleteFields.find(f => f.name === 'frequency').options = data.serviceFreq?.map(f => f.name) || []
+
+      // ⭐⭐ NEW — CHEMICALS AUTOCOMPLETE ⭐⭐
+      autocompleteFields.push({
+        name: 'chemicals',
+        options: data.chemicals?.map(c => c.name) || []
+      })
+    } catch (error) {
+      console.error('Dropdown load error', error)
     }
   }
 
@@ -379,13 +392,15 @@ const [dropdowns, setDropdowns] = useState({
     }
   }
 
-  // Autocomplete change handler that also moves focus (Unchanged, for main form data)
   const handleAutocompleteChange = (name, newValue, currentInputRef) => {
-    setFormData(prev => ({ ...prev, [name]: newValue }))
+    setFormData(prev => ({
+      ...prev,
+      [name]: typeof newValue === 'string' ? newValue : (newValue ?? '')
+    }))
+
     const setStateFunc = setOpenStates[name + 'SetOpen']
-    if (setStateFunc) {
-      setStateFunc(false)
-    }
+    if (setStateFunc) setStateFunc(false)
+
     focusNextElement(currentInputRef)
   }
 
@@ -603,17 +618,16 @@ const [dropdowns, setDropdowns] = useState({
           ref={ref}
           freeSolo={false}
           options={options}
-          value={formData[name]}
+          value={formData[name] || ''}
           getOptionLabel={option => (typeof option === 'string' ? option : option?.label || '')}
           open={isOpen}
-          onFocus={() => setIsOpen(true)}
-          onBlur={() => setIsOpen(false)}
           onOpen={() => setIsOpen(true)}
           onClose={() => setIsOpen(false)}
+          onFocus={() => setIsOpen(true)}
           onInputChange={(e, newValue, reason) => handleAutocompleteInputChange(name, options, newValue, reason)}
-          onChange={(e, newValue) => handleAutocompleteChange(name, newValue, inputRef)}
-          onKeyDown={e => handleKeyDown(e, inputRef)}
+          onChange={(e, newValue) => handleAutocompleteChange(name, newValue || '', inputRef)}
           noOptionsText='No options'
+          onKeyDown={e => handleKeyDown(e, inputRef)}
           renderInput={params => <CustomTextField {...params} label={label} inputRef={inputRef} />}
         />
       </Grid>
@@ -644,7 +658,7 @@ const [dropdowns, setDropdowns] = useState({
           {renderAutocomplete({
             name: 'customer',
             label: 'Customer',
-            options: cleanOptions(dropdowns.customers.map(c => c.customer_name))
+            options: cleanOptions(dropdowns.customers?.map(c => c.name))
           })}
 
           {renderAutocomplete({
@@ -696,11 +710,6 @@ const [dropdowns, setDropdowns] = useState({
               onKeyDown={e => handleKeyDown(e, postalCodeRef)}
             />
           </Grid>
-          {renderAutocomplete({
-            name: 'accountItemCode',
-            label: 'Account Item Code',
-            options: cleanOptions(dropdowns.accountItems.map(a => a.account_item_code))
-          })}
 
           <Grid item xs={12} md={3}>
             <CustomTextField
@@ -799,7 +808,7 @@ const [dropdowns, setDropdowns] = useState({
           {renderAutocomplete({
             name: 'callType',
             label: 'Call Type',
-            options: cleanOptions(dropdowns.callTypes.map(c => c.call_type))
+            options: cleanOptions(dropdowns.callTypes?.map(c => c.name))
           })}
 
           <Grid item xs={12} md={3}>
@@ -849,7 +858,7 @@ const [dropdowns, setDropdowns] = useState({
           {renderAutocomplete({
             name: 'industry',
             label: 'Industry',
-            options: dropdowns.industries?.map(i => i.industry_name) || []
+            options: cleanOptions(dropdowns.industries?.map(i => i.name))
           })}
 
           <Grid item xs={12} md={3}>
@@ -867,7 +876,9 @@ const [dropdowns, setDropdowns] = useState({
           {renderAutocomplete({
             name: 'technician',
             label: 'Technician',
-            options: dropdowns.employees?.filter(e => e.role === 'Technician')?.map(e => e.employee_name) || []
+            options: cleanOptions(
+              dropdowns.employees?.filter(e => e.designation === 'Technician')?.map(e => e.nick_name || e.name)
+            )
           })}
 
           {renderAutocomplete({
@@ -884,13 +895,17 @@ const [dropdowns, setDropdowns] = useState({
           {renderAutocomplete({
             name: 'supervisor',
             label: 'Supervisor',
-            options: dropdowns.employees?.filter(e => e.role === 'Supervisor')?.map(e => e.employee_name) || []
+            options: cleanOptions(
+              dropdowns.employees
+                ?.filter(e => e.designation?.toLowerCase() === 'supervisor')
+                ?.map(e => e.nick_name || e.name)
+            )
           })}
 
           {renderAutocomplete({
             name: 'billingFrequency',
             label: 'Billing Frequency',
-            options: cleanOptions(dropdowns.billingFrequencies.map(b => b.billing_frequency))
+            options: cleanOptions(dropdowns.billingFrequencies?.map(b => b.name))
           })}
 
           <Grid item xs={12} md={3}>
@@ -1009,8 +1024,7 @@ const [dropdowns, setDropdowns] = useState({
             <Autocomplete
               ref={refs.pestRef}
               freeSolo={false}
-              options={cleanOptions(dropdowns.serviceFrequency?.map(f => f.frequency_name) || [])}
-
+              options={cleanOptions(dropdowns.pests?.map(p => p.name) || [])}
               getOptionLabel={option => (typeof option === 'string' ? option : option?.label || '')}
               value={currentPestItem.pest}
               open={openStates.pestOpen}
@@ -1026,11 +1040,10 @@ const [dropdowns, setDropdowns] = useState({
             />
           </Grid>
           <Grid item xs={12} md={2.4}>
-            {/* Frequency Autocomplete */}
             <Autocomplete
               ref={refs.frequencyRef}
               freeSolo={false}
-              options={cleanOptions(dropdowns.serviceFrequency?.map(f => f.frequency_name) || [])}
+              options={cleanOptions(dropdowns.serviceFrequency?.map(f => f.name) || [])}
               getOptionLabel={option => (typeof option === 'string' ? option : option?.label || '')}
               value={currentPestItem.frequency}
               open={openStates.frequencyOpen}
@@ -1049,6 +1062,7 @@ const [dropdowns, setDropdowns] = useState({
               )}
             />
           </Grid>
+
           <Grid item xs={12} md={2.4}>
             {/* Pest Count */}
             <CustomTextField
@@ -1118,14 +1132,24 @@ const [dropdowns, setDropdowns] = useState({
           </Grid>
           <Grid item xs={12} md={3}>
             {/* Chemicals */}
-            <CustomTextField
-              fullWidth
-              label='Chemicals'
-              name='chemicals'
+            <Autocomplete
+              ref={refs.chemicalsRef}
+              freeSolo={false}
+              options={cleanOptions(dropdowns.chemicals?.map(c => c.name) || [])}
+              getOptionLabel={option => (typeof option === 'string' ? option : option?.label || '')}
               value={currentPestItem.chemicals}
-              onChange={handleCurrentPestItemChange}
-              inputRef={currentChemicalsRef}
+              open={openStates.chemicalsOpen}
+              onFocus={() => setOpenStates.chemicalsSetOpen(true)}
+              onBlur={() => setOpenStates.chemicalsSetOpen(false)}
+              onOpen={() => setOpenStates.chemicalsSetOpen(true)}
+              onClose={() => setOpenStates.chemicalsSetOpen(false)}
+              onChange={(e, newValue) =>
+                handleCurrentPestItemAutocompleteChange('chemicals', newValue, currentChemicalsRef)
+              }
+              onInputChange={(e, newValue) => setCurrentPestItem(prev => ({ ...prev, chemicals: newValue }))}
               onKeyDown={e => handleKeyDown(e, currentChemicalsRef)}
+              noOptionsText='No options'
+              renderInput={params => <CustomTextField {...params} label='Chemicals' inputRef={currentChemicalsRef} />}
             />
           </Grid>
           <Grid item xs={12} md={3}>

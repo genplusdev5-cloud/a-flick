@@ -64,7 +64,6 @@ import CustomTextFieldWrapper from '@/components/common/CustomTextField'
 import CustomTextarea from '@/components/common/CustomTextarea'
 import CustomSelectField from '@/components/common/CustomSelectField'
 
-
 // 🔥 Global UI Components (use everywhere)
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalTextField from '@/components/common/GlobalTextField'
@@ -92,7 +91,6 @@ const employeeOptions = [
 
 // Default Leave Types
 const DEFAULT_LEAVE_OPTIONS = ['Annual Leave', 'Sick Leave', 'Casual Leave', 'Maternity Leave', 'Paternity Leave']
-
 
 // Debounced Input
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
@@ -172,26 +170,6 @@ export default function EmployeeLeavePage() {
       showToast('error', 'Failed to load data')
     } finally {
       setLoading(false)
-    }
-  }
-
-  const fetchLeaveTypes = async () => {
-    try {
-      const res = await getLeaveTypeList()
-      console.log('🧾 Leave Type API Response:', res)
-
-      // ✅ Fix deep path (same structure as employee)
-      const types = res?.data?.results || res?.results || []
-
-      if (types.length > 0) {
-        setLeaveTypeList(types)
-        console.log('✅ Leave types loaded:', types)
-      } else {
-        showToast('warning', 'No leave types found')
-      }
-    } catch (err) {
-      console.error('❌ Failed to load leave types:', err)
-      showToast('error', 'Failed to fetch leave types')
     }
   }
 
@@ -305,10 +283,9 @@ export default function EmployeeLeavePage() {
       try {
         const res = await getEmployeeList()
         const employees = res?.data?.results || res?.results || []
-        if (employees.length > 0) setEmployeeList(employees)
-        else showToast('warning', 'No employees found')
+        setEmployeeList(employees)
       } catch (err) {
-        showToast('error', 'Failed to fetch employee list')
+        console.error(err)
       }
     }
 
@@ -316,10 +293,9 @@ export default function EmployeeLeavePage() {
       try {
         const res = await getLeaveTypeList()
         const types = res?.data?.results || res?.results || []
-        if (types.length > 0) setLeaveTypeList(types)
-        else showToast('warning', 'No leave types found')
+        setLeaveTypeList(types)
       } catch (err) {
-        showToast('error', 'Failed to fetch leave types')
+        console.error(err)
       }
     }
 
@@ -439,9 +415,24 @@ export default function EmployeeLeavePage() {
     }
   }
 
-  // Dynamic Leave Type Options
-  const existingLeaveTypes = rows.map(r => r.leaveType).filter(Boolean)
-  const leaveTypeOptions = Array.from(new Set([...DEFAULT_LEAVE_OPTIONS, ...existingLeaveTypes]))
+  const fetchEmployees = async () => {
+    try {
+      const res = await getEmployeeList()
+      const employees = res?.data?.results || []
+      setEmployeeList(employees)
+    } catch (err) {
+      showToast('error', 'Failed to fetch employee list')
+    }
+  }
+  const fetchLeaveTypes = async () => {
+    try {
+      const res = await getLeaveTypeList()
+      const types = res?.data?.results || []
+      setLeaveTypeList(types)
+    } catch (err) {
+      showToast('error', 'Failed to fetch leave types')
+    }
+  }
 
   // Table setup
   const columnHelper = createColumnHelper()
@@ -743,9 +734,11 @@ export default function EmployeeLeavePage() {
             <tbody>
               {rows.length ? (
                 table.getRowModel().rows.map(row => (
-                  <tr key={row.id}>
+                  <tr key={row.original.id + '_' + row.original.sno}>
                     {row.getVisibleCells().map(cell => (
-                      <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                      <td key={cell.column.id + '_' + row.original.id + '_' + row.index}>
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
                     ))}
                   </tr>
                 ))
@@ -787,22 +780,17 @@ export default function EmployeeLeavePage() {
               {/* Employee Dropdown */}
               <Grid item xs={12}>
                 <GlobalAutocomplete
+                  label='Employee'
                   fullWidth
                   required
-                  label='Employee'
-                  value={formData.employee_id ?? ''} // ✅ controlled
-                  onChange={e => {
-                    const selectedId = Number(e.target.value) || ''
-                    const selected = employeeList.find(emp => emp.id === selectedId)
-                    setFormData(prev => ({
-                      ...prev,
-                      employee_id: selectedId,
-                      name: selected ? selected.name : ''
-                    }))
+                  value={formData.employee_id}
+                  onChange={selectedValue => {
+                    setFormData(prev => ({ ...prev, employee_id: Number(selectedValue) }))
                   }}
-                  options={employeeList.map(emp => ({
-                    value: emp.id,
-                    label: emp.name || emp.email || `User-${emp.id}`
+                  options={employeeList.map((emp, index) => ({
+                    key: String(emp.id ?? index),
+                    value: emp.id ?? index,
+                    label: emp.name || `Employee ${index + 1}`
                   }))}
                 />
               </Grid>
@@ -810,23 +798,21 @@ export default function EmployeeLeavePage() {
               {/* Leave Type Dropdown */}
               <Grid item xs={12}>
                 <GlobalAutocomplete
+                  label='Leave Type'
                   fullWidth
                   required
-                  label='Leave Type'
-                  value={formData.leaveType ?? ''} // ✅ controlled
-                  onChange={e => {
-                    const selectedId = Number(e.target.value)
-                    handleFieldChange('leaveType', selectedId) // send ID, not name
-                  }}
-                  options={leaveTypeList.map(l => ({
-                    value: l.id,
-                    label: l.name || l.leave_code || `Leave-${l.id}`
+                  value={formData.leaveType || null} // 💥 FIXED
+                  onChange={selectedValue => handleFieldChange('leaveType', Number(selectedValue))}
+                  options={(leaveTypeList || []).map((type, index) => ({
+                    id: type.id ?? index, // unique internal id
+                    value: type.id ?? index, // value sent to form
+                    label: type.name || `Leave Type ${index + 1}` // 👈 FIX HERE (use type.name)
                   }))}
                 />
               </Grid>
 
               {/* From Date + Time */}
-              {/* From Date & Time */}
+
               <Grid item xs={12}>
                 <Typography sx={{ mb: 1, fontWeight: 500 }}>From Date & Time</Typography>
                 <Grid container spacing={2}>

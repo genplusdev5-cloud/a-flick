@@ -15,7 +15,7 @@ import {
   CircularProgress,
   Pagination,
   InputAdornment,
-  FormControl,        // ← Required
+  FormControl, // ← Required
   Select,
   Button
 } from '@mui/material'
@@ -23,7 +23,6 @@ import {
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
-
 
 // Components
 import CustomTextField from '@core/components/mui/TextField'
@@ -149,6 +148,8 @@ export default function StockReportPage() {
   const [supplierFilter, setSupplierFilter] = useState('')
   const [chemicalFilter, setChemicalFilter] = useState('')
   const [searchText, setSearchText] = useState('')
+  const [employeeFilter, setEmployeeFilter] = useState('')
+  const [customerFilter, setCustomerFilter] = useState('')
 
   const columnHelper = createColumnHelper()
   const columns = useMemo(
@@ -236,14 +237,16 @@ export default function StockReportPage() {
           sx={{
             pb: 1.5,
             pt: 1.5,
-            '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
             '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
           }}
           title={
-            <Box display='flex' alignItems='center' gap={2}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              {/* Title */}
               <Typography variant='h5' sx={{ fontWeight: 600 }}>
                 Stock Report
               </Typography>
+
+              {/* Refresh Button */}
               <Button
                 variant='contained'
                 color='primary'
@@ -261,17 +264,171 @@ export default function StockReportPage() {
                 disabled={loading}
                 onClick={async () => {
                   setLoading(true)
-                  await loadData(true) // show toast on refresh
+                  await loadData(true)
                   setTimeout(() => setLoading(false), 600)
                 }}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 500,
+                  px: 2.5,
+                  height: 36
+                }}
               >
                 {loading ? 'Refreshing...' : 'Refresh'}
               </Button>
             </Box>
           }
-          action={
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          action={null}
+        />
+
+        {/* Loader */}
+        {loading && (
+          <Box
+            sx={{
+              position: 'fixed',
+              inset: 0,
+              bgcolor: 'rgba(255,255,255,0.65)',
+              backdropFilter: 'blur(3px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexDirection: 'column',
+              zIndex: 2000,
+              animation: 'fadeIn 0.3s ease-in-out',
+              '@keyframes fadeIn': {
+                from: { opacity: 0 },
+                to: { opacity: 1 }
+              }
+            }}
+          >
+            <ProgressCircularCustomization size={70} thickness={5} />
+            <Typography
+              mt={2}
+              sx={{
+                color: 'primary.main',
+                fontWeight: 600,
+                fontSize: '1.05rem',
+                letterSpacing: 0.3
+              }}
+            >
+              Loading Stock Report...
+            </Typography>
+          </Box>
+        )}
+
+        <Divider sx={{ mb: 2 }} />
+
+        {/* Filters – SINGLE ROW LAYOUT */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 3,
+            mb: 3,
+            flexWrap: 'nowrap'
+          }}
+        >
+          {/* Date Range + Checkbox */}
+          <Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+              <Typography variant='body2' sx={{ fontWeight: 500 }}>
+                Date Range
+              </Typography>
+
+              <Checkbox
+                size='small'
+                checked={enableDateFilter}
+                onChange={e => setEnableDateFilter(e.target.checked)}
+                sx={{ p: 0 }}
+              />
+            </Box>
+
+            <AppReactDatepicker
+              selectsRange
+              startDate={startDate}
+              endDate={endDate}
+              onChange={dates => {
+                if (enableDateFilter && dates) {
+                  setStartDate(dates[0])
+                  setEndDate(dates[1])
+                }
+              }}
+              disabled={!enableDateFilter}
+              readOnly={!enableDateFilter}
+              customInput={
+                <CustomTextField
+                  size='small'
+                  sx={{
+                    width: 260,
+                    backgroundColor: 'white',
+                    '& .MuiInputBase-root': { height: 40 }
+                  }}
+                  value={`${format(startDate, 'dd/MM/yyyy')} - ${format(endDate, 'dd/MM/yyyy')}`}
+                />
+              }
+            />
+          </Box>
+
+          {/* Supplier */}
+          <Box>
+            <Typography variant='body2' sx={{ fontWeight: 500, mb: 0.5 }}>
+              Supplier
+            </Typography>
+            <CustomAutocomplete
+              options={['Stock-TECH STOCK 1', 'Supplier-ABC']}
+              value={supplierFilter || null}
+              onChange={(e, val) => setSupplierFilter(val || '')}
+              renderInput={p => (
+                <CustomTextField {...p} size='small' sx={{ width: 220, '& .MuiInputBase-root': { height: 40 } }} />
+              )}
+            />
+          </Box>
+
+          {/* Customer */}
+          <Box>
+            <Typography variant='body2' sx={{ fontWeight: 500, mb: 0.5 }}>
+              Customer
+            </Typography>
+            <CustomAutocomplete
+              options={['Customer-A', 'Customer-B', 'Customer-C']}
+              value={customerFilter || null}
+              onChange={(e, val) => setCustomerFilter(val || '')}
+              renderInput={p => (
+                <CustomTextField {...p} size='small' sx={{ width: 220, '& .MuiInputBase-root': { height: 40 } }} />
+              )}
+            />
+          </Box>
+        </Box>
+
+        <Divider sx={{ mb: 4 }} />
+
+        {/* Search + Page Size */}
+        {/* Toolbar Row */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 2,
+            mb: 2
+          }}
+        >
+          {/* LEFT: Entries + Export Buttons */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+            {/* Page Size */}
+            <FormControl size='small' sx={{ width: 140 }}>
+              <Select value={pageSize} onChange={e => table.setPageSize(Number(e.target.value))}>
+                {[10, 25, 50, 100].map(s => (
+                  <MenuItem key={s} value={s}>
+                    {s} entries
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            {/* Export Buttons */}
+            <Box sx={{ display: 'flex', gap: 1.5 }}>
               {['Copy', 'CSV', 'Excel', 'PDF', 'Print'].map(label => (
                 <Button
                   key={label}
@@ -295,119 +452,9 @@ export default function StockReportPage() {
                 </Button>
               ))}
             </Box>
-          }
-        />
-        {/* Loader */}
-       {loading && (
-  <Box
-    sx={{
-      position: 'fixed',
-      inset: 0,
-      bgcolor: 'rgba(255,255,255,0.65)',
-      backdropFilter: 'blur(3px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexDirection: 'column',
-      zIndex: 2000,
-      animation: 'fadeIn 0.3s ease-in-out',
-      '@keyframes fadeIn': {
-        from: { opacity: 0 },
-        to: { opacity: 1 }
-      }
-    }}
-  >
-    <ProgressCircularCustomization size={70} thickness={5} />
-    <Typography
-      mt={2}
-      sx={{
-        color: 'primary.main',
-        fontWeight: 600,
-        fontSize: '1.05rem',
-        letterSpacing: 0.3
-      }}
-    >
-      Loading Stock Report...
-    </Typography>
-  </Box>
-)}
-
-
-        <Divider sx={{ mb: 2 }} />
-
-        {/* Filters */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, mb: 3, flexWrap: 'wrap' }}>
-          <Box>
-            <Box display='flex' alignItems='center' gap={1} sx={{ mb: 0.5 }}>
-              <Typography variant='body2' sx={{ fontWeight: 500, color: 'text.primary' }}>
-                Date Range
-              </Typography>
-              <Checkbox size='small' checked={enableDateFilter} onChange={e => setEnableDateFilter(e.target.checked)} />
-            </Box>
-
-            <AppReactDatepicker
-              selectsRange
-              startDate={startDate}
-              endDate={endDate}
-              onChange={dates => enableDateFilter && dates && setStartDate(dates[0]) && setEndDate(dates[1])}
-              shouldCloseOnSelect={false}
-              disabled={!enableDateFilter}
-              readOnly={!enableDateFilter}
-              customInput={
-                <CustomTextField
-                  size='small'
-                  fullWidth
-                  value={`${format(startDate, 'dd/MM/yyyy')} - ${format(endDate, 'dd/MM/yyyy')}`}
-                  sx={{ minWidth: 260, backgroundColor: 'white' }}
-                />
-              }
-            />
           </Box>
 
-          <CustomAutocomplete
-            className='is-[220px]'
-            options={['Stock-TECH STOCK 1', 'Supplier-ABC']}
-            value={supplierFilter || null}
-            onChange={(e, val) => setSupplierFilter(val || '')}
-            renderInput={p => <CustomTextField {...p} label='Supplier' size='small' />}
-          />
-
-          <CustomAutocomplete
-            className='is-[220px]'
-            options={['Abate', 'Falcon', 'Aquabac']}
-            value={chemicalFilter || null}
-            onChange={(e, val) => setChemicalFilter(val || '')}
-            renderInput={p => <CustomTextField {...p} label='Chemical' size='small' />}
-          />
-        </Box>
-
-        <Divider sx={{ mb: 4 }} />
-
-        {/* Search + Page Size */}
-        {/* Search + Page Size */}
-        <Box
-          sx={{
-            p: 2,
-            pt: 0,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: 2
-          }}
-        >
-          {/* Page Size Dropdown (EXACTLY like Material Request) */}
-          <FormControl size='small' sx={{ width: 140 }}>
-            <Select value={pageSize} onChange={e => table.setPageSize(Number(e.target.value))}>
-              {[10, 25, 50, 100].map(s => (
-                <MenuItem key={s} value={s}>
-                  {s} entries
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          {/* Search */}
+          {/* RIGHT: Search */}
           <CustomTextField
             size='small'
             placeholder='Search supplier or chemical...'
@@ -425,6 +472,7 @@ export default function StockReportPage() {
             }}
           />
         </Box>
+
         {/* Table */}
         <Box sx={{ overflowX: 'auto' }}>
           <table

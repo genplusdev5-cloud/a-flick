@@ -269,9 +269,10 @@ export default function SiteRiskPage() {
     try {
       const payload = {
         id: formData.id,
-        name: formData.name,
-        description: formData.description,
-        is_active: formData.status === 'Active' ? 1 : 0
+        supplier_type: formData.supplier_type,
+        supplier_name: formData.supplier_name,
+        billing_address: formData.billing_address,
+        is_active: formData.status === 'Active' ? 1 : 0 // IMPORTANT
       }
 
       const result = isEdit ? await updateSiteRisk(payload) : await addSiteRisk(payload)
@@ -295,13 +296,35 @@ export default function SiteRiskPage() {
 
   const handleStatusChange = async e => {
     const newStatus = e.target.value
+    const is_active = newStatus === 'Active' ? 1 : 0
+
     setFormData(prev => ({ ...prev, status: newStatus }))
+
     if (isEdit && formData.id) {
-      const updatedRow = { ...formData, status: newStatus, id: formData.id }
-      setRows(prev => prev.map(r => (r.id === formData.id ? updatedRow : r)))
-      const db = await initDB()
-      await db.put(STORE_NAME, updatedRow)
-      showToast('success', 'Status updated')
+      try {
+        setLoading(true)
+
+        const payload = {
+          id: formData.id,
+          name: formData.name,
+          description: formData.description,
+          is_active
+        }
+
+        const result = await updateSiteRisk(payload)
+
+        if (result.success) {
+          showToast('success', 'Status updated')
+          await loadData() // 🔥 refresh table correctly
+        } else {
+          showToast('error', result.message)
+        }
+      } catch (err) {
+        console.error(err)
+        showToast('error', 'Failed to update status')
+      } finally {
+        setLoading(false)
+      }
     }
   }
 
@@ -662,7 +685,12 @@ export default function SiteRiskPage() {
                   <GlobalSelect
                     label='Status'
                     value={formData.status}
-                    onChange={e => handleFieldChange('status', e.target.value)}
+                    onChange={e =>
+                      setFormData(prev => ({
+                        ...prev,
+                        status: e.target.value
+                      }))
+                    }
                     options={[
                       { value: 'Active', label: 'Active' },
                       { value: 'Inactive', label: 'Inactive' }

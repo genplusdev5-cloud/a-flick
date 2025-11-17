@@ -44,6 +44,7 @@ export default function FindingDrawerContent({ pestId }) {
       const mapped = list.map((item, index) => ({
         ...item,
         sno: index + 1,
+        name: item.name || item.finding || item.finding_name || item.finding_text || '',
         statusLabel: item.is_active === 1 ? 'Active' : 'Inactive'
       }))
 
@@ -74,10 +75,6 @@ export default function FindingDrawerContent({ pestId }) {
       setDeleteId(null)
     }
   }
-
-  useEffect(() => {
-    if (pestId) loadFindings()
-  }, [pestId])
 
   // 🔹 Add / Update
   const handleSubmit = async () => {
@@ -120,15 +117,14 @@ export default function FindingDrawerContent({ pestId }) {
   }
 
   // 🔹 Edit
-const handleEdit = row => {
-  setEditId(row.id)
+  const handleEdit = row => {
+    setEditId(row.id)
 
-  setFormData({
-    name: row.name,
-    status: row.is_active === 1 ? 'Active' : 'Inactive'
-  })
-}
-
+    setFormData({
+      name: row.name,
+      status: row.is_active === 1 ? 'Active' : 'Inactive'
+    })
+  }
 
   // 🔹 Delete
   const handleDelete = async id => {

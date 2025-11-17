@@ -31,7 +31,6 @@ import CustomAutocomplete from '@core/components/mui/Autocomplete'
 import CustomTextField from '@core/components/mui/TextField'
 import { getCustomerNamesForList } from '@/api/contract/listDropdowns'
 
-
 // 🔥 Global UI Components (use everywhere)
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalTextField from '@/components/common/GlobalTextField'
@@ -67,8 +66,6 @@ import {
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
 
-
-
 // Debounced Input
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
   const [value, setValue] = useState(initialValue)
@@ -79,6 +76,23 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
   }, [value])
   return <TextField {...props} value={value} onChange={e => setValue(e.target.value)} />
 }
+
+const CONTRACT_TYPES = [
+  { label: 'Limited Contract', value: 'limited' },
+  { label: 'Job', value: 'job' },
+  { label: 'Continuous Contract', value: 'continuous_contract' },
+  { label: 'Continuous Job', value: 'continuous_job' },
+  { label: 'Warranty', value: 'warranty' }
+]
+
+// 🔥 Contract Status Values (backend expects lowercase)
+const CONTRACT_STATUS = [
+  { label: 'Current', value: 'current' },
+  { label: 'Renewed', value: 'renewed' },
+  { label: 'Hold', value: 'hold' },
+  { label: 'Terminated', value: 'terminated' },
+  { label: 'Expired', value: 'expired' }
+]
 
 // ───────────────────────────────────────────
 // Component
@@ -102,9 +116,9 @@ export default function ContractsPage() {
     setLoading(true)
     try {
       const filters = {}
-      if (customerFilter) filters.customer_id = customerFilter
+      if (customerFilter?.id) filters.customer_id = customerFilter.id
       if (typeFilter) filters.contract_type = typeFilter
-      if (statusFilter) filters.contract_status = statusFilter // ✅ correct key
+      if (statusFilter) filters.contract_status = statusFilter
 
       console.log('🧠 Filters Sent →', filters)
 
@@ -131,7 +145,7 @@ export default function ContractsPage() {
         pestList: item.pest_items?.map(p => p.pest_id).join(', ') || 'N/A',
         startDate: item.start_date ? new Date(item.start_date).toLocaleDateString('en-GB') : '',
         endDate: item.end_date ? new Date(item.end_date).toLocaleDateString('en-GB') : '',
-        status: item.is_active === 1 ? 'Active' : 'Inactive'
+        contractStatus: item.contract_status || 'N/A'
       }))
 
       setRows(normalized)
@@ -148,30 +162,28 @@ export default function ContractsPage() {
     try {
       const names = await getCustomerNamesForList()
 
-      // ✅ Remove duplicates based on name
-      const uniqueCustomers = Array.from(new Map(names.map(item => [item.name, item])).values())
+      // Backend returns: { id: 1613, name: "XXXX" }
+      const mapped = names.map(c => ({
+        id: c.id, // ✔ correct id
+        name: c.name.trim() // ✔ remove spaces
+      }))
 
-      setCustomerOptions(uniqueCustomers)
+      setCustomerOptions(mapped)
     } catch (error) {
       console.error('Error loading customers:', error)
       setCustomerOptions([])
     }
   }
 
+  // Load customer dropdown only once
   useEffect(() => {
-    if (customerFilter || typeFilter || statusFilter) {
-      loadData()
-    }
-  }, [customerFilter, typeFilter, statusFilter])
+    loadCustomers()
+  }, [])
 
+  // Load contracts whenever filters / pagination / search changes
   useEffect(() => {
     loadData()
-    const loadCustomers = async () => {
-      const names = await getCustomerNamesForList()
-      setCustomerOptions(names)
-    }
-    loadCustomers()
-  }, [pagination.pageIndex, pagination.pageSize, searchText])
+  }, [customerFilter, typeFilter, statusFilter, pagination.pageIndex, pagination.pageSize, searchText])
 
   const handleEdit = id => router.push(`/admin/contracts/${id}/edit`)
   const confirmDelete = async () => {
@@ -188,11 +200,13 @@ export default function ContractsPage() {
   const columnHelper = createColumnHelper()
   const columns = useMemo(
     () => [
-      columnHelper.accessor('sno', { header: 'S.No' }),
+      columnHelper.accessor('sno', {
+        id: 'sno_column',
+        header: 'S.No'
+      }),
 
-      // 🔥 ACTIONS
       columnHelper.display({
-        id: 'actions',
+        id: 'actions_column',
         header: 'Actions',
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
@@ -210,63 +224,103 @@ export default function ContractsPage() {
         )
       }),
 
-      // 🔥 BASIC INFO
-      columnHelper.accessor('customer', { header: 'Customer' }),
-      columnHelper.accessor('contractCode', { header: 'Code' }),
-      columnHelper.accessor('serviceAddress', { header: 'Address' }),
-      columnHelper.accessor('contractType', { header: 'Type' }),
+      columnHelper.accessor('customer', {
+        id: 'customer_column',
+        header: 'Customer'
+      }),
 
-      // 🔥 NEW DATES
-      columnHelper.accessor('startDate', { header: 'Start Date' }),
-      columnHelper.accessor('endDate', { header: 'End Date' }),
+      columnHelper.accessor('contractCode', {
+        id: 'code_column',
+        header: 'Code'
+      }),
 
-      // 🔥 POSTAL CODE
+      columnHelper.accessor('serviceAddress', {
+        id: 'address_column',
+        header: 'Address'
+      }),
+
+      columnHelper.accessor('contractType', {
+        id: 'type_column',
+        header: 'Type'
+      }),
+
+      columnHelper.accessor('startDate', {
+        id: 'startDate_column',
+        header: 'Start Date'
+      }),
+
+      columnHelper.accessor('endDate', {
+        id: 'endDate_column',
+        header: 'End Date'
+      }),
+
       columnHelper.accessor('postalCode', {
+        id: 'postal_column',
         header: 'Postal Code',
         cell: info => info.getValue() || '—'
       }),
 
-      // 🔥 PRODUCT VALUE
       columnHelper.accessor('productValue', {
+        id: 'product_column',
         header: 'Product Value',
         cell: info => `₹ ${info.getValue() || 0}`
       }),
 
-      // 🔥 CONTRACT VALUE
       columnHelper.accessor('contractValue', {
+        id: 'contract_value_column',
         header: 'Contract Value',
         cell: info => `₹ ${info.getValue() || 0}`
       }),
 
-      // 🔥 CONTACT PERSON DETAILS
-      columnHelper.accessor('contactName', { header: 'Contact Person' }),
-      columnHelper.accessor('contactPhone', { header: 'Phone' }),
-      columnHelper.accessor('mobile', { header: 'Mobile' }),
+      columnHelper.accessor('contactName', {
+        id: 'contact_name_column',
+        header: 'Contact Person'
+      }),
 
-      // 🔥 SERVICES LIST
+      columnHelper.accessor('contactPhone', {
+        id: 'contact_phone_column',
+        header: 'Phone'
+      }),
+
+      columnHelper.accessor('mobile', {
+        id: 'mobile_column',
+        header: 'Mobile'
+      }),
+
       columnHelper.accessor('services', {
+        id: 'services_column',
         header: 'Services',
         cell: info => info.getValue()?.join(', ') || 'N/A'
       }),
 
-      // 🔥 PEST LIST
-      columnHelper.accessor('pestList', { header: 'Pests' }),
+      columnHelper.accessor('pestList', {
+        id: 'pest_column',
+        header: 'Pests'
+      }),
 
-      // 🔥 STATUS
-      columnHelper.accessor('status', {
-        header: 'Status',
+      columnHelper.accessor('contractStatus', {
+        id: 'contract_status_column',
+        header: 'Contract Status',
         cell: info => {
-          const status = info.getValue() || 'Active'
+          const status = (info.getValue() || '').toLowerCase()
+
+          let color = 'default'
+          if (status === 'current') color = 'success'
+          else if (status === 'renewed') color = 'info'
+          else if (status === 'hold') color = 'warning'
+          else if (status === 'terminated') color = 'error'
+          else if (status === 'expired') color = 'error'
+
           return (
             <Chip
-              label={status}
+              label={info.getValue() || 'N/A'}
               size='small'
+              color={color}
+              variant='filled'
               sx={{
-                color: '#fff',
-                bgcolor: status === 'Active' ? 'success.main' : 'error.main',
                 fontWeight: 600,
-                borderRadius: '6px',
-                px: 1.5
+                textTransform: 'capitalize',
+                borderRadius: '6px'
               }}
             />
           )
@@ -494,14 +548,8 @@ export default function ContractsPage() {
               id='customer-filter'
               options={customerOptions}
               getOptionLabel={option => option?.name || ''}
-              renderOption={(props, option) => (
-                <li {...props} key={`${option.id}-${option.name}`}>
-                  {option.name}
-                </li>
-              )}
-              isOptionEqualToValue={(option, value) => option.id === value.id}
-              value={customerOptions.find(c => c.id === customerFilter) || null}
-              onChange={(e, newVal) => setCustomerFilter(newVal?.id || null)} // ✅ store ID here
+              value={customerOptions.find(opt => opt.id === customerFilter?.id) || null} // <-- FIXED
+              onChange={newVal => setCustomerFilter(newVal)} // <-- FIXED
               renderInput={params => (
                 <GlobalTextField {...params} label='Customer' placeholder='Select Customer' size='small' />
               )}
@@ -511,10 +559,10 @@ export default function ContractsPage() {
             {/* Contract Type (AutoComplete) */}
             <GlobalAutocomplete
               fullWidth
-              id='contract-type-filter'
-              options={['Limited Contract', 'Job', 'Continuous Contract', 'Continuous Job', 'Warranty']}
-              value={typeFilter}
-              onChange={(e, newVal) => setTypeFilter(newVal)}
+              options={CONTRACT_TYPES}
+              getOptionLabel={o => o.label}
+              value={CONTRACT_TYPES.find(t => t.value === typeFilter) || null}
+              onChange={newVal => setTypeFilter(newVal?.value || null)}
               renderInput={params => (
                 <GlobalTextField {...params} label='Contract Type' placeholder='Select Type' size='small' />
               )}
@@ -524,10 +572,12 @@ export default function ContractsPage() {
             {/* Contract Status (AutoComplete) */}
             <GlobalAutocomplete
               fullWidth
-              id='contract-status-filter'
-              options={['Current', 'Renewed', 'Hold', 'Terminated', 'Expired']}
-              value={statusFilter}
-              onChange={(e, newVal) => setStatusFilter(newVal)}
+              options={CONTRACT_STATUS}
+              getOptionLabel={o => o.label}
+              value={CONTRACT_STATUS.find(s => s.value === statusFilter) || null}
+              onChange={newValue => {
+                setStatusFilter(newValue?.value || null)
+              }}
               renderInput={params => (
                 <GlobalTextField {...params} label='Contract Status' placeholder='Select Status' size='small' />
               )}
@@ -588,7 +638,7 @@ export default function ContractsPage() {
                 table.getRowModel().rows.map(row => (
                   <tr key={row.id}>
                     {row.getVisibleCells().map(cell => (
-                      <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                      <td key={cell.column.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
                     ))}
                   </tr>
                 ))

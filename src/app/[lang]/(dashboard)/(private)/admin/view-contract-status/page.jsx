@@ -441,101 +441,168 @@ export default function ContractStatusPage() {
         <Typography color='text.primary'>View Contract Status</Typography>
       </Breadcrumbs>
 
-      {/* Filters */}
-
       {/* Table */}
       <Card sx={{ p: 4 }}>
+        <CardHeader
+          title={
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 2
+              }}
+            >
+              {/* LEFT — Title + Refresh */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Typography variant='h5' sx={{ fontWeight: 600 }}>
+                  View Contract Status
+                </Typography>
 
-        <Box sx={{ mb: 6 }}>
-          <Grid container spacing={2}>
-            {/* Date Filter */}
-            <Grid item xs={12} md={4}>
-              <Box display='flex' flexDirection='column' sx={{ width: '100%' }}>
-                {/* Label + Checkbox (UPPER) */}
-                <Box display='flex' alignItems='center' gap={1}>
-                  <Checkbox
-                    checked={filterByDate}
-                    onChange={e => setFilterByDate(e.target.checked)}
-                    size='small'
-                    sx={{ padding: '0px' }}
-                  />
-                  <Typography sx={{ fontSize: '0.85rem', color: '#444' }}>Date</Typography>
-                </Box>
-
-                {/* Date Input Box (DOWN) */}
-                <AppReactDatepicker
-                  selected={dateFilter}
-                  onChange={setDateFilter}
-                  dateFormat='dd/MM/yyyy'
-                  customInput={<TextField fullWidth size='small' disabled={!filterByDate} placeholder='Select Date' />}
-                />
+                <Button
+                  variant='contained'
+                  color='primary'
+                  startIcon={
+                    <RefreshIcon
+                      sx={{
+                        animation: loading ? 'spin 1s linear infinite' : 'none',
+                        '@keyframes spin': {
+                          '0%': { transform: 'rotate(0deg)' },
+                          '100%': { transform: 'rotate(360deg)' }
+                        }
+                      }}
+                    />
+                  }
+                  disabled={loading}
+                  onClick={async () => {
+                    setLoading(true)
+                    await loadData(true)
+                    setTimeout(() => setLoading(false), 600)
+                  }}
+                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                >
+                  {loading ? 'Refreshing...' : 'Refresh'}
+                </Button>
               </Box>
-            </Grid>
 
-            {/* Origin */}
-            <Grid item xs={12} md={4}>
-              <GlobalAutocomplete
-                label='Origin'
-                options={originOptions}
-                value={originFilter}
-                onChange={v => setOriginFilter(v)}
-              />
-            </Grid>
+              {/* RIGHT — ADD CONTRACT */}
+              <Button
+                variant='contained'
+                color='primary'
+                startIcon={<AddIcon />}
+                onClick={() => router.push('/admin/contracts/add')}
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 500,
+                  px: 3,
+                  height: 36
+                }}
+              >
+                Add Contract
+              </Button>
+            </Box>
+          }
+          sx={{
+            pb: 1.5,
+            pt: 1.5,
+            '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
+          }}
+        />
 
-            {/* Customer */}
-            <Grid item xs={12} md={4}>
-              <GlobalAutocomplete
-                label='Customer'
-                options={customerOptions}
-                value={customerFilter}
-                onChange={v => setCustomerFilter(v)}
-              />
-            </Grid>
+        <Divider sx={{ mb: 2 }} />
 
-            {/* Contract Type */}
-            <Grid item xs={12} md={4}>
-              <GlobalAutocomplete
-                label='Contract Type'
-                options={contractTypeOptions}
-                value={contractTypeFilter}
-                onChange={v => setContractTypeFilter(v)}
-              />
-            </Grid>
+        {/* SINGLE ROW FILTER BAR */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'flex-end',
+            gap: 3,
+            flexWrap: 'wrap',
+            mb: 4
+          }}
+        >
+          {/* Date Filter */}
+          <Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+              <Checkbox checked={filterByDate} onChange={e => setFilterByDate(e.target.checked)} size='small' />
+              <Typography sx={{ fontSize: '0.85rem', fontWeight: 500 }}>Date</Typography>
+            </Box>
 
-            {/* Invoice Frequency */}
-            <Grid item xs={12} md={4}>
-              <GlobalAutocomplete
-                label='Invoice Frequency'
-                options={invoiceOptions}
-                value={invoiceFrequencyFilter}
-                onChange={v => setInvoiceFrequencyFilter(v)}
-              />
-            </Grid>
+            <AppReactDatepicker
+              selected={dateFilter}
+              onChange={setDateFilter}
+              dateFormat='dd/MM/yyyy'
+              customInput={
+                <TextField
+                  fullWidth
+                  size='small'
+                  disabled={!filterByDate}
+                  sx={{ width: 180 }}
+                  placeholder='Select Date'
+                />
+              }
+            />
+          </Box>
 
-            {/* Contract Status */}
-            <Grid item xs={12} md={4}>
-              <GlobalAutocomplete
-                label='Contract Status'
-                options={contractStatusOptions}
-                value={contractStatusFilter}
-                onChange={v => setContractStatusFilter(v)}
-              />
-            </Grid>
+          {/* Origin */}
+          <GlobalAutocomplete
+            label='Origin'
+            options={originOptions}
+            value={originFilter}
+            onChange={v => setOriginFilter(v)}
+            sx={{ width: 200 }}
+          />
 
-            {/* New / Renewed */}
-            <Grid item xs={12} md={4}>
-              <GlobalAutocomplete
-                label='New / Renewed'
-                options={renewalOptions}
-                value={renewalFilter}
-                onChange={v => setRenewalFilter(v)}
-              />
-            </Grid>
-          </Grid>
+          {/* Customer */}
+          <GlobalAutocomplete
+            label='Customer'
+            options={customerOptions}
+            value={customerFilter}
+            onChange={v => setCustomerFilter(v)}
+            sx={{ width: 200 }}
+          />
+
+          {/* Contract Type */}
+          <GlobalAutocomplete
+            label='Contract Type'
+            options={contractTypeOptions}
+            value={contractTypeFilter}
+            onChange={v => setContractTypeFilter(v)}
+            sx={{ width: 200 }}
+          />
+
+          {/* Invoice Frequency */}
+          <GlobalAutocomplete
+            label='Invoice Frequency'
+            options={invoiceOptions}
+            value={invoiceFrequencyFilter}
+            onChange={v => setInvoiceFrequencyFilter(v)}
+            sx={{ width: 200 }}
+          />
+
+          {/* Contract Status */}
+          <GlobalAutocomplete
+            label='Contract Status'
+            options={contractStatusOptions}
+            value={contractStatusFilter}
+            onChange={v => setContractStatusFilter(v)}
+            sx={{ width: 200 }}
+          />
+
+          {/* New / Renewed */}
+          <GlobalAutocomplete
+            label='New / Renewed'
+            options={renewalOptions}
+            value={renewalFilter}
+            onChange={v => setRenewalFilter(v)}
+            sx={{ width: 200 }}
+          />
         </Box>
 
         <Divider sx={{ mb: 2 }} />
 
+        {/* TOOLBAR: Entries + Export + Search */}
         <Box
           sx={{
             mb: 3,
@@ -546,50 +613,54 @@ export default function ContractStatusPage() {
             flexWrap: 'wrap'
           }}
         >
-          {/* Left: Entries Dropdown */}
-          <FormControl size='small' sx={{ width: 140 }}>
-            <Select
-              value={pagination.pageSize}
-              onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
-            >
-              {[10, 25, 50, 100].map(s => (
-                <MenuItem key={s} value={s}>
-                  {s} entries
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          {/* Center: Export Buttons */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            {['Copy', 'CSV', 'Excel', 'PDF', 'Print'].map(btn => (
-              <GlobalButton
-                key={btn}
-                variant='contained'
-                size='small'
-                onClick={
-                  btn === 'CSV'
-                    ? exportCSV
-                    : btn === 'Print'
-                      ? exportPrint
-                      : () => showToast('info', `${btn} coming soon`)
-                }
-                sx={{
-                  bgcolor: '#6c757d',
-                  color: '#fff',
-                  textTransform: 'none',
-                  borderRadius: '8px',
-                  px: 2,
-                  py: 1,
-                  '&:hover': { bgcolor: '#5a6268' }
-                }}
+          {/* LEFT SIDE — Entries + Export */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            {/* Entries Dropdown */}
+            <FormControl size='small' sx={{ width: 140 }}>
+              <Select
+                value={pagination.pageSize}
+                onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
               >
-                {btn}
-              </GlobalButton>
-            ))}
+                {[10, 25, 50, 100].map(s => (
+                  <MenuItem key={s} value={s}>
+                    {s} entries
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            {/* Export Buttons next to Entries */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              {['Copy', 'CSV', 'Excel', 'PDF', 'Print'].map(btn => (
+                <GlobalButton
+                  key={btn}
+                  variant='contained'
+                  size='small'
+                  onClick={
+                    btn === 'CSV'
+                      ? exportCSV
+                      : btn === 'Print'
+                        ? exportPrint
+                        : () => showToast('info', `${btn} coming soon`)
+                  }
+                  sx={{
+                    bgcolor: '#6c757d',
+                    color: '#fff',
+                    textTransform: 'none',
+                    borderRadius: '8px',
+                    px: 2,
+                    py: 1,
+                    minWidth: 60,
+                    '&:hover': { bgcolor: '#5a6268' }
+                  }}
+                >
+                  {btn}
+                </GlobalButton>
+              ))}
+            </Box>
           </Box>
 
-          {/* Right: Search */}
+          {/* RIGHT SIDE — Search */}
           <DebouncedInput
             value={searchText}
             onChange={v => {

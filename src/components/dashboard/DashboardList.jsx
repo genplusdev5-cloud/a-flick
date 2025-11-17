@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import {
   Box,
   Button,
@@ -41,6 +41,8 @@ export default function DashboardList() {
   const [searchText, setSearchText] = useState('')
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
   const [loading, setLoading] = useState(false)
+  const runOnce = useRef(false);
+
 
   const columnHelper = createColumnHelper()
 
@@ -115,7 +117,7 @@ export default function DashboardList() {
   // ----------------------------
   // LOAD DATA
   // ----------------------------
-  const loadList = async () => {
+const loadList = async () => {
   try {
     setLoading(true);
 
@@ -133,12 +135,8 @@ export default function DashboardList() {
       searchText
     );
 
-    // 🔥 FIX: If the request was cancelled, STOP RIGHT HERE
-    if (res.status === 'cancelled') {
-      return;
-    }
+    if (res.status === 'cancelled') return;
 
-    // 🔥 Process successful response
     if (res.status === 'success') {
       let formatted = [];
 
@@ -174,14 +172,22 @@ export default function DashboardList() {
       setRows(formatted);
       setCount(res.count);
     }
+
+  } catch {
+    // 🔥 FIX: DO NOT LOG RAW ERROR OBJECT
+    console.error("❌ Dashboard List Load Error");
   } finally {
     setLoading(false);
   }
 };
 
 useEffect(() => {
-  loadList()
-}, [filterType, pagination.pageIndex, pagination.pageSize, radioFilter, searchText])
+  if (runOnce.current) return;
+  runOnce.current = true;
+
+  loadList();
+}, [filterType, pagination.pageIndex, pagination.pageSize, radioFilter, searchText]);
+
 
 
   const handleRefresh = () => loadList()

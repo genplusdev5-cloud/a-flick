@@ -252,79 +252,44 @@ export default function UsageReportPage() {
       <Card sx={{ p: 3, mt: 2 }}>
         {/* Header */}
         <CardHeader
-          title={
-            <Box
-              sx={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                flexWrap: 'wrap',
-                gap: 2
-              }}
-            >
-              {/* Left Section — Title + Refresh Button */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Typography variant='h5' sx={{ fontWeight: 600 }}>
-                  Usage Report
-                </Typography>
-
-                <Button
-                  variant='contained'
-                  color='primary'
-                  startIcon={
-                    <RefreshIcon
-                      sx={{
-                        animation: loading ? 'spin 1s linear infinite' : 'none',
-                        '@keyframes spin': {
-                          '0%': { transform: 'rotate(0deg)' },
-                          '100%': { transform: 'rotate(360deg)' }
-                        }
-                      }}
-                    />
-                  }
-                  disabled={loading}
-                  onClick={async () => {
-                    setLoading(true)
-                    await loadData(true) // show toast only when manually refreshed
-                    setTimeout(() => setLoading(false), 600)
-                  }}
-                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-                >
-                  {loading ? 'Refreshing...' : 'Refresh'}
-                </Button>
-              </Box>
-
-              {/* Right Section — Export Buttons */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                {['Copy', 'CSV', 'Excel', 'PDF', 'Print'].map(label => (
-                  <Button
-                    key={label}
-                    variant='contained'
-                    sx={{
-                      backgroundColor: '#5A5A5A',
-                      color: 'white',
-                      textTransform: 'none',
-                      fontWeight: 500,
-                      fontSize: '0.8rem',
-                      px: 2,
-                      py: 2,
-                      borderRadius: 1,
-                      minWidth: 68,
-                      boxShadow: 'none',
-                      '&:hover': { backgroundColor: '#4b4b4b' }
-                    }}
-                  >
-                    {label}
-                  </Button>
-                ))}
-              </Box>
-            </Box>
-          }
           sx={{
             pb: 1.5,
             pt: 1.5,
             '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
           }}
+          title={
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Typography variant='h5' sx={{ fontWeight: 600 }}>
+                Usage Report
+              </Typography>
+
+              <Button
+                variant='contained'
+                color='primary'
+                startIcon={
+                  <RefreshIcon
+                    sx={{
+                      animation: loading ? 'spin 1s linear infinite' : 'none',
+                      '@keyframes spin': {
+                        '0%': { transform: 'rotate(0deg)' },
+                        '100%': { transform: 'rotate(360deg)' }
+                      }
+                    }}
+                  />
+                }
+                disabled={loading}
+                onClick={async () => {
+                  setLoading(true)
+                  await loadData(true)
+                  setTimeout(() => setLoading(false), 600)
+                }}
+                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+              >
+                {loading ? 'Refreshing...' : 'Refresh'}
+              </Button>
+            </Box>
+          }
+          action={null}
         />
 
         {/* Full-screen Loader */}
@@ -365,20 +330,27 @@ export default function UsageReportPage() {
         <Divider sx={{ mb: 2 }} />
 
         {/* Filters */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, mb: 3, flexWrap: 'wrap' }}>
+        {/* FILTERS — SINGLE ROW */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 3,
+            mb: 3,
+            flexWrap: 'nowrap'
+          }}
+        >
+          {/* Date Range */}
           <Box>
-            <Box display='flex' alignItems='center' gap={1} sx={{ mb: 0.5 }}>
-              <Typography variant='body2' sx={{ fontWeight: 500, color: 'text.primary' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+              <Typography variant='body2' sx={{ fontWeight: 500 }}>
                 Date Range
               </Typography>
               <Checkbox
                 size='small'
                 checked={enableDateFilter}
                 onChange={e => setEnableDateFilter(e.target.checked)}
-                sx={{
-                  color: '#9c27b0',
-                  '&.Mui-checked': { color: '#7367f0' }
-                }}
+                sx={{ p: 0 }}
               />
             </Box>
 
@@ -386,73 +358,107 @@ export default function UsageReportPage() {
               selectsRange
               startDate={startDate}
               endDate={endDate}
-              onChange={dates => enableDateFilter && dates && setStartDate(dates[0]) && setEndDate(dates[1])}
-              shouldCloseOnSelect={false}
+              onChange={dates => {
+                if (enableDateFilter && dates) {
+                  setStartDate(dates[0])
+                  setEndDate(dates[1])
+                }
+              }}
               disabled={!enableDateFilter}
               readOnly={!enableDateFilter}
               customInput={
                 <CustomTextField
                   size='small'
-                  fullWidth
-                  value={`${format(startDate, 'dd/MM/yyyy')} - ${format(endDate, 'dd/MM/yyyy')}`}
                   sx={{
-                    minWidth: 260,
+                    width: 260,
                     backgroundColor: 'white',
-                    '& .MuiInputBase-input.Mui-disabled': {
-                      WebkitTextFillColor: '#555'
-                    },
-                    '& .MuiOutlinedInput-root': {
-                      '& fieldset': {
-                        borderColor: enableDateFilter ? '#7367f0' : '#d0d0d0'
-                      }
-                    }
+                    '& .MuiInputBase-root': { height: 40 }
                   }}
+                  value={`${format(startDate, 'dd/MM/yyyy')} - ${format(endDate, 'dd/MM/yyyy')}`}
                 />
               }
             />
           </Box>
 
-          <CustomAutocomplete
-            className='is-[220px]'
-            options={['Admin', 'Tech', 'User A']}
-            value={employeeFilter || null}
-            onChange={(e, val) => setEmployeeFilter(val || '')}
-            renderInput={params => <CustomTextField {...params} label='Employee' size='small' />}
-          />
+          {/* Employee */}
+          <Box>
+            <Typography variant='body2' sx={{ fontWeight: 500, mb: 0.5 }}>
+              Employee
+            </Typography>
+            <CustomAutocomplete
+              options={['Admin', 'Tech', 'User A']}
+              value={employeeFilter || null}
+              onChange={(e, val) => setEmployeeFilter(val || '')}
+              renderInput={p => (
+                <CustomTextField {...p} size='small' sx={{ width: 220, '& .MuiInputBase-root': { height: 40 } }} />
+              )}
+            />
+          </Box>
 
-          <CustomAutocomplete
-            className='is-[220px]'
-            options={['GP Industries Pvt Ltd', 'ABC Pvt Ltd', 'Tech Solutions']}
-            value={customerFilter || null}
-            onChange={(e, val) => setCustomerFilter(val || '')}
-            renderInput={params => <CustomTextField {...params} label='Customer' size='small' />}
-          />
+          {/* Customer */}
+          <Box>
+            <Typography variant='body2' sx={{ fontWeight: 500, mb: 0.5 }}>
+              Customer
+            </Typography>
+            <CustomAutocomplete
+              options={['GP Industries Pvt Ltd', 'ABC Pvt Ltd', 'Tech Solutions']}
+              value={customerFilter || null}
+              onChange={(e, val) => setCustomerFilter(val || '')}
+              renderInput={p => (
+                <CustomTextField {...p} size='small' sx={{ width: 220, '& .MuiInputBase-root': { height: 40 } }} />
+              )}
+            />
+          </Box>
 
-          <CustomAutocomplete
-            className='is-[220px]'
-            options={['Stock-TECH STOCK 1', 'Supplier-B']}
-            value={supplierFilter || null}
-            onChange={(e, val) => setSupplierFilter(val || '')}
-            renderInput={params => <CustomTextField {...params} label='Supplier' size='small' />}
-          />
+          {/* Supplier */}
+          <Box>
+            <Typography variant='body2' sx={{ fontWeight: 500, mb: 0.5 }}>
+              Supplier
+            </Typography>
+            <CustomAutocomplete
+              options={['Stock-TECH STOCK 1', 'Supplier-B']}
+              value={supplierFilter || null}
+              onChange={(e, val) => setSupplierFilter(val || '')}
+              renderInput={p => (
+                <CustomTextField {...p} size='small' sx={{ width: 220, '& .MuiInputBase-root': { height: 40 } }} />
+              )}
+            />
+          </Box>
 
-          <CustomAutocomplete
-            className='is-[220px]'
-            options={['Abate', 'Advion Ant Gel', 'Aquabac']}
-            value={chemicalFilter || null}
-            onChange={(e, val) => setChemicalFilter(val || '')}
-            renderInput={params => <CustomTextField {...params} label='Chemical' size='small' />}
-          />
+          {/* Chemical */}
+          <Box>
+            <Typography variant='body2' sx={{ fontWeight: 500, mb: 0.5 }}>
+              Chemical
+            </Typography>
+            <CustomAutocomplete
+              options={['Abate', 'Advion Ant Gel', 'Aquabac']}
+              value={chemicalFilter || null}
+              onChange={(e, val) => setChemicalFilter(val || '')}
+              renderInput={p => (
+                <CustomTextField {...p} size='small' sx={{ width: 220, '& .MuiInputBase-root': { height: 40 } }} />
+              )}
+            />
+          </Box>
         </Box>
 
         <Divider sx={{ mb: 4 }} />
 
         {/* Search + Entries control */}
-        <Box sx={{ p: 2, pt: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant='body2' color='text.secondary'>
-              Show
-            </Typography>
+        {/* Toolbar */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 2,
+            mb: 2,
+            px: 1
+          }}
+        >
+          {/* LEFT: Entries + Export Buttons */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+            {/* Entries */}
             <CustomTextField
               select
               size='small'
@@ -463,14 +469,39 @@ export default function UsageReportPage() {
                 table.setPageIndex(0)
               }}
             >
-              {[5, 10, 25, 50, 100].map(size => (
+              {[10, 25, 50, 100].map(size => (
                 <MenuItem key={size} value={size}>
                   {size} entries
                 </MenuItem>
               ))}
             </CustomTextField>
+
+            {/* Export */}
+            <Box sx={{ display: 'flex', gap: 1.5 }}>
+              {['Copy', 'CSV', 'Excel', 'PDF', 'Print'].map(label => (
+                <Button
+                  key={label}
+                  variant='contained'
+                  sx={{
+                    backgroundColor: '#5A5A5A',
+                    color: 'white',
+                    textTransform: 'none',
+                    fontWeight: 500,
+                    fontSize: '0.8rem',
+                    px: 2,
+                    py: 0.7,
+                    borderRadius: 2,
+                    minWidth: 68,
+                    '&:hover': { backgroundColor: '#4b4b4b' }
+                  }}
+                >
+                  {label}
+                </Button>
+              ))}
+            </Box>
           </Box>
 
+          {/* RIGHT: Search */}
           <CustomTextField
             size='small'
             placeholder='Search by employee, customer, or chemical...'

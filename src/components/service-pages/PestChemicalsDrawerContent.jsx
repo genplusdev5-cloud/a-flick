@@ -70,9 +70,7 @@ export default function PestChemicalsDrawerContent({ pestId }) {
     }
   }
 
-  useEffect(() => {
-    if (pestId) loadChemicals()
-  }, [pestId])
+
 
   // Add / Update
   const handleSubmit = async () => {

@@ -71,9 +71,7 @@ export default function RecommendationDrawerContent({ pestId }) {
     }
   }
 
-  useEffect(() => {
-    if (pestId) loadRecommendations()
-  }, [pestId])
+
 
   // Submit (Add / Update)
   const handleSubmit = async () => {

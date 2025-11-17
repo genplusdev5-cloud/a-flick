@@ -7,31 +7,47 @@ const GlobalAutocomplete = ({
   label = 'Select',
   placeholder = 'Search...',
   options = [],
-  value = null,               // ✅ controlled value
-  onChange = () => {},        // ✅ callback
+  value = null,
+  onChange = () => {},
+  getOptionLabel = option => option?.label || option?.name || '',
+  isOptionEqualToValue = (opt, val) => opt?.id === val?.id,
   ...props
 }) => {
-  // Convert simple string value → option object
-  const selectedOption =
-    options.find(opt => opt.value === value) || null
+
+  // Create safe options with unique keys
+  const safeOptions = options.map((opt, index) => ({
+    ...opt,
+    _key: opt.id ?? opt.value ?? index
+  }))
 
   return (
     <CustomAutocomplete
       fullWidth
-      options={options}
-      value={selectedOption}   // ✅ must be an object, not string
+      options={safeOptions}
+      value={value}
+      getOptionLabel={getOptionLabel}
+      isOptionEqualToValue={isOptionEqualToValue}
+
+      // FIX: Do NOT override key inside props
+      renderOption={(params, option) => (
+        <li {...params} key={option._key}>
+          {getOptionLabel(option)}
+        </li>
+      )}
+
+      // FIX: return full object, NOT id
       onChange={(event, newValue) => {
-        onChange(newValue ? newValue.value : '')  // return string only
+        onChange(newValue || null)
       }}
-      getOptionLabel={option => option?.label || ''}
-      isOptionEqualToValue={(opt, val) => opt.value === val.value}  // 🔥 avoid duplicate key error
-      renderInput={params => (
+
+      renderInput={(params) => (
         <CustomTextField
           {...params}
           label={label}
           placeholder={placeholder}
         />
       )}
+
       {...props}
     />
   )

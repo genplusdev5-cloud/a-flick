@@ -28,6 +28,15 @@ import {
   Autocomplete
 } from '@mui/material'
 
+import {
+  getSupplierList,
+  addSupplier,
+  updateSupplier,
+  getSupplierDetails,
+  deleteSupplier,
+  deleteSupplierContact
+} from '@/api/supplier'
+
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
@@ -43,6 +52,7 @@ import { toast } from 'react-toastify'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 import classnames from 'classnames'
 import { rankItem } from '@tanstack/match-sorter-utils'
+import { showToast } from '@/components/common/Toasts'
 import {
   useReactTable,
   getCoreRowModel,
@@ -53,76 +63,6 @@ import {
 } from '@tanstack/react-table'
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
-
-// ───────────────────────────────────────────
-// IndexedDB
-// ───────────────────────────────────────────
-const DB_NAME = 'supplierDB'
-const STORE_NAME = 'suppliers'
-
-const initDB = async () => {
-  return await openDB(DB_NAME, 1, {
-    upgrade(db) {
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true })
-      }
-    }
-  })
-}
-
-// Toast helper
-// ──────────────────────────────────────────────────────────────
-// Toast (Custom Styled, Global, with Icons & Colors)
-// ──────────────────────────────────────────────────────────────
-const showToast = (type, message = '') => {
-  const icons = {
-    success: 'tabler-circle-check',
-    delete: 'tabler-trash',
-    error: 'tabler-alert-triangle',
-    warning: 'tabler-info-circle',
-    info: 'tabler-refresh'
-  }
-
-  toast(
-    <div className='flex items-center gap-2'>
-      <i
-        className={icons[type]}
-        style={{
-          color:
-            type === 'success'
-              ? '#16a34a'
-              : type === 'error'
-                ? '#dc2626'
-                : type === 'delete'
-                  ? '#dc2626'
-                  : type === 'warning'
-                    ? '#f59e0b'
-                    : '#2563eb',
-          fontSize: '22px'
-        }}
-      />
-      <Typography variant='body2' sx={{ fontSize: '0.9rem', color: '#111' }}>
-        {message}
-      </Typography>
-    </div>,
-    {
-      position: 'top-right',
-      autoClose: 2000,
-      hideProgressBar: true,
-      closeOnClick: true,
-      pauseOnHover: false,
-      draggable: false,
-      theme: 'light',
-      style: {
-        borderRadius: '10px',
-        padding: '8px 14px',
-        boxShadow: '0 4px 10px rgba(0,0,0,0.06)',
-        display: 'flex',
-        alignItems: 'center'
-      }
-    }
-  )
-}
 
 // Debounced Input
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
@@ -152,7 +92,7 @@ export default function SupplierPage() {
     id: null,
     type: '',
     name: '',
-    address: '',
+    address: '', // make sure no null here
     status: 'Active'
   })
 
@@ -167,29 +107,31 @@ export default function SupplierPage() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const db = await initDB()
-      const all = await db.getAll(STORE_NAME)
+      const response = await getSupplierList()
 
-      const filtered = searchText
-        ? all.filter(r =>
-            ['name', 'type', 'address', 'status', 'id'].some(key =>
-              (r[key] || '').toString().toLowerCase().includes(searchText.toLowerCase())
-            )
-          )
-        : all
+      const list = response?.data?.data?.results || []
 
-      const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
+      const normalizedList = list.map(item => ({
+        ...item,
+        name: item.name || '',
+        type: item.is_pest === '1' ? 'Pest Supplier' : 'General Supplier',
+        address: item.billing_address || '', // FIXED
+        status: item.is_active === 1 ? 'Active' : 'Inactive'
+      }))
+
+      const sorted = normalizedList.sort((a, b) => b.id - a.id)
+
       const start = pagination.pageIndex * pagination.pageSize
       const end = start + pagination.pageSize
       const paginated = sorted.slice(start, end)
 
-      const normalized = paginated.map((item, i) => ({
+      const finalRows = paginated.map((item, i) => ({
         ...item,
         sno: start + i + 1
       }))
 
-      setRows(normalized)
-      setRowCount(filtered.length)
+      setRows(finalRows)
+      setRowCount(sorted.length)
     } catch (err) {
       console.error(err)
       showToast('error', 'Failed to load data')
@@ -218,18 +160,57 @@ export default function SupplierPage() {
     setTimeout(() => typeRef.current?.focus(), 100)
   }
 
-  const handleEdit = row => {
+  const handleEdit = async row => {
     setIsEdit(true)
-    setFormData(row)
-    setDrawerOpen(true)
-    setTimeout(() => typeRef.current?.focus(), 100)
+    setLoading(true)
+
+    try {
+      const response = await getSupplierDetails(row.id)
+      const data = response?.data?.data
+
+      const clean = {
+        id: data.id,
+        name: data.name || '',
+        type: data.is_pest === '1' ? 'Pest Supplier' : 'General Supplier',
+        address: data.billing_address || '',
+        status: data.is_active === 1 ? 'Active' : 'Inactive',
+
+        // Additional fields backend requires
+        business_name: data.business_name || '',
+        billing_contact_name: data.billing_contact_name || '',
+        billing_email: data.billing_email || '',
+        billing_phone: data.billing_phone || '',
+        pic_contact_name: data.pic_contact_name || '',
+        pic_email: data.pic_email || '',
+        pic_phone: data.pic_phone || '',
+        postal_code: data.postal_code || '',
+        payment_term: data.payment_term || '',
+        city: data.city || '',
+        state: data.state || '',
+        account_details: data.account_details || '',
+        short_description: data.short_description || '',
+        description: data.description || ''
+      }
+
+      setFormData(clean)
+      setDrawerOpen(true)
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'Failed to fetch supplier details')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleDelete = async row => {
-    const db = await initDB()
-    await db.delete(STORE_NAME, row.id)
-    showToast('delete', `${row.name} deleted`)
-    loadData()
+    try {
+      await deleteSupplier(row.id)
+      showToast('delete', `${row.name} deleted`)
+      loadData()
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'Failed to delete')
+    }
   }
 
   const confirmDelete = async () => {
@@ -237,44 +218,69 @@ export default function SupplierPage() {
     setDeleteDialog({ open: false, row: null })
   }
 
-  const handleSubmit = async e => {
-    e.preventDefault()
-    if (!formData.name.trim() || !formData.type.trim()) {
-      showToast('warning', 'Name and Type are required')
-      return
-    }
-    setLoading(true)
-    try {
-      const db = await initDB()
-      const payload = { ...formData }
-      if (isEdit && formData.id) {
-        await db.put(STORE_NAME, payload)
-        showToast('success', 'Supplier updated')
-      } else {
-        delete payload.id
-        await db.add(STORE_NAME, payload)
-        showToast('success', 'Supplier added')
-      }
-      toggleDrawer()
-      loadData()
-    } catch {
-      showToast('error', 'Failed to save')
-    } finally {
-      setLoading(false)
-    }
+ const handleSubmit = async (e) => {
+  e.preventDefault()
+
+  const payload = {
+    id: formData.id,
+
+    name: formData.name,
+    business_name: formData.business_name,
+    billing_address: formData.address,
+    billing_contact_name: formData.billing_contact_name,
+    billing_email: formData.billing_email,
+    billing_phone: formData.billing_phone,
+    pic_contact_name: formData.pic_contact_name,
+    pic_email: formData.pic_email,
+    pic_phone: formData.pic_phone,
+
+    city: formData.city,
+    state: formData.state,
+    postal_code: formData.postal_code,
+    payment_term: formData.payment_term,
+    account_details: formData.account_details,
+    description: formData.description,
+    short_description: formData.short_description,
+
+    is_pest: formData.type === "Pest Supplier" ? 1 : 0,
+    is_active: formData.status === "Active" ? 1 : 0,
+    status: formData.status === "Active" ? 1 : 0
   }
 
-  const handleStatusChange = async e => {
-    const newStatus = e.target.value
-    setFormData(prev => ({ ...prev, status: newStatus }))
-    if (isEdit && formData.id) {
-      const updatedRow = { ...formData, status: newStatus, id: formData.id }
-      setRows(prev => prev.map(r => (r.id === formData.id ? updatedRow : r)))
-      const db = await initDB()
-      await db.put(STORE_NAME, updatedRow)
-      showToast('success', 'Status updated')
-    }
+  try {
+    await updateSupplier(payload)
+    showToast('success', 'Supplier updated successfully')
+    toggleDrawer()
+    loadData()
+  } catch (err) {
+    console.error(err)
+    showToast('error', 'Failed to update supplier')
   }
+}
+
+
+ const handleStatusChange = async (e) => {
+  const newStatus = e.target.value;
+  const id = formData.id;
+
+  setFormData(prev => ({ ...prev, status: newStatus }));
+
+  const payload = {
+    id: id,
+    is_active: newStatus === "Active" ? 1 : 0,
+    status: newStatus === "Active" ? 1 : 0
+  };
+
+  try {
+    await updateSupplier(payload);
+    showToast("success", "Status updated");
+    loadData();
+  } catch (err) {
+    console.error(err);
+    showToast("error", "Failed to update status");
+  }
+};
+
 
   // Table setup
   const columnHelper = createColumnHelper()
@@ -301,7 +307,7 @@ export default function SupplierPage() {
       }),
       columnHelper.accessor('name', { header: 'Supplier Name' }),
       columnHelper.accessor('type', { header: 'Supplier Type' }),
-      columnHelper.accessor('address', { header: 'Billing Address' }),
+      // columnHelper.accessor('address', { header: 'Billing Address' }),
       columnHelper.accessor('status', {
         header: 'Status',
         cell: info => (

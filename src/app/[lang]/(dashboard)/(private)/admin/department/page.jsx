@@ -77,7 +77,6 @@ import {
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
 
-
 // Debounced Input
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
   const [value, setValue] = useState(initialValue)
@@ -103,6 +102,8 @@ export default function DepartmentPage() {
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
   const [unsavedAddData, setUnsavedAddData] = useState(null)
+  const [closeReason, setCloseReason] = useState(null);
+
   const [formData, setFormData] = useState({
     id: null,
     name: '',
@@ -157,22 +158,37 @@ export default function DepartmentPage() {
   }
 
   useEffect(() => {
+  if (!drawerOpen) {
+    if (closeReason === "save" || closeReason === "cancel") {
+      setFormData({
+        id: null,
+        name: '',
+        description: '',
+        status: 'Active'
+      });
+      setUnsavedAddData(null);
+    }
+  }
+}, [drawerOpen]);
+
+
+  useEffect(() => {
     loadData()
   }, [pagination.pageIndex, pagination.pageSize, searchText])
 
   // Drawer
-  const toggleDrawer = () => setDrawerOpen(p => !p)
+const toggleDrawer = () => {
+  setCloseReason("manual");    // outside click close
+  setDrawerOpen(false);
+};
+
+
   // 🔹 Cancel drawer + reset form
-  const handleCancel = () => {
-    setFormData({
-      id: null,
-      name: '',
-      description: '',
-      status: 'Active'
-    })
-    setUnsavedAddData(null)
-    setDrawerOpen(false)
-  }
+const handleCancel = () => {
+  setCloseReason("cancel");
+  setDrawerOpen(false);
+};
+
 
   // 🔹 Handle field change + store unsaved add data
   const handleFieldChange = (field, value) => {
@@ -184,21 +200,27 @@ export default function DepartmentPage() {
   }
 
   // 🔹 Updated Add handler with unsaved data restore
-  const handleAdd = () => {
-    setIsEdit(false)
-    if (unsavedAddData) {
-      setFormData(unsavedAddData)
-    } else {
-      setFormData({
-        id: null,
-        name: '',
-        description: '',
-        status: 'Active'
-      })
-    }
-    setDrawerOpen(true)
-    setTimeout(() => nameRef.current?.focus(), 100)
+const handleAdd = () => {
+  setIsEdit(false);
+
+  if (closeReason === "manual" && unsavedAddData) {
+    // Outside click → keep data
+    setFormData(unsavedAddData);
+  } else {
+    // After save/cancel → start fresh
+    setFormData({
+      id: null,
+      name: '',
+      description: '',
+      status: 'Active'
+    });
   }
+
+  setDrawerOpen(true);
+  setCloseReason(null); // reset
+  setTimeout(() => nameRef.current?.focus(), 100);
+};
+
 
   const handleEdit = async row => {
     try {
@@ -227,6 +249,17 @@ export default function DepartmentPage() {
     }
   }
 
+  const closeByAction = () => {
+    setUnsavedAddData(null)
+    setFormData({
+      id: null,
+      name: '',
+      description: '',
+      status: 'Active'
+    })
+    setDrawerOpen(false)
+  }
+
   const handleDelete = async row => {
     const db = await initDB()
     await db.delete(STORE_NAME, row.id)
@@ -238,7 +271,10 @@ export default function DepartmentPage() {
       if (!deleteDialog.row?.id) return
       const result = await deleteDepartment(deleteDialog.row.id)
       if (result.success) {
-        showToast('delete', result.message)
+        showToast('success', result.message)
+
+        closeByAction() // 🔥 SAVE clears
+
         await loadData()
       } else {
         showToast('error', result.message)
@@ -251,41 +287,44 @@ export default function DepartmentPage() {
     }
   }
 
-  const handleSubmit = async e => {
-    e.preventDefault()
+ const handleSubmit = async e => {
+  e.preventDefault()
 
-    if (!formData.name.trim()) {
-      showToast('warning', 'Department name is required')
-      return
-    }
-
-    setLoading(true)
-    try {
-      const payload = {
-        id: formData.id,
-        name: formData.name,
-        description: formData.description,
-        is_active: formData.status === 'Active' ? 1 : 0
-      }
-
-      const result = isEdit ? await updateDepartment(payload) : await addDepartment(payload)
-
-      if (result.success) {
-        showToast('success', result.message)
-        setDrawerOpen(false)
-        setFormData({ id: null, name: '', description: '', status: 'Active' })
-        setIsEdit(false)
-        await loadData()
-      } else {
-        showToast('error', result.message)
-      }
-    } catch (err) {
-      console.error('❌ Save Department Error:', err)
-      showToast('error', 'Something went wrong while saving department')
-    } finally {
-      setLoading(false)
-    }
+  if (!formData.name.trim()) {
+    showToast('warning', 'Department name is required')
+    return
   }
+
+  setLoading(true)
+  try {
+    const payload = {
+      id: formData.id,
+      name: formData.name,
+      description: formData.description,
+      is_active: formData.status === 'Active' ? 1 : 0
+    }
+
+    const result = isEdit ? await updateDepartment(payload) : await addDepartment(payload)
+
+    if (result.success) {
+      showToast('success', result.message)
+
+      setDrawerOpen(false)     // <-- THIS IS WHERE WE PUT closeReason
+
+      setFormData({ id: null, name: '', description: '', status: 'Active' })
+      setIsEdit(false)
+      await loadData()
+    } else {
+      showToast('error', result.message)
+    }
+  } catch (err) {
+    console.error('❌ Save Department Error:', err)
+    showToast('error', 'Something went wrong while saving department')
+  } finally {
+    setLoading(false)
+  }
+}
+
 
   const handleStatusChange = async e => {
     const newStatus = e.target.value

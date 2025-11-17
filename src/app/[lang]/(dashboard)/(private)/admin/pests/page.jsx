@@ -36,7 +36,7 @@ import ChecklistDrawerContent from '@/components/service-pages/ChecklistDrawerCo
 import PestChemicalsDrawerContent from '@/components/service-pages/PestChemicalsDrawerContent'
 import UnitDrawerContent from '@/components/service-pages/UnitDrawerContent'
 
-import { getPestList, addPest, updatePest, deletePest } from '@/api/pest'
+import { getPestList, addPest, updatePest, deletePest, getPestDetails } from '@/api/pest'
 import { getFindingList, addFinding, updateFinding, deleteFinding } from '@/api/findings'
 import { getActionList, addAction, updateAction, deleteAction } from '@/api/actions'
 import {
@@ -176,6 +176,54 @@ export default function PestPage() {
   const descRef = useRef(null)
   const statusRef = useRef(null)
 
+  const loadPestDetails = async () => {
+    if (!selectedPestId) return
+
+    setLoading(true)
+
+    try {
+      if (drawerType === 'Action') {
+        const res = await getActionList(selectedPestId)
+        setSubRows(res?.data?.results || [])
+        return
+      }
+
+      if (drawerType === 'Finding') {
+        const res = await getFindingList(selectedPestId)
+        setSubRows(res?.data?.data?.results || [])
+        return
+      }
+
+      if (drawerType === 'Checklist') {
+        const res = await getChecklistList(selectedPestId)
+        setSubRows(res?.data?.data?.results || [])
+        return
+      }
+
+      if (drawerType === 'Recommendation') {
+        const res = await getRecommendationList(selectedPestId)
+        setSubRows(res?.data?.data?.results || [])
+        return
+      }
+
+      if (drawerType === 'Chemicals') {
+        const res = await getPestChemicalsList(selectedPestId)
+        setSubRows(res?.data?.data?.results || [])
+        return
+      }
+
+      if (drawerType === 'Pest Units') {
+        const res = await getUnitList(selectedPestId)
+        setSubRows(res?.data?.data?.results || [])
+        return
+      }
+    } catch (error) {
+      console.log('ERR: ', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // Load data
   const loadData = async () => {
     setLoading(true)
@@ -196,12 +244,12 @@ export default function PestPage() {
       const normalized = all.map((item, idx) => ({
         ...item,
         sno: idx + 1,
-        pest_code: item.pest_code || '-',
-        parent_code: item.parent_code || '-',
-        pest_value: item.pest_value || '-',
-        name: item.name || '-',
-        is_active: item.is_active,
-        status: item.is_active === 1 ? 'Active' : 'Inactive'
+        action_count: item.action_count,
+        finding_count: item.finding_count,
+        recommendation_count: item.recommendation_count,
+        checklist_count: item.checklist_count,
+        chemicals_count: item.chemical_count,
+        unit_count: item.unit_count
       }))
 
       setRows(normalized)
@@ -211,70 +259,6 @@ export default function PestPage() {
       setLoading(false)
     }
   }
-
-  const syncAllData = async () => {
-    setLoading(true)
-    // showToast('info', 'Syncing all pest data...')
-    try {
-      const pestRes = await getPestList()
-
-      // ✅ This condition was wrong earlier; update to match your real API response
-      const allPests = pestRes?.data?.data?.results || []
-
-      if (allPests.length > 0) {
-        const synced = await Promise.all(
-          allPests.map(async pest => {
-            try {
-              const [findings, actions, recommendations, checklist, chemicals, units] = await Promise.all([
-                getFindingList(pest.id),
-                getActionList(pest.id),
-                getRecommendationList(pest.id),
-                getChecklistList(pest.id),
-                getPestChemicalsList(pest.id),
-                getUnitList(pest.id)
-              ])
-
-              return {
-                ...pest,
-                finding_count: findings?.data?.data?.count || findings?.data?.count || 0,
-                action_count: actions?.data?.data?.count || actions?.data?.count || 0,
-                recommendation_count: recommendations?.data?.data?.count || recommendations?.data?.count || 0,
-                checklist_count: checklist?.data?.data?.count || checklist?.data?.count || 0,
-                chemicals_count: chemicals?.data?.data?.count || chemicals?.data?.count || 0,
-                unit_count: units?.data?.data?.count || units?.data?.count || 0
-              }
-            } catch (subErr) {
-              console.warn('Submodule sync failed for pest:', pest.id, subErr)
-              return pest
-            }
-          })
-        )
-
-        // 🧾 Normalize final synced data
-        const normalized = synced.map((item, index) => ({
-          ...item,
-          sno: index + 1
-        }))
-
-        setRows(normalized)
-        setRowCount(normalized.length)
-        showToast('success', 'All pest data synced successfully')
-      } else {
-        showToast('warning', 'No pests found during sync')
-        await loadData() // ✅ reload from backend instead of clearing rows
-      }
-    } catch (err) {
-      console.error('Global sync error:', err)
-      showToast('error', 'Failed to sync pest data')
-      await loadData() // ✅ fallback to reload existing data
-    } finally {
-      setLoading(false)
-    }
-  }
-  useEffect(() => {
-    // auto call syncAllData on page load
-    syncAllData()
-  }, [])
 
   // --- Main Drawer ---
   const toggleMainDrawer = () => setMainDrawerOpen(p => !p)
@@ -413,29 +397,27 @@ export default function PestPage() {
   const loadSubList = async () => {
     const apiSet = apiMap[drawerType]
     if (!apiSet || !selectedPestId) return
-    setLoading(true)
-    try {
-      // ✅ Correct call for list (not add)
-      const res = await apiSet.list(selectedPestId)
 
-      if (res.status === 'success') {
-        const list = res?.data?.data?.results || res?.data?.results || []
-        setSubRows(list)
-        setRowCount(res?.data?.data?.count || list.length)
-      } else {
-        setSubRows([])
-      }
-    } catch (err) {
-      console.error(err)
-      showToast('error', `Failed to fetch ${drawerType} list`)
-    } finally {
-      setLoading(false)
-    }
+    const res = await apiSet.list(selectedPestId)
+
+    const list =
+      res?.data?.data?.results || // Backend nested format
+      res?.data?.results || // Action API fallback
+      []
+
+    setSubRows(list)
   }
 
   useEffect(() => {
-    if (subDrawerOpen) loadSubList()
-  }, [subDrawerOpen, drawerType])
+  loadData()
+}, [])
+
+
+  useEffect(() => {
+    if (subDrawerOpen && selectedPestId) {
+      loadSubList() // ⭐ THIS fetches actions filtered by pest_id
+    }
+  }, [subDrawerOpen, drawerType, selectedPestId])
 
   // 🔹 Add or Update sub-item (Finding, Action, etc.)
   const handleSubSubmit = async () => {
@@ -855,7 +837,7 @@ export default function PestPage() {
                   />
                 }
                 disabled={loading}
-                onClick={syncAllData}
+                onClick={loadData}
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
                 {loading ? 'Refreshing...' : 'Refresh'}
@@ -1144,7 +1126,20 @@ export default function PestPage() {
           </Box>
 
           {/* Action Drawer */}
-          {drawerType === 'Action' && <ActionDrawerContent pestId={selectedPestId} />}
+          {drawerType === 'Action' && (
+            <ActionDrawerContent
+              pestId={selectedPestId}
+              rows={subRows}
+              reload={loadSubList}
+              onDelete={id =>
+                setDeleteDialog({
+                  open: true,
+                  isSub: true,
+                  subId: id
+                })
+              }
+            />
+          )}
 
           {/* Finding Drawer */}
           {drawerType === 'Finding' && <FindingDrawerContent pestId={selectedPestId} />}

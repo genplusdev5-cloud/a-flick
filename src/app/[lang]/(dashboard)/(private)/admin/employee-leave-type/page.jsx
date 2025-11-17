@@ -71,8 +71,6 @@ import {
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
 
-
-
 // Debounced Input
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
   const [value, setValue] = useState(initialValue)
@@ -98,6 +96,8 @@ export default function EmployeeLeaveTypePage() {
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
   const [unsavedAddData, setUnsavedAddData] = useState(null)
+  const [closeReason, setCloseReason] = useState(null)
+
   const [formData, setFormData] = useState({
     id: null,
     leaveCode: '',
@@ -133,20 +133,33 @@ export default function EmployeeLeaveTypePage() {
   }
 
   useEffect(() => {
+  if (!drawerOpen) {
+    if (closeReason === "save" || closeReason === "cancel") {
+      setFormData({
+        id: null,
+        leaveCode: '',
+        name: '',
+        status: 'Active'
+      })
+      setUnsavedAddData(null)
+    }
+  }
+}, [drawerOpen])
+
+
+  useEffect(() => {
     loadData()
   }, [pagination.pageIndex, pagination.pageSize, searchText])
 
   // Drawer
-  const toggleDrawer = () => setDrawerOpen(p => !p)
+  const toggleDrawer = () => {
+    setCloseReason('manual') // outside click / X button
+    setDrawerOpen(false)
+  }
+
   // 🔹 Cancel drawer + reset form
   const handleCancel = () => {
-    setFormData({
-      id: null,
-      leaveCode: '',
-      name: '',
-      status: 'Active'
-    })
-    setUnsavedAddData(null)
+    setCloseReason('cancel')
     setDrawerOpen(false)
   }
 
@@ -238,11 +251,6 @@ export default function EmployeeLeaveTypePage() {
       console.log('🛰️ Payload Sent:', payload)
 
       if (isEdit) {
-        if (!formData.id) {
-          showToast('error', 'Invalid record ID for update')
-          setLoading(false)
-          return
-        }
         await updateLeaveType(payload)
         showToast('success', 'Leave Type updated successfully!')
       } else {
@@ -251,7 +259,9 @@ export default function EmployeeLeaveTypePage() {
       }
 
       await loadData()
-      setDrawerOpen(false)
+
+      setCloseReason('save') // 🔥 save means clear form
+      setDrawerOpen(false) // close drawer only (no clear here)
     } catch (err) {
       console.error('❌ Error while saving:', err)
       showToast('error', err.response?.data?.message || err.message)

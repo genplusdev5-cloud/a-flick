@@ -77,7 +77,6 @@ import {
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
 
-
 // Debounced Input
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
   const [value, setValue] = useState(initialValue)
@@ -104,6 +103,8 @@ export default function DesignationPage() {
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
   // 🧠 Store unsaved Add form data (restores if drawer reopened)
   const [unsavedAddData, setUnsavedAddData] = useState(null)
+  const [closeReason, setCloseReason] = useState(null)
+
   const [formData, setFormData] = useState({
     id: null,
     name: '',
@@ -157,20 +158,32 @@ export default function DesignationPage() {
   }
 
   useEffect(() => {
+    if (!drawerOpen) {
+      if (closeReason === 'save' || closeReason === 'cancel') {
+        setFormData({
+          id: null,
+          name: '',
+          description: '',
+          status: 'Active'
+        })
+        setUnsavedAddData(null)
+      }
+    }
+  }, [drawerOpen])
+
+  useEffect(() => {
     loadData()
   }, [pagination.pageIndex, pagination.pageSize, searchText])
 
   // Drawer
-  const toggleDrawer = () => setDrawerOpen(p => !p)
+  const toggleDrawer = () => {
+    setCloseReason('manual') // outside click / X button
+    setDrawerOpen(false)
+  }
+
   // 🔹 Cancel drawer + reset form
   const handleCancel = () => {
-    setFormData({
-      id: null,
-      name: '',
-      description: '',
-      status: 'Active'
-    })
-    setUnsavedAddData(null)
+    setCloseReason('cancel')
     setDrawerOpen(false)
   }
 
@@ -238,7 +251,11 @@ export default function DesignationPage() {
       if (!deleteDialog.row?.id) return
       const result = await deleteDesignation(deleteDialog.row.id)
       if (result.success) {
-        showToast('delete', result.message)
+        showToast('success', result.message)
+
+        setCloseReason('save') // <-- 🔥 THIS triggers clearing
+        setDrawerOpen(false) // close the drawer ONLY
+
         await loadData()
       } else {
         showToast('error', result.message)

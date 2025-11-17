@@ -76,9 +76,7 @@ export default function UnitDrawerContent({ pestId }) {
     }
   }
 
-  useEffect(() => {
-    loadUnits()
-  }, [pestId])
+
 
   // SUBMIT (ADD/UPDATE)
   const handleSubmit = async () => {

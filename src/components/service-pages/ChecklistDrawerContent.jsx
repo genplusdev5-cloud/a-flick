@@ -64,9 +64,7 @@ export default function ChecklistDrawerContent({ pestId }) {
     }
   }
 
-  useEffect(() => {
-    if (pestId) loadChecklist()
-  }, [pestId])
+
 
   // Add / Update
   const handleSubmit = async () => {

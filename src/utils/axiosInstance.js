@@ -18,6 +18,7 @@ api.interceptors.request.use(
       const token = localStorage.getItem('access_token')
       if (token) config.headers.Authorization = `Bearer ${token}`
     }
+
     return config
   },
   error => Promise.reject(error)
@@ -62,11 +63,11 @@ if (process.env.NODE_ENV === 'development') {
   })
   api.interceptors.response.use(
     res => {
-      console.log('✅ Response:', res.status, res.config.url, res.data || '')
+      console.log('✅ Response:', res.status, res.config.url)
       return res
     },
     e => {
-      console.error('❌ Error:', e.response?.status, e.config?.url, e.response?.data || '')
+      console.warn('❌ API Error')
       return Promise.reject(e)
     }
   )

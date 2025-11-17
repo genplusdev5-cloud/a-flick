@@ -86,7 +86,6 @@ const deleteRequest = async id => {
   await db.delete(STORE_NAME, Number(id))
 }
 
-
 // ──────────────────────────────────────────────────────────────
 // Toast (Custom Styled, Global, with Icons & Colors)
 // ──────────────────────────────────────────────────────────────
@@ -208,24 +207,22 @@ export default function MaterialRequestPage() {
   const [searchText, setSearchText] = useState('')
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
 
-
   // ✅ Confirm delete (properly scoped)
-const confirmDelete = async () => {
-  try {
-    const row = deleteDialog.row
-    if (!row) return
+  const confirmDelete = async () => {
+    try {
+      const row = deleteDialog.row
+      if (!row) return
 
-    await deleteRequest(row.id)
-    showToast('delete', `Request ${row.requestNo || `REQ-${row.id}`} deleted`)
-    await loadData()
-  } catch (err) {
-    console.error(err)
-    showToast('error', 'Failed to delete request')
-  } finally {
-    setDeleteDialog({ open: false, row: null })
+      await deleteRequest(row.id)
+      showToast('delete', `Request ${row.requestNo || `REQ-${row.id}`} deleted`)
+      await loadData()
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'Failed to delete request')
+    } finally {
+      setDeleteDialog({ open: false, row: null })
+    }
   }
-}
-
 
   const statusRef = useRef(null)
   const fromRef = useRef(null)
@@ -473,14 +470,19 @@ const confirmDelete = async () => {
           sx={{
             pb: 1.5,
             pt: 1.5,
-            '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
-            '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
+            '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' },
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between' // ⭐ this aligns Refresh & Add Request right
           }}
           title={
-            <Box display='flex' alignItems='center' gap={2}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              {/* Title */}
               <Typography variant='h5' sx={{ fontWeight: 600 }}>
                 Material Request List
               </Typography>
+
+              {/* Refresh Button */}
               <Button
                 variant='contained'
                 color='primary'
@@ -508,34 +510,22 @@ const confirmDelete = async () => {
             </Box>
           }
           action={
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              {['Copy', 'CSV', 'Excel', 'PDF', 'Print'].map(label => (
-                <Button
-                  key={label}
-                  variant='contained'
-                  sx={{
-                    backgroundColor: '#5A5A5A',
-                    color: 'white',
-                    textTransform: 'none',
-                    fontWeight: 500,
-                    fontSize: '0.8rem',
-                    px: 2,
-                    py: 0.7,
-                    borderRadius: 2,
-                    minWidth: 68,
-                    boxShadow: 'none',
-                    '&:hover': { backgroundColor: '#4b4b4b' }
-                  }}
-                  onClick={() => {
-                    if (label === 'CSV') exportCSV()
-                    else if (label === 'Print') exportPrint()
-                    else showToast('info', `${label} export coming soon`)
-                  }}
-                >
-                  {label}
-                </Button>
-              ))}
-            </Box>
+            <Button
+              variant='contained'
+              color='secondary'
+              startIcon={<AddIcon />}
+              onClick={() => router.push('/admin/stock/material-request/add')}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 500,
+                px: 2.5,
+                height: 36,
+                backgroundColor: '#8B0000',
+                '&:hover': { backgroundColor: '#700000' }
+              }}
+            >
+              Add Request
+            </Button>
           }
         />
 
@@ -576,102 +566,168 @@ const confirmDelete = async () => {
 
         <Divider sx={{ mb: 2 }} />
 
-        {/* Filters */}
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3, mb: 3 }}>
-          {/* Date Range */}
-          <Box>
-            <Box display='flex' alignItems='center' gap={1} sx={{ mb: 0.5 }}>
-              <Typography variant='body2' sx={{ fontWeight: 500 }}>
-                Date Range
-              </Typography>
-              <Checkbox size='small' checked={enableDateFilter} onChange={e => setEnableDateFilter(e.target.checked)} />
-            </Box>
-            <AppReactDatepicker
-              selectsRange
-              startDate={startDate}
-              endDate={endDate}
-              onChange={dates => enableDateFilter && dates && setStartDate(dates[0]) && setEndDate(dates[1])}
-              shouldCloseOnSelect={false}
-              disabled={!enableDateFilter}
-              readOnly={!enableDateFilter}
-              customInput={
-                <CustomTextField
-                  size='small'
-                  fullWidth
-                  value={`${format(startDate, 'dd/MM/yyyy')} - ${format(endDate, 'dd/MM/yyyy')}`}
-                  sx={{ minWidth: 260, backgroundColor: 'white' }}
-                />
-              }
+        {/* FILTER WRAPPER */}
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: '260px repeat(4, 220px)',
+            columnGap: 3,
+            rowGap: 0,
+            mb: 3,
+            alignItems: 'center'
+          }}
+        >
+          {/* LABEL ROW */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant='body2' sx={{ fontWeight: 500 }}>
+              Date Range
+            </Typography>
+
+            <Checkbox
+              size='small'
+              checked={enableDateFilter}
+              onChange={e => setEnableDateFilter(e.target.checked)}
+              sx={{ p: 0, mt: '-2px' }}
             />
           </Box>
 
-          {/* Status */}
+          <Typography variant='body2' sx={{ fontWeight: 500 }}>
+            Request Status
+          </Typography>
+
+          <Typography variant='body2' sx={{ fontWeight: 500 }}>
+            From Location/Supplier
+          </Typography>
+
+          <Typography variant='body2' sx={{ fontWeight: 500 }}>
+            To Location/Supplier
+          </Typography>
+
+          <Typography variant='body2' sx={{ fontWeight: 500 }}>
+            Requested By
+          </Typography>
+
+          {/* INPUT ROW */}
+          <AppReactDatepicker
+            selectsRange
+            startDate={startDate}
+            endDate={endDate}
+            onChange={dates => {
+              if (enableDateFilter && dates) {
+                setStartDate(dates[0])
+                setEndDate(dates[1])
+              }
+            }}
+            disabled={!enableDateFilter}
+            readOnly={!enableDateFilter}
+            customInput={
+              <CustomTextField
+                size='small'
+                fullWidth
+                sx={{
+                  backgroundColor: 'white',
+                  height: 40,
+                  '& .MuiInputBase-root': { height: 40 }
+                }}
+                value={`${format(startDate, 'dd/MM/yyyy')} - ${format(endDate, 'dd/MM/yyyy')}`}
+              />
+            }
+          />
+
           <CustomAutocomplete
-            className='is-[220px]'
             options={['Waiting', 'Pending', 'Rejected', 'Approved', 'Issued', 'Completed', 'Declined']}
             value={requestStatus || null}
             onChange={(e, val) => setRequestStatus(val || '')}
-            renderInput={p => <CustomTextField {...p} label='Request Status' size='small' inputRef={statusRef} />}
+            renderInput={p => <CustomTextField {...p} size='small' sx={{ '& .MuiInputBase-root': { height: 40 } }} />}
           />
 
-          {/* From */}
           <CustomAutocomplete
-            className='is-[220px]'
             options={['Stock-TECH STOCK 1', 'Supplier-ABC']}
             value={fromLocation || null}
             onChange={(e, val) => setFromLocation(val || '')}
-            renderInput={p => <CustomTextField {...p} label='From Location/Supplier' size='small' inputRef={fromRef} />}
+            renderInput={p => <CustomTextField {...p} size='small' sx={{ '& .MuiInputBase-root': { height: 40 } }} />}
           />
 
-          {/* To */}
           <CustomAutocomplete
-            className='is-[220px]'
             options={['Stock-TECH STOCK 1', 'Stock-TECH STOCK 2', 'Site-A', 'Site-B', 'Site-C']}
             value={toLocation || null}
             onChange={(e, val) => setToLocation(val || '')}
-            renderInput={p => <CustomTextField {...p} label='To Location/Supplier' size='small' inputRef={toRef} />}
+            renderInput={p => <CustomTextField {...p} size='small' sx={{ '& .MuiInputBase-root': { height: 40 } }} />}
           />
 
-          {/* Requested By */}
           <CustomAutocomplete
-            className='is-[220px]'
             options={['Admin', 'Tech', 'John Doe', 'Jane Smith']}
             value={requestedBy || null}
             onChange={(e, val) => setRequestedBy(val || '')}
-            renderInput={p => <CustomTextField {...p} label='Requested By' size='small' inputRef={byRef} />}
+            renderInput={p => <CustomTextField {...p} size='small' sx={{ '& .MuiInputBase-root': { height: 40 } }} />}
           />
         </Box>
 
         <Divider sx={{ mb: 4 }} />
 
         {/* Search + Page Size */}
+        {/* Toolbar Row */}
         <Box
           sx={{
-            p: 2,
-            pt: 0,
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
             flexWrap: 'wrap',
-            gap: 2
+            gap: 2,
+            mb: 2
           }}
         >
-          <FormControl size='small' sx={{ width: 140 }}>
-            <Select value={pageSize} onChange={e => table.setPageSize(Number(e.target.value))}>
-              {[10, 25, 50, 100].map(s => (
-                <MenuItem key={s} value={s}>
-                  {s} entries
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          {/* LEFT SIDE: Entries + Export Buttons */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+            {/* Entries */}
+            <FormControl size='small' sx={{ width: 120 }}>
+              <Select value={pageSize} onChange={e => table.setPageSize(Number(e.target.value))}>
+                {[10, 25, 50, 100].map(s => (
+                  <MenuItem key={s} value={s}>
+                    {s} entries
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
 
+            {/* Export Buttons */}
+            <Box sx={{ display: 'flex', gap: 1.5 }}>
+              {['Copy', 'CSV', 'Excel', 'PDF', 'Print'].map(label => (
+                <Button
+                  key={label}
+                  variant='contained'
+                  sx={{
+                    backgroundColor: '#5A5A5A',
+                    color: 'white',
+                    textTransform: 'none',
+                    fontWeight: 500,
+                    fontSize: '0.8rem',
+                    px: 2,
+                    py: 0.7,
+                    borderRadius: 2,
+                    minWidth: 68,
+                    boxShadow: 'none',
+                    '&:hover': { backgroundColor: '#4b4b4b' }
+                  }}
+                  onClick={() => {
+                    if (label === 'CSV') exportCSV()
+                    else if (label === 'Print') exportPrint()
+                    else showToast('info', `${label} export coming soon`)
+                  }}
+                >
+                  {label}
+                </Button>
+              ))}
+            </Box>
+          </Box>
+
+          {/* RIGHT SIDE: Search */}
           <CustomTextField
             size='small'
             placeholder='Search any field...'
             value={searchText}
             onChange={e => setSearchText(e.target.value)}
-            sx={{ width: 360 }}
+            sx={{ width: 350 }}
             slotProps={{
               input: {
                 startAdornment: (
