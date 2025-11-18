@@ -26,6 +26,8 @@ import {
 
 import { getContractList, deleteContractApi } from '@/api/contract'
 
+import VisibilityIcon from '@mui/icons-material/Visibility'
+
 // Custom Autocomplete + TextField
 import CustomAutocomplete from '@core/components/mui/Autocomplete'
 import CustomTextField from '@core/components/mui/TextField'
@@ -210,9 +212,21 @@ export default function ContractsPage() {
         header: 'Actions',
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
+            {/* 👁️ View */}
+            <IconButton
+              size='small'
+              color='info'
+              onClick={() => router.push(`/admin/contracts/${info.row.original.id}/view`)}
+            >
+              <VisibilityIcon />
+            </IconButton>
+
+            {/* ✏️ Edit */}
             <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original.id)}>
               <EditIcon />
             </IconButton>
+
+            {/* 🗑️ Delete */}
             <IconButton
               size='small'
               color='error'

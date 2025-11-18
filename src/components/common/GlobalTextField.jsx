@@ -2,7 +2,7 @@
 
 import CustomTextField from '@core/components/mui/TextField'
 
-const GlobalTextField = ({ label = 'Label', placeholder = 'Placeholder', ...props }) => {
+const GlobalTextField = ({ label = 'Label', placeholder = '', ...props }) => {
   return <CustomTextField label={label} placeholder={placeholder} fullWidth {...props} />
 }
 
