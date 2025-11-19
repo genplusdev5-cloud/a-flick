@@ -1,6 +1,9 @@
 // React Imports
 import { useEffect, useRef } from 'react'
 
+// API
+import { listCalendarEvents } from '@/api/calendar'
+
 // MUI Imports
 import { useTheme } from '@mui/material/styles'
 import 'bootstrap-icons/font/bootstrap-icons.css'
@@ -11,8 +14,9 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 
 // Slice Imports
-import { filterEvents, selectedEvent, updateEvent } from '@/redux-store/slices/calendar'
+import { filterEvents, selectedEvent, updateEvent, setEvents } from '@/redux-store/slices/calendar'
 
+// Blank event template
 const blankEvent = {
   title: '',
   start: '',
@@ -27,7 +31,6 @@ const blankEvent = {
 }
 
 const Calendar = props => {
-  // Props
   const {
     calendarStore,
     calendarApi,
@@ -35,7 +38,8 @@ const Calendar = props => {
     calendarsColor,
     dispatch,
     handleAddEventSidebarToggle,
-    handleLeftSidebarToggle
+    handleLeftSidebarToggle,
+    selectedEmployee // <-- RECEIVED HERE
   } = props
 
   // Refs
@@ -44,82 +48,82 @@ const Calendar = props => {
   // Hooks
   const theme = useTheme()
 
+  // INITIALIZE fullcalendar api
   useEffect(() => {
     if (calendarApi === null) {
-      // @ts-ignore
       setCalendarApi(calendarRef.current?.getApi())
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // calendarOptions(Props)
+  // 🔥 CALL API WHEN EMPLOYEE CHANGES
+useEffect(() => {
+  if (selectedEmployee) {
+    loadEvents()
+  }
+}, [selectedEmployee])
+
+
+  const loadEvents = async () => {
+    try {
+      const from_date = '2025-12-12'
+      const to_date = '2026-01-12'
+
+      // ✔ Backend expects num_series
+      const employee_id = selectedEmployee?.num_series || ''
+
+      console.log('API CALL:', { from_date, to_date, employee_id })
+
+      const response = await listCalendarEvents({
+        from_date,
+        to_date,
+        employee_id
+      })
+
+      const events = response.data?.data || []
+      dispatch(setEvents(events))
+    } catch (error) {
+      console.error('❌ Failed to fetch calendar events:', error)
+    }
+  }
+
+  // Calendar Options
   const calendarOptions = {
     events: calendarStore.events,
     plugins: [interactionPlugin, dayGridPlugin, timeGridPlugin, listPlugin],
     initialView: 'dayGridMonth',
+
     headerToolbar: {
       start: 'sidebarToggle, prev, next, title',
       end: 'dayGridMonth,timeGridWeek,timeGridDay,listMonth'
     },
+
     views: {
       week: {
         titleFormat: { year: 'numeric', month: 'short', day: 'numeric' }
       }
     },
 
-    /*
-          Enable dragging and resizing event
-          ? Docs: https://fullcalendar.io/docs/editable
-        */
     editable: true,
-
-    /*
-          Enable resizing event from start
-          ? Docs: https://fullcalendar.io/docs/eventResizableFromStart
-        */
     eventResizableFromStart: true,
-
-    /*
-          Automatically scroll the scroll-containers during event drag-and-drop and date selecting
-          ? Docs: https://fullcalendar.io/docs/dragScroll
-        */
     dragScroll: true,
-
-    /*
-          Max number of events within a given day
-          ? Docs: https://fullcalendar.io/docs/dayMaxEvents
-        */
     dayMaxEvents: 2,
-
-    /*
-          Determines if day names and week names are clickable
-          ? Docs: https://fullcalendar.io/docs/navLinks
-        */
     navLinks: true,
-    eventClassNames({ event: calendarEvent }) {
-      // @ts-ignore
-      const colorName = calendarsColor[calendarEvent._def.extendedProps.calendar]
 
-      return [
-        // Background Color
-        `event-bg-${colorName}`
-      ]
+    eventClassNames({ event: calendarEvent }) {
+      const colorName = calendarsColor[calendarEvent._def.extendedProps.calendar]
+      return [`event-bg-${colorName}`]
     },
+
     eventClick({ event: clickedEvent, jsEvent }) {
       jsEvent.preventDefault()
       dispatch(selectedEvent(clickedEvent))
       handleAddEventSidebarToggle()
 
       if (clickedEvent.url) {
-        // Open the URL in a new tab
         window.open(clickedEvent.url, '_blank')
       }
-
-      //* Only grab required field otherwise it goes in infinity loop
-      //! Always grab all fields rendered by form (even if it get `undefined`)
-      // event.value = grabEventDataFromEventApi(clickedEvent)
-      // isAddNewEventSidebarActive.value = true
     },
+
     customButtons: {
       sidebarToggle: {
         icon: 'tabler tabler-menu-2',
@@ -128,9 +132,9 @@ const Calendar = props => {
         }
       }
     },
+
     dateClick(info) {
       const ev = { ...blankEvent }
-
       ev.start = info.date
       ev.end = info.date
       ev.allDay = true
@@ -138,26 +142,16 @@ const Calendar = props => {
       handleAddEventSidebarToggle()
     },
 
-    /*
-          Handle event drop (Also include dragged event)
-          ? Docs: https://fullcalendar.io/docs/eventDrop
-          ? We can use `eventDragStop` but it doesn't return updated event so we have to use `eventDrop` which returns updated event
-        */
     eventDrop({ event: droppedEvent }) {
       dispatch(updateEvent(droppedEvent))
       dispatch(filterEvents())
     },
 
-    /*
-          Handle event resize
-          ? Docs: https://fullcalendar.io/docs/eventResize
-        */
     eventResize({ event: resizedEvent }) {
       dispatch(updateEvent(resizedEvent))
       dispatch(filterEvents())
     },
 
-    // @ts-ignore
     ref: calendarRef,
     direction: theme.direction
   }

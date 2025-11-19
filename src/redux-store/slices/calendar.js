@@ -19,12 +19,17 @@ export const calendarSlice = createSlice({
   name: 'calendar',
   initialState: initialState,
   reducers: {
+    // ⭐ NEW REDUCER ADDED
+    setEvents: (state, action) => {
+      state.events = action.payload
+      state.filteredEvents = action.payload
+    },
+
     filterEvents: state => {
       state.filteredEvents = state.events
     },
     addEvent: (state, action) => {
       const newEvent = { ...action.payload, id: `${parseInt(state.events[state.events.length - 1]?.id ?? '') + 1}` }
-
       state.events.push(newEvent)
     },
     updateEvent: (state, action) => {
@@ -69,7 +74,9 @@ export const calendarSlice = createSlice({
     }
   }
 })
+
 export const {
+  setEvents,  // ⭐ EXPORT NEW REDUCER
   filterEvents,
   addEvent,
   updateEvent,
@@ -78,4 +85,5 @@ export const {
   filterCalendarLabel,
   filterAllCalendarLabels
 } = calendarSlice.actions
+
 export default calendarSlice.reducer

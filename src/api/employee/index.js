@@ -3,4 +3,5 @@ export * from './list'
 export * from './details'
 export * from './update'
 export * from './delete'
-export * from './flag'   // <--- ADD THIS
+export * from './flag'
+export * from './getAllEmployees'   // <--- Added

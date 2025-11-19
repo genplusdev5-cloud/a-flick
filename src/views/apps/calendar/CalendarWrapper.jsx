@@ -1,73 +1,77 @@
 'use client'
 
-// React Imports
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useDispatch } from 'react-redux'
+import Card from '@mui/material/Card'
+import AppFullCalendar from '@/libs/styles/AppFullCalendar'
+import AppCalendar from './AppCalendar'
+import { listCalendarEvents } from '@/api/calendar'
+import { setEvents } from '@/redux-store/slices/calendar'
 
-// MUI Imports
-import { useMediaQuery } from '@mui/material'
-
-// Third-party Imports
-import { useDispatch, useSelector } from 'react-redux'
-
-// Component Imports
-import Calendar from './Calendar'
-import SidebarLeft from './SidebarLeft'
-import AddEventSidebar from './AddEventSidebar'
-
-// CalendarColors Object
-const calendarsColor = {
-  Personal: 'error',
-  Business: 'primary',
-  Family: 'warning',
-  Holiday: 'success',
-  ETC: 'info'
-}
-
-const AppCalendar = () => {
-  // States
-  const [calendarApi, setCalendarApi] = useState(null)
-  const [leftSidebarOpen, setLeftSidebarOpen] = useState(false)
-  const [addEventSidebarOpen, setAddEventSidebarOpen] = useState(false)
-
-  // Hooks
+const CalendarWrapper = ({ selectedEmployee }) => {
   const dispatch = useDispatch()
-  const calendarStore = useSelector(state => state.calendarReducer)
-  const mdAbove = useMediaQuery(theme => theme.breakpoints.up('md'))
-  const handleLeftSidebarToggle = () => setLeftSidebarOpen(!leftSidebarOpen)
-  const handleAddEventSidebarToggle = () => setAddEventSidebarOpen(!addEventSidebarOpen)
+  const [calendarApi, setCalendarApi] = useState(null)
+
+  const mapEvent = ev => ({
+    id: `${ev.id || ev.title}_${ev.start}_${ev.end}_${Math.random()}`,
+    title: ev.title,
+    start: ev.start,
+    end: ev.end ?? ev.start,
+    backgroundColor: ev.backgroundColor,
+    borderColor: ev.borderColor,
+    editable: ev.editable ?? false,
+    extendedProps: {
+      calendar: ev.type ? ev.type.charAt(0).toUpperCase() + ev.type.slice(1) : 'Holiday',
+      ...ev
+    }
+  })
+
+  const fetchEvents = useCallback(
+    async (from_date, to_date) => {
+      try {
+        const resp = await listCalendarEvents({
+          from_date,
+          to_date,
+          employee_id: selectedEmployee?.id ?? null
+        })
+
+        const raw = resp?.data?.data || []
+        const mapped = raw.map(mapEvent)
+
+        dispatch(setEvents(mapped))
+      } catch (err) {
+        console.error('Calendar fetch error:', err)
+      }
+    },
+    [dispatch, selectedEmployee]
+  )
+
+  useEffect(() => {
+    if (!calendarApi) return
+
+    const view = calendarApi.view
+    const fromDate = view.activeStart.toISOString().slice(0, 10)
+    const toDate = view.activeEnd.toISOString().slice(0, 10)
+
+    fetchEvents(fromDate, toDate)
+
+    const handle = arg => {
+      const from = arg.view.activeStart.toISOString().slice(0, 10)
+      const to = arg.view.activeEnd.toISOString().slice(0, 10)
+      fetchEvents(from, to)
+    }
+
+    calendarApi.on('datesSet', handle)
+    return () => calendarApi.off('datesSet', handle)
+  }, [calendarApi, selectedEmployee])
 
   return (
-    <>
-      <SidebarLeft
-        mdAbove={mdAbove}
-        dispatch={dispatch}
-        calendarApi={calendarApi}
-        calendarStore={calendarStore}
-        calendarsColor={calendarsColor}
-        leftSidebarOpen={leftSidebarOpen}
-        handleLeftSidebarToggle={handleLeftSidebarToggle}
-        handleAddEventSidebarToggle={handleAddEventSidebarToggle}
-      />
-      <div className='p-6 pbe-0 flex-grow overflow-visible bg-backgroundPaper rounded'>
-        <Calendar
-          dispatch={dispatch}
-          calendarApi={calendarApi}
-          calendarStore={calendarStore}
-          setCalendarApi={setCalendarApi}
-          calendarsColor={calendarsColor}
-          handleLeftSidebarToggle={handleLeftSidebarToggle}
-          handleAddEventSidebarToggle={handleAddEventSidebarToggle}
-        />
-      </div>
-      <AddEventSidebar
-        dispatch={dispatch}
-        calendarApi={calendarApi}
-        calendarStore={calendarStore}
-        addEventSidebarOpen={addEventSidebarOpen}
-        handleAddEventSidebarToggle={handleAddEventSidebarToggle}
-      />
-    </>
+    <Card>
+      <AppFullCalendar className='app-calendar'>
+        <AppCalendar calendarApi={calendarApi} setCalendarApi={setCalendarApi} />
+      </AppFullCalendar>
+    </Card>
   )
 }
 
-export default AppCalendar
+export default CalendarWrapper

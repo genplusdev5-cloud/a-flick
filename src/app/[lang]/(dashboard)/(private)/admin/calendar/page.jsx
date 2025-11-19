@@ -1,19 +1,24 @@
 'use client'
 
 import Card from '@mui/material/Card'
-import CalendarWrapper from '@views/apps/calendar/CalendarWrapper'
+import AppCalendar from '@/views/apps/calendar/AppCalendar'
 import AppFullCalendar from '@/libs/styles/AppFullCalendar'
-
-// ✅ Import Vuexy Calendar SCSS for layout + design
-
+import { useState } from 'react'
 
 const CalendarApp = () => {
+  const [selectedEmployee, setSelectedEmployee] = useState(null)
+
   return (
-    <Card>
-      <AppFullCalendar className='app-calendar'>
-        <CalendarWrapper />
-      </AppFullCalendar>
-    </Card>
+    <>
+      <Card>
+        <AppFullCalendar className='app-calendar'>
+          <AppCalendar
+            selectedEmployee={selectedEmployee}
+            setSelectedEmployee={setSelectedEmployee}   // 🔥 ADD THIS LINE
+          />
+        </AppFullCalendar>
+      </Card>
+    </>
   )
 }
 

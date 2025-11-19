@@ -2,7 +2,7 @@
 import Card from '@mui/material/Card'
 
 // Component Imports
-import CalendarWrapper from '@views/apps/calendar/CalendarWrapper'
+import CalendarWrapper from '@/views/apps/calendar/AppCalendar'
 
 // Styled Component Imports
 import AppFullCalendar from '@/libs/styles/AppFullCalendar'

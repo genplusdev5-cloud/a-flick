@@ -1,133 +1,109 @@
-// MUI Imports
-import Button from '@mui/material/Button'
+'use client'
+
+import { useEffect, useState } from 'react'
 import Drawer from '@mui/material/Drawer'
 import Divider from '@mui/material/Divider'
-import Checkbox from '@mui/material/Checkbox'
 import Typography from '@mui/material/Typography'
-import FormControlLabel from '@mui/material/FormControlLabel'
+import List from '@mui/material/List'
+import ListItemButton from '@mui/material/ListItemButton'
+import ListItemText from '@mui/material/ListItemText'
+import ListItemAvatar from '@mui/material/ListItemAvatar'
+import Avatar from '@mui/material/Avatar'
+import CustomTextField from '@core/components/mui/TextField'
 
-// Third-party imports
 import classnames from 'classnames'
+import { selectedEvent } from '@/redux-store/slices/calendar'
+import { getAllEmployees } from '@/api/employee/getAllEmployees'
 
-// Styled Component Imports
-import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
+const SidebarLeft = ({
+  mdAbove,
+  leftSidebarOpen,
+  dispatch,
+  handleLeftSidebarToggle,
+  handleAddEventSidebarToggle,
+  searchText,
+  setSearchText,
+  selectedEmployee,
+  setSelectedEmployee
+}) => {
+  const [employees, setEmployees] = useState([])
 
-// Slice Imports
-import { filterAllCalendarLabels, filterCalendarLabel, selectedEvent } from '@/redux-store/slices/calendar'
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const list = await getAllEmployees() // <-- USE THIS
+        setEmployees(list)
+      } catch (err) {
+        console.error('Failed to load employees', err)
+      }
+    })()
+  }, [])
 
-const SidebarLeft = props => {
-  // Props
-  const {
-    mdAbove,
-    leftSidebarOpen,
-    calendarStore,
-    calendarsColor,
-    calendarApi,
-    dispatch,
-    handleLeftSidebarToggle,
-    handleAddEventSidebarToggle
-  } = props
+  const filteredEmployees = employees.filter(emp => emp?.name?.toLowerCase().includes((searchText || '').toLowerCase()))
 
-  // Vars
-  const colorsArr = calendarsColor ? Object.entries(calendarsColor) : []
-
-  const renderFilters = colorsArr.length
-    ? colorsArr.map(([key, value]) => {
-        return (
-          <FormControlLabel
-            className='mbe-1'
-            key={key}
-            label={key}
-            control={
-              <Checkbox
-                color={value}
-                checked={calendarStore.selectedCalendars.indexOf(key) > -1}
-                onChange={() => dispatch(filterCalendarLabel(key))}
-              />
+  return (
+    <Drawer
+      open={leftSidebarOpen}
+      onClose={handleLeftSidebarToggle}
+      variant={mdAbove ? 'permanent' : 'temporary'}
+      ModalProps={{ keepMounted: true }}
+      PaperProps={{
+        className: classnames('items-start is-[280px] shadow-none rounded', {
+          static: mdAbove
+        })
+      }}
+      sx={{ zIndex: 3 }}
+    >
+      <div style={{ width: '100%', padding: '16px 16px 0 16px' }}>
+        <CustomTextField
+          fullWidth
+          size='small'
+          placeholder='Search Employee'
+          value={searchText}
+          onChange={e => setSearchText(e.target.value)}
+          sx={{
+            '& .MuiOutlinedInput-root': {
+              height: 40,
+              borderRadius: 2
             }
-          />
-        )
-      })
-    : null
-
-  const handleSidebarToggleSidebar = () => {
-    dispatch(selectedEvent(null))
-    handleAddEventSidebarToggle()
-  }
-
-  if (renderFilters) {
-    return (
-      <Drawer
-        open={leftSidebarOpen}
-        onClose={handleLeftSidebarToggle}
-        variant={mdAbove ? 'permanent' : 'temporary'}
-        ModalProps={{
-          disablePortal: true,
-          disableAutoFocus: true,
-          disableScrollLock: true,
-          keepMounted: true // Better open performance on mobile.
-        }}
-        className={classnames('block', { static: mdAbove, absolute: !mdAbove })}
-        PaperProps={{
-          className: classnames('items-start is-[280px] shadow-none rounded rounded-se-none rounded-ee-none', {
-            static: mdAbove,
-            absolute: !mdAbove
-          })
-        }}
-        sx={{
-          zIndex: 3,
-          '& .MuiDrawer-paper': {
-            zIndex: mdAbove ? 2 : 'drawer'
-          },
-          '& .MuiBackdrop-root': {
-            borderRadius: 1,
-            position: 'absolute'
-          }
-        }}
-      >
-        <div className='is-full p-6'>
-          <Button
-            fullWidth
-            variant='contained'
-            onClick={handleSidebarToggleSidebar}
-            startIcon={<i className='tabler-plus' />}
-          >
-            Add Event
-          </Button>
-        </div>
-        <Divider className='is-full' />
-        <AppReactDatepicker
-          inline
-          onChange={date => calendarApi.gotoDate(date)}
-          boxProps={{
-            className: 'flex justify-center is-full',
-            sx: { '& .react-datepicker': { boxShadow: 'none !important', border: 'none !important' } }
           }}
         />
-        <Divider className='is-full' />
+      </div>
 
-        <div className='flex flex-col p-6 is-full'>
-          <Typography variant='h5' className='mbe-4'>
-            Event Filters
-          </Typography>
-          <FormControlLabel
-            className='mbe-1'
-            label='View All'
-            control={
-              <Checkbox
-                color='secondary'
-                checked={calendarStore.selectedCalendars.length === colorsArr.length}
-                onChange={e => dispatch(filterAllCalendarLabels(e.target.checked))}
-              />
-            }
-          />
-          {renderFilters}
-        </div>
-      </Drawer>
-    )
-  } else {
-    return null
-  }
+      <Divider sx={{ mb: 3 }} />
+
+      <div className='p-4 is-full'>
+        <Typography variant='h5' className='mb-4'>
+          Employees
+        </Typography>
+
+        <List dense sx={{ maxHeight: '70vh', overflowY: 'auto' }}>
+          {filteredEmployees.map(emp => (
+            <ListItemButton
+              key={emp.id}
+              selected={selectedEmployee?.id === emp.id}
+              onClick={() => {
+                console.log('EMPLOYEE SELECTED:', emp)
+                setSelectedEmployee(emp)
+              }}
+            >
+              <ListItemAvatar>
+                <Avatar src='/images/avatars/1.png' alt={emp.name} />
+              </ListItemAvatar>
+
+              <ListItemText primary={emp.name} />
+            </ListItemButton>
+          ))}
+
+          {filteredEmployees.length === 0 && (
+            <Typography variant='body2' color='textSecondary'>
+              No employees found.
+            </Typography>
+          )}
+        </List>
+      </div>
+    </Drawer>
+  )
 }
 
 export default SidebarLeft
