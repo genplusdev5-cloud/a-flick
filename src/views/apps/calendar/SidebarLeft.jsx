@@ -7,39 +7,61 @@ import Typography from '@mui/material/Typography'
 import List from '@mui/material/List'
 import ListItemButton from '@mui/material/ListItemButton'
 import ListItemText from '@mui/material/ListItemText'
-import ListItemAvatar from '@mui/material/ListItemAvatar'
 import Avatar from '@mui/material/Avatar'
 import CustomTextField from '@core/components/mui/TextField'
-
 import classnames from 'classnames'
-import { selectedEvent } from '@/redux-store/slices/calendar'
-import { getAllEmployees } from '@/api/employee/getAllEmployees'
+import { loadTechnicians } from '@/api/employee/loadTechnician'
+
+// Fallback colors
+const getFallbackColor = name => {
+  const colors = [
+    '#e57373', '#64b5f6', '#81c784', '#ffb74d', '#ba68c8',
+    '#4db6ac', '#9575cd', '#4dd0e1', '#f06292', '#7986cb'
+  ]
+  let index = ((name?.charCodeAt(0) || 0) + (name?.length || 0)) % colors.length
+  return colors[index]
+}
 
 const SidebarLeft = ({
   mdAbove,
   leftSidebarOpen,
-  dispatch,
   handleLeftSidebarToggle,
-  handleAddEventSidebarToggle,
   searchText,
   setSearchText,
-  selectedEmployee,
-  setSelectedEmployee
+  selectedEmployees = [],       // default to [] if not passed
+  setSelectedEmployees = () => {}
 }) => {
   const [employees, setEmployees] = useState([])
 
+  // Load Technicians
   useEffect(() => {
     ;(async () => {
       try {
-        const list = await getAllEmployees() // <-- USE THIS
-        setEmployees(list)
+        const list = await loadTechnicians()
+        const sorted = [...list].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+        setEmployees(sorted)
       } catch (err) {
-        console.error('Failed to load employees', err)
+        console.error('Failed to load technicians', err)
       }
     })()
   }, [])
 
-  const filteredEmployees = employees.filter(emp => emp?.name?.toLowerCase().includes((searchText || '').toLowerCase()))
+  const filtered = employees.filter(emp =>
+    (emp?.name || '').toLowerCase().includes((searchText || '').toLowerCase())
+  )
+
+  // Toggle employee in array safely
+  const toggleEmployee = emp => {
+    // ensure selectedEmployees is array
+    const sel = Array.isArray(selectedEmployees) ? selectedEmployees : []
+
+    const exists = sel.some(e => e.id === emp.id)
+    if (exists) {
+      setSelectedEmployees(prev => (Array.isArray(prev) ? prev.filter(e => e.id !== emp.id) : []))
+    } else {
+      setSelectedEmployees(prev => (Array.isArray(prev) ? [...prev, emp] : [emp]))
+    }
+  }
 
   return (
     <Drawer
@@ -54,19 +76,13 @@ const SidebarLeft = ({
       }}
       sx={{ zIndex: 3 }}
     >
-      <div style={{ width: '100%', padding: '16px 16px 0 16px' }}>
+      <div style={{ padding: '16px' }}>
         <CustomTextField
           fullWidth
           size='small'
           placeholder='Search Employee'
           value={searchText}
           onChange={e => setSearchText(e.target.value)}
-          sx={{
-            '& .MuiOutlinedInput-root': {
-              height: 40,
-              borderRadius: 2
-            }
-          }}
         />
       </div>
 
@@ -78,28 +94,26 @@ const SidebarLeft = ({
         </Typography>
 
         <List dense sx={{ maxHeight: '70vh', overflowY: 'auto' }}>
-          {filteredEmployees.map(emp => (
-            <ListItemButton
-              key={emp.id}
-              selected={selectedEmployee?.id === emp.id}
-              onClick={() => {
-                console.log('EMPLOYEE SELECTED:', emp)
-                setSelectedEmployee(emp)
-              }}
-            >
-              <ListItemAvatar>
-                <Avatar src='/images/avatars/1.png' alt={emp.name} />
-              </ListItemAvatar>
+          {filtered.map(emp => {
+            const color = emp?.color_code && emp.color_code.startsWith('#')
+              ? emp.color_code
+              : getFallbackColor(emp?.name)
 
-              <ListItemText primary={emp.name} />
-            </ListItemButton>
-          ))}
+            const isSelected = Array.isArray(selectedEmployees) && selectedEmployees.some(e => e.id === emp.id)
 
-          {filteredEmployees.length === 0 && (
-            <Typography variant='body2' color='textSecondary'>
-              No employees found.
-            </Typography>
-          )}
+            return (
+              <ListItemButton
+                key={emp.id}
+                selected={isSelected}
+                onClick={() => toggleEmployee(emp)}
+              >
+                <Avatar sx={{ bgcolor: color, color: '#fff', width: 36, height: 36 }}>
+                  {emp?.name ? emp.name.charAt(0).toUpperCase() : '?'}
+                </Avatar>
+                <ListItemText primary={emp?.name || '-'} sx={{ marginLeft: 2 }} />
+              </ListItemButton>
+            )
+          })}
         </List>
       </div>
     </Drawer>

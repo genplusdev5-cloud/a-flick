@@ -1,25 +1,24 @@
-// Third-party Imports
 import { createSlice } from '@reduxjs/toolkit'
-
-// Data Imports
 import { events } from '@/fake-db/apps/calendar'
 
 const initialState = {
-  events: events,
-  filteredEvents: events,
+  events: [],
+  filteredEvents: [],
   selectedEvent: null,
   selectedCalendars: ['Personal', 'Business', 'Family', 'Holiday', 'ETC']
 }
 
 const filterEventsUsingCheckbox = (events, selectedCalendars) => {
-  return events.filter(event => selectedCalendars.includes(event.extendedProps?.calendar))
+  return events.filter(event => {
+    const cal = event.extendedProps?.calendar || event.extendedProps?.type
+    return selectedCalendars.includes(cal)
+  })
 }
 
 export const calendarSlice = createSlice({
   name: 'calendar',
-  initialState: initialState,
+  initialState,
   reducers: {
-    // ⭐ NEW REDUCER ADDED
     setEvents: (state, action) => {
       state.events = action.payload
       state.filteredEvents = action.payload
@@ -28,10 +27,15 @@ export const calendarSlice = createSlice({
     filterEvents: state => {
       state.filteredEvents = state.events
     },
+
     addEvent: (state, action) => {
-      const newEvent = { ...action.payload, id: `${parseInt(state.events[state.events.length - 1]?.id ?? '') + 1}` }
+      const newEvent = {
+        ...action.payload,
+        id: `${parseInt(state.events[state.events.length - 1]?.id ?? '') + 1}`
+      }
       state.events.push(newEvent)
     },
+
     updateEvent: (state, action) => {
       state.events = state.events.map(event => {
         if (action.payload._def && event.id === action.payload._def.publicId) {
@@ -51,23 +55,25 @@ export const calendarSlice = createSlice({
         }
       })
     },
+
     deleteEvent: (state, action) => {
       state.events = state.events.filter(event => event.id !== action.payload)
     },
+
     selectedEvent: (state, action) => {
       state.selectedEvent = action.payload
     },
-    filterCalendarLabel: (state, action) => {
-      const index = state.selectedCalendars.indexOf(action.payload)
 
-      if (index !== -1) {
-        state.selectedCalendars.splice(index, 1)
+    filterCalendarLabel: (state, action) => {
+      const idx = state.selectedCalendars.indexOf(action.payload)
+      if (idx !== -1) {
+        state.selectedCalendars.splice(idx, 1)
       } else {
         state.selectedCalendars.push(action.payload)
       }
-
       state.events = filterEventsUsingCheckbox(state.filteredEvents, state.selectedCalendars)
     },
+
     filterAllCalendarLabels: (state, action) => {
       state.selectedCalendars = action.payload ? ['Personal', 'Business', 'Family', 'Holiday', 'ETC'] : []
       state.events = filterEventsUsingCheckbox(state.filteredEvents, state.selectedCalendars)
@@ -76,7 +82,7 @@ export const calendarSlice = createSlice({
 })
 
 export const {
-  setEvents,  // ⭐ EXPORT NEW REDUCER
+  setEvents,
   filterEvents,
   addEvent,
   updateEvent,

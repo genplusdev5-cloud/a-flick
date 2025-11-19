@@ -1,34 +1,14 @@
-// React Imports
+'use client'
+
 import { useEffect, useRef } from 'react'
-
-// API
 import { listCalendarEvents } from '@/api/calendar'
-
-// MUI Imports
 import { useTheme } from '@mui/material/styles'
-import 'bootstrap-icons/font/bootstrap-icons.css'
 import FullCalendar from '@fullcalendar/react'
 import listPlugin from '@fullcalendar/list'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
-
-// Slice Imports
 import { filterEvents, selectedEvent, updateEvent, setEvents } from '@/redux-store/slices/calendar'
-
-// Blank event template
-const blankEvent = {
-  title: '',
-  start: '',
-  end: '',
-  allDay: false,
-  url: '',
-  extendedProps: {
-    calendar: '',
-    guests: [],
-    description: ''
-  }
-}
 
 const Calendar = props => {
   const {
@@ -39,67 +19,82 @@ const Calendar = props => {
     dispatch,
     handleAddEventSidebarToggle,
     handleLeftSidebarToggle,
-    selectedEmployee // <-- RECEIVED HERE
+    selectedEmployees = [] // expect an array
   } = props
 
-  // Refs
   const calendarRef = useRef()
-
-  // Hooks
   const theme = useTheme()
 
-  // INITIALIZE fullcalendar api
   useEffect(() => {
-    if (calendarApi === null) {
+    if (!calendarApi) {
       setCalendarApi(calendarRef.current?.getApi())
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // 🔥 CALL API WHEN EMPLOYEE CHANGES
-useEffect(() => {
-  if (selectedEmployee) {
-    loadEvents()
-  }
-}, [selectedEmployee])
-
+  useEffect(() => {
+    // When selectedEmployees changes
+    if (Array.isArray(selectedEmployees) && selectedEmployees.length > 0) {
+      loadEvents()
+    } else {
+      // Clear when nothing selected
+      dispatch(setEvents([]))
+      const api = calendarRef.current?.getApi?.()
+      api?.removeAllEvents?.()
+      api?.refetchEvents?.()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEmployees])
 
   const loadEvents = async () => {
     try {
-      const from_date = '2025-12-12'
+      const from_date = '2025-11-01'
       const to_date = '2026-01-12'
 
-      // ✔ Backend expects num_series
-      const employee_id = selectedEmployee?.num_series || ''
+      // ⭐ JOIN MULTIPLE EMPLOYEE IDS
+      const employee_id = selectedEmployees.map(e => e.id).join(',')
 
-      console.log('API CALL:', { from_date, to_date, employee_id })
-
-      const response = await listCalendarEvents({
+      const res = await listCalendarEvents({
         from_date,
         to_date,
         employee_id
       })
 
-      const events = response.data?.data || []
+      let events = res.data?.data || []
+
+      events = events.map(ev => ({
+        ...ev,
+        start: ev.start?.includes('T') ? ev.start : ev.start + 'T00:00:00',
+        end: ev.end?.includes('T') ? ev.end : ev.end + 'T00:00:00'
+      }))
+
       dispatch(setEvents(events))
-    } catch (error) {
-      console.error('❌ Failed to fetch calendar events:', error)
+
+      const api = calendarRef.current?.getApi()
+      if (api) {
+        api.removeAllEvents()
+        api.addEventSource(events)
+      }
+    } catch (err) {
+      console.error('Failed to load calendar events', err)
     }
   }
 
-  // Calendar Options
   const calendarOptions = {
-    events: calendarStore.events,
+    events: calendarStore.events ? [...calendarStore.events] : [],
     plugins: [interactionPlugin, dayGridPlugin, timeGridPlugin, listPlugin],
-    initialView: 'dayGridMonth',
 
     headerToolbar: {
-      start: 'sidebarToggle, prev, next, title',
-      end: 'dayGridMonth,timeGridWeek,timeGridDay,listMonth'
+      left: 'today prev,next',
+      center: 'title',
+      right: 'timeGridDay,timeGridThreeDay,timeGridWeek,dayGridMonth'
     },
 
     views: {
-      week: {
-        titleFormat: { year: 'numeric', month: 'short', day: 'numeric' }
+      timeGridThreeDay: {
+        type: 'timeGrid',
+        duration: { days: 3 },
+        buttonText: '3 days'
       }
     },
 
@@ -109,19 +104,25 @@ useEffect(() => {
     dayMaxEvents: 2,
     navLinks: true,
 
-    eventClassNames({ event: calendarEvent }) {
-      const colorName = calendarsColor[calendarEvent._def.extendedProps.calendar]
+    eventDidMount(info) {
+      const bg = info.event.extendedProps?.backgroundColor || info.event.backgroundColor
+      const border = info.event.extendedProps?.borderColor || info.event.borderColor
+      if (bg) info.el.style.backgroundColor = bg
+      if (border) info.el.style.border = `1px solid ${border}`
+      info.el.style.borderRadius = '6px'
+      info.el.style.padding = '2px 6px'
+    },
+
+    eventClassNames({ event }) {
+      const calendarType = event._def.extendedProps?.calendar || event._def.extendedProps?.type
+      const colorName = calendarsColor[calendarType] || 'info'
       return [`event-bg-${colorName}`]
     },
 
     eventClick({ event: clickedEvent, jsEvent }) {
-      jsEvent.preventDefault()
+      jsEvent?.preventDefault?.()
       dispatch(selectedEvent(clickedEvent))
       handleAddEventSidebarToggle()
-
-      if (clickedEvent.url) {
-        window.open(clickedEvent.url, '_blank')
-      }
     },
 
     customButtons: {
@@ -131,15 +132,6 @@ useEffect(() => {
           handleLeftSidebarToggle()
         }
       }
-    },
-
-    dateClick(info) {
-      const ev = { ...blankEvent }
-      ev.start = info.date
-      ev.end = info.date
-      ev.allDay = true
-      dispatch(selectedEvent(ev))
-      handleAddEventSidebarToggle()
     },
 
     eventDrop({ event: droppedEvent }) {

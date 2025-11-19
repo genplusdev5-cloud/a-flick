@@ -13,39 +13,33 @@ const calendarsColor = {
   Business: 'primary',
   Family: 'warning',
   Holiday: 'success',
-  ETC: 'info'
+  ETC: 'info',
+  lunch: 'info',
+  ticket: 'primary'
 }
 
-const AppCalendar = ({ selectedEmployee, setSelectedEmployee }) => {   // 🔥 FIXED
-
+const AppCalendar = () => {
   const [calendarApi, setCalendarApi] = useState(null)
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(false)
   const [addEventSidebarOpen, setAddEventSidebarOpen] = useState(false)
+
+  const [searchText, setSearchText] = useState('')
+  const [selectedEmployees, setSelectedEmployees] = useState([])
 
   const dispatch = useDispatch()
   const calendarStore = useSelector(state => state.calendarReducer)
   const mdAbove = useMediaQuery(theme => theme.breakpoints.up('md'))
 
-  const handleLeftSidebarToggle = () => setLeftSidebarOpen(!leftSidebarOpen)
-  const handleAddEventSidebarToggle = () => setAddEventSidebarOpen(!addEventSidebarOpen)
-
-  const [searchText, setSearchText] = useState('')
-
   return (
     <>
       <SidebarLeft
         mdAbove={mdAbove}
-        dispatch={dispatch}
-        calendarApi={calendarApi}
-        calendarStore={calendarStore}
-        calendarsColor={calendarsColor}
         leftSidebarOpen={leftSidebarOpen}
-        handleLeftSidebarToggle={handleLeftSidebarToggle}
-        handleAddEventSidebarToggle={handleAddEventSidebarToggle}
+        handleLeftSidebarToggle={() => setLeftSidebarOpen(!leftSidebarOpen)}
         searchText={searchText}
         setSearchText={setSearchText}
-        selectedEmployee={selectedEmployee}
-        setSelectedEmployee={setSelectedEmployee}
+        selectedEmployees={selectedEmployees}
+        setSelectedEmployees={setSelectedEmployees}
       />
 
       <div className='p-6 pbe-0 flex-grow overflow-visible bg-backgroundPaper rounded'>
@@ -55,9 +49,9 @@ const AppCalendar = ({ selectedEmployee, setSelectedEmployee }) => {   // 🔥 F
           calendarStore={calendarStore}
           setCalendarApi={setCalendarApi}
           calendarsColor={calendarsColor}
-          handleLeftSidebarToggle={handleLeftSidebarToggle}
-          handleAddEventSidebarToggle={handleAddEventSidebarToggle}
-          selectedEmployee={selectedEmployee}  // 🔥 PASSED PROPERLY
+          handleLeftSidebarToggle={() => setLeftSidebarOpen(!leftSidebarOpen)}
+          handleAddEventSidebarToggle={() => setAddEventSidebarOpen(!addEventSidebarOpen)}
+          selectedEmployees={selectedEmployees}
         />
       </div>
 
@@ -66,7 +60,7 @@ const AppCalendar = ({ selectedEmployee, setSelectedEmployee }) => {   // 🔥 F
         calendarApi={calendarApi}
         calendarStore={calendarStore}
         addEventSidebarOpen={addEventSidebarOpen}
-        handleAddEventSidebarToggle={handleAddEventSidebarToggle}
+        handleAddEventSidebarToggle={() => setAddEventSidebarOpen(!addEventSidebarOpen)}
       />
     </>
   )

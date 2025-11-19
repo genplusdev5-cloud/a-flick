@@ -1,5 +1,4 @@
 'use client'
-
 import Card from '@mui/material/Card'
 import AppCalendar from '@/views/apps/calendar/AppCalendar'
 import AppFullCalendar from '@/libs/styles/AppFullCalendar'
@@ -9,16 +8,11 @@ const CalendarApp = () => {
   const [selectedEmployee, setSelectedEmployee] = useState(null)
 
   return (
-    <>
-      <Card>
-        <AppFullCalendar className='app-calendar'>
-          <AppCalendar
-            selectedEmployee={selectedEmployee}
-            setSelectedEmployee={setSelectedEmployee}   // 🔥 ADD THIS LINE
-          />
-        </AppFullCalendar>
-      </Card>
-    </>
+    <Card>
+      <AppFullCalendar className='app-calendar'>
+        <AppCalendar selectedEmployee={selectedEmployee} setSelectedEmployee={setSelectedEmployee} />
+      </AppFullCalendar>
+    </Card>
   )
 }
 
