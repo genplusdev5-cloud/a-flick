@@ -8,7 +8,13 @@ import listPlugin from '@fullcalendar/list'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
+
 import { filterEvents, selectedEvent, updateEvent, setEvents } from '@/redux-store/slices/calendar'
+
+import resourcePlugin from '@fullcalendar/resource'
+import resourceDayGridPlugin from '@fullcalendar/resource-daygrid'
+import resourceTimelinePlugin from '@fullcalendar/resource-timeline'
+import resourceTimeGridPlugin from '@fullcalendar/resource-timegrid'
 
 const Calendar = props => {
   const {
@@ -19,7 +25,7 @@ const Calendar = props => {
     dispatch,
     handleAddEventSidebarToggle,
     handleLeftSidebarToggle,
-    selectedEmployees = [] // expect an array
+    selectedEmployees = []
   } = props
 
   const calendarRef = useRef()
@@ -29,21 +35,17 @@ const Calendar = props => {
     if (!calendarApi) {
       setCalendarApi(calendarRef.current?.getApi())
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
-    // When selectedEmployees changes
     if (Array.isArray(selectedEmployees) && selectedEmployees.length > 0) {
       loadEvents()
     } else {
-      // Clear when nothing selected
       dispatch(setEvents([]))
       const api = calendarRef.current?.getApi?.()
       api?.removeAllEvents?.()
       api?.refetchEvents?.()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEmployees])
 
   const loadEvents = async () => {
@@ -51,7 +53,6 @@ const Calendar = props => {
       const from_date = '2025-11-01'
       const to_date = '2026-01-12'
 
-      // ⭐ JOIN MULTIPLE EMPLOYEE IDS
       const employee_id = selectedEmployees.map(e => e.id).join(',')
 
       const res = await listCalendarEvents({
@@ -80,29 +81,58 @@ const Calendar = props => {
     }
   }
 
+  // -----------------------------
+  // RESOURCES (EMPLOYEES LIST)
+  // -----------------------------
+  const resources = selectedEmployees.map(emp => ({
+    id: String(emp.id),
+    title: emp.name
+  }))
+
+  // -----------------------------
+  // FULLCALENDAR OPTIONS
+  // -----------------------------
   const calendarOptions = {
     events: calendarStore.events ? [...calendarStore.events] : [],
-    plugins: [interactionPlugin, dayGridPlugin, timeGridPlugin, listPlugin],
+
+    plugins: [
+      interactionPlugin,
+      dayGridPlugin,
+      timeGridPlugin,
+      listPlugin,
+      resourcePlugin,
+      resourceDayGridPlugin,
+      resourceTimeGridPlugin,
+      resourceTimelinePlugin // ← THIS WAS MISSING!
+    ],
+
+    // -----------------------------
+    // MAIN FIX → SHOW EMPLOYEES ON LEFT
+    // -----------------------------
+    resources: resources,
+    resourceAreaWidth: '200px',
+    resourceAreaHeaderContent: 'Employees',
+    resourceLabelContent: arg => arg.resource.title,
 
     headerToolbar: {
       left: 'today prev,next',
       center: 'title',
-      right: 'timeGridDay,timeGridThreeDay,timeGridWeek,dayGridMonth'
+      right: 'resourceTimeGridDay,resourceTimelineThreeDay,timeGridWeek,dayGridMonth'
     },
 
     views: {
-      timeGridThreeDay: {
-        type: 'timeGrid',
+      resourceTimeGridDay: {
+        type: 'resourceTimeGrid',
+        buttonText: 'Day'
+      },
+      resourceTimelineThreeDay: {
+        type: 'resourceTimeline',
         duration: { days: 3 },
-        buttonText: '3 days'
+        buttonText: '3 Days'
       }
     },
 
     editable: true,
-    eventResizableFromStart: true,
-    dragScroll: true,
-    dayMaxEvents: 2,
-    navLinks: true,
 
     eventDidMount(info) {
       const bg = info.event.extendedProps?.backgroundColor || info.event.backgroundColor
