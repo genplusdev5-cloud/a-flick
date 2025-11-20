@@ -21,7 +21,7 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import CustomTextFieldWrapper from '@/components/common/CustomTextField'
-import CustomSelectField from '@/components/common/CustomSelectField'
+import GlobalSelect from '@/components/common/GlobalSelect'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 
 import { getChecklistList, addChecklist, updateChecklist, deleteChecklist } from '@/api/checklist'
@@ -40,7 +40,10 @@ export default function ChecklistDrawerContent({ pestId }) {
     status: 'Active'
   })
 
-  const statusOptions = ['Active', 'Inactive']
+  const statusOptions = [
+    { label: 'Active', value: 'Active' },
+    { label: 'Inactive', value: 'Inactive' }
+  ]
 
   // Load Checklist
   const loadChecklist = async () => {
@@ -64,7 +67,9 @@ export default function ChecklistDrawerContent({ pestId }) {
     }
   }
 
-
+  useEffect(() => {
+    if (pestId) loadChecklist()
+  }, [pestId])
 
   // Add / Update
   const handleSubmit = async () => {
@@ -89,15 +94,13 @@ export default function ChecklistDrawerContent({ pestId }) {
       }
 
       if (res.status === 'success') {
-        showToast('success', editId ? 'Checklist updated successfully' : 'Checklist added successfully')
+        showToast('success', editId ? 'Checklist updated' : 'Checklist added')
         setFormData({ name: '', status: 'Active' })
         setEditId(null)
         loadChecklist()
       } else {
-        showToast('error', res.message || 'Failed to save data')
+        showToast('error', res.message || 'Failed to save')
       }
-    } catch {
-      showToast('error', 'Something went wrong')
     } finally {
       setLoading(false)
     }
@@ -117,15 +120,12 @@ export default function ChecklistDrawerContent({ pestId }) {
     setLoading(true)
     try {
       const res = await deleteChecklist(deleteId)
-
       if (res.status === 'success') {
-        showToast('delete', 'Checklist deleted successfully')
+        showToast('delete', 'Checklist deleted')
         loadChecklist()
       } else {
-        showToast('error', res.message || 'Delete failed')
+        showToast('error', res.message)
       }
-    } catch {
-      showToast('error', 'Delete failed')
     } finally {
       setLoading(false)
       setOpenDelete(false)
@@ -147,14 +147,18 @@ export default function ChecklistDrawerContent({ pestId }) {
           />
         </Grid>
 
+        {/* Status */}
         {editId && (
           <Grid item xs={12}>
-            <CustomSelectField
-              fullWidth
+            <GlobalSelect
               label='Status'
               value={formData.status}
-              onChange={e => setFormData(prev => ({ ...prev, status: e.target.value }))}
-              options={statusOptions.map(s => ({ value: s, label: s }))}
+              onChange={e =>
+                setFormData(prev => ({
+                  ...prev,
+                  status: e.target.value
+                }))
+              }
             />
           </Grid>
         )}
@@ -180,18 +184,17 @@ export default function ChecklistDrawerContent({ pestId }) {
         </Grid>
       </Grid>
 
-      {/* LIST TITLE */}
+      {/* LIST */}
       <Typography variant='subtitle1' mb={1}>
         Checklist List
       </Typography>
 
-      {/* Loader */}
       {loading ? (
         <Box textAlign='center' py={2}>
           <ProgressCircularCustomization size={50} />
         </Box>
       ) : (
-        <Box sx={{ maxHeight: '60vh', overflowY: 'auto', pr: 1 }}>
+        <Box sx={{ maxHeight: '60vh', overflowY: 'auto' }}>
           <table className={styles.table}>
             <thead>
               <tr>
@@ -207,6 +210,7 @@ export default function ChecklistDrawerContent({ pestId }) {
                 rows.map((row, idx) => (
                   <tr key={row.id}>
                     <td>{idx + 1}</td>
+
                     <td>
                       <Box sx={{ display: 'flex', gap: 1 }}>
                         <IconButton size='small' onClick={() => handleEdit(row)}>
@@ -253,7 +257,7 @@ export default function ChecklistDrawerContent({ pestId }) {
         </Box>
       )}
 
-      {/* DELETE DIALOG */}
+      {/* DELETE DIALOG (same as Action drawer) */}
       <Dialog
         open={openDelete}
         onClose={() => setOpenDelete(false)}
@@ -278,16 +282,15 @@ export default function ChecklistDrawerContent({ pestId }) {
           <DialogCloseButton
             onClick={() => setOpenDelete(false)}
             disableRipple
-            sx={{ position: 'absolute', top: 1, right: 1 }}
-          >
-            <i className='tabler-x' />
-          </DialogCloseButton>
+            sx={{ position: 'absolute', right: 1, top: 1 }}
+          />
         </DialogTitle>
 
         <DialogContent sx={{ px: 5, pt: 1 }}>
           <Typography sx={{ color: 'text.secondary', fontSize: 14 }}>
             Are you sure you want to delete the checklist{' '}
-            <strong style={{ color: '#d32f2f' }}>{rows.find(r => r.id === deleteId)?.name || 'this item'}</strong>?
+            <strong style={{ color: '#d32f2f' }}>{rows.find(r => r.id === deleteId)?.name || 'this item'}</strong>
+            ?
             <br />
             This action cannot be undone.
           </Typography>

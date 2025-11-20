@@ -9,30 +9,49 @@ const GlobalAutocomplete = ({
   options = [],
   value = null,
   onChange = () => {},
-  getOptionLabel = option => option?.label || option?.name || '',
-  isOptionEqualToValue = (opt, val) => opt?.id === val?.id,
+  getOptionLabel,
+  isOptionEqualToValue,
   ...props
 }) => {
-  // Create safe options with unique keys
-  const safeOptions = options.map((opt, index) => ({
-    ...opt,
-    _key: opt.id ?? opt.value ?? index
-  }))
+  // ⭐ Normalize options
+  const normalizedOptions = options.map((opt, i) => {
+    if (typeof opt === 'string') {
+      return {
+        id: opt,
+        label: opt,
+        value: opt,
+        _key: opt
+      }
+    }
+    return {
+      ...opt,
+      _key: `${opt.id ?? opt.value ?? i}-${i}`
+    }
+  })
+
+  // ⭐ Normalize current value
+  const normalizedValue =
+    typeof value === 'string' ? normalizedOptions.find(o => o.value === value || o.label === value) || null : value
+
+  // ⭐ Default label renderer
+  const finalGetLabel = getOptionLabel ?? (option => option?.label || option?.value || option?.name || '')
+
+  // ⭐ Default equality check
+  const finalIsEqual = isOptionEqualToValue ?? ((opt, val) => opt?.id === val?.id || opt?.value === val?.value)
 
   return (
     <CustomAutocomplete
       fullWidth
-      options={safeOptions}
-      value={value}
-      getOptionLabel={getOptionLabel}
-      isOptionEqualToValue={isOptionEqualToValue}
-      // FIX: Do NOT override key inside props
+      options={normalizedOptions}
+      value={normalizedValue}
+      getOptionLabel={finalGetLabel}
+      isOptionEqualToValue={finalIsEqual}
       renderOption={(params, option) => (
         <li {...params} key={option._key}>
-          {getOptionLabel(option)}
+          {finalGetLabel(option)}
         </li>
       )}
-      // FIX: return full object, NOT id
+      // ⭐ FIX: Return FULL OBJECT (never return string)
       onChange={(event, newValue) => {
         onChange(newValue || null)
       }}

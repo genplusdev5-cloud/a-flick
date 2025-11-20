@@ -112,18 +112,22 @@ export default function EmployeeLeaveTypePage() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const res = await getLeaveTypeList()
+      const res = await getLeaveTypeList(pagination.pageIndex + 1, pagination.pageSize, searchText)
+
+      // FIXED MAPPING
       const results = res?.data?.results || []
+      const count = res?.data?.count || results.length
+
       const normalized = results.map((item, idx) => ({
-        sno: idx + 1,
+        sno: pagination.pageIndex * pagination.pageSize + idx + 1,
         id: item.id,
         leaveCode: item.leave_code || '',
         name: item.name || '',
-        is_active: item.is_active === 1 ? 1 : 0 // keep numeric for chip condition
+        is_active: item.is_active === 1 ? 1 : 0
       }))
 
       setRows(normalized)
-      setRowCount(results.length)
+      setRowCount(count)
     } catch (err) {
       console.error(err)
       showToast('error', 'Failed to load data')
@@ -133,19 +137,18 @@ export default function EmployeeLeaveTypePage() {
   }
 
   useEffect(() => {
-  if (!drawerOpen) {
-    if (closeReason === "save" || closeReason === "cancel") {
-      setFormData({
-        id: null,
-        leaveCode: '',
-        name: '',
-        status: 'Active'
-      })
-      setUnsavedAddData(null)
+    if (!drawerOpen) {
+      if (closeReason === 'save' || closeReason === 'cancel') {
+        setFormData({
+          id: null,
+          leaveCode: '',
+          name: '',
+          status: 'Active'
+        })
+        setUnsavedAddData(null)
+      }
     }
-  }
-}, [drawerOpen])
-
+  }, [drawerOpen])
 
   useEffect(() => {
     loadData()

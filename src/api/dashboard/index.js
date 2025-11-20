@@ -34,7 +34,7 @@ export const getDashboardList = async (
     const params = {
       type,
       page,
-      limit: pageSize
+      page_size: pageSize
     }
 
     // Dynamic filter

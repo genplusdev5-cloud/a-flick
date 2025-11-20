@@ -20,7 +20,6 @@ import { toast } from 'react-toastify'
 
 import { showToast } from '@/components/common/Toasts'
 
-
 // 🔥 Global UI Components (use everywhere)
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalTextField from '@/components/common/GlobalTextField'
@@ -280,10 +279,10 @@ export default function EditEmployeePage() {
     <Grid item xs={12} md={4} key={name}>
       <GlobalAutocomplete
         options={list}
-        getOptionLabel={o => o.label || ''}
-        isOptionEqualToValue={(a, b) => a.id === b.id}
+        getOptionLabel={o => o?.label || ''}
+        isOptionEqualToValue={(a, b) => a?.id === b?.id}
         value={form[name] || null}
-        onChange={(e, v) => setField(name, v)}
+        onChange={v => setField(name, v)} // ✅ FIXED
         renderInput={params => <GlobalTextField {...params} label={label} fullWidth />}
       />
     </Grid>

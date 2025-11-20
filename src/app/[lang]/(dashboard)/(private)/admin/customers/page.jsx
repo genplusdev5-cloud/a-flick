@@ -31,7 +31,6 @@ import { getCustomerList, deleteCustomer } from '@/api/customer'
 import { getCustomerOrigin } from '@/api/customer/origin'
 import GlobalButton from '@/components/common/GlobalButton'
 
-
 import { showToast } from '@/components/common/Toasts'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
@@ -63,10 +62,6 @@ import {
 } from '@tanstack/react-table'
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
-
-
-
-
 
 // Debounced Input
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
@@ -232,7 +227,10 @@ export default function CustomersPage() {
               fontWeight: 500,
               py: 0.5
             }}
-            onClick={() => router.push('/en/admin/contracts')}
+            onClick={() => {
+              const encodedId = btoa(info.row.original.id.toString())
+              router.push(`/en/admin/contracts?customer=${encodedId}`)
+            }}
           >
             Contracts
           </GlobalButton>

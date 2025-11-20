@@ -280,7 +280,8 @@ export default function TaxPage() {
         name: formData.name.trim(),
         percent: Number(formData.tax_value),
         description: formData.description?.trim() || '',
-        is_active: Number(formData.status) // ← idhu dhaan correct field!
+        status: Number(formData.status), // ADD THIS
+        is_active: Number(formData.status) // KEEP THIS
       }
 
       let res
@@ -293,12 +294,14 @@ export default function TaxPage() {
       if (res.status === 'success') {
         showToast('success', isEdit ? 'Tax updated successfully' : 'Tax added successfully')
 
-        // 🔥 Reset cached Add Drawer data
         setUnsavedAddData(null)
         setOriginalData(null)
-
         setDrawerOpen(false)
-        await loadTaxes()
+
+        setRows([]) // 👈 CLEAR OLD DATA
+        setRowCount(0) // 👈 RESET COUNT
+
+        await loadTaxes() // 👈 RELOAD FRESH
       }
     } catch (err) {
       console.error('❌ TAX SAVE ERROR:', err.response?.data || err.message)
@@ -737,8 +740,13 @@ export default function TaxPage() {
                 <Grid item xs={12}>
                   <GlobalSelect
                     label='Status'
-                    defaultValue={formData.status}
-                    onChange={value => setFormData(p => ({ ...p, status: Number(value) }))}
+                    value={formData.status === 1 ? 'Active' : 'Inactive'}
+                    onChange={e =>
+                      setFormData(p => ({
+                        ...p,
+                        status: e.target.value === 'Active' ? 1 : 0
+                      }))
+                    }
                   />
                 </Grid>
               )}

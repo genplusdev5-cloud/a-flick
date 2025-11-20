@@ -220,7 +220,7 @@ export default function BillingFrequencyPage() {
       frequencyCode: row.frequencyCode || '',
       sortOrder: row.sortOrder || '',
       description: row.description || '',
-      status: row.status === 'Active' ? 'Active' : 'Active' // ✅ force normalize
+      status: row.is_active === 1 ? 'Active' : 'Inactive' // 🔥 EXACT TAX STYLE
     })
     setDrawerOpen(true)
   }
@@ -264,17 +264,16 @@ export default function BillingFrequencyPage() {
     try {
       // ✅ Prepare payload exactly as backend expects
       const payload = {
-        name: formData.billingFrequency || '',
-        frequency: formData.incrementType || null,
-        times: formData.noOfIncrements?.toString() || '0',
-        frequency_code: formData.frequencyCode || '',
-        frequency_count: formData.noOfIncrements?.toString() || '0',
-        backlog_age: formData.backlogAge?.toString() || '0',
-        sort_order: formData.sortOrder?.toString() || '0',
-        description: formData.description || '',
-        is_active: formData.status === 'Active' ? 1 : 0,
-        is_billing: 1,
-        status: 1
+        id: formData.id,
+        name: formData.billingFrequency,
+        frequency: formData.incrementType,
+        times: Number(formData.noOfIncrements),
+        backlog_age: Number(formData.backlogAge),
+        frequency_code: formData.frequencyCode,
+        sort_order: Number(formData.sortOrder),
+        description: formData.description,
+        is_active: formData.status === 'Active' ? 1 : 0, // 🔥 EXACT TAX STYLE
+        is_billing: 1
       }
 
       console.log('🚀 FINAL PAYLOAD SENT:', payload)
@@ -333,14 +332,14 @@ export default function BillingFrequencyPage() {
       columnHelper.accessor('is_active', {
         header: 'Status',
         cell: info => {
-          const isActive = info.getValue() === 1 || info.getValue() === '1'
+          const val = info.row.original.is_active
           return (
             <Chip
-              label={isActive ? 'Active' : 'Inactive'}
+              label={val === 1 ? 'Active' : 'Inactive'}
               size='small'
               sx={{
                 color: '#fff',
-                bgcolor: isActive ? 'success.main' : 'error.main',
+                bgcolor: val === 1 ? 'success.main' : 'error.main',
                 fontWeight: 600,
                 borderRadius: '6px',
                 px: 1.5
@@ -704,8 +703,8 @@ export default function BillingFrequencyPage() {
                 <Grid item xs={12}>
                   <GlobalSelect
                     label='Status'
-                    defaultValue={formData.status}
-                    onChange={value => handleFieldChange('status', value)}
+                    value={formData.status} // 🔥 corrected
+                    onChange={e => handleFieldChange('status', e.target.value)}
                     options={[
                       { value: 'Active', label: 'Active' },
                       { value: 'Inactive', label: 'Inactive' }

@@ -10,7 +10,6 @@ import EditIcon from '@mui/icons-material/Edit'
 import { getCustomerOrigin } from '@/api/customer/origin'
 import { showToast } from '@/components/common/Toasts'
 
-
 // 🔥 Global UI Components (use everywhere)
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalTextField from '@/components/common/GlobalTextField'
@@ -206,7 +205,7 @@ export default function AddCustomerPage() {
       name: formData.customerName,
       business_name: formData.abssCustomerName,
       customer_code: formData.cardId,
-      company_id: formData.origin,
+      company_id: Number(formData.origin),
       prefix: formData.companyPrefix,
       commence_date: formatDate(formData.commenceDate),
       pic_contact_name: formData.picName,
@@ -289,8 +288,13 @@ export default function AddCustomerPage() {
                   fullWidth
                   label='Origin'
                   value={formData.origin}
-                  onChange={e => setFormData(prev => ({ ...prev, origin: e.target.value }))}
                   options={originOptions}
+                  onChange={newValue =>
+                    setFormData(prev => ({
+                      ...prev,
+                      origin: newValue?.value ?? '' // use object directly
+                    }))
+                  }
                 />
               </Grid>
 
@@ -475,30 +479,22 @@ export default function AddCustomerPage() {
               {/* Payment Terms */}
               <Grid item xs={12} md={4}>
                 <GlobalAutocomplete
-                  ref={paymentTermsRef}
                   fullWidth
                   label='Payment Terms'
                   value={formData.paymentTerms}
-                  onChange={e => {
-                    setFormData(prev => ({ ...prev, paymentTerms: e.target.value }))
-                    salespersonRef.current?.querySelector('input')?.focus()
-                  }}
                   options={['Monthly', 'Yearly'].map(v => ({ value: v, label: v }))}
+                  onChange={(_, option) => setFormData(prev => ({ ...prev, paymentTerms: option?.value || '' }))}
                 />
               </Grid>
 
               {/* Sales Person */}
               <Grid item xs={12} md={4}>
                 <GlobalAutocomplete
-                  ref={salespersonRef}
                   fullWidth
                   label='Sales Person'
                   value={formData.salesperson}
-                  onChange={e => {
-                    setFormData(prev => ({ ...prev, salesperson: e.target.value }))
-                    loginEmailRef.current?.querySelector('input')?.focus()
-                  }}
                   options={['Employee 1', 'Employee 2'].map(v => ({ value: v, label: v }))}
+                  onChange={(_, option) => setFormData(prev => ({ ...prev, salesperson: option?.value || '' }))}
                 />
               </Grid>
 

@@ -15,14 +15,12 @@ import {
   FormControlLabel
 } from '@mui/material'
 
-
 // 🔥 Global UI Components (use everywhere)
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalTextField from '@/components/common/GlobalTextField'
 import GlobalTextarea from '@/components/common/GlobalTextarea'
 import GlobalSelect from '@/components/common/GlobalSelect'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
-
 
 import { getDepartmentList } from '../../../../../../../api/departments/list'
 import { getDesignationList } from '../../../../../../../api/designations/list'
@@ -311,7 +309,6 @@ export default function AddEmployeePage() {
     }
   }
 
-
   const focusNextElement = useCallback(
     currentRef => {
       const currentElement = currentRef.current
@@ -500,7 +497,7 @@ export default function AddEmployeePage() {
           getOptionLabel={o => (typeof o === 'string' ? o : (o?.label ?? ''))}
           isOptionEqualToValue={(o, v) => o?.id === v?.id}
           value={stateValues[name] || null} // ✅ Correct mapping
-          onChange={(e, newValue) => handleAutocompleteChange(name, newValue, inputRef)}
+          onChange={newValue => handleAutocompleteChange(name, newValue, inputRef)}
           renderInput={params => <GlobalTextField {...params} label={label} inputRef={inputRef} />}
         />
       </Grid>

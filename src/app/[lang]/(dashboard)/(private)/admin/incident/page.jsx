@@ -333,7 +333,7 @@ export default function IncidentPage() {
         )
       }),
       columnHelper.accessor('name', { header: 'Incident Name' }),
-      columnHelper.accessor('description', { header: 'Description' }),
+      // columnHelper.accessor('description', { header: 'Description' }),
       columnHelper.accessor('status', {
         header: 'Status',
         cell: info => (
@@ -650,7 +650,7 @@ export default function IncidentPage() {
               </Grid>
 
               {/* Description */}
-              <Grid item xs={12}>
+              {/* <Grid item xs={12}>
                 <GlobalTextarea
                   label='Description'
                   placeholder='Enter description or details...'
@@ -658,7 +658,7 @@ export default function IncidentPage() {
                   value={formData.description}
                   onChange={e => handleFieldChange('description', e.target.value)}
                 />
-              </Grid>
+              </Grid> */}
 
               {/* Status - only on edit */}
               {isEdit && (

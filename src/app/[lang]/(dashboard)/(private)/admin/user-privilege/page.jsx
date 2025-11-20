@@ -50,6 +50,7 @@ import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
+import DoneIcon from '@mui/icons-material/Done'
 
 // Component Imports
 
@@ -173,6 +174,15 @@ export default function UserPrivilegePage() {
     update: false,
     delete: false
   })
+
+  const paginatedRows = useMemo(() => {
+    const start = pagination.pageIndex * pagination.pageSize
+    const end = start + pagination.pageSize
+    return rows.slice(start, end).map((row, index) => ({
+      ...row,
+      sno: start + index + 1 // ⭐ continuous S.No
+    }))
+  }, [rows, pagination])
 
   const moduleRef = useRef(null)
 
@@ -548,7 +558,7 @@ export default function UserPrivilegePage() {
   }
 
   const table = useReactTable({
-    data: rows,
+    data: paginatedRows,
     columns,
     manualPagination: true,
     pageCount: Math.ceil(rowCount / pagination.pageSize),
@@ -641,28 +651,21 @@ export default function UserPrivilegePage() {
 
         {/* 🔹 Role Dropdown + Action Buttons */}
         <Box
-          display='flex'
-          alignItems='center'
-          justifyContent='space-between'
-          flexWrap='wrap'
-          mb={3}
           sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-end', // ⭐ FIX: Align by bottom (input line)
+            mb: 4,
             gap: 2,
-            '@media (max-width: 1200px)': {
-              flexDirection: 'column',
-              alignItems: 'stretch'
-            }
+            flexWrap: 'nowrap'
           }}
         >
-          {/* 🔹 Left Section (Role + Buttons) */}
           <Box
-            display='flex'
-            alignItems='center'
-            flexWrap='nowrap'
-            gap={2}
             sx={{
-              overflowX: 'auto',
-              pb: 1
+              display: 'flex',
+              alignItems: 'flex-end', // ⭐ FIX: Align bottom of all fields
+              gap: 2,
+              flexWrap: 'nowrap'
             }}
           >
             {/* User Role Dropdown */}
@@ -743,7 +746,7 @@ export default function UserPrivilegePage() {
           <Button
             variant='contained'
             color='success'
-            startIcon={<ArrowDropDownIcon />}
+            startIcon={<DoneIcon />}
             onClick={handleUpdatePrivileges}
             sx={{
               textTransform: 'none',

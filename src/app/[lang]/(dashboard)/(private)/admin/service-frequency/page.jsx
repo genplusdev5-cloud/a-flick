@@ -248,29 +248,28 @@ export default function ServiceFrequencyPage() {
   // Drawer
   const toggleDrawer = () => setDrawerOpen(p => !p)
 
- const handleAdd = () => {
-  setIsEdit(false)
+  const handleAdd = () => {
+    setIsEdit(false)
 
-  if (unsavedAddData) {
-    setFormData(unsavedAddData)  // restore ONLY if outside click
-  } else {
-    setFormData({
-      id: null,
-      incrementType: '',
-      noOfIncrements: '',
-      backlogAge: '',
-      frequencyCode: '',
-      displayFrequency: '',
-      serviceFrequency: '',
-      sortOrder: '',
-      description: '',
-      status: 'Active'
-    })
+    if (unsavedAddData) {
+      setFormData(unsavedAddData) // restore ONLY if outside click
+    } else {
+      setFormData({
+        id: null,
+        incrementType: '',
+        noOfIncrements: '',
+        backlogAge: '',
+        frequencyCode: '',
+        displayFrequency: '',
+        serviceFrequency: '',
+        sortOrder: '',
+        description: '',
+        status: 'Active'
+      })
+    }
+
+    setDrawerOpen(true)
   }
-
-  setDrawerOpen(true)
-}
-
 
   const handleEdit = row => {
     setIsEdit(true)
@@ -285,7 +284,7 @@ export default function ServiceFrequencyPage() {
       displayFrequency: row.displayFrequency || '',
       sortOrder: row.sortOrder || '',
       description: row.description || '',
-      status: row.status || 'Active'
+      status: row.is_active === 1 ? 'Active' : 'Inactive'
     })
 
     setDrawerOpen(true)

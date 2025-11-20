@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 
 import {
   Box,
@@ -41,11 +41,35 @@ import CustomTextField from '@core/components/mui/TextField'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import { Autocomplete } from '@mui/material'
 
+// Autocomplete Fields Definition (Unchanged)
+
+const autocompleteFields = [
+  { name: 'salesMode', options: ['Confirmed Sales', 'Quotation'] },
+  { name: 'contractType', options: ['Continuous Contract', 'Limited Contract', 'Continuous Job', 'Job', 'Warranty'] },
+  { name: 'paymentTerm', options: ['0 days', '30 days'] },
+  { name: 'salesPerson', options: ['Admin'] },
+  { name: 'time', options: ['0:05', '0:10', '0:15'] },
+
+  // BACKEND-DRIVEN DROPDOWNS
+  { name: 'customer', options: [] },
+  { name: 'callType', options: [] },
+  { name: 'industry', options: [] },
+  { name: 'technician', options: [] },
+  { name: 'supervisor', options: [] },
+  { name: 'billingFrequency', options: [] },
+  { name: 'pest', options: [] },
+  { name: 'chemicals', options: [] },
+  { name: 'frequency', options: [] }
+]
+
 export default function AddContractPage() {
   const router = useRouter()
 
   // Helper function to generate a simple unique ID
   const generateUniqueId = () => Date.now().toString(36) + Math.random().toString(36).substring(2)
+
+  // Dynamic Autocomplete Fields (Safe copy)
+  const [dynamicAutocompleteFields, setDynamicAutocompleteFields] = useState(autocompleteFields)
 
   // ----------------------------------------------------------------------
   // State and Options
@@ -129,41 +153,32 @@ export default function AddContractPage() {
     chemicals: []
   })
 
-  // Autocomplete Fields Definition (Unchanged)
-  // ALL autocomplete fields (static + backend)
-  const autocompleteFields = [
-    { name: 'salesMode', options: ['Confirmed Sales', 'Quotation'] },
-    { name: 'contractType', options: ['Continuous Contract', 'Limited Contract', 'Continuous Job', 'Job', 'Warranty'] },
-    { name: 'paymentTerm', options: ['0 days', '30 days'] },
-    { name: 'salesPerson', options: ['Admin'] },
-    { name: 'time', options: ['0:05', '0:10', '0:15'] },
-
-    // BACKEND-DRIVEN DROPDOWNS
-    { name: 'customer', options: [] },
-    { name: 'callType', options: [] },
-    { name: 'industry', options: [] },
-    { name: 'technician', options: [] },
-    { name: 'supervisor', options: [] },
-    { name: 'billingFrequency', options: [] },
-    { name: 'pest', options: [] },
-    { name: 'chemicals', options: [] },
-    { name: 'frequency', options: [] }
-  ]
-
   // Dynamic Refs and Open States for Autocomplete (Unchanged)
-  const refs = {}
-  const openStates = {}
-  const setOpenStates = {}
 
-  autocompleteFields.forEach(({ name }) => {
-    refs[name + 'Ref'] = useRef(null)
-    refs[name + 'InputRef'] = useRef(null)
+  const refs = autocompleteFields.reduce((acc, f) => {
+    acc[f.name + 'Ref'] = useRef(null)
+    acc[f.name + 'InputRef'] = useRef(null)
+    return acc
+  }, {})
 
-    const [isOpen, setIsOpen] = useState(false)
+  const [autoOpen, setAutoOpen] = useState(() => Object.fromEntries(autocompleteFields.map(f => [f.name, false])))
 
-    openStates[name + 'Open'] = isOpen
-    setOpenStates[name + 'SetOpen'] = setIsOpen
-  })
+  const openStates = useMemo(() => {
+    return Object.fromEntries(autocompleteFields.map(f => [f.name + 'Open', autoOpen[f.name]]))
+  }, [autoOpen])
+
+  const setOpenStates = useMemo(() => {
+    return Object.fromEntries(
+      autocompleteFields.map(f => [
+        f.name + 'SetOpen',
+        value =>
+          setAutoOpen(prev => ({
+            ...prev,
+            [f.name]: value
+          }))
+      ])
+    )
+  }, [])
 
   // Explicit Refs (Unchanged)
   const coveredLocationRef = useRef(null),
@@ -271,8 +286,6 @@ export default function AddContractPage() {
     try {
       const data = await getAllDropdowns()
 
-      console.log('✔ ALL DROPDOWNS:', data)
-
       setDropdowns({
         customers: data.customers,
         callTypes: data.callTypes,
@@ -284,32 +297,42 @@ export default function AddContractPage() {
         chemicals: data.chemicals
       })
 
-      // UPDATE AUTO COMPLETE OPTIONS
+      // 🔥 DO NOT mutate autocompleteFields array
+      //    Instead update your dynamic state only
+      const updatedFields = autocompleteFields.map(f => {
+        if (f.name === 'customer') return { ...f, options: data.customers?.map(c => c.name) || [] }
 
-      autocompleteFields.find(f => f.name === 'customer').options = data.customers?.map(c => c.name) || []
+        if (f.name === 'callType') return { ...f, options: data.callTypes?.map(c => c.name) || [] }
 
-      autocompleteFields.find(f => f.name === 'callType').options = data.callTypes?.map(c => c.name) || []
+        if (f.name === 'industry') return { ...f, options: data.industries?.map(i => i.name) || [] }
 
-      autocompleteFields.find(f => f.name === 'industry').options = data.industries?.map(i => i.name) || []
+        if (f.name === 'technician')
+          return {
+            ...f,
+            options: data.employees?.filter(e => e.designation === 'Technician')?.map(e => e.nick_name || e.name) || []
+          }
 
-      autocompleteFields.find(f => f.name === 'technician').options =
-        data.employees?.filter(e => e.designation === 'Technician')?.map(e => e.nick_name || e.name) || []
+        if (f.name === 'supervisor')
+          return {
+            ...f,
+            options:
+              data.employees
+                ?.filter(e => e.designation?.toLowerCase() === 'supervisor')
+                ?.map(e => e.nick_name || e.name) || []
+          }
 
-      autocompleteFields.find(f => f.name === 'supervisor').options =
-        data.employees?.filter(e => e.designation?.toLowerCase() === 'supervisor')?.map(e => e.nick_name || e.name) ||
-        []
+        if (f.name === 'billingFrequency') return { ...f, options: data.billingFreq?.map(b => b.name) || [] }
 
-      autocompleteFields.find(f => f.name === 'billingFrequency').options = data.billingFreq?.map(b => b.name) || []
+        if (f.name === 'pest') return { ...f, options: data.pests?.map(p => p.name) || [] }
 
-      autocompleteFields.find(f => f.name === 'pest').options = data.pests?.map(p => p.name) || []
+        if (f.name === 'frequency') return { ...f, options: data.serviceFreq?.map(f => f.name) || [] }
 
-      autocompleteFields.find(f => f.name === 'frequency').options = data.serviceFreq?.map(f => f.name) || []
+        if (f.name === 'chemicals') return { ...f, options: data.chemicals?.map(c => c.name) || [] }
 
-      // ⭐⭐ NEW — CHEMICALS AUTOCOMPLETE ⭐⭐
-      autocompleteFields.push({
-        name: 'chemicals',
-        options: data.chemicals?.map(c => c.name) || []
+        return f
       })
+
+      setDynamicAutocompleteFields(updatedFields)
     } catch (error) {
       console.error('Dropdown load error', error)
     }
@@ -653,7 +676,7 @@ export default function AddContractPage() {
           {renderAutocomplete({
             name: 'salesMode',
             label: 'Sales Mode',
-            options: autocompleteFields.find(f => f.name === 'salesMode').options
+            options: dynamicAutocompleteFields.find(f => f.name === 'salesMode')?.options || []
           })}
           {renderAutocomplete({
             name: 'customer',
@@ -664,7 +687,7 @@ export default function AddContractPage() {
           {renderAutocomplete({
             name: 'contractType',
             label: 'Contract Type',
-            options: autocompleteFields.find(f => f.name === 'contractType').options
+            options: dynamicAutocompleteFields.find(f => f.name === 'contractType')?.options || []
           })}
           <Grid item xs={12} md={3}>
             <CustomTextField

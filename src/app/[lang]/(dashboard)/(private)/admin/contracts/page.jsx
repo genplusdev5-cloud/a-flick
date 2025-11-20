@@ -27,6 +27,7 @@ import {
 import { getContractList, deleteContractApi } from '@/api/contract'
 
 import VisibilityIcon from '@mui/icons-material/Visibility'
+import { useSearchParams } from 'next/navigation'
 
 // Custom Autocomplete + TextField
 import CustomAutocomplete from '@core/components/mui/Autocomplete'
@@ -110,6 +111,10 @@ export default function ContractsPage() {
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
   const [customerOptions, setCustomerOptions] = useState([])
 
+  const searchParams = useSearchParams()
+  const encodedCustomerId = searchParams.get('customer')
+  const decodedCustomerId = encodedCustomerId ? parseInt(atob(encodedCustomerId)) : null
+
   const [customerFilter, setCustomerFilter] = useState(null)
   const [typeFilter, setTypeFilter] = useState(null)
   const [statusFilter, setStatusFilter] = useState(null)
@@ -176,6 +181,15 @@ export default function ContractsPage() {
       setCustomerOptions([])
     }
   }
+
+  useEffect(() => {
+    if (decodedCustomerId && customerOptions.length > 0) {
+      const matched = customerOptions.find(c => c.id === decodedCustomerId)
+      if (matched) {
+        setCustomerFilter(matched)
+      }
+    }
+  }, [decodedCustomerId, customerOptions])
 
   // Load customer dropdown only once
   useEffect(() => {
@@ -530,17 +544,24 @@ export default function ContractsPage() {
         <Divider sx={{ mb: 6 }} />
         <Box
           sx={{
-            mb: 6,
             display: 'flex',
-            alignItems: 'center',
             justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: 2
+            alignItems: 'flex-end', // ⭐ FIX: Align by bottom (input line)
+            mb: 4,
+            gap: 2,
+            flexWrap: 'nowrap'
           }}
         >
           {/* 🔥 LEFT SIDE: Entries + Filters */}
 
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'flex-end', // ⭐ FIX: Align bottom of all fields
+              gap: 2,
+              flexWrap: 'nowrap'
+            }}
+          >
             {/* Entries per page */}
             <FormControl size='small' sx={{ width: 120 }}>
               <Select

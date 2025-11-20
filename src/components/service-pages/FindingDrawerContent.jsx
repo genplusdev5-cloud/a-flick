@@ -1,24 +1,34 @@
 'use client'
 
-import { Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material'
-
 import { useEffect, useState } from 'react'
-import { Box, Button, Typography, IconButton, Chip, Grid } from '@mui/material'
+import {
+  Box,
+  Button,
+  Typography,
+  IconButton,
+  Chip,
+  Grid,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
+} from '@mui/material'
+
 import AddIcon from '@mui/icons-material/Add'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
-
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
-import DialogCloseButton from '@components/dialogs/DialogCloseButton'
+import GlobalSelect from '@/components/common/GlobalSelect'
 
 import CustomTextFieldWrapper from '@/components/common/CustomTextField'
 import CustomSelectField from '@/components/common/CustomSelectField'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
-import { getFindingList, addFinding, updateFinding, deleteFinding } from '@/api/findings'
-import styles from '@core/styles/table.module.css'
 
-// ⭐ GLOBAL TOAST IMPORT
+import { getFindingList, addFinding, updateFinding, deleteFinding } from '@/api/findings'
 import { showToast } from '@/components/common/Toasts'
+import DialogCloseButton from '@components/dialogs/DialogCloseButton'
+
+import styles from '@core/styles/table.module.css'
 
 export default function FindingDrawerContent({ pestId }) {
   const [rows, setRows] = useState([])
@@ -34,49 +44,41 @@ export default function FindingDrawerContent({ pestId }) {
 
   const statusOptions = ['Active', 'Inactive']
 
+  // ==============================
+  // 🔥 Auto Load on Drawer OPEN
+  // ==============================
+  useEffect(() => {
+    if (pestId) loadFindings()
+  }, [pestId])
+
+  // ==============================
   // 🔹 Load Findings
+  // ==============================
   const loadFindings = async () => {
     setLoading(true)
     try {
       const res = await getFindingList(pestId)
+
       const list = res?.data?.data?.results || res?.data?.results || []
 
       const mapped = list.map((item, index) => ({
         ...item,
         sno: index + 1,
-        name: item.name || item.finding || item.finding_name || item.finding_text || '',
+        name: item.name || item.finding || item.finding_name || '',
         statusLabel: item.is_active === 1 ? 'Active' : 'Inactive'
       }))
 
       setRows(mapped)
     } catch (err) {
-      console.error(err)
       showToast('error', 'Failed to load findings')
     } finally {
       setLoading(false)
     }
   }
 
-  const confirmDelete = async () => {
-    setLoading(true)
-    try {
-      const res = await deleteFinding(deleteId)
-      if (res.status === 'success') {
-        showToast('delete', 'Finding deleted successfully')
-        loadFindings()
-      } else {
-        showToast('error', res.message)
-      }
-    } catch (err) {
-      showToast('error', 'Delete failed')
-    } finally {
-      setLoading(false)
-      setOpenDelete(false)
-      setDeleteId(null)
-    }
-  }
-
+  // ==============================
   // 🔹 Add / Update
+  // ==============================
   const handleSubmit = async () => {
     if (!formData.name.trim()) {
       showToast('warning', 'Finding name required')
@@ -92,7 +94,6 @@ export default function FindingDrawerContent({ pestId }) {
     setLoading(true)
     try {
       let res
-
       if (editId) {
         res = await updateFinding({ id: editId, ...payload })
       } else {
@@ -100,54 +101,59 @@ export default function FindingDrawerContent({ pestId }) {
       }
 
       if (res.status === 'success') {
-        showToast('success', editId ? 'Finding updated successfully' : 'Finding added successfully')
+        showToast('success', editId ? 'Finding updated' : 'Finding added')
 
+        // reset
         setFormData({ name: '', status: 'Active' })
         setEditId(null)
-        loadFindings()
+        loadFindings() // refresh
       } else {
-        showToast('error', res.message || 'Failed to save finding')
+        showToast('error', res.message)
       }
     } catch (err) {
-      console.error(err)
-      showToast('error', 'Something went wrong')
+      showToast('error', 'Save failed')
     } finally {
       setLoading(false)
     }
   }
 
+  // ==============================
   // 🔹 Edit
+  // ==============================
   const handleEdit = row => {
     setEditId(row.id)
-
     setFormData({
       name: row.name,
-      status: row.is_active === 1 ? 'Active' : 'Inactive'
+      status: row.statusLabel
     })
   }
 
+  // ==============================
   // 🔹 Delete
-  const handleDelete = async id => {
+  // ==============================
+  const confirmDelete = async () => {
     setLoading(true)
     try {
-      const res = await deleteFinding(id)
+      const res = await deleteFinding(deleteId)
+
       if (res.status === 'success') {
-        showToast('delete', 'Finding deleted successfully')
+        showToast('delete', 'Finding deleted')
         loadFindings()
       } else {
         showToast('error', res.message)
       }
-    } catch (err) {
-      console.error(err)
+    } catch {
       showToast('error', 'Delete failed')
     } finally {
       setLoading(false)
+      setOpenDelete(false)
+      setDeleteId(null)
     }
   }
 
   return (
     <Box>
-      {/* Input Fields */}
+      {/* Form */}
       <Grid container spacing={2} mb={2}>
         <Grid item xs={12}>
           <CustomTextFieldWrapper
@@ -161,27 +167,29 @@ export default function FindingDrawerContent({ pestId }) {
 
         {editId && (
           <Grid item xs={12}>
-            <CustomSelectField
-              fullWidth
+            <GlobalSelect
               label='Status'
               value={formData.status}
-              onChange={e => setFormData(prev => ({ ...prev, status: e.target.value }))}
-              options={statusOptions.map(s => ({ value: s, label: s }))}
+              onChange={e =>
+                setFormData(prev => ({
+                  ...prev,
+                  status: e.target.value // ⭐ FIXED: Status will update correctly
+                }))
+              }
             />
           </Grid>
         )}
 
-        {/* Buttons Row */}
         <Grid item xs={12} display='flex' gap={2}>
-          <Button variant='contained' fullWidth startIcon={<AddIcon />} onClick={handleSubmit}>
+          <Button variant='contained' fullWidth onClick={handleSubmit}>
             {editId ? 'Update Finding' : 'Add Finding'}
           </Button>
 
           {editId && (
             <Button
               variant='outlined'
-              color='secondary'
               fullWidth
+              color='secondary'
               onClick={() => {
                 setEditId(null)
                 setFormData({ name: '', status: 'Active' })
@@ -193,24 +201,17 @@ export default function FindingDrawerContent({ pestId }) {
         </Grid>
       </Grid>
 
-      {/* Table Title */}
+      {/* List */}
       <Typography variant='subtitle1' mb={1}>
         Finding List
       </Typography>
 
-      {/* Table Scroll Section */}
       {loading ? (
         <Box textAlign='center' py={2}>
           <ProgressCircularCustomization size={50} />
         </Box>
       ) : (
-        <Box
-          sx={{
-            maxHeight: '60vh',
-            overflowY: 'auto',
-            pr: 1
-          }}
-        >
+        <Box sx={{ maxHeight: '60vh', overflowY: 'auto' }}>
           <table className={styles.table}>
             <thead>
               <tr>
@@ -228,22 +229,20 @@ export default function FindingDrawerContent({ pestId }) {
                     <td>{index + 1}</td>
 
                     <td>
-                      <Box sx={{ display: 'flex', gap: 1 }}>
-                        <IconButton size='small' color='primary' onClick={() => handleEdit(row)}>
-                          <EditIcon fontSize='small' />
-                        </IconButton>
+                      <IconButton size='small' color='primary' onClick={() => handleEdit(row)}>
+                        <EditIcon />
+                      </IconButton>
 
-                        <IconButton
-                          size='small'
-                          color='error'
-                          onClick={() => {
-                            setDeleteId(row.id)
-                            setOpenDelete(true)
-                          }}
-                        >
-                          <DeleteIcon fontSize='small' />
-                        </IconButton>
-                      </Box>
+                      <IconButton
+                        size='small'
+                        color='error'
+                        onClick={() => {
+                          setDeleteId(row.id)
+                          setOpenDelete(true)
+                        }}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
                     </td>
 
                     <td>{row.name}</td>
@@ -254,8 +253,7 @@ export default function FindingDrawerContent({ pestId }) {
                         size='small'
                         sx={{
                           color: '#fff',
-                          bgcolor: row.statusLabel === 'Active' ? 'success.main' : 'error.main',
-                          fontWeight: 600
+                          bgcolor: row.statusLabel === 'Active' ? 'success.main' : 'error.main'
                         }}
                       />
                     </td>
@@ -273,6 +271,7 @@ export default function FindingDrawerContent({ pestId }) {
         </Box>
       )}
 
+      {/* Delete Dialog */}
       <Dialog
         onClose={() => setOpenDelete(false)}
         aria-labelledby='delete-dialog-title'

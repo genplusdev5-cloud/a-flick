@@ -206,7 +206,11 @@ export default function UnitOfMeasurementPage() {
     setFormData({
       id: row.id,
       name: row.name,
-      status: row.is_active === 1 ? 'Active' : 'Inactive'
+      description: row.description || '',
+      uomStore: row.uomStore || '',
+      uomPurchase: row.uomPurchase || '',
+      conversion: row.conversion || '',
+      status: row.is_active === 1 ? 'Active' : 'Inactive' // 🔥 EXACT TAX PAGE STYLE
     })
     setDrawerOpen(true)
   }
@@ -251,7 +255,11 @@ export default function UnitOfMeasurementPage() {
       const payload = {
         id: formData.id,
         name: formData.name,
-        is_active: formData.status === 'Active' ? 1 : 0
+        description: formData.description || '',
+        uom_store: formData.uomStore || '',
+        uom_purchase: formData.uomPurchase || '',
+        conversion: formData.conversion || '',
+        is_active: formData.status === 'Active' ? 1 : 0 // 🔥 EXACT FIX
       }
 
       const result = isEdit ? await updateUom(payload) : await addUom(payload)
@@ -308,21 +316,24 @@ export default function UnitOfMeasurementPage() {
         )
       }),
       columnHelper.accessor('name', { header: 'UOM Name' }),
-      columnHelper.accessor('status', {
+      columnHelper.accessor('is_active', {
         header: 'Status',
-        cell: info => (
-          <Chip
-            label={info.getValue() === 'Active' ? 'Active' : 'Inactive'}
-            size='small'
-            sx={{
-              color: '#fff',
-              bgcolor: info.getValue() === 'Active' ? 'success.main' : 'error.main',
-              fontWeight: 600,
-              borderRadius: '6px',
-              px: 1.5
-            }}
-          />
-        )
+        cell: info => {
+          const val = info.getValue()
+          return (
+            <Chip
+              label={val === 1 ? 'Active' : 'Inactive'}
+              size='small'
+              sx={{
+                color: '#fff',
+                bgcolor: val === 1 ? 'success.main' : 'error.main',
+                fontWeight: 600,
+                borderRadius: '6px',
+                px: 1.5
+              }}
+            />
+          )
+        }
       })
     ],
     []
@@ -621,7 +632,7 @@ export default function UnitOfMeasurementPage() {
                   <GlobalSelect
                     label='Status'
                     value={formData.status}
-                    onChange={value => handleFieldChange('status', value)}
+                    onChange={e => handleFieldChange('status', e.target.value)}
                     options={[
                       { value: 'Active', label: 'Active' },
                       { value: 'Inactive', label: 'Inactive' }

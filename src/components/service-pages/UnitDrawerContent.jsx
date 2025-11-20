@@ -19,18 +19,13 @@ import EditIcon from '@mui/icons-material/Edit'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 
 import CustomTextFieldWrapper from '@/components/common/CustomTextField'
-import CustomSelectField from '@/components/common/CustomSelectField'
+import GlobalSelect from '@/components/common/GlobalSelect'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import DialogCloseButton from '@/components/dialogs/DialogCloseButton'
 
 import { showToast } from '@/components/common/Toasts'
 
-import {
-  getUnitList,
-  addUnit,
-  updateUnit,
-  deleteUnit
-} from '@/api/unit'
+import { getUnitList, addUnit, updateUnit, deleteUnit } from '@/api/unit'
 
 import styles from '@core/styles/table.module.css'
 
@@ -46,7 +41,10 @@ export default function UnitDrawerContent({ pestId }) {
     status: 'Active'
   })
 
-  const statusOptions = ['Active', 'Inactive']
+  const statusOptions = [
+    { label: 'Active', value: 'Active' },
+    { label: 'Inactive', value: 'Inactive' }
+  ]
 
   // LOAD UNITS
   const loadUnits = async () => {
@@ -55,12 +53,7 @@ export default function UnitDrawerContent({ pestId }) {
     try {
       const res = await getUnitList(pestId)
 
-      const list =
-        res?.data?.data?.results ||
-        res?.data?.results ||
-        res?.data?.data ||
-        res?.data ||
-        []
+      const list = res?.data?.data?.results || res?.data?.results || res?.data?.data || res?.data || []
 
       const mapped = list.map((item, index) => ({
         ...item,
@@ -76,9 +69,11 @@ export default function UnitDrawerContent({ pestId }) {
     }
   }
 
+  useEffect(() => {
+    loadUnits()
+  }, [pestId])
 
-
-  // SUBMIT (ADD/UPDATE)
+  // SUBMIT
   const handleSubmit = async () => {
     if (!formData.name.trim()) {
       showToast('warning', 'Unit name is required')
@@ -101,10 +96,7 @@ export default function UnitDrawerContent({ pestId }) {
       }
 
       if (res.status === 'success') {
-        showToast(
-          'success',
-          editId ? 'Unit updated successfully' : 'Unit added successfully'
-        )
+        showToast('success', editId ? 'Unit updated successfully' : 'Unit added successfully')
 
         setFormData({ name: '', status: 'Active' })
         setEditId(null)
@@ -152,46 +144,41 @@ export default function UnitDrawerContent({ pestId }) {
     <Box>
       {/* FORM */}
       <Grid container spacing={2} mb={2}>
-        {/* Name */}
         <Grid item xs={12}>
           <CustomTextFieldWrapper
             fullWidth
-            label="Unit Name"
-            placeholder="Enter unit name"
+            label='Unit Name'
+            placeholder='Enter unit name'
             value={formData.name}
             onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
           />
         </Grid>
 
-        {/* Status only in Edit */}
+        {/* Status in Edit Mode */}
         {editId && (
           <Grid item xs={12}>
-            <CustomSelectField
-              fullWidth
-              label="Status"
+            <GlobalSelect
+              label='Status'
               value={formData.status}
               onChange={e =>
-                setFormData(prev => ({ ...prev, status: e.target.value }))
+                setFormData(prev => ({
+                  ...prev,
+                  status: e.target.value
+                }))
               }
-              options={statusOptions.map(s => ({ value: s, label: s }))}
             />
           </Grid>
         )}
 
-        <Grid item xs={12} display="flex" gap={2}>
-          <Button
-            variant="contained"
-            fullWidth
-            onClick={handleSubmit}
-            disabled={loading}
-          >
+        <Grid item xs={12} display='flex' gap={2}>
+          <Button variant='contained' fullWidth onClick={handleSubmit} disabled={loading}>
             {editId ? 'Update Unit' : 'Add Unit'}
           </Button>
 
           {editId && (
             <Button
-              variant="outlined"
-              color="secondary"
+              variant='outlined'
+              color='secondary'
               fullWidth
               onClick={() => {
                 setEditId(null)
@@ -205,12 +192,12 @@ export default function UnitDrawerContent({ pestId }) {
       </Grid>
 
       {/* LIST */}
-      <Typography variant="subtitle1" mb={1}>
+      <Typography variant='subtitle1' mb={1}>
         Unit List
       </Typography>
 
       {loading ? (
-        <Box textAlign="center" py={2}>
+        <Box textAlign='center' py={2}>
           <ProgressCircularCustomization size={50} />
         </Box>
       ) : (
@@ -233,19 +220,19 @@ export default function UnitDrawerContent({ pestId }) {
 
                     <td>
                       <Box sx={{ display: 'flex', gap: 1 }}>
-                        <IconButton size="small" color="primary" onClick={() => handleEdit(row)}>
-                          <EditIcon fontSize="small" />
+                        <IconButton size='small' color='primary' onClick={() => handleEdit(row)}>
+                          <EditIcon fontSize='small' />
                         </IconButton>
 
                         <IconButton
-                          size="small"
-                          color="error"
+                          size='small'
+                          color='error'
                           onClick={() => {
                             setDeleteId(row.id)
                             setOpenDelete(true)
                           }}
                         >
-                          <DeleteIcon fontSize="small" />
+                          <DeleteIcon fontSize='small' />
                         </IconButton>
                       </Box>
                     </td>
@@ -255,13 +242,10 @@ export default function UnitDrawerContent({ pestId }) {
                     <td>
                       <Chip
                         label={row.statusLabel}
-                        size="small"
+                        size='small'
                         sx={{
                           color: '#fff',
-                          bgcolor:
-                            row.statusLabel === 'Active'
-                              ? 'success.main'
-                              : 'error.main',
+                          bgcolor: row.statusLabel === 'Active' ? 'success.main' : 'error.main',
                           fontWeight: 600
                         }}
                       />
@@ -270,7 +254,7 @@ export default function UnitDrawerContent({ pestId }) {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={4} className="text-center py-4">
+                  <td colSpan={4} className='text-center py-4'>
                     No units found
                   </td>
                 </tr>
@@ -285,7 +269,7 @@ export default function UnitDrawerContent({ pestId }) {
         open={openDelete}
         onClose={() => setOpenDelete(false)}
         PaperProps={{
-          sx: { width: 420, borderRadius: 1, textAlign: 'center' }
+          sx: { width: 420, borderRadius: 1, textAlign: 'center', overflow: 'visible' }
         }}
       >
         <DialogTitle
@@ -295,31 +279,32 @@ export default function UnitDrawerContent({ pestId }) {
             justifyContent: 'center',
             gap: 1,
             color: 'error.main',
-            fontWeight: 700
+            fontWeight: 700,
+            pb: 1,
+            position: 'relative'
           }}
         >
-          <WarningAmberIcon color="error" />
+          <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
           Confirm Delete
-          <DialogCloseButton
-            onClick={() => setOpenDelete(false)}
-            sx={{ position: 'absolute', top: 1, right: 1 }}
-          />
+          <DialogCloseButton onClick={() => setOpenDelete(false)} sx={{ position: 'absolute', top: 1, right: 1 }} />
         </DialogTitle>
 
         <DialogContent sx={{ px: 5, pt: 1 }}>
           <Typography sx={{ color: 'text.secondary', fontSize: 14 }}>
-            Are you sure you want to delete this{' '}
-            <strong style={{ color: '#d32f2f' }}>unit</strong>?
+            Are you sure you want to delete the unit{' '}
+            <strong style={{ color: '#d32f2f' }}>{rows.find(r => r.id === deleteId)?.name || 'this item'}</strong>
+            ?
             <br />
             This action cannot be undone.
           </Typography>
         </DialogContent>
 
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3 }}>
-          <Button variant="tonal" color="secondary" onClick={() => setOpenDelete(false)}>
+          <Button variant='tonal' color='secondary' onClick={() => setOpenDelete(false)}>
             Cancel
           </Button>
-          <Button variant="contained" color="error" onClick={confirmDelete}>
+
+          <Button variant='contained' color='error' onClick={confirmDelete}>
             Delete
           </Button>
         </DialogActions>

@@ -9,6 +9,7 @@ import {
   CardHeader,
   Typography,
   Menu,
+  InputLabel,
   MenuItem,
   IconButton,
   Divider,
@@ -145,32 +146,67 @@ export default function EmployeeLeavePage() {
   const statusRef = useRef(null)
 
   // Load rows
-  const loadData = async () => {
-    setLoading(true)
-    try {
-      const res = await getEmployeeLeaveList()
-      const results = res?.data?.results || []
+const loadData = async () => {
+  setLoading(true)
+  try {
+    const res = await getEmployeeLeaveList({
+      page: pagination.pageIndex + 1,
+      page_size: pagination.pageSize,
+      search: searchText || ''
+    })
 
-      const formatted = results.map((item, idx) => ({
-        sno: idx + 1,
-        id: item.id,
-        employee: item.employee_name || '-', // ✅ fixed key
-        supervisor: item.supervisor || '-', // ✅ same
-        leaveType: item.leave_type || '-', // ✅ same
-        fromDate: item.leave_date ? new Date(item.leave_date) : '-',
-        toDate: item.to_date ? new Date(item.to_date) : '-',
-        status: item.is_approved === 1 ? 'Approved' : item.is_approved === 0 ? 'Rejected' : 'Pending',
-        is_active: item.is_active
-      }))
+    const results = res?.data?.results || []
 
-      setRows(formatted)
-      setRowCount(formatted.length)
-    } catch (err) {
-      console.error(err)
-      showToast('error', 'Failed to load data')
-    } finally {
-      setLoading(false)
+    const formatted = results.map((item, idx) => ({
+      sno: idx + 1 + pagination.pageIndex * pagination.pageSize,
+      id: item.id,
+      employee: item.employee_name || '-',
+      supervisor: item.supervisor || '-',
+      leaveType: item.leave_type || '-',
+      fromDate: item.leave_date ? new Date(item.leave_date) : '-',
+      toDate: item.to_date ? new Date(item.to_date) : '-',
+      status:
+        item.is_approved === 1
+          ? 'Approved'
+          : item.is_approved === 0
+          ? 'Rejected'
+          : 'Pending',
+      is_active: item.is_active
+    }))
+
+    setRows(formatted)
+    setRowCount(res?.data?.count || 0)
+  } catch (err) {
+    console.error(err)
+  } finally {
+    setLoading(false)
+  }
+}
+
+  const handleDrawerClose = () => {
+    if (!isEdit) {
+      // ADD mode la irundha preserve data
+      setUnsavedAddData(formData)
     }
+    setDrawerOpen(false)
+  }
+
+  const resetForm = () => {
+    setFormData({
+      id: null,
+      employee_id: '',
+      name: '',
+      supervisor: '',
+      leaveType: '',
+      leave_date: new Date(),
+      to_date: new Date(),
+      start_time: '',
+      end_time: '',
+      from_ampm: 'AM',
+      to_ampm: 'PM',
+      status: 'Pending',
+      description: ''
+    })
   }
 
   // ✅ Date formatter function
@@ -183,65 +219,67 @@ export default function EmployeeLeavePage() {
     return `${year}-${month}-${day}`
   }
 
-  // ✅ Final working submit handler
   const handleSubmit = async e => {
-    e.preventDefault()
+  e.preventDefault();
 
-    if (!formData.employee_id || !formData.leaveType) {
-      showToast('warning', 'Employee and Leave Type are required')
-      return
-    }
-
-    setLoading(true)
-    try {
-      const formatDate = d => {
-        if (!d) return null
-        const x = new Date(d)
-        return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
-      }
-
-      const payload = {
-        id: formData.id || null,
-        employee_id: Number(formData.employee_id),
-        supervisor_id: formData.supervisor_id ? Number(formData.supervisor_id) : null,
-        leave_type_id: Number(formData.leaveType), // ✅ changed key
-        leave_date: formatDate(formData.leave_date),
-        to_date: formatDate(formData.to_date),
-        start_time: formData.start_time
-          ? `${formData.start_time.length === 5 ? formData.start_time + ':00' : formData.start_time}`
-          : '00:00:00',
-        end_time: formData.end_time
-          ? `${formData.end_time.length === 5 ? formData.end_time + ':00' : formData.end_time}`
-          : '00:00:00',
-        from_ampm: String(formData.from_ampm || 'AM').trim(),
-        to_ampm: String(formData.to_ampm || 'PM').trim(),
-        is_approved: formData.status === 'Approved' ? 1 : formData.status === 'Rejected' ? 0 : null,
-        is_active: 1,
-        status: 1,
-        created_by: 1,
-        updated_by: 1
-      }
-
-      // 👇 PASTE IT RIGHT HERE (before API call)
-      console.log('🧾 Payload before submit:', payload)
-
-      if (isEdit && formData.id) {
-        await updateEmployeeLeave(payload)
-        showToast('success', 'Leave updated successfully')
-      } else {
-        await addEmployeeLeave(payload)
-        showToast('success', 'Leave added successfully')
-      }
-
-      setDrawerOpen(false)
-      await loadData()
-    } catch (err) {
-      console.error('❌ Error:', err)
-      showToast('error', 'Failed to save leave')
-    } finally {
-      setLoading(false)
-    }
+  if (!formData.employee_id || !formData.leaveType) {
+    showToast('warning', 'Employee and Leave Type are required');
+    return;
   }
+
+  setLoading(true);
+  try {
+    const formatDate = d => {
+      if (!d) return null;
+      const x = new Date(d);
+      return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+    };
+
+    const payload = {
+      id: formData.id || null,
+      employee_id: Number(formData.employee_id),
+      supervisor_id: formData.supervisor_id ? Number(formData.supervisor_id) : null,
+      leave_type_id: Number(formData.leaveType),
+      leave_date: formatDate(formData.leave_date),
+      to_date: formatDate(formData.to_date),
+      start_time: formData.start_time
+        ? `${formData.start_time.length === 5 ? formData.start_time + ':00' : formData.start_time}`
+        : '00:00:00',
+      end_time: formData.end_time
+        ? `${formData.end_time.length === 5 ? formData.end_time + ':00' : formData.end_time}`
+        : '00:00:00',
+      from_ampm: String(formData.from_ampm || 'AM').trim(),
+      to_ampm: String(formData.to_ampm || 'PM').trim(),
+      is_approved: formData.status === 'Approved' ? 1 : formData.status === 'Rejected' ? 0 : null,
+      is_active: 1,
+      status: 1,
+      created_by: 1,
+      updated_by: 1
+    };
+
+    console.log("🧾 Payload before submit:", payload);
+
+    if (isEdit && formData.id) {
+      await updateEmployeeLeave(payload);
+      showToast('success', 'Leave updated successfully');
+    } else {
+      await addEmployeeLeave(payload);
+      showToast('success', 'Leave added successfully');
+    }
+
+    // 🔥 Order VERY important
+    resetForm();              // ✅ 1. Clear form
+    setUnsavedAddData(null);  // ✅ 2. Clear temp saved data
+    setDrawerOpen(false);     // ✅ 3. Close drawer
+
+    await loadData();
+  } catch (err) {
+    console.error("❌ Error:", err);
+    showToast('error', 'Failed to save leave');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleDateChange = (date, field) => {
     if (field === 'fromDate' && formData.toDate && date > formData.toDate) {
@@ -309,19 +347,9 @@ export default function EmployeeLeavePage() {
 
   // Drawer
   const toggleDrawer = () => setDrawerOpen(p => !p)
-  // 🔹 Cancel drawer + reset form
-  const handleCancel = () => {
-    setFormData({
-      id: data.id || row.id,
-      name: data.employee_name || '', // ✅ consistent key + fallback
-      supervisor: data.supervisor || '',
-      leaveType: data.leave_type || '',
-      fromDate: data.leave_date ? new Date(data.leave_date) : new Date(),
-      toDate: data.to_date ? new Date(data.to_date) : new Date(),
-      status: data.is_approved === 1 ? 'Approved' : data.is_approved === 0 ? 'Rejected' : 'Pending',
-      description: data.description || ''
-    })
 
+  const handleCancel = () => {
+    resetForm() // 🔥 Clear form fully
     setUnsavedAddData(null)
     setDrawerOpen(false)
   }
@@ -337,18 +365,15 @@ export default function EmployeeLeavePage() {
   // 🔹 Updated Add handler with unsaved data restore
   const handleAdd = () => {
     setIsEdit(false)
-    // in handleAdd / handleCancel resets
-    setFormData({
-      id: null,
-      employee_id: '', // ✅
-      name: '', // ✅
-      supervisor: '',
-      leaveType: '',
-      fromDate: new Date(),
-      toDate: new Date(),
-      status: 'Pending',
-      description: ''
-    })
+
+    // 🔥 If user entered something earlier and closed drawer by clicking outside,
+    // restore that data
+    if (unsavedAddData) {
+      setFormData(unsavedAddData)
+    } else {
+      // Fresh blank form
+      resetForm()
+    }
 
     setDateError('')
     setDrawerOpen(true)
@@ -756,11 +781,10 @@ export default function EmployeeLeavePage() {
       </Card>
 
       {/* Drawer */}
-      {/* Drawer */}
       <Drawer
         anchor='right'
         open={drawerOpen}
-        onClose={toggleDrawer}
+        onClose={handleDrawerClose}
         PaperProps={{ sx: { width: 460, boxShadow: '0px 0px 15px rgba(0,0,0,0.08)' } }}
       >
         <Box sx={{ p: 5, display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -768,7 +792,7 @@ export default function EmployeeLeavePage() {
             <Typography variant='h5' fontWeight={600}>
               {isEdit ? 'Edit Leave Request' : 'Add Leave Request'}
             </Typography>
-            <IconButton onClick={toggleDrawer} size='small'>
+            <IconButton onClick={() => setDrawerOpen(false)} size='small'>
               <CloseIcon />
             </IconButton>
           </Box>
@@ -783,14 +807,25 @@ export default function EmployeeLeavePage() {
                   label='Employee'
                   fullWidth
                   required
-                  value={formData.employee_id}
-                  onChange={selectedValue => {
-                    setFormData(prev => ({ ...prev, employee_id: Number(selectedValue) }))
+                  value={
+                    employeeList
+                      .map(emp => ({
+                        id: emp.id,
+                        value: emp.id,
+                        label: emp.name ? String(emp.name) : `Employee ${emp.id}`
+                      }))
+                      .find(opt => opt.value === formData.employee_id) || null
+                  }
+                  onChange={selectedObj => {
+                    setFormData(prev => ({
+                      ...prev,
+                      employee_id: selectedObj?.value ?? ''
+                    }))
                   }}
-                  options={employeeList.map((emp, index) => ({
-                    key: String(emp.id ?? index),
-                    value: emp.id ?? index,
-                    label: emp.name || `Employee ${index + 1}`
+                  options={employeeList.map(emp => ({
+                    id: emp.id,
+                    value: emp.id,
+                    label: emp.name ? String(emp.name) : `Employee ${emp.id}`
                   }))}
                 />
               </Grid>
@@ -801,12 +836,22 @@ export default function EmployeeLeavePage() {
                   label='Leave Type'
                   fullWidth
                   required
-                  value={formData.leaveType || null} // 💥 FIXED
-                  onChange={selectedValue => handleFieldChange('leaveType', Number(selectedValue))}
+                  value={
+                    (leaveTypeList || [])
+                      .map(type => ({
+                        id: type.id,
+                        value: type.id,
+                        label: type.name ? String(type.name) : ''
+                      }))
+                      .find(opt => opt.value === formData.leaveType) || null
+                  }
+                  onChange={selectedObj => {
+                    handleFieldChange('leaveType', selectedObj?.value ?? '')
+                  }}
                   options={(leaveTypeList || []).map((type, index) => ({
-                    id: type.id ?? index, // unique internal id
-                    value: type.id ?? index, // value sent to form
-                    label: type.name || `Leave Type ${index + 1}` // 👈 FIX HERE (use type.name)
+                    id: type.id ?? index,
+                    value: type.id ?? index,
+                    label: type.name ? String(type.name) : ''
                   }))}
                 />
               </Grid>
@@ -900,17 +945,17 @@ export default function EmployeeLeavePage() {
               {/* Status (Edit Mode Only) */}
               {isEdit && (
                 <Grid item xs={12}>
-                  <GlobalSelect
+                  <CustomTextField
+                    select
                     fullWidth
                     label='Status'
-                    value={formData.status ?? 'Pending'} // ✅ controlled
+                    value={formData.status}
                     onChange={e => handleFieldChange('status', e.target.value)}
-                    options={[
-                      { value: 'Pending', label: 'Pending' },
-                      { value: 'Approved', label: 'Approved' },
-                      { value: 'Rejected', label: 'Rejected' }
-                    ]}
-                  />
+                  >
+                    <MenuItem value='Pending'>Pending</MenuItem>
+                    <MenuItem value='Approved'>Approved</MenuItem>
+                    <MenuItem value='Rejected'>Rejected</MenuItem>
+                  </CustomTextField>
                 </Grid>
               )}
             </Grid>

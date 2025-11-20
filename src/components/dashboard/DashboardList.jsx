@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState, useMemo, useRef } from 'react'
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
+
 import {
   Box,
   Button,
@@ -22,7 +23,8 @@ import RefreshIcon from '@mui/icons-material/Refresh'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
 
-import Autocomplete from '@mui/material/Autocomplete'
+import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
+import GlobalTextField from '@/components/common/GlobalTextField'
 import axios from 'axios'
 
 import { getDashboardList } from '@/api/dashboard'
@@ -36,13 +38,13 @@ export default function DashboardList() {
   const [rows, setRows] = useState([])
   const [count, setCount] = useState(0)
 
-  const [filterType, setFilterType] = useState('Customer') // Customer | Contract
+  const [filterType, setFilterType] = useState('Contract')
+
   const [radioFilter, setRadioFilter] = useState('')
   const [searchText, setSearchText] = useState('')
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
   const [loading, setLoading] = useState(false)
-  const runOnce = useRef(false);
-
+  const runOnce = useRef(false)
 
   const columnHelper = createColumnHelper()
 
@@ -117,78 +119,71 @@ export default function DashboardList() {
   // ----------------------------
   // LOAD DATA
   // ----------------------------
-const loadList = async () => {
-  try {
-    setLoading(true);
+  const loadList = useCallback(async () => {
+    if (!filterType) return
 
-    if (cancelSource) cancelSource.cancel();
-    cancelSource = axios.CancelToken.source();
+    try {
+      setLoading(true)
 
-    const type = filterType.toLowerCase();
+      if (cancelSource) cancelSource.cancel()
+      cancelSource = axios.CancelToken.source()
 
-    const res = await getDashboardList(
-      type,
-      pagination.pageIndex + 1,
-      pagination.pageSize,
-      cancelSource.token,
-      radioFilter,
-      searchText
-    );
+      const type = filterType.toLowerCase()
 
-    if (res.status === 'cancelled') return;
+      const res = await getDashboardList(
+        type,
+        pagination.pageIndex + 1,
+        pagination.pageSize,
+        cancelSource.token,
+        radioFilter,
+        searchText
+      )
 
-    if (res.status === 'success') {
-      let formatted = [];
+      if (res.status === 'success') {
+        let formatted = []
 
-      if (filterType === 'Customer') {
-        formatted = res.table.map((item, idx) => ({
-          id: item.id || idx + 1,
-          origin: item.origin || '-',
-          customer_code: item.customer_code || '-',
-          commence_date: item.commence_date || '-',
-          billing_name: item.billing_name || '-',
-          business_name: item.business_name || '-',
-          contracts: item.contracts || '-',
-          contact_person: item.contact_person || '-',
-          contact_email: item.contact_email || '-',
-          contact_phone: item.contact_phone || '-',
-          billing_address: item.billing_address || '-',
-          postal_code: item.postal_code || '-'
-        }));
-      } else {
-        formatted = res.table.map((item, idx) => ({
-          id: item.id || idx + 1,
-          customer: item.business_name || item.billing_name || '-',
-          contractCode: item.contract_code || '-',
-          type: item.type || '-',
-          serviceAddress: item.billing_address || '-',
-          postalCode: item.postal_code || '-',
-          startDate: item.commence_date || '-',
-          endDate: item.end_date || '-',
-          pests: item.pests || '-'
-        }));
+        if (filterType === 'Customer') {
+          formatted = res.table.map((item, idx) => ({
+            id: item.id || idx + 1,
+            origin: item.origin || '-',
+            customer_code: item.customer_code || '-',
+            commence_date: item.commence_date || '-',
+            billing_name: item.billing_name || '-',
+            business_name: item.business_name || '-',
+            contracts: item.contracts || '-',
+            contact_person: item.contact_person || '-',
+            contact_email: item.contact_email || '-',
+            contact_phone: item.contact_phone || '-',
+            billing_address: item.billing_address || '-',
+            postal_code: item.postal_code || '-'
+          }))
+        } else {
+          formatted = res.table.map((item, idx) => ({
+            id: item.id || idx + 1,
+            customer: item.business_name || item.billing_name || '-',
+            contractCode: item.contract_code || '-',
+            type: item.type || '-',
+            serviceAddress: item.billing_address || '-',
+            postalCode: item.postal_code || '-',
+            startDate: item.commence_date || '-',
+            endDate: item.end_date || '-',
+            pests: item.pests || '-'
+          }))
+        }
+
+        setRows(formatted)
+        setCount(res.count)
       }
-
-      setRows(formatted);
-      setCount(res.count);
+    } catch (err) {
+      console.error('❌ Dashboard List Load Error:', err)
+    } finally {
+      setLoading(false)
     }
+  }, [filterType, pagination.pageIndex, pagination.pageSize, radioFilter, searchText])
 
-  } catch {
-    // 🔥 FIX: DO NOT LOG RAW ERROR OBJECT
-    console.error("❌ Dashboard List Load Error");
-  } finally {
-    setLoading(false);
-  }
-};
-
-useEffect(() => {
-  if (runOnce.current) return;
-  runOnce.current = true;
-
-  loadList();
-}, [filterType, pagination.pageIndex, pagination.pageSize, radioFilter, searchText]);
-
-
+  useEffect(() => {
+    loadList()
+  }, [loadList])
 
   const handleRefresh = () => loadList()
 
@@ -229,25 +224,56 @@ useEffect(() => {
         <CardHeader title='Dashboard Summary' />
 
         {/* TOP FILTER ROW */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 4, flexWrap: 'wrap', gap: 2 }}>
-          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-end', // ⭐ FIX: Align by bottom (input line)
+            mb: 4,
+            gap: 2,
+            flexWrap: 'nowrap'
+          }}
+        >
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'flex-end', // ⭐ FIX: Align bottom of all fields
+              gap: 2,
+              flexWrap: 'nowrap'
+            }}
+          >
             {/* FILTER TYPE */}
-            <Autocomplete
+            <GlobalAutocomplete
               size='small'
               sx={{ width: 200 }}
               options={['Customer', 'Contract']}
               value={filterType}
-              onChange={(e, v) => setFilterType(v)}
-              renderInput={params => <TextField {...params} label='Filter Type' />}
+              onChange={value => {
+                if (typeof value === 'string') {
+                  setFilterType(value)
+                } else if (value?.value) {
+                  setFilterType(value.value)
+                } else if (value?.label) {
+                  setFilterType(value.label)
+                }
+              }}
+              label='Filter Type'
             />
 
             {/* SEARCH */}
-            <TextField
+            <GlobalTextField
               size='small'
               sx={{ width: 300 }}
               placeholder='Search...'
               value={searchText}
-              onChange={e => setSearchText(e.target.value)}
+              onChange={e => {
+                const value = e.target.value
+                setSearchText(value)
+                if (!value) {
+                  setRadioFilter('')
+                  loadList()
+                }
+              }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position='start'>
@@ -258,7 +284,18 @@ useEffect(() => {
             />
 
             {/* REFRESH */}
-            <Button variant='contained' onClick={handleRefresh} startIcon={<RefreshIcon />} disabled={loading}>
+            <Button
+              variant='contained'
+              onClick={handleRefresh}
+              startIcon={<RefreshIcon />}
+              disabled={loading}
+              size='medium'
+              sx={{
+                height: 40, // same as textfield height
+                paddingX: 3, // better spacing
+                borderRadius: '4px' // clean modern shape
+              }}
+            >
               {loading ? 'Loading...' : 'Refresh'}
             </Button>
           </Box>
@@ -275,7 +312,7 @@ useEffect(() => {
                 }))
               }
             >
-              {[10, 25, 50, 100].map(n => (
+              {[25, 50, 75, 100].map(n => (
                 <MenuItem key={n} value={n}>
                   {n} entries
                 </MenuItem>

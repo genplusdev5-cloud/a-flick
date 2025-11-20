@@ -22,7 +22,7 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 
 import CustomTextFieldWrapper from '@/components/common/CustomTextField'
-import CustomSelectField from '@/components/common/CustomSelectField'
+import GlobalSelect from '@/components/common/GlobalSelect'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 
 import {
@@ -47,7 +47,10 @@ export default function RecommendationDrawerContent({ pestId }) {
     status: 'Active'
   })
 
-  const statusOptions = ['Active', 'Inactive']
+  const statusOptions = [
+    { label: 'Active', value: 'Active' },
+    { label: 'Inactive', value: 'Inactive' }
+  ]
 
   // Load Recommendations
   const loadRecommendations = async () => {
@@ -64,14 +67,16 @@ export default function RecommendationDrawerContent({ pestId }) {
       }))
 
       setRows(mapped)
-    } catch (err) {
+    } catch {
       showToast('error', 'Failed to load recommendations')
     } finally {
       setLoading(false)
     }
   }
 
-
+  useEffect(() => {
+    if (pestId) loadRecommendations()
+  }, [pestId])
 
   // Submit (Add / Update)
   const handleSubmit = async () => {
@@ -97,7 +102,7 @@ export default function RecommendationDrawerContent({ pestId }) {
       }
 
       if (res.status === 'success') {
-        showToast('success', editId ? 'Recommendation updated successfully' : 'Recommendation added successfully')
+        showToast('success', editId ? 'Recommendation updated' : 'Recommendation added')
 
         setFormData({ name: '', status: 'Active' })
         setEditId(null)
@@ -105,8 +110,6 @@ export default function RecommendationDrawerContent({ pestId }) {
       } else {
         showToast('error', res.message || 'Failed to save data')
       }
-    } catch {
-      showToast('error', 'Something went wrong')
     } finally {
       setLoading(false)
     }
@@ -121,19 +124,17 @@ export default function RecommendationDrawerContent({ pestId }) {
     })
   }
 
-  // Delete - Confirm
+  // Delete Confirm
   const confirmDelete = async () => {
     setLoading(true)
     try {
       const res = await deleteRecommendation(deleteId)
       if (res.status === 'success') {
-        showToast('delete', 'Recommendation deleted successfully')
+        showToast('delete', 'Recommendation deleted')
         loadRecommendations()
       } else {
         showToast('error', res.message || 'Delete failed')
       }
-    } catch {
-      showToast('error', 'Delete failed')
     } finally {
       setLoading(false)
       setOpenDelete(false)
@@ -145,7 +146,6 @@ export default function RecommendationDrawerContent({ pestId }) {
     <Box>
       {/* FORM */}
       <Grid container spacing={2} mb={2}>
-        {/* Name */}
         <Grid item xs={12}>
           <CustomTextFieldWrapper
             fullWidth
@@ -156,22 +156,24 @@ export default function RecommendationDrawerContent({ pestId }) {
           />
         </Grid>
 
-        {/* Status (Only in Edit) */}
+        {/* Status */}
         {editId && (
           <Grid item xs={12}>
-            <CustomSelectField
-              fullWidth
+            <GlobalSelect
               label='Status'
               value={formData.status}
-              onChange={e => setFormData(prev => ({ ...prev, status: e.target.value }))}
-              options={statusOptions.map(s => ({ value: s, label: s }))}
+              onChange={e =>
+                setFormData(prev => ({
+                  ...prev,
+                  status: e.target.value
+                }))
+              }
             />
           </Grid>
         )}
 
-        {/* Buttons */}
         <Grid item xs={12} display='flex' gap={2}>
-          <Button variant='contained' fullWidth startIcon={<AddIcon />} onClick={handleSubmit}>
+          <Button variant='contained' fullWidth onClick={handleSubmit} startIcon={<AddIcon />}>
             {editId ? 'Update Recommendation' : 'Add Recommendation'}
           </Button>
 
@@ -191,18 +193,17 @@ export default function RecommendationDrawerContent({ pestId }) {
         </Grid>
       </Grid>
 
-      {/* LIST TITLE */}
+      {/* TABLE */}
       <Typography variant='subtitle1' mb={1}>
         Recommendation List
       </Typography>
 
-      {/* Loader */}
       {loading ? (
         <Box textAlign='center' py={2}>
           <ProgressCircularCustomization size={50} />
         </Box>
       ) : (
-        <Box sx={{ maxHeight: '60vh', overflowY: 'auto', pr: 1 }}>
+        <Box sx={{ maxHeight: '60vh', overflowY: 'auto' }}>
           <table className={styles.table}>
             <thead>
               <tr>
@@ -246,8 +247,7 @@ export default function RecommendationDrawerContent({ pestId }) {
                         size='small'
                         sx={{
                           color: '#fff',
-                          bgcolor: row.statusLabel === 'Active' ? 'success.main' : 'error.main',
-                          fontWeight: 600
+                          bgcolor: row.statusLabel === 'Active' ? 'success.main' : 'error.main'
                         }}
                       />
                     </td>
@@ -265,7 +265,7 @@ export default function RecommendationDrawerContent({ pestId }) {
         </Box>
       )}
 
-      {/* DELETE DIALOG (same UI as Finding/Action) */}
+      {/* DELETE DIALOG – Same as Action drawer */}
       <Dialog
         open={openDelete}
         onClose={() => setOpenDelete(false)}
@@ -292,14 +292,14 @@ export default function RecommendationDrawerContent({ pestId }) {
           <DialogCloseButton
             onClick={() => setOpenDelete(false)}
             disableRipple
-            sx={{ position: 'absolute', top: 1, right: 1 }}
+            sx={{ position: 'absolute', right: 1, top: 1 }}
           >
             <i className='tabler-x' />
           </DialogCloseButton>
         </DialogTitle>
 
         <DialogContent sx={{ px: 5, pt: 1 }}>
-          <Typography sx={{ color: 'text.secondary', fontSize: 14 }}>
+          <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
             Are you sure you want to delete the recommendation{' '}
             <strong style={{ color: '#d32f2f' }}>{rows.find(r => r.id === deleteId)?.name || 'this item'}</strong>
             ?

@@ -21,15 +21,10 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import CustomTextFieldWrapper from '@/components/common/CustomTextField'
-import CustomSelectField from '@/components/common/CustomSelectField'
+import GlobalSelect from '@/components/common/GlobalSelect'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 
-import {
-  getPestChemicalsList,
-  addPestChemical,
-  updatePestChemical,
-  deletePestChemical
-} from '@/api/pestchemicals'
+import { getPestChemicalsList, addPestChemical, updatePestChemical, deletePestChemical } from '@/api/pestchemicals'
 
 import { showToast } from '@/components/common/Toasts'
 import styles from '@core/styles/table.module.css'
@@ -46,7 +41,10 @@ export default function PestChemicalsDrawerContent({ pestId }) {
     status: 'Active'
   })
 
-  const statusOptions = ['Active', 'Inactive']
+  const statusOptions = [
+    { label: 'Active', value: 'Active' },
+    { label: 'Inactive', value: 'Inactive' }
+  ]
 
   // Load Chemicals
   const loadChemicals = async () => {
@@ -70,7 +68,9 @@ export default function PestChemicalsDrawerContent({ pestId }) {
     }
   }
 
-
+  useEffect(() => {
+    if (pestId) loadChemicals()
+  }, [pestId])
 
   // Add / Update
   const handleSubmit = async () => {
@@ -95,15 +95,13 @@ export default function PestChemicalsDrawerContent({ pestId }) {
       }
 
       if (res.status === 'success') {
-        showToast('success', editId ? 'Chemical updated successfully' : 'Chemical added successfully')
+        showToast('success', editId ? 'Chemical updated' : 'Chemical added')
         setFormData({ name: '', status: 'Active' })
         setEditId(null)
         loadChemicals()
       } else {
         showToast('error', res.message || 'Failed to save data')
       }
-    } catch {
-      showToast('error', 'Something went wrong')
     } finally {
       setLoading(false)
     }
@@ -125,13 +123,11 @@ export default function PestChemicalsDrawerContent({ pestId }) {
       const res = await deletePestChemical(deleteId)
 
       if (res.status === 'success') {
-        showToast('delete', 'Chemical deleted successfully')
+        showToast('delete', 'Chemical deleted')
         loadChemicals()
       } else {
         showToast('error', res.message || 'Delete failed')
       }
-    } catch {
-      showToast('error', 'Delete failed')
     } finally {
       setLoading(false)
       setOpenDelete(false)
@@ -155,12 +151,15 @@ export default function PestChemicalsDrawerContent({ pestId }) {
 
         {editId && (
           <Grid item xs={12}>
-            <CustomSelectField
-              fullWidth
+            <GlobalSelect
               label='Status'
               value={formData.status}
-              onChange={e => setFormData(prev => ({ ...prev, status: e.target.value }))}
-              options={statusOptions.map(s => ({ value: s, label: s }))}
+              onChange={e =>
+                setFormData(prev => ({
+                  ...prev,
+                  status: e.target.value
+                }))
+              }
             />
           </Grid>
         )}
@@ -285,16 +284,15 @@ export default function PestChemicalsDrawerContent({ pestId }) {
           <DialogCloseButton
             onClick={() => setOpenDelete(false)}
             disableRipple
-            sx={{ position: 'absolute', top: 1, right: 1 }}
-          >
-            <i className='tabler-x' />
-          </DialogCloseButton>
+            sx={{ position: 'absolute', right: 1, top: 1 }}
+          />
         </DialogTitle>
 
         <DialogContent sx={{ px: 5, pt: 1 }}>
           <Typography sx={{ color: 'text.secondary', fontSize: 14 }}>
             Are you sure you want to delete the chemical{' '}
-            <strong style={{ color: '#d32f2f' }}>{rows.find(r => r.id === deleteId)?.name || 'this item'}</strong>?
+            <strong style={{ color: '#d32f2f' }}>{rows.find(r => r.id === deleteId)?.name || 'this item'}</strong>
+            ?
             <br />
             This action cannot be undone.
           </Typography>

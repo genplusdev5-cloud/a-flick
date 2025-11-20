@@ -227,34 +227,26 @@ export default function PestPage() {
   // Load data
   const loadData = async () => {
     setLoading(true)
+
     try {
-      const res = await getPestList()
-      console.log('Response:', res) // just check once
+      const res = await getPestList({
+        page: pagination.pageIndex + 1,
+        page_size: pagination.pageSize,
+        search: searchText || ''
+      })
 
-      // ✅ Now res.data.data.results will work properly
-      const all =
-        res?.data?.data?.results || // Case 1: nested response
-        res?.data?.results || // Case 2: flatter response
-        res?.data ||
-        [] // Case 3: direct array
+      const results = res?.data?.data?.results || res?.data?.results || []
+      const count = res?.data?.data?.count || res?.data?.count || results.length
 
-      console.log('🐞 Final loaded pests:', all)
-
-      console.log('🐞 Rows to show:', all)
-      const normalized = all.map((item, idx) => ({
+      const normalized = results.map((item, idx) => ({
         ...item,
-        sno: idx + 1,
-        action_count: item.action_count,
-        finding_count: item.finding_count,
-        recommendation_count: item.recommendation_count,
-        checklist_count: item.checklist_count,
-        chemicals_count: item.chemical_count,
-        unit_count: item.unit_count
+        sno: idx + 1 + pagination.pageIndex * pagination.pageSize
       }))
 
       setRows(normalized)
+      setRowCount(count)
     } catch (err) {
-      console.error('❌ Pest list load failed:', err)
+      console.error('❌ loadData error:', err)
     } finally {
       setLoading(false)
     }
@@ -409,9 +401,8 @@ export default function PestPage() {
   }
 
   useEffect(() => {
-  loadData()
-}, [])
-
+    loadData()
+  }, [pagination.pageIndex, pagination.pageSize, searchText])
 
   useEffect(() => {
     if (subDrawerOpen && selectedPestId) {
@@ -650,7 +641,7 @@ export default function PestPage() {
             onClick={() => openSubDrawer(info.row.original, 'Chemicals')}
             sx={{ borderRadius: '999px', px: 2 }}
           >
-            Chemicals({info.row.original.chemicals_count || 0})
+            Chemicals({info.row.original.chemical_count || 0})
           </Button>
         )
       }),
@@ -901,15 +892,22 @@ export default function PestPage() {
           <FormControl size='small' sx={{ width: 140 }}>
             <Select
               value={pagination.pageSize}
-              onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
+              onChange={e =>
+                setPagination(p => ({
+                  ...p,
+                  pageSize: Number(e.target.value),
+                  pageIndex: 0
+                }))
+              }
             >
-              {[5, 10, 25, 50].map(s => (
+              {[25, 50, 75, 100].map(s => (
                 <MenuItem key={s} value={s}>
                   {s} entries
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
+
           <DebouncedInput
             value={searchText}
             onChange={v => {
