@@ -31,6 +31,8 @@ import GlobalSelect from '@/components/common/GlobalSelect'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
 import { showToast } from '@/components/common/Toasts'
 
+import { getContractView } from '@/api/contract/viewStatus'
+
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import RefreshIcon from '@mui/icons-material/Refresh'
@@ -55,68 +57,6 @@ import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 
-// ───────────────────────────────────────────
-// Mock Data (Replace with IndexedDB later)
-// ───────────────────────────────────────────
-const mockData = [
-  {
-    id: 1,
-    customer: 'GP Industries Pvt Ltd',
-    services: 'Pest Control',
-    contractCode: 'CON-2025-001',
-    type: 'Annual Contract',
-    serviceAddress: '123 Industrial Area, Delhi',
-    postalCode: '110020',
-    startDate: '2025-01-01',
-    endDate: '2025-12-31',
-    pest: 'Rodent',
-    contractValue: 120000,
-    prodValue: 15000,
-    contactPerson: 'Mr. Rajesh Kumar',
-    contactPhone: '+91 9876543210',
-    renewalPending: 'No',
-    renewalOn: null,
-    holdedOn: null,
-    terminatedOn: null,
-    expiredOn: null,
-    status: 'Current',
-    origin: 'Genplus Innovations',
-    reportEmail: 'report@gpindustries.com',
-    picEmail: 'rajesh@gpindustries.com',
-    billingEmail: 'billing@gpindustries.com'
-  },
-  {
-    id: 2,
-    customer: 'Acme Corp',
-    services: 'Termite Treatment',
-    contractCode: 'CON-2024-045',
-    type: 'Limited Contract',
-    serviceAddress: '456 MG Road, Mumbai',
-    postalCode: '400001',
-    startDate: '2024-06-01',
-    endDate: '2024-11-30',
-    pest: 'Termite',
-    contractValue: 85000,
-    prodValue: 12000,
-    contactPerson: 'Ms. Priya Sharma',
-    contactPhone: '+91 9123456789',
-    renewalPending: 'Yes',
-    renewalOn: '2024-11-01',
-    holdedOn: null,
-    terminatedOn: null,
-    expiredOn: null,
-    status: 'Current',
-    origin: 'Pest Masters',
-    reportEmail: 'reports@acmecorp.com',
-    picEmail: 'priya@acmecorp.com',
-    billingEmail: 'billing@acmecorp.com'
-  }
-]
-
-const getContracts = async () => {
-  return new Promise(resolve => setTimeout(() => resolve(mockData), 300))
-}
-
 // Debounced Input
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
   const [value, setValue] = useState(initialValue)
@@ -136,7 +76,8 @@ export default function ContractStatusPage() {
   const [rows, setRows] = useState([])
   const [rowCount, setRowCount] = useState(0)
   const [searchText, setSearchText] = useState('')
-  const [dateFilter, setDateFilter] = useState(new Date())
+  const [dateFilter, setDateFilter] = useState({ start: null, end: null })
+
   const [filterByDate, setFilterByDate] = useState(false)
   const [originFilter, setOriginFilter] = useState('')
   const [customerFilter, setCustomerFilter] = useState('')
@@ -144,7 +85,7 @@ export default function ContractStatusPage() {
   const [invoiceFrequencyFilter, setInvoiceFrequencyFilter] = useState('')
   const [contractStatusFilter, setContractStatusFilter] = useState('')
   const [renewalFilter, setRenewalFilter] = useState('')
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 })
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
   const [loading, setLoading] = useState(false)
 
   const originRef = useRef()
@@ -154,55 +95,78 @@ export default function ContractStatusPage() {
   const contractStatusRef = useRef()
   const renewalRef = useRef()
 
-  // Load & Filter Data
   const loadData = async () => {
     setLoading(true)
+
     try {
-      const all = await getContracts()
+      // 1️⃣ CALL API WITH FILTERS + PAGINATION
+      const params = {
+        customer_id: customerFilter || undefined,
+        contract_type: contractTypeFilter || undefined,
+        contract_status: contractStatusFilter || undefined,
+        invoice_frequency: invoiceFrequencyFilter || undefined,
+        company_id: originFilter || undefined,
+        is_renewed: renewalFilter || undefined,
 
-      const filtered = all.filter(r => {
-        const matchesSearch =
-          !searchText ||
-          Object.values(r).some(v =>
-            String(v || '')
-              .toLowerCase()
-              .includes(searchText.toLowerCase())
-          )
+        // date filter
+        start_date: filterByDate && dateFilter.start ? dateFilter.start.toISOString().slice(0, 10) : undefined,
+        end_date: filterByDate && dateFilter.end ? dateFilter.end.toISOString().slice(0, 10) : undefined,
 
-        const matchesDate = !filterByDate || new Date(r.startDate).toDateString() === dateFilter.toDateString()
-        const matchesOrigin = !originFilter || r.origin === originFilter
-        const matchesCustomer = !customerFilter || r.customer === customerFilter
-        const matchesType = !contractTypeFilter || r.type === contractTypeFilter
-        const matchesStatus = !contractStatusFilter || r.status === contractStatusFilter
-        const matchesRenewal = !renewalFilter || r.renewalPending === (renewalFilter === 'Renewed' ? 'No' : 'Yes')
+        // pagination
+        page: pagination.pageIndex + 1,
+        page_size: pagination.pageSize
+      }
 
-        return (
-          matchesSearch &&
-          matchesDate &&
-          matchesOrigin &&
-          matchesCustomer &&
-          matchesType &&
-          matchesStatus &&
-          matchesRenewal
-        )
-      })
+      const response = await getContractView(params)
 
-      // 🔢 Sort latest first
-      const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
+      const count = response.data.count
+      const results = response.data.results
 
-      // 📄 Pagination
-      const start = pagination.pageIndex * pagination.pageSize
-      const end = start + pagination.pageSize
-      const paginated = sorted.slice(start, end)
+      setRowCount(count)
 
-      // 🧾 Normalize + S.No
-      const normalized = paginated.map((item, idx) => ({
-        ...item,
-        sno: start + idx + 1
+      // 2️⃣ MAP API FIELDS → UI FIELDS
+      const normalized = results.map((item, index) => ({
+        sno: index + 1 + pagination.pageIndex * pagination.pageSize,
+        id: item.id,
+
+        customer: item.customer_name,
+        services: item.service_label, // correct
+
+        contractCode: item.contract_code,
+        type: item.contract_type,
+
+        serviceAddress: item.service_address, // ← correct key
+        postalCode: item.postal_address, // ← correct key
+
+        startDate: item.start_date, // already correct
+        endDate: item.end_date,
+
+        // PEST — API gives only array, no label present directly
+        pest: item.pest_items?.map(p => p.pest).join(', ') || '',
+
+        contractValue: item.contract_value,
+        prodValue: item.product_value,
+
+        contactPerson: item.contact_person_name, // ← correct key
+        contactPhone: item.mobile || item.phone, // API has phone + mobile
+
+        renewalPending: item.is_renewed ? 'No' : 'Yes',
+        renewalOn: item.renewed_on,
+        holdedOn: item.holded_on,
+        terminatedOn: item.terminated_on,
+        expiredOn: item.expired_on,
+
+        status: item.contract_status,
+
+        origin: item.company_id, // API gives only ID, no name
+
+        reportEmail: item.report_email,
+        picEmail: item.appointment_remarks, // API does not have pic_email
+        billingEmail: item.billing_remarks
       }))
 
+      // 3️⃣ SET DATA TO TABLE
       setRows(normalized)
-      setRowCount(filtered.length)
     } catch (err) {
       console.error(err)
       showToast('error', 'Failed to load contracts')
@@ -244,20 +208,26 @@ export default function ContractStatusPage() {
     { label: 'Renewed', value: 'Renewed' }
   ]
 
+  // STEP 2: Filter change aana page 1 ku po
   useEffect(() => {
-    loadData()
+    setPagination(prev => ({ ...prev, pageIndex: 0 }))
   }, [
-    pagination.pageIndex,
-    pagination.pageSize,
     searchText,
     filterByDate,
-    dateFilter,
+    dateFilter.start,
+    dateFilter.end,
     originFilter,
     customerFilter,
     contractTypeFilter,
+    invoiceFrequencyFilter,
     contractStatusFilter,
     renewalFilter
   ])
+
+  // STEP 3: Page number or page size maatrina data load pannu
+  useEffect(() => {
+    loadData()
+  }, [pagination.pageIndex, pagination.pageSize])
 
   // Table Columns
   const columnHelper = createColumnHelper()
@@ -369,16 +339,29 @@ export default function ContractStatusPage() {
   const table = useReactTable({
     data: rows,
     columns,
+
+    // CHANGE 1: manualPagination true aakku
     manualPagination: true,
-    pageCount: Math.ceil(rowCount / pagination.pageSize),
-    state: { globalFilter: searchText, pagination },
-    onGlobalFilterChange: setSearchText,
+
+    // CHANGE 2: pageCount loading-la iruntha -1 aakku (important!)
+    pageCount: loading ? -1 : Math.ceil(rowCount / pagination.pageSize),
+
+    state: { pagination },
     onPaginationChange: setPagination,
-    globalFilterFn: fuzzyFilter,
     getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel()
+    // getFilteredRowModel remove pannu if not needed (optional)
   })
+
+  // ADD THIS FULL BLOCK — Jumping 100% Stop Aagum
+  useEffect(() => {
+    if (!loading && rowCount > 0) {
+      const maxPageIndex = Math.max(0, Math.ceil(rowCount / pagination.pageSize) - 1)
+      if (pagination.pageIndex > maxPageIndex) {
+        setPagination(prev => ({ ...prev, pageIndex: maxPageIndex }))
+      }
+    }
+  }, [rowCount, pagination.pageSize, loading])
 
   // Export
   const exportCSV = () => {
@@ -523,23 +506,33 @@ export default function ContractStatusPage() {
           }}
         >
           {/* Date Filter */}
-          <Box>
+          <Box sx={{ position: 'relative', zIndex: 30 }}>
+            {' '}
+            {/* 👈 FIX is here */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
               <Checkbox checked={filterByDate} onChange={e => setFilterByDate(e.target.checked)} size='small' />
-              <Typography sx={{ fontSize: '0.85rem', fontWeight: 500 }}>Date</Typography>
+              <Typography sx={{ fontSize: '0.85rem', fontWeight: 500 }}>Date Range</Typography>
             </Box>
-
             <AppReactDatepicker
-              selected={dateFilter}
-              onChange={setDateFilter}
-              dateFormat='dd/MM/yyyy'
+              selectsRange
+              startDate={dateFilter?.start || null}
+              endDate={dateFilter?.end || null}
+              selected={dateFilter?.start || null}
+              onChange={dates => {
+                const [start, end] = dates
+                setDateFilter({ start, end })
+              }}
+              shouldCloseOnSelect={false}
+              disabled={!filterByDate}
+              popperProps={{ strategy: 'fixed' }}
+              popperPlacement='bottom-start'
               customInput={
                 <TextField
                   fullWidth
                   size='small'
                   disabled={!filterByDate}
-                  sx={{ width: 180 }}
-                  placeholder='Select Date'
+                  sx={{ width: 220, bgcolor: '#fff' }}
+                  placeholder='Select Date Range'
                 />
               }
             />
@@ -621,7 +614,7 @@ export default function ContractStatusPage() {
                 value={pagination.pageSize}
                 onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
               >
-                {[10, 25, 50, 100].map(s => (
+                {[25, 50, 75, 100].map(s => (
                   <MenuItem key={s} value={s}>
                     {s} entries
                   </MenuItem>
@@ -720,7 +713,13 @@ export default function ContractStatusPage() {
                 ))}
               </thead>
               <tbody>
-                {rows.length ? (
+                {rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={columns.length} className='text-center py-4'>
+                      {loading ? 'Loading...' : 'No contracts found'}
+                    </td>
+                  </tr>
+                ) : (
                   table.getRowModel().rows.map(row => (
                     <tr key={row.id}>
                       {row.getVisibleCells().map((cell, idx) => (
@@ -740,12 +739,6 @@ export default function ContractStatusPage() {
                       ))}
                     </tr>
                   ))
-                ) : (
-                  <tr>
-                    <td colSpan={columns.length} className='text-center py-4'>
-                      {loading ? 'Loading...' : 'No results found'}
-                    </td>
-                  </tr>
                 )}
               </tbody>
             </table>

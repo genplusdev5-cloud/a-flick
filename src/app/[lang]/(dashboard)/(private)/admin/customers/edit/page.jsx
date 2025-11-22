@@ -10,7 +10,6 @@ import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
 import { showToast } from '@/components/common/Toasts'
 
-
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalTextField from '@/components/common/GlobalTextField'
 import GlobalTextarea from '@/components/common/GlobalTextarea'
@@ -274,53 +273,52 @@ export default function EditCustomerPage() {
 
   const handleFinalCancel = () => router.push('/admin/customers')
 
-const handleFinalSave = async () => {
-  const formatDate = d => (d ? new Date(d).toISOString().split('T')[0] : null)
+  const handleFinalSave = async () => {
+    const formatDate = d => (d ? new Date(d).toISOString().split('T')[0] : null)
 
-  const payload = {
-    name: formData.customerName,
-    business_name: formData.abssCustomerName,
-    customer_code: formData.cardId,
-    company_id: Number(formData.origin),
-    prefix: formData.companyPrefix,
-    commence_date: formatDate(formData.commenceDate),
-    pic_contact_name: formData.picName,
-    pic_email: formData.picEmail,
-    pic_phone: formData.picPhone,
-    billing_contact_name: formData.billingName,
-    billing_email: formData.billingEmail,
-    billing_phone: formData.billingPhone,
-    city: formData.city,
-    postal_code: formData.postalCode,
-    payment_term: formData.paymentTerms ? Number(formData.paymentTerms) : null,
-    sales_person_id: formData.salesperson ? Number(formData.salesperson) : null,
-    billing_address: formData.billingAddress,
-    email: formData.loginEmail,
-    password: formData.password,
-    short_description: formData.remarks1,
-    description: formData.remarks2,
-    contact: contacts.map(c => ({
-      name: c.miniName,
-      email: c.miniEmail,
-      phone: c.miniPhone
-    }))
-  }
-
-  try {
-    const res = await updateCustomer({ id: editCustomerId, ...payload })
-
-    if (res.status === 'success') {
-      showToast('success', 'Customer updated successfully')
-      setTimeout(() => router.push('/admin/customers'), 600)
-    } else {
-      showToast('error', res.message || 'Update failed')
+    const payload = {
+      name: formData.customerName,
+      business_name: formData.abssCustomerName,
+      customer_code: formData.cardId,
+      company_id: Number(formData.origin),
+      prefix: formData.companyPrefix,
+      commence_date: formatDate(formData.commenceDate),
+      pic_contact_name: formData.picName,
+      pic_email: formData.picEmail,
+      pic_phone: formData.picPhone,
+      billing_contact_name: formData.billingName,
+      billing_email: formData.billingEmail,
+      billing_phone: formData.billingPhone,
+      city: formData.city,
+      postal_code: formData.postalCode,
+      payment_term: formData.paymentTerms ? Number(formData.paymentTerms) : null,
+      sales_person_id: formData.salesperson ? Number(formData.salesperson) : null,
+      billing_address: formData.billingAddress,
+      email: formData.loginEmail,
+      password: formData.password,
+      short_description: formData.remarks1,
+      description: formData.remarks2,
+      contact: contacts.map(c => ({
+        name: c.miniName,
+        email: c.miniEmail,
+        phone: c.miniPhone
+      }))
     }
-  } catch (err) {
-    console.error(err)
-    showToast('error', 'Error saving customer')
-  }
-}
 
+    try {
+      const res = await updateCustomer({ id: editCustomerId, ...payload })
+
+      if (res.status === 'success') {
+        showToast('success', 'Customer updated successfully')
+        setTimeout(() => router.push('/admin/customers'), 600)
+      } else {
+        showToast('error', res.message || 'Update failed')
+      }
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'Error saving customer')
+    }
+  }
 
   const contactManualColumns = [
     {
@@ -384,8 +382,8 @@ const handleFinalSave = async () => {
                   ref={originRef}
                   fullWidth
                   label='Origin'
-                  value={formData.origin}
-                  onChange={e => setFormData(prev => ({ ...prev, origin: e.target.value }))}
+                  value={originOptions.find(o => o.value === formData.origin) || null}
+                  onChange={option => setFormData(prev => ({ ...prev, origin: option?.value || '' }))}
                   options={originOptions}
                 />
               </Grid>
@@ -574,12 +572,17 @@ const handleFinalSave = async () => {
                   ref={paymentTermsRef}
                   fullWidth
                   label='Payment Terms'
-                  value={formData.paymentTerms}
-                  onChange={e => {
-                    setFormData(prev => ({ ...prev, paymentTerms: e.target.value }))
-                    salespersonRef.current?.querySelector('input')?.focus()
-                  }}
-                  options={['Monthly', 'Yearly'].map(v => ({ value: v, label: v }))}
+                  value={
+                    [
+                      { value: 'Monthly', label: 'Monthly' },
+                      { value: 'Yearly', label: 'Yearly' }
+                    ].find(o => o.value === formData.paymentTerms) || null
+                  }
+                  onChange={opt => setFormData(prev => ({ ...prev, paymentTerms: opt?.value || '' }))}
+                  options={[
+                    { value: 'Monthly', label: 'Monthly' },
+                    { value: 'Yearly', label: 'Yearly' }
+                  ]}
                 />
               </Grid>
 

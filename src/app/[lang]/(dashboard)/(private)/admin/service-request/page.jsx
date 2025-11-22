@@ -19,15 +19,22 @@ import {
   Select,
   Checkbox
 } from '@mui/material'
+import { getTicketList } from '@/api/ticket'
+
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
 import AddIcon from '@mui/icons-material/Add'
+
+import EditIcon from '@mui/icons-material/Edit'
+import DeleteIcon from '@mui/icons-material/Delete'
+
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import CustomTextField from '@core/components/mui/TextField'
 import CustomAutocomplete from '@core/components/mui/Autocomplete'
 import { toast, ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
+import { showToast } from '@/components/common/Toasts'
 
 import {
   useReactTable,
@@ -44,97 +51,6 @@ import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
 
 // -------------------------
-// Dummy data (sample service requests)
-// -------------------------
-const dummyData = [
-  {
-    id: 1,
-    scheduleDate: '2025-11-10',
-    day: 'Mon',
-    timeIn: '09:00',
-    timeOut: '10:00',
-    pestCode: 'PC-001',
-    technician: 'John Doe',
-    prodVal: 1200,
-    customer: 'GP Industries Pvt Ltd',
-    serviceAddress: '123 Industrial Area, Delhi',
-    postalCode: '110020',
-    contactPerson: 'Rajesh Kumar',
-    phone: '+91 9876543210',
-    contractCode: 'CON-2025-001',
-    appointmentRemarks: 'Routine monthly service',
-    serviceType: 'Pest Control',
-    scheduleStatus: 'Scheduled',
-    appointmentStatus: 'Pending',
-    status: 'Active'
-  },
-  {
-    id: 2,
-    scheduleDate: '2025-11-11',
-    day: 'Tue',
-    timeIn: '11:00',
-    timeOut: '12:00',
-    pestCode: 'PC-005',
-    technician: 'Priya Sharma',
-    prodVal: 750,
-    customer: 'Acme Corp',
-    serviceAddress: '456 MG Road, Mumbai',
-    postalCode: '400001',
-    contactPerson: 'Ms. Priya',
-    phone: '+91 9123456789',
-    contractCode: 'CON-2024-045',
-    appointmentRemarks: 'Termite follow-up',
-    serviceType: 'Termite Treatment',
-    scheduleStatus: 'Completed',
-    appointmentStatus: 'Done',
-    status: 'Completed'
-  },
-  {
-    id: 3,
-    scheduleDate: '2025-11-12',
-    day: 'Wed',
-    timeIn: '14:00',
-    timeOut: '15:30',
-    pestCode: 'PC-010',
-    technician: 'A. Kumar',
-    prodVal: 500,
-    customer: 'Tech Solutions',
-    serviceAddress: '789 Service Lane',
-    postalCode: '600001',
-    contactPerson: 'Arjun',
-    phone: '+91 9988776655',
-    contractCode: 'CON-2023-010',
-    appointmentRemarks: 'Urgent rodent complaint',
-    serviceType: 'Rodent Control',
-    scheduleStatus: 'Scheduled',
-    appointmentStatus: 'Pending',
-    status: 'Active'
-  }
-]
-
-// -------------------------
-// Toast helper
-// -------------------------
-const showToast = (type, message = '') => {
-  const icons = {
-    success: 'tabler-circle-check',
-    delete: 'tabler-trash',
-    error: 'tabler-alert-triangle',
-    warning: 'tabler-info-circle',
-    info: 'tabler-refresh'
-  }
-  toast(
-    <div className='flex items-center gap-2'>
-      <i className={icons[type]} style={{ fontSize: 20, color: type === 'error' ? '#dc2626' : '#16a34a' }} />
-      <Typography variant='body2' sx={{ fontSize: '0.9rem' }}>
-        {message}
-      </Typography>
-    </div>,
-    { position: 'top-right', autoClose: 2000, hideProgressBar: true, pauseOnHover: false }
-  )
-}
-
-// -------------------------
 // Service Request Page (full)
 // -------------------------
 export default function ServiceRequestPage() {
@@ -142,6 +58,7 @@ export default function ServiceRequestPage() {
   const [rows, setRows] = useState([])
   const [rowCount, setRowCount] = useState(0)
   const [loading, setLoading] = useState(false)
+  const [allTickets, setAllTickets] = useState([])
 
   // filters
   const [enableDateFilter, setEnableDateFilter] = useState(false)
@@ -172,14 +89,24 @@ export default function ServiceRequestPage() {
   const columnHelper = createColumnHelper()
   const columns = useMemo(
     () => [
-      columnHelper.accessor('id', { header: 'ID', meta: { width: '60px' } }),
+      columnHelper.accessor('sno', {
+        header: 'S.No',
+        meta: { width: '60px' }
+      }),
       columnHelper.display({
         id: 'action',
         header: 'Action',
         cell: info => (
-          <Button size='small' variant='text'>
-            ⋮
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <EditIcon
+              sx={{ cursor: 'pointer', color: 'primary.main' }}
+              onClick={() => handleEdit(info.row.original.id)}
+            />
+            <DeleteIcon
+              sx={{ cursor: 'pointer', color: 'error.main' }}
+              onClick={() => handleDelete(info.row.original.id)}
+            />
+          </Box>
         ),
         meta: { width: '80px' }
       }),
@@ -202,16 +129,64 @@ export default function ServiceRequestPage() {
       columnHelper.accessor('appointmentRemarks', { header: 'Appointment Remarks' }),
       columnHelper.accessor('serviceType', { header: 'Service Type' }),
       columnHelper.accessor('scheduleStatus', { header: 'Schedule Status' }),
-      columnHelper.accessor('appointmentStatus', { header: 'Appointment Status' }),
-      columnHelper.accessor('status', {
-        header: 'Status',
+      columnHelper.accessor('appointmentStatus', {
+        header: 'Appointment Status',
         cell: info => {
-          const s = info.getValue() || 'Active'
-          const bg = s === 'Active' ? 'success.main' : s === 'Completed' ? 'info.main' : 'error.main'
+          const s = info.getValue() || 'Pending'
+
+          const bg =
+            s === 'Done'
+              ? 'success.main'
+              : s === 'Pending'
+                ? 'warning.main'
+                : s === 'Cancelled'
+                  ? 'error.main'
+                  : 'info.main'
+
           return (
             <Box
               component='span'
-              sx={{ bgcolor: bg, color: '#fff', px: 1.2, borderRadius: 1, fontWeight: 600, fontSize: '0.8rem' }}
+              sx={{
+                bgcolor: bg,
+                color: '#fff',
+                px: 1.2,
+                py: 0.3,
+                borderRadius: 1,
+                fontWeight: 600,
+                fontSize: '0.75rem'
+              }}
+            >
+              {s}
+            </Box>
+          )
+        }
+      }),
+      columnHelper.accessor('status', {
+        header: 'Status',
+        cell: info => {
+          const s = info.getValue() || 'Pending'
+
+          const bg =
+            s === 'Completed'
+              ? 'success.main'
+              : s === 'Pending'
+                ? 'warning.main'
+                : s === 'Cancelled'
+                  ? 'error.main'
+                  : 'info.main'
+
+          return (
+            <Box
+              component='span'
+              sx={{
+                bgcolor: bg,
+                color: '#fff',
+                px: 1.2,
+                py: 0.3,
+                borderRadius: 1,
+                fontWeight: 600,
+                fontSize: '0.75rem'
+              }}
             >
               {s}
             </Box>
@@ -222,6 +197,58 @@ export default function ServiceRequestPage() {
     []
   )
 
+  const mapTicketToRow = ticket => {
+    const scheduleDate = ticket.schedule_date
+
+    const prodVal = (ticket.pest_items || []).reduce((sum, p) => sum + (p.pest_value || 0), 0)
+
+    return {
+      id: ticket.id,
+      scheduleDate,
+      day: scheduleDate ? format(new Date(scheduleDate), 'EEE') : '',
+      timeIn: ticket.schedule_start_time,
+      timeOut: ticket.schedule_end_time,
+      pestCode: ticket.name || '',
+      technician: ticket.technician_id || '',
+      prodVal,
+      customer: ticket.customer_id || '',
+      serviceAddress: ticket.service_address || '',
+      postalCode: ticket.postal_code || '',
+      contactPerson: ticket.contact_person || '',
+      phone: ticket.contact_number || '',
+      contractCode: ticket.num_series || '',
+      appointmentRemarks: ticket.remarks || '',
+      serviceType: ticket.ticket_type || '',
+      scheduleStatus: ticket.ticket_status || '',
+      appointmentStatus: ticket.ticket_status || '',
+      status: ticket.ticket_status || ''
+    }
+  }
+
+  const CONTRACT_ID = 6010
+
+  const fetchTicketsFromApi = async () => {
+    try {
+      setLoading(true)
+
+      const res = await getTicketList({ contract_id: CONTRACT_ID })
+
+      const list = res?.data?.results || []
+      const mapped = list.map(mapTicketToRow)
+
+      setAllTickets(mapped)
+    } catch (err) {
+      console.log(err)
+      showToast('error', 'Failed to fetch ticket list')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchTicketsFromApi()
+  }, [])
+
   // filter + load data
   const loadData = async (showToastMsg = false) => {
     setLoading(true)
@@ -230,7 +257,7 @@ export default function ServiceRequestPage() {
       await new Promise(r => setTimeout(r, 200))
 
       // apply filters on dummyData
-      const filtered = dummyData.filter(r => {
+      const filtered = (allTickets || []).filter(r => {
         const matchSearch =
           !searchText ||
           Object.values({
@@ -287,6 +314,7 @@ export default function ServiceRequestPage() {
   useEffect(() => {
     loadData(false)
   }, [
+    allTickets,
     pagination.pageIndex,
     pagination.pageSize,
     searchText,
@@ -391,9 +419,8 @@ export default function ServiceRequestPage() {
                   variant='contained'
                   startIcon={<RefreshIcon />}
                   onClick={async () => {
-                    setLoading(true)
-                    await loadData(true)
-                    setTimeout(() => setLoading(false), 400)
+                    await fetchTicketsFromApi()
+                    showToast('success', 'Refreshed')
                   }}
                   sx={{ textTransform: 'none' }}
                 >

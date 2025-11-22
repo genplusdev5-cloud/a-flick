@@ -19,10 +19,14 @@ import {
   Breadcrumbs,
   Chip,
   TextField,
+  Checkbox,
   FormControl,
   Select,
   InputAdornment
 } from '@mui/material'
+
+import { getReportBacklogList } from '@/api/reportBacklog/list'
+import GlobalDateRange from '@/components/common/GlobalDateRange'
 
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
@@ -69,70 +73,6 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
   return <TextField {...props} value={value} onChange={e => setValue(e.target.value)} />
 }
 
-// Dummy Data
-const BASE = [
-  {
-    id: 1,
-    serviceDate: '2025-01-03',
-    scheduleDate: '2025-01-01',
-    backlogDays: 2,
-    productivity: 3.4,
-    frequency: 'Weekly',
-    customer: 'DBS Trustee Ltd',
-    contactPerson: 'Arun Kumar',
-    phone: '91234567',
-    timeIn: '10:00 AM',
-    timeOut: '11:30 AM',
-    serviceType: 'Routine',
-    contractType: 'Limited',
-    technician: 'Shan',
-    pestCode: 'MC01',
-    address: '163 Kallang Way',
-    postalCode: '349256',
-    scheduleStatus: 'Pending',
-    serviceStatus: 'Missed',
-    remarks: 'Customer not available',
-    status: 'Active'
-  },
-  {
-    id: 2,
-    serviceDate: '2025-01-10',
-    scheduleDate: '2025-01-08',
-    backlogDays: 2,
-    productivity: 4.2,
-    frequency: 'Monthly',
-    customer: 'SBCD ARC Pte Ltd',
-    contactPerson: 'David Lee',
-    phone: '98765432',
-    timeIn: '09:00 AM',
-    timeOut: '10:10 AM',
-    serviceType: 'Follow-Up',
-    contractType: 'Continuous',
-    technician: 'Melvin',
-    pestCode: 'RC02',
-    address: '460 Alexandra Road',
-    postalCode: '119963',
-    scheduleStatus: 'Overdue',
-    serviceStatus: 'Pending',
-    remarks: 'Technician Delay',
-    status: 'Active'
-  }
-]
-
-// Duplicate for table population
-const makeRows = () => {
-  const arr = []
-  for (let i = 0; i < 10; i++) {
-    BASE.forEach((r, idx) => {
-      arr.push({
-        ...r,
-        id: r.id + i * 10 + idx
-      })
-    })
-  }
-  return arr
-}
-
 // Date formatter
 const formatDate = iso => {
   try {
@@ -150,10 +90,12 @@ const formatDate = iso => {
 export default function BacklogFinderPage() {
   const router = useRouter()
 
-  const [master] = useState(makeRows)
+  const [allRows, setAllRows] = useState([])
+
   const [rows, setRows] = useState([])
 
-  const [rowCount, setRowCount] = useState(master.length)
+  const [rowCount, setRowCount] = useState(0)
+
   const [searchText, setSearchText] = useState('')
 
   const [fromDate, setFromDate] = useState('')
@@ -169,7 +111,7 @@ export default function BacklogFinderPage() {
     setLoading(true)
 
     try {
-      let data = [...master]
+      let data = [...allRows]
 
       // Apply date filter
       if (fromDate) {
@@ -212,9 +154,75 @@ export default function BacklogFinderPage() {
     }
   }
 
+  const fetchBacklog = async () => {
+    setLoading(true)
+    try {
+      const res = await getReportBacklogList()
+
+      if (res?.status === 'success') {
+        let list = Array.isArray(res.data) ? res.data : []
+
+        // backend returns empty object → remove those
+        list = list.filter(item => item.id)
+
+        const normalized = list.map((item, index) => ({
+          id: item.id,
+          sno: index + 1,
+
+          serviceDate: item.service_date,
+          scheduleDate: item.schedule_date,
+          backlogDays: item.backlog_days,
+          productivity: item.productivity_value,
+          frequency: item.frequency,
+          customer: item.customer,
+          contactPerson: item.contact_person,
+          phone: item.phone,
+          timeIn: item.appointment_time_in,
+          timeOut: item.appointment_time_out,
+          serviceType: item.service_type,
+          contractType: item.contract_type,
+          technician: item.technician,
+          pestCode: item.pest_code,
+          address: item.service_address,
+          postalCode: item.postal_code,
+          scheduleStatus: item.schedule_status,
+          serviceStatus: item.service_status,
+          remarks: item.remarks,
+          status: item.status || 'Active'
+        }))
+
+        setAllRows(normalized)
+        setRowCount(normalized.length)
+        setPagination(prev => ({ ...prev, pageIndex: 0 }))
+      } else {
+        showToast('error', res?.message || 'Failed to fetch report backlog')
+        setAllRows([])
+        setRowCount(0)
+      }
+    } catch (err) {
+      console.error('report-backlog fetch error:', err)
+      showToast('error', 'Error fetching report backlog')
+      setAllRows([])
+      setRowCount(0)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // fetch once on page load
   useEffect(() => {
+    fetchBacklog()
+  }, [])
+
+  // reload table when filters/pagination change
+  useEffect(() => {
+    if (!allRows.length) {
+      setRows([])
+      setRowCount(0)
+      return
+    }
     loadData()
-  }, [pagination.pageIndex, pagination.pageSize, searchText, fromDate, toDate])
+  }, [allRows, pagination.pageIndex, pagination.pageSize, searchText, fromDate, toDate])
 
   const handleEdit = id => router.push(`/admin/backlog/${id}/edit`)
   const confirmDelete = () => {
@@ -422,10 +430,7 @@ export default function BacklogFinderPage() {
                   />
                 }
                 disabled={loading}
-                onClick={() => {
-                  setPagination({ pageIndex: 0, pageSize: pagination.pageSize })
-                  loadData()
-                }}
+                onClick={() => fetchBacklog()}
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
                 {loading ? 'Refreshing...' : 'Refresh'}
@@ -434,8 +439,6 @@ export default function BacklogFinderPage() {
           }
           action={
             <Box display='flex' alignItems='center' gap={2}>
-
-
               <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
                 <MenuItem onClick={exportPrint}>
                   <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
@@ -451,75 +454,90 @@ export default function BacklogFinderPage() {
         <Divider sx={{ mb: 4 }} />
 
         {/* FILTERS */}
-        <Box
-          sx={{
-            mb: 4,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-            flexWrap: 'wrap'
-          }}
-        >
-          {/* 🔥 Entries Dropdown */}
-          <FormControl size='small' sx={{ width: 120 }}>
-            <Select
-              value={pagination.pageSize}
-              onChange={e =>
-                setPagination(p => ({
-                  ...p,
-                  pageSize: Number(e.target.value),
-                  pageIndex: 0
-                }))
-              }
-            >
-              {[10, 25, 50, 100].map(s => (
-                <MenuItem key={s} value={s}>
-                  {s} entries
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
 
-          {/* From Date */}
-          <GlobalTextField
-            type='date'
-            label='From Date'
-            value={fromDate}
-            onChange={e => setFromDate(e.target.value)}
-            size='small'
-            sx={{ width: 220 }}
-          />
+        {/* FILTERS BLOCK (Date Range ONLY) */}
+        <Box sx={{ mb: 4 }}>
+          {/* ROW 1 — Date Range ABOVE input */}
+          <Box sx={{ display: 'flex', flexDirection: 'column', width: 260, mb: 3 }}>
+            {/* Checkbox + Label */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+              <Checkbox
+                checked={!!fromDate || !!toDate}
+                onChange={e => {
+                  if (!e.target.checked) {
+                    setFromDate('')
+                    setToDate('')
+                  }
+                }}
+                size='small'
+              />
+              <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Date Range</Typography>
+            </Box>
 
-          {/* To Date */}
-          <GlobalTextField
-            type='date'
-            label='To Date'
-            value={toDate}
-            onChange={e => setToDate(e.target.value)}
-            size='small'
-            sx={{ width: 220 }}
-          />
+            {/* Single Date Range Picker */}
+            <GlobalDateRange
+              label=''
+              start={fromDate}
+              end={toDate}
+              onSelectRange={({ start, end }) => {
+                setFromDate(start)
+                setToDate(end)
+              }}
+              disabled={!fromDate && !toDate}
+            />
+          </Box>
+          <Divider sx={{ mb: 4 }} />
 
-          {/* Search */}
-          <DebouncedInput
-            value={searchText}
-            onChange={val => {
-              setSearchText(val)
-              setPagination(p => ({ ...p, pageIndex: 0 }))
+          {/* ROW 2 — Entries + Search */}
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 3
             }}
-            placeholder='Search customer, address, pest code...'
-            sx={{ width: 340 }}
-            size='small'
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position='start'>
-                    <SearchIcon />
-                  </InputAdornment>
-                )
-              }
-            }}
-          />
+          >
+            {/* Entries Dropdown */}
+            <FormControl size='small' sx={{ width: 120 }}>
+              <Select
+                value={pagination.pageSize}
+                onChange={e =>
+                  setPagination(p => ({
+                    ...p,
+                    pageSize: Number(e.target.value),
+                    pageIndex: 0
+                  }))
+                }
+              >
+                {[10, 25, 50, 100].map(s => (
+                  <MenuItem key={s} value={s}>
+                    {s} entries
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            {/* Search */}
+            <DebouncedInput
+              value={searchText}
+              onChange={val => {
+                setSearchText(val)
+                setPagination(p => ({ ...p, pageIndex: 0 }))
+              }}
+              placeholder='Search customer, address, pest code...'
+              sx={{ width: 340 }}
+              size='small'
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position='start'>
+                      <SearchIcon />
+                    </InputAdornment>
+                  )
+                }
+              }}
+            />
+          </Box>
         </Box>
 
         {/* TABLE */}

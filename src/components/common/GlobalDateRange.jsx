@@ -1,44 +1,63 @@
 'use client'
 
-import { useState, forwardRef } from 'react'
+import { useState, forwardRef, useEffect } from 'react'
 import { format } from 'date-fns'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import CustomTextField from '@core/components/mui/TextField'
 
-const formatDate = date => format(date, 'dd-MM-yyyy')
+const formatDate = date => (date ? format(date, 'dd-MM-yyyy') : '')
 
-const GlobalDateRange = ({ label = 'Date Range', ...props }) => {
-  const [start, setStart] = useState(new Date())
-  const [end, setEnd] = useState(new Date())
+const GlobalDateRange = ({
+  label = 'Date Range',
+  onSelectRange,
+  start,
+  end,
+  disabled = false   // ✅ NEW
+}) => {
+  const [localStart, setLocalStart] = useState(start)
+  const [localEnd, setLocalEnd] = useState(end)
 
-  const onChange = (dates) => {
+  // Sync selected range back to parent
+  useEffect(() => {
+    if (!disabled && onSelectRange && localStart && localEnd) {
+      onSelectRange({ start: localStart, end: localEnd })
+    }
+  }, [localStart, localEnd, disabled])
+
+  const onChange = dates => {
+    if (disabled) return     // 🚫 Ignore changes when disabled
+
     const [s, e] = dates
-    setStart(s)
-    setEnd(e)
+    setLocalStart(s)
+    setLocalEnd(e)
   }
 
-  const CustomInput = forwardRef(({ start, end, label }, ref) => {
-    const value = `${formatDate(start)} - ${end ? formatDate(end) : ''}`
-
-    return (
-      <CustomTextField
-        fullWidth
-        inputRef={ref}
-        label={label}
-        value={value}
-        {...props}
-      />
-    )
-  })
+  const CustomInput = forwardRef(({ value, onClick }, ref) => (
+    <CustomTextField
+      fullWidth
+      label={label}
+      inputRef={ref}
+      value={value}
+      onClick={disabled ? undefined : onClick} // disable click
+      readOnly
+      disabled={disabled}
+      sx={{ cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.6 : 1 }}
+    />
+  ))
 
   return (
     <AppReactDatepicker
       selectsRange
-      startDate={start}
-      endDate={end}
+      startDate={localStart}
+      endDate={localEnd}
       onChange={onChange}
       shouldCloseOnSelect={false}
-      customInput={<CustomInput start={start} end={end} label={label} />}
+      disabled={disabled}  // ✅ IMPORTANT
+      customInput={
+        <CustomInput
+          value={`${formatDate(localStart)} - ${formatDate(localEnd)}`}
+        />
+      }
     />
   )
 }

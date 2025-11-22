@@ -7,6 +7,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
 
+import { getAllDropdowns } from '@/api/dropdowns/single'
+
 import { getCustomerOrigin } from '@/api/customer/origin'
 import { showToast } from '@/components/common/Toasts'
 
@@ -96,6 +98,60 @@ export default function AddCustomerPage() {
   const remarks2Ref = useRef(null)
 
   const [originOptions, setOriginOptions] = useState([])
+
+  // ===============================
+  // 🔥 LOAD ALL DROPDOWNS IN ONE CALL
+  // ===============================
+  const [dropdowns, setDropdowns] = useState({
+    employees: [],
+    customers: [],
+    industries: [],
+    callTypes: [],
+    billingFreq: [],
+    serviceFreq: [],
+    pests: [],
+    chemicals: [],
+    uom: [],
+    supplier: []
+  })
+
+  useEffect(() => {
+    const loadDropdowns = async () => {
+      try {
+        const data = await getAllDropdowns()
+
+       const safeArray = val => {
+  if (!val) return [];
+  if (Array.isArray(val)) return val;
+  if (val.name && Array.isArray(val.name)) return val.name;
+  if (val.results && Array.isArray(val.results)) return val.results;
+  return [];
+};
+
+
+        setDropdowns({
+          employees: safeArray(data.employee?.name),
+          customers: safeArray(data.customer?.name),
+          industries: safeArray(data.industry?.name),
+
+          callTypes: safeArray(data.calltype?.name),
+
+          billingFreq: safeArray(data.billingfrequency?.name),
+          serviceFreq: safeArray(data.servicefrequency?.name),
+
+          pests: safeArray(data.pest?.name),
+          chemicals: safeArray(data.chemicals?.name),
+          uom: safeArray(data.uom?.name),
+
+          supplier: safeArray(data.supplier?.name)
+        })
+      } catch (error) {
+        console.error('Dropdown load error:', error)
+      }
+    }
+
+    loadDropdowns()
+  }, [])
 
   useEffect(() => {
     const loadOrigins = async () => {

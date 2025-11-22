@@ -114,21 +114,18 @@ const Calendar = props => {
     resourceAreaHeaderContent: 'Employees',
     resourceLabelContent: arg => arg.resource.title,
 
+    initialView: 'timeGridWeek', // 👈 DEFAULT WEEK VIEW
+
     headerToolbar: {
       left: 'today prev,next',
       center: 'title',
-      right: 'resourceTimeGridDay,resourceTimelineThreeDay,timeGridWeek,dayGridMonth'
+      right: 'resourceTimeGridDay,timeGridWeek,dayGridMonth' // 👈 removed 'resourceTimelineThreeDay'
     },
 
     views: {
       resourceTimeGridDay: {
         type: 'resourceTimeGrid',
         buttonText: 'Day'
-      },
-      resourceTimelineThreeDay: {
-        type: 'resourceTimeline',
-        duration: { days: 3 },
-        buttonText: '3 Days'
       }
     },
 

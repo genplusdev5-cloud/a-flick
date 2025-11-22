@@ -33,6 +33,9 @@ import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
 import StatusChip from '@/components/common/StatusChip'
 
+import { getTmMaterialRequestList } from '@/api/materialRequest/list'
+import { deleteTmMaterialRequest } from '@/api/materialRequest/delete'
+
 import CustomTextField from '@core/components/mui/TextField'
 import CustomAutocomplete from '@core/components/mui/Autocomplete'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
@@ -58,134 +61,7 @@ import classnames from 'classnames'
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
 import { format } from 'date-fns'
-
-// ───────────────────────────────────────
-// IndexedDB
-// ───────────────────────────────────────
-const DB_NAME = 'material_request_db'
-const STORE_NAME = 'requests'
-
-const initDB = async () => {
-  return await openDB(DB_NAME, 1, {
-    upgrade(db) {
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true })
-      }
-    }
-  })
-}
-
-const loadRequests = async () => {
-  const db = await initDB()
-  const all = await db.getAll(STORE_NAME)
-  return all.sort((a, b) => b.id - a.id)
-}
-
-const deleteRequest = async id => {
-  const db = await initDB()
-  await db.delete(STORE_NAME, Number(id))
-}
-
-// ──────────────────────────────────────────────────────────────
-// Toast (Custom Styled, Global, with Icons & Colors)
-// ──────────────────────────────────────────────────────────────
-const showToast = (type, message = '') => {
-  const icons = {
-    success: 'tabler-circle-check',
-    delete: 'tabler-trash',
-    error: 'tabler-alert-triangle',
-    warning: 'tabler-info-circle',
-    info: 'tabler-refresh'
-  }
-
-  toast(
-    <div className='flex items-center gap-2'>
-      <i
-        className={icons[type]}
-        style={{
-          color:
-            type === 'success'
-              ? '#16a34a'
-              : type === 'error'
-                ? '#dc2626'
-                : type === 'delete'
-                  ? '#dc2626'
-                  : type === 'warning'
-                    ? '#f59e0b'
-                    : '#2563eb',
-          fontSize: '22px'
-        }}
-      />
-      <Typography variant='body2' sx={{ fontSize: '0.9rem', color: '#111' }}>
-        {message}
-      </Typography>
-    </div>,
-    {
-      position: 'top-right',
-      autoClose: 2000,
-      hideProgressBar: true,
-      closeOnClick: true,
-      pauseOnHover: false,
-      draggable: false,
-      theme: 'light',
-      style: {
-        borderRadius: '10px',
-        padding: '8px 14px',
-        boxShadow: '0 4px 10px rgba(0,0,0,0.06)',
-        display: 'flex',
-        alignItems: 'center'
-      }
-    }
-  )
-}
-
-// ───────────────────────────────────────
-// Dummy Data (replace with API later)
-// ───────────────────────────────────────
-const dummyRequests = [
-  {
-    id: 1,
-    requestNo: 'REQ-001',
-    requestDate: '2025-10-15',
-    requestType: 'Transfer',
-    fromLocation: 'Stock-TECH STOCK 1',
-    toLocation: 'Site-A',
-    requestedBy: 'John Doe',
-    status: 'Approved',
-    approvedStatus: 'Approved',
-    issuedStatus: 'Issued',
-    completedStatus: 'Yes',
-    remarks: 'Urgent transfer'
-  },
-  {
-    id: 2,
-    requestNo: 'REQ-002',
-    requestDate: '2025-10-16',
-    requestType: 'Purchase',
-    fromLocation: 'Supplier-ABC',
-    toLocation: 'Stock-TECH STOCK 1',
-    requestedBy: 'Jane Smith',
-    status: 'Pending',
-    approvedStatus: 'Pending',
-    issuedStatus: 'Pending',
-    completedStatus: 'No',
-    remarks: ''
-  },
-  {
-    id: 3,
-    requestNo: 'REQ-003',
-    requestDate: '2025-10-17',
-    requestType: 'Transfer',
-    fromLocation: 'Stock-TECH STOCK 1',
-    toLocation: 'Site-C',
-    requestedBy: 'Admin',
-    status: 'Issued',
-    approvedStatus: 'Approved',
-    issuedStatus: 'Issued',
-    completedStatus: 'No',
-    remarks: 'Partial issue'
-  }
-]
+import { showToast } from '@/components/common/Toasts'
 
 // ───────────────────────────────────────
 // Main Component
@@ -206,6 +82,7 @@ export default function MaterialRequestPage() {
   const [requestedBy, setRequestedBy] = useState('')
   const [searchText, setSearchText] = useState('')
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
+  const [sorting, setSorting] = useState([])
 
   // ✅ Confirm delete (properly scoped)
   const confirmDelete = async () => {
@@ -213,7 +90,8 @@ export default function MaterialRequestPage() {
       const row = deleteDialog.row
       if (!row) return
 
-      await deleteRequest(row.id)
+      await deleteTmMaterialRequest(row.id)
+
       showToast('delete', `Request ${row.requestNo || `REQ-${row.id}`} deleted`)
       await loadData()
     } catch (err) {
@@ -233,35 +111,62 @@ export default function MaterialRequestPage() {
   const loadData = async (showToastMsg = false) => {
     setLoading(true)
     try {
-      let data = dummyRequests // Replace later with IndexedDB data: await loadRequests()
+      const response = await getTmMaterialRequestList()
+      const data = response?.data?.results || []
 
-      // 🔍 Apply all filters
-      const filtered = data.filter(r => {
-        const reqNo = r.requestNo || `REQ-${r.id}`
-        const matchesSearch =
-          !searchText ||
-          Object.values({ ...r, reqNo })
-            .join(' ')
-            .toLowerCase()
-            .includes(searchText.toLowerCase())
+      // 1️⃣ MAP API → UI FIELDS (camelCase)
+      const mapped = data.map(r => {
+        const reqNo = r.request_no || `REQ-${r.id}`
+
+        return {
+          id: r.id,
+
+          // table columns
+          requestType: r.request_type || 'Material',
+          requestNo: reqNo,
+          requestDate: r.request_date, // "2025-11-04"
+
+          fromLocation: r.from_location || r.from_location_supplier || '',
+          toLocation: r.to_location || r.to_location_supplier || '',
+
+          requestedBy: r.requested_by_name || r.employee_name || (r.employee_id ? `EMP-${r.employee_id}` : ''),
+
+          approvedStatus: r.is_approved === 1 ? 'Yes' : 'N/A',
+          issuedStatus: r.is_issued === 1 ? 'Yes' : 'N/A', // if API doesn’t have, stays N/A
+          completedStatus: r.is_completed === 1 ? 'Yes' : 'No',
+
+          remarks: r.remarks || '',
+          status: r.request_status || 'Waiting'
+        }
+      })
+
+      // 2️⃣ APPLY FILTERS ON MAPPED DATA
+      const filtered = mapped.filter(row => {
+        const text = searchText.trim().toLowerCase()
+
+        const matchesSearch = !text || Object.values(row).join(' ').toLowerCase().includes(text)
 
         const matchesDate = !enableDateFilter
           ? true
-          : new Date(r.requestDate) >= startDate && new Date(r.requestDate) <= endDate
+          : row.requestDate && new Date(row.requestDate) >= startDate && new Date(row.requestDate) <= endDate
 
-        const matchesStatus = !requestStatus || r.status === requestStatus
-        const matchesFrom = !fromLocation || r.fromLocation === fromLocation
-        const matchesTo = !toLocation || r.toLocation === toLocation
-        const matchesBy = !requestedBy || r.requestedBy === requestedBy
+        const matchesStatus = !requestStatus || row.status === requestStatus
+        const matchesFrom = !fromLocation || row.fromLocation === fromLocation
+        const matchesTo = !toLocation || row.toLocation === toLocation
+        const matchesBy = !requestedBy || row.requestedBy === requestedBy
 
         return matchesSearch && matchesDate && matchesStatus && matchesFrom && matchesTo && matchesBy
       })
 
-      // 🧾 Normalize with serial number
-      const withSno = filtered.map((r, i) => ({ ...r, sno: i + 1 }))
+      // 3️⃣ ADD S.NO
+      const withSno = filtered.map((row, i) => ({ ...row, sno: i + 1 }))
+
       setRows(withSno)
 
-      if (showToastMsg) showToast('info', 'Material requests refreshed')
+      // toast only from Refresh button
+      if (showToastMsg) {
+        showToast('info', 'Material requests refreshed')
+      }
     } catch (err) {
       console.error(err)
       showToast('error', 'Failed to load requests')
@@ -271,18 +176,19 @@ export default function MaterialRequestPage() {
   }
 
   useEffect(() => {
-    loadData(false)
+    loadData(false) // Never show toast here
   }, [searchText, enableDateFilter, startDate, endDate, requestStatus, fromLocation, toLocation, requestedBy])
 
   // Actions
   const handleDelete = async row => {
-    await deleteRequest(row.id)
+    await deleteTmMaterialRequest(row.id)
+
     showToast('delete', 'Request deleted')
     loadData()
   }
 
   const handleEdit = row => {
-    router.push(`/admin/stock/material-request/${row.id}/edit`)
+    router.push(`/admin/stock/material-request/${encodeURIComponent(row.id)}/edit`)
   }
 
   const getStatusColor = status => {
@@ -362,39 +268,47 @@ export default function MaterialRequestPage() {
       columnHelper.accessor('sno', {
         header: 'S.No',
         size: 60,
-        meta: { align: 'center' },
         enableSorting: false
       }),
+
       columnHelper.display({
         id: 'actions',
         header: 'Actions',
         size: 100,
-        meta: { align: 'center' },
-        cell: ({ row }) => (
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            {/* ✏️ Edit Button */}
-            <IconButton
-              size='small'
-              color='primary'
-              onClick={() => router.push(`/admin/stock/material-request/${row.original.id}/edit`)}
-            >
-              <EditIcon fontSize='small' />
-            </IconButton>
+        enableSorting: false,
+        cell: ({ row }) => {
+          const encodedId = btoa(String(row.original.id))
 
-            {/* 🗑️ Delete Button */}
-            <IconButton size='small' color='error' onClick={() => setDeleteDialog({ open: true, row: row.original })}>
-              <DeleteIcon fontSize='small' />
-            </IconButton>
-          </Box>
-        )
+          return (
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <IconButton
+                size='small'
+                color='primary'
+                onClick={() => router.push(`/admin/stock/material-request/${encodedId}/edit`)}
+              >
+                <EditIcon fontSize='small' />
+              </IconButton>
+
+              <IconButton size='small' color='error' onClick={() => setDeleteDialog({ open: true, row: row.original })}>
+                <DeleteIcon fontSize='small' />
+              </IconButton>
+            </Box>
+          )
+        }
+      }),
+      // ✔ Comes from mapped.requestType
+      columnHelper.accessor('requestType', {
+        header: 'Request Type',
+        size: 150
       }),
 
-      columnHelper.accessor('requestType', { header: 'Request Type', size: 150 }),
-      columnHelper.accessor(row => row.requestNo || `REQ-${row.id}`, {
-        id: 'requestNo',
+      // ✔ Comes from mapped.requestNo
+      columnHelper.accessor('requestNo', {
         header: 'Request No',
         size: 150
       }),
+
+      // ✔ Comes from mapped.requestDate
       columnHelper.accessor('requestDate', {
         header: 'Request Date',
         size: 130,
@@ -403,32 +317,59 @@ export default function MaterialRequestPage() {
           return d ? format(new Date(d), 'dd/MM/yyyy') : ''
         }
       }),
-      columnHelper.accessor('fromLocation', { header: 'From Location/Supplier', size: 200 }),
-      columnHelper.accessor('toLocation', { header: 'To Location/Supplier', size: 200 }),
-      columnHelper.accessor('requestedBy', { header: 'Requested By', size: 140 }),
 
-      // ✅ Use StatusChip globally
+      // ✔ Comes from mapped.fromLocation
+      columnHelper.accessor('fromLocation', {
+        header: 'From Location/Supplier',
+        size: 200
+      }),
+
+      // ✔ Comes from mapped.toLocation
+      columnHelper.accessor('toLocation', {
+        header: 'To Location/Supplier',
+        size: 200
+      }),
+
+      // ✔ Comes from mapped.requestedBy
+      columnHelper.accessor('requestedBy', {
+        header: 'Requested By',
+        size: 140
+      }),
+
+      // ------- STATUS COLUMNS -------
+
       columnHelper.display({
         id: 'isApproved',
         header: 'Is Approved',
         size: 120,
+        enableSorting: false,
         cell: ({ row }) => <StatusChip status={row.original.approvedStatus} />
       }),
+
       columnHelper.display({
         id: 'isIssued',
         header: 'Is Issued',
         size: 120,
+        enableSorting: false,
         cell: ({ row }) => <StatusChip status={row.original.issuedStatus} />
       }),
+
       columnHelper.display({
         id: 'isCompleted',
         header: 'Is Completed',
         size: 120,
-        cell: ({ row }) => <StatusChip status={row.original.completedStatus === 'Yes' ? 'Yes' : 'No'} />
+        enableSorting: false,
+        cell: ({ row }) => <StatusChip status={row.original.completedStatus} />
       }),
-      columnHelper.accessor('remarks', { header: 'Remarks', size: 200 }),
-      columnHelper.accessor(row => row.status || 'Waiting', {
-        id: 'status',
+
+      // ✔ Comes from mapped.remarks
+      columnHelper.accessor('remarks', {
+        header: 'Remarks',
+        size: 200
+      }),
+
+      // ✔ Comes from mapped.status
+      columnHelper.accessor('status', {
         header: 'Request Status',
         size: 150,
         cell: info => <StatusChip status={info.getValue()} />
@@ -440,6 +381,10 @@ export default function MaterialRequestPage() {
   const table = useReactTable({
     data: rows,
     columns,
+    state: {
+      sorting
+    },
+    onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -498,10 +443,12 @@ export default function MaterialRequestPage() {
                   />
                 }
                 disabled={loading}
-                onClick={async () => {
+                onClick={() => {
                   setLoading(true)
-                  await loadData(true)
-                  setTimeout(() => setLoading(false), 600)
+                  setTimeout(async () => {
+                    await loadData(true)
+                    setLoading(false)
+                  }, 50)
                 }}
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >

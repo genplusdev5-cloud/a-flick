@@ -88,6 +88,10 @@ export default function SupplierPage() {
   const [loading, setLoading] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
+
+  const [unsavedAddData, setUnsavedAddData] = useState(null)
+  const [originalEditData, setOriginalEditData] = useState(null)
+
   const [formData, setFormData] = useState({
     id: null,
     type: '',
@@ -102,6 +106,16 @@ export default function SupplierPage() {
   const statusRef = useRef(null)
 
   const supplierTypes = ['Stock', 'Supplier', 'Vehicle', 'Adjustment', 'Opening Stock']
+
+  const clearForm = () => {
+    setFormData({
+      id: null,
+      type: '',
+      name: '',
+      address: '',
+      status: 'Active'
+    })
+  }
 
   // Load rows
   const loadData = async () => {
@@ -148,16 +162,38 @@ export default function SupplierPage() {
   const toggleDrawer = () => setDrawerOpen(p => !p)
 
   const handleAdd = () => {
-    setIsEdit(false)
-    setFormData({
-      id: null,
-      type: '',
-      name: '',
-      address: '',
-      status: 'Active'
-    })
+    setIsEdit(false) // add mode
+
+    // Restore previously typed values when reopening Add drawer
+    if (unsavedAddData) {
+      setFormData(unsavedAddData)
+    } else {
+      // default empty form
+      setFormData({
+        id: null,
+        type: '',
+        name: '',
+        address: '',
+        status: 'Active'
+      })
+    }
+
     setDrawerOpen(true)
+
     setTimeout(() => typeRef.current?.focus(), 100)
+  }
+
+  const handleFieldChange = (field, value) => {
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value }
+
+      // Only store cache during ADD mode
+      if (!isEdit) {
+        setUnsavedAddData(updated)
+      }
+
+      return updated
+    })
   }
 
   const handleEdit = async row => {
@@ -175,7 +211,6 @@ export default function SupplierPage() {
         address: data.billing_address || '',
         status: data.is_active === 1 ? 'Active' : 'Inactive',
 
-        // Additional fields backend requires
         business_name: data.business_name || '',
         billing_contact_name: data.billing_contact_name || '',
         billing_email: data.billing_email || '',
@@ -192,10 +227,12 @@ export default function SupplierPage() {
         description: data.description || ''
       }
 
+      // keep original edit values
+      setOriginalEditData(clean)
+
       setFormData(clean)
       setDrawerOpen(true)
     } catch (err) {
-      console.error(err)
       showToast('error', 'Failed to fetch supplier details')
     } finally {
       setLoading(false)
@@ -218,69 +255,71 @@ export default function SupplierPage() {
     setDeleteDialog({ open: false, row: null })
   }
 
- const handleSubmit = async (e) => {
-  e.preventDefault()
+  const handleSubmit = async e => {
+    e.preventDefault()
 
-  const payload = {
-    id: formData.id,
+    const payload = {
+      name: formData.name,
+      business_name: formData.business_name,
+      billing_address: formData.address,
+      billing_contact_name: formData.billing_contact_name,
+      billing_email: formData.billing_email,
+      billing_phone: formData.billing_phone,
+      pic_contact_name: formData.pic_contact_name,
+      pic_email: formData.pic_email,
+      pic_phone: formData.pic_phone,
+      city: formData.city,
+      state: formData.state,
+      postal_code: formData.postal_code,
+      payment_term: formData.payment_term,
+      account_details: formData.account_details,
+      description: formData.description,
+      short_description: formData.short_description,
+      is_pest: formData.type === 'Pest Supplier' ? 1 : 0,
+      is_active: formData.status === 'Active' ? 1 : 0,
+      status: 1
+    }
 
-    name: formData.name,
-    business_name: formData.business_name,
-    billing_address: formData.address,
-    billing_contact_name: formData.billing_contact_name,
-    billing_email: formData.billing_email,
-    billing_phone: formData.billing_phone,
-    pic_contact_name: formData.pic_contact_name,
-    pic_email: formData.pic_email,
-    pic_phone: formData.pic_phone,
+    try {
+      if (isEdit) {
+        payload.id = formData.id
+        await updateSupplier(payload)
+      } else {
+        await addSupplier(payload)
+        showToast('success', 'Supplier added successfully')
+      }
 
-    city: formData.city,
-    state: formData.state,
-    postal_code: formData.postal_code,
-    payment_term: formData.payment_term,
-    account_details: formData.account_details,
-    description: formData.description,
-    short_description: formData.short_description,
-
-    is_pest: formData.type === "Pest Supplier" ? 1 : 0,
-    is_active: formData.status === "Active" ? 1 : 0,
-    status: formData.status === "Active" ? 1 : 0
+      setDrawerOpen(false) // ✔ Close only
+      clearForm() // ✔ Clear only after save
+      setUnsavedAddData(null) // 🔥 VERY IMPORTANT
+      loadData()
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'Failed to save supplier')
+    }
   }
 
-  try {
-    await updateSupplier(payload)
-    showToast('success', 'Supplier updated successfully')
-    toggleDrawer()
-    loadData()
-  } catch (err) {
-    console.error(err)
-    showToast('error', 'Failed to update supplier')
+  const handleCancel = () => {
+    clearForm()
+    setUnsavedAddData(null)
+    setOriginalEditData(null)
+    setDrawerOpen(false)
   }
-}
 
-
- const handleStatusChange = async (e) => {
-  const newStatus = e.target.value;
-  const id = formData.id;
-
-  setFormData(prev => ({ ...prev, status: newStatus }));
-
-  const payload = {
-    id: id,
-    is_active: newStatus === "Active" ? 1 : 0,
-    status: newStatus === "Active" ? 1 : 0
-  };
-
-  try {
-    await updateSupplier(payload);
-    showToast("success", "Status updated");
-    loadData();
-  } catch (err) {
-    console.error(err);
-    showToast("error", "Failed to update status");
+  const handleDrawerClose = (event, reason) => {
+    if (reason === 'backdropClick' || reason === 'escapeKeyDown') {
+      setDrawerOpen(false) // DO NOT CLEAR ADD DATA
+      return
+    }
+    setDrawerOpen(false)
   }
-};
 
+  const handleStatusChange = e => {
+    setFormData(prev => ({
+      ...prev,
+      status: e.target.value
+    }))
+  }
 
   // Table setup
   const columnHelper = createColumnHelper()
@@ -569,13 +608,19 @@ export default function SupplierPage() {
       </Card>
 
       {/* Drawer */}
-      <Drawer anchor='right' open={drawerOpen} onClose={toggleDrawer}>
+      <Drawer
+        anchor='right'
+        open={drawerOpen}
+        onClose={handleDrawerClose}
+        ModalProps={{ keepMounted: true }}
+        SlideProps={{ mountOnEnter: true, unmountOnExit: false }} // 🔥 REAL FIX HERE
+      >
         <Box sx={{ p: 5, width: 420 }}>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
             <Typography variant='h5' fontWeight={600}>
               {isEdit ? 'Edit Supplier' : 'Add Supplier'}
             </Typography>
-            <IconButton onClick={toggleDrawer}>
+            <IconButton onClick={() => setDrawerOpen(false)}>
               <CloseIcon />
             </IconButton>
           </Box>
@@ -610,7 +655,7 @@ export default function SupplierPage() {
                   fullWidth
                   label='Supplier Name *'
                   value={formData.name}
-                  onChange={e => setFormData({ ...formData, name: e.target.value })}
+                  onChange={e => handleFieldChange('name', e.target.value)}
                   inputRef={nameRef}
                   onKeyDown={e => {
                     if (e.key === 'Enter') {
@@ -628,7 +673,7 @@ export default function SupplierPage() {
                   rows={4}
                   label='Billing Address'
                   value={formData.address}
-                  onChange={e => setFormData({ ...formData, address: e.target.value })}
+                  onChange={e => handleFieldChange('address', e.target.value)}
                   inputRef={addressRef}
                   onKeyDown={e => {
                     if (e.key === 'Enter' && !e.shiftKey) {
@@ -660,7 +705,7 @@ export default function SupplierPage() {
               <Button type='submit' variant='contained' fullWidth disabled={loading}>
                 {loading ? 'Saving...' : isEdit ? 'Update' : 'Save'}
               </Button>
-              <Button variant='outlined' fullWidth onClick={toggleDrawer}>
+              <Button variant='outlined' fullWidth onClick={handleCancel}>
                 Cancel
               </Button>
             </Box>

@@ -19,13 +19,15 @@ import {
   Breadcrumbs,
   Chip,
   TextField,
+  Checkbox,
   FormControl,
   Select,
   InputAdornment
 } from '@mui/material'
 
-import AddIcon from '@mui/icons-material/Add'
-import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
+import { getReportFollowupList } from '@/api/reportFollowup/list'
+import GlobalDateRange from '@/components/common/GlobalDateRange'
+
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
 import PrintIcon from '@mui/icons-material/Print'
@@ -58,7 +60,7 @@ import {
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
 
-// Debounced Input
+// Debounce Input
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
   const [value, setValue] = useState(initialValue)
   useEffect(() => setValue(initialValue), [initialValue])
@@ -69,54 +71,14 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
   return <TextField {...props} value={value} onChange={e => setValue(e.target.value)} />
 }
 
-// Dummy Dataset
-const BASE = [
-  {
-    id: 1,
-    customer: 'DBS Trustee Ltd',
-    address: '163 Kallang Way',
-    serviceDate: '2025-01-03',
-    nextServiceDate: '2025-01-17',
-    purpose: 'Follow Up',
-    appointmentStatus: 'Completed',
-    pest: 'Rodents',
-    degree: 'Medium',
-    technician: 'Shan'
-  },
-  {
-    id: 2,
-    customer: 'SBCD ARC Pte Ltd',
-    address: '460 Alexandra Road',
-    serviceDate: '2025-01-05',
-    nextServiceDate: '2025-01-20',
-    purpose: 'Revisit',
-    appointmentStatus: 'Pending',
-    pest: 'Mosquito',
-    degree: 'Low',
-    technician: 'Melvin'
-  }
-]
-
-const makeRows = () => {
-  const arr = []
-  for (let i = 0; i < 10; i++) {
-    BASE.forEach((r, idx) => {
-      arr.push({
-        ...r,
-        id: r.id + i * 10 + idx
-      })
-    })
-  }
-  return arr
-}
-
+// Date formatter
 const formatDate = iso => {
   try {
     const d = new Date(iso)
-    return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(
-      2,
-      '0'
-    )}-${d.getFullYear()}`
+    const dd = String(d.getDate()).padStart(2, '0')
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const yyyy = d.getFullYear()
+    return `${dd}-${mm}-${yyyy}`
   } catch {
     return iso
   }
@@ -125,17 +87,16 @@ const formatDate = iso => {
 export default function FollowupFinderPage() {
   const router = useRouter()
 
-  const [master] = useState(makeRows)
+  const [allRows, setAllRows] = useState([])
   const [rows, setRows] = useState([])
-  const [rowCount, setRowCount] = useState(master.length)
+  const [rowCount, setRowCount] = useState(0)
 
+  const [searchText, setSearchText] = useState('')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
-  const [searchText, setSearchText] = useState('')
 
   const [loading, setLoading] = useState(false)
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
-
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
 
   const [pagination, setPagination] = useState({
@@ -143,12 +104,14 @@ export default function FollowupFinderPage() {
     pageSize: 25
   })
 
+  // ----------------------------
+  // Load table after filters / pagination
+  // ----------------------------
   const loadData = () => {
     setLoading(true)
     try {
-      let data = [...master]
+      let data = [...allRows]
 
-      // Date Filter
       if (fromDate) {
         data = data.filter(r => new Date(r.serviceDate) >= new Date(fromDate))
       }
@@ -156,17 +119,16 @@ export default function FollowupFinderPage() {
         data = data.filter(r => new Date(r.serviceDate) <= new Date(toDate))
       }
 
-      // Search
       if (searchText) {
         const q = searchText.toLowerCase()
-        data = data.filter(r =>
-          r.customer.toLowerCase().includes(q) ||
-          r.address.toLowerCase().includes(q) ||
-          r.pest.toLowerCase().includes(q)
+        data = data.filter(
+          r =>
+            r.customer.toLowerCase().includes(q) ||
+            r.address.toLowerCase().includes(q) ||
+            r.pest.toLowerCase().includes(q)
         )
       }
 
-      // Sort by ID desc
       data.sort((a, b) => b.id - a.id)
 
       const start = pagination.pageIndex * pagination.pageSize
@@ -176,9 +138,7 @@ export default function FollowupFinderPage() {
         ...r,
         sno: start + i + 1,
         serviceDateFormatted: formatDate(r.serviceDate),
-        nextServiceDateFormatted: formatDate(r.nextServiceDate),
-        daysDiff:
-          (new Date(r.nextServiceDate) - new Date(r.serviceDate)) / (1000 * 60 * 60 * 24)
+        nextServiceDateFormatted: formatDate(r.nextServiceDate)
       }))
 
       setRows(paginated)
@@ -188,9 +148,67 @@ export default function FollowupFinderPage() {
     }
   }
 
+  // ----------------------------
+  // Fetch from API
+  // ----------------------------
+  const fetchFollowup = async () => {
+    setLoading(true)
+    try {
+      const res = await getReportFollowupList()
+
+      if (res?.status === 'success') {
+        let list = Array.isArray(res.data) ? res.data : []
+
+        // Remove empty rows from backend
+        list = list.filter(item => item.customer)
+
+        const normalized = list.map((item, index) => ({
+          id: index + 1,
+          sno: index + 1,
+
+          customer: item.customer,
+          address: item.service_address,
+          serviceDate: item.service_date,
+          nextServiceDate: item.next_service_date,
+          daysDiff: item.days_diff,
+
+          appointmentStatus: item.appointment_status,
+          pest: item.pest,
+          purpose: item.purpose,
+          degree: item.degree,
+          technician: item.technician
+        }))
+
+        setAllRows(normalized)
+        setRowCount(normalized.length)
+        setPagination(prev => ({ ...prev, pageIndex: 0 }))
+      } else {
+        showToast('error', res?.message || 'Failed to fetch follow-up report')
+        setAllRows([])
+        setRowCount(0)
+      }
+    } catch (err) {
+      console.error('followup fetch error:', err)
+      showToast('error', 'Error fetching follow-up report')
+      setAllRows([])
+      setRowCount(0)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
+    fetchFollowup()
+  }, [])
+
+  useEffect(() => {
+    if (!allRows.length) {
+      setRows([])
+      setRowCount(0)
+      return
+    }
     loadData()
-  }, [pagination.pageIndex, pagination.pageSize, fromDate, toDate, searchText])
+  }, [allRows, pagination.pageIndex, pagination.pageSize, searchText, fromDate, toDate])
 
   const handleEdit = id => router.push(`/admin/followup/${id}/edit`)
   const confirmDelete = () => {
@@ -200,6 +218,7 @@ export default function FollowupFinderPage() {
 
   const columnHelper = createColumnHelper()
   const columns = [
+    columnHelper.accessor('sno', { header: 'ID' }),
     columnHelper.display({
       id: 'actions',
       header: 'Action',
@@ -218,6 +237,7 @@ export default function FollowupFinderPage() {
         </Box>
       )
     }),
+
     columnHelper.accessor('customer', { header: 'Customer' }),
     columnHelper.accessor('address', { header: 'Service Address' }),
     columnHelper.accessor('serviceDateFormatted', { header: 'Service Date' }),
@@ -246,16 +266,20 @@ export default function FollowupFinderPage() {
     onGlobalFilterChange: setSearchText,
     globalFilterFn: fuzzyFilter,
     getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getSortedRowModel: getSortedRowModel()
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel()
   })
 
+  // ----------------------------
+  // Export CSV + Print
+  // ----------------------------
   const exportCSV = () => {
     const headers = columns.map(c => c.header).join(',')
     const csv = [
       headers,
       ...rows.map(r =>
         [
+          r.sno,
           r.customer,
           r.address,
           r.serviceDateFormatted,
@@ -280,13 +304,13 @@ export default function FollowupFinderPage() {
   const exportPrint = () => {
     const w = window.open('', '_blank')
     const html = `
-      <html><body>
-      <h2>Follow-Up Finder</h2>
+      <html><body><h2>Follow-Up Finder</h2>
       <table border="1" style="width:100%;border-collapse:collapse;">
       <tr>${columns.map(c => `<th>${c.header}</th>`).join('')}</tr>
       ${rows
         .map(
           r => `<tr>
+        <td>${r.sno}</td>
         <td>${r.customer}</td>
         <td>${r.address}</td>
         <td>${r.serviceDateFormatted}</td>
@@ -317,135 +341,128 @@ export default function FollowupFinderPage() {
 
       <Card sx={{ p: 3 }}>
         <CardHeader
+         sx={{
+            pb: 1.5,
+            pt: 1.5,
+            '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
+            '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
+          }}
           title={
             <Box display='flex' alignItems='center' gap={2}>
               <Typography variant='h5' sx={{ fontWeight: 600 }}>
                 Follow-Up Finder
               </Typography>
 
-              {/* Refresh Button */}
               <GlobalButton
                 variant='contained'
                 color='primary'
-                startIcon={
-                  <RefreshIcon
-                    sx={{
-                      animation: loading ? 'spin 1s linear infinite' : 'none',
-                      '@keyframes spin': {
-                        '0%': { transform: 'rotate(0deg)' },
-                        '100%': { transform: 'rotate(360deg)' }
-                      }
-                    }}
-                  />
-                }
+                startIcon={<RefreshIcon />}
                 disabled={loading}
-                onClick={() => {
-                  setPagination({ pageIndex: 0, pageSize: pagination.pageSize })
-                  loadData()
-                }}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                onClick={() => fetchFollowup()}
               >
                 {loading ? 'Refreshing...' : 'Refresh'}
               </GlobalButton>
             </Box>
           }
           action={
-            <Box display='flex' alignItems='center' gap={2}>
-              {/* <GlobalButton
-                variant='outlined'
-                color='secondary'
-                endIcon={<ArrowDropDownIcon />}
-                onClick={e => setExportAnchorEl(e.currentTarget)}
-                disabled={!rows.length}
-              >
-                Export
-              </GlobalButton> */}
-
-              <Menu
-                anchorEl={exportAnchorEl}
-                open={Boolean(exportAnchorEl)}
-                onClose={() => setExportAnchorEl(null)}
-              >
-                <MenuItem onClick={exportPrint}>
-                  <PrintIcon sx={{ mr: 1 }} /> Print
-                </MenuItem>
-                <MenuItem onClick={exportCSV}>
-                  <FileDownloadIcon sx={{ mr: 1 }} /> CSV
-                </MenuItem>
-              </Menu>
-            </Box>
+            <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
+              <MenuItem onClick={exportPrint}>
+                <PrintIcon sx={{ mr: 1 }} /> Print
+              </MenuItem>
+              <MenuItem onClick={exportCSV}>
+                <FileDownloadIcon sx={{ mr: 1 }} /> CSV
+              </MenuItem>
+            </Menu>
           }
         />
 
         <Divider sx={{ mb: 4 }} />
 
-        {/* FILTER SECTION */}
-        <Box
-          sx={{
-            mb: 4,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-            flexWrap: 'wrap'
-          }}
-        >
-          <FormControl size='small' sx={{ width: 120 }}>
-            <Select
-              value={pagination.pageSize}
-              onChange={e =>
-                setPagination(p => ({
-                  ...p,
-                  pageSize: Number(e.target.value),
-                  pageIndex: 0
-                }))
-              }
-            >
-              {[10, 25, 50, 100].map(s => (
-                <MenuItem key={s} value={s}>
-                  {s} entries
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+        {/* Filters */}
+        {/* FILTERS BLOCK (Date Range ONLY — same layout as other pages) */}
+        <Box sx={{ mb: 4 }}>
+          {/* ROW 1 — Date Range ABOVE input */}
+          <Box sx={{ display: 'flex', flexDirection: 'column', width: 260, mb: 3 }}>
+            {/* Checkbox + Label */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+              <Checkbox
+                checked={!!fromDate || !!toDate}
+                onChange={e => {
+                  if (!e.target.checked) {
+                    setFromDate('')
+                    setToDate('')
+                  }
+                }}
+                size='small'
+              />
+              <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Date Range</Typography>
+            </Box>
 
-          <GlobalTextField
-            type='date'
-            label='From Date'
-            value={fromDate}
-            onChange={e => setFromDate(e.target.value)}
-            sx={{ width: 220 }}
-            size='small'
-          />
+            {/* Single Date Range Picker */}
+            <GlobalDateRange
+              label=''
+              start={fromDate}
+              end={toDate}
+              onSelectRange={({ start, end }) => {
+                setFromDate(start)
+                setToDate(end)
+              }}
+              disabled={!fromDate && !toDate}
+            />
+          </Box>
+          <Divider sx={{ mb: 4 }} />
 
-          <GlobalTextField
-            type='date'
-            label='To Date'
-            value={toDate}
-            onChange={e => setToDate(e.target.value)}
-            sx={{ width: 220 }}
-            size='small'
-          />
-
-          <DebouncedInput
-            value={searchText}
-            onChange={v => setSearchText(String(v))}
-            placeholder='Search customer, address, pest...'
-            sx={{ width: 340 }}
-            variant='outlined'
-            size='small'
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position='start'>
-                    <SearchIcon />
-                  </InputAdornment>
-                )
-              }
+          {/* ROW 2 — Entries Dropdown + Search Box */}
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 3
             }}
-          />
+          >
+            {/* Entries Dropdown */}
+            <FormControl size='small' sx={{ width: 120 }}>
+              <Select
+                value={pagination.pageSize}
+                onChange={e =>
+                  setPagination(p => ({
+                    ...p,
+                    pageSize: Number(e.target.value),
+                    pageIndex: 0
+                  }))
+                }
+              >
+                {[10, 25, 50, 100].map(s => (
+                  <MenuItem key={s} value={s}>
+                    {s} entries
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            {/* Search */}
+            <DebouncedInput
+              value={searchText}
+              onChange={v => setSearchText(String(v))}
+              placeholder='Search customer, address, pest...'
+              sx={{ width: 340 }}
+              variant='outlined'
+              size='small'
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position='start'>
+                      <SearchIcon />
+                    </InputAdornment>
+                  )
+                }
+              }}
+            />
+          </Box>
         </Box>
 
-        {/* TABLE */}
+        {/* Table */}
         <div className='overflow-x-auto'>
           <table className={styles.table}>
             <thead>
@@ -463,9 +480,9 @@ export default function FollowupFinderPage() {
                         {flexRender(h.column.columnDef.header, h.getContext())}
 
                         {{
-                          asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
-                          desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
-                        }[h.column.getIsSorted()] ?? null}
+                          asc: <ChevronRight className='-rotate-90' />,
+                          desc: <ChevronRight className='rotate-90' />
+                        }[h.column.getIsSorted()] || null}
                       </div>
                     </th>
                   ))}
@@ -478,9 +495,7 @@ export default function FollowupFinderPage() {
                 table.getRowModel().rows.map(row => (
                   <tr key={row.id}>
                     {row.getVisibleCells().map(cell => (
-                      <td key={cell.id}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
+                      <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
                     ))}
                   </tr>
                 ))
@@ -495,18 +510,11 @@ export default function FollowupFinderPage() {
           </table>
         </div>
 
-        <TablePaginationComponent
-          totalCount={rowCount}
-          pagination={pagination}
-          setPagination={setPagination}
-        />
+        <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
       </Card>
 
-      {/* DELETE DIALOG */}
-      <Dialog
-        open={deleteDialog.open}
-        onClose={() => setDeleteDialog({ open: false })}
-      >
+      {/* Delete Dialog */}
+      <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false })}>
         <DialogTitle sx={{ textAlign: 'center' }}>
           <WarningAmberIcon color='error' sx={{ mr: 1 }} />
           Confirm Delete
@@ -514,9 +522,7 @@ export default function FollowupFinderPage() {
         </DialogTitle>
 
         <DialogContent>
-          <Typography sx={{ textAlign: 'center' }}>
-            Are you sure you want to delete this record?
-          </Typography>
+          <Typography sx={{ textAlign: 'center' }}>Are you sure you want to delete this record?</Typography>
         </DialogContent>
 
         <DialogActions sx={{ justifyContent: 'center', pb: 3 }}>

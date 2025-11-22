@@ -17,6 +17,7 @@ import {
   DialogActions,
   Breadcrumbs,
   Chip,
+  Checkbox,
   TextField,
   FormControl,
   Select,
@@ -24,6 +25,7 @@ import {
 } from '@mui/material'
 
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
+import GlobalDateRange from '@/components/common/GlobalDateRange'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
 import PrintIcon from '@mui/icons-material/Print'
@@ -32,12 +34,12 @@ import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 
+import { getKviFinderList } from '@/api/kviFinder/list'
 import { useRouter } from 'next/navigation'
 
 // Global Components
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalTextField from '@/components/common/GlobalTextField'
-import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import { showToast } from '@/components/common/Toasts'
@@ -67,55 +69,12 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
   return <TextField {...props} value={value} onChange={e => setValue(e.target.value)} />
 }
 
-// Dummy KIV Data
-const BASE = [
-  {
-    id: 1,
-    customer: 'DBS Trustee Ltd',
-    address: '163 Kallang Way',
-    serviceDate: '2025-01-03',
-    nextRoutineDate: '2025-01-17',
-    appointment: 'Pending',
-    pest: 'Rodents',
-    degree: 'Medium',
-    purpose: 'Revisit',
-    technician: 'Shan'
-  },
-  {
-    id: 2,
-    customer: 'SBCD ARC Pte Ltd',
-    address: '460 Alexandra Road',
-    serviceDate: '2025-01-05',
-    nextRoutineDate: '2025-01-20',
-    appointment: 'Completed',
-    pest: 'Mosquito',
-    degree: 'High',
-    purpose: 'Follow Up',
-    technician: 'Melvin'
-  }
-]
-
-const makeRows = () => {
-  const arr = []
-  for (let i = 0; i < 10; i++) {
-    BASE.forEach((r, idx) => {
-      arr.push({
-        ...r,
-        id: r.id + i * 10 + idx
-      })
-    })
-  }
-  return arr
-}
-
 // Format DD-MM-YYYY
 const formatDate = iso => {
+  if (!iso) return ''
   try {
     const d = new Date(iso)
-    return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(
-      2,
-      '0'
-    )}-${d.getFullYear()}`
+    return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`
   } catch {
     return iso
   }
@@ -124,78 +83,121 @@ const formatDate = iso => {
 export default function KivFinderPage() {
   const router = useRouter()
 
-  const [master] = useState(makeRows)
+  const [allRows, setAllRows] = useState([])
   const [rows, setRows] = useState([])
-  const [rowCount, setRowCount] = useState(master.length)
+  const [rowCount, setRowCount] = useState(0)
 
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [searchText, setSearchText] = useState('')
+
   const [loading, setLoading] = useState(false)
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
 
-  const [pagination, setPagination] = useState({
-    pageIndex: 0,
-    pageSize: 25
-  })
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
 
-  const loadData = () => {
+  // -----------------------------
+  // FETCH DATA FROM API
+  // -----------------------------
+  const fetchKVI = async () => {
     setLoading(true)
+
     try {
-      let data = [...master]
+      const res = await getKviFinderList()
 
-      // Date Filter
-      if (fromDate) {
-        data = data.filter(r => new Date(r.serviceDate) >= new Date(fromDate))
+      if (res?.status === 'success') {
+        let list = Array.isArray(res.data) ? res.data : []
+
+        // remove empty placeholder object
+        list = list.filter(item => item.customer || item.service_address)
+
+        const normalized = list.map((item, index) => ({
+          id: index + 1,
+          sno: index + 1,
+
+          customer: item.customer,
+          address: item.service_address,
+          serviceDate: item.service_date,
+          nextRoutineDate: item.next_routine_date,
+          daysDiff: item.days_diff,
+          appointment: item.appointment_status,
+          pest: item.pest,
+          technician: item.technician,
+          degree: item.degree,
+          purpose: item.purpose,
+
+          serviceDateFormatted: formatDate(item.service_date),
+          nextRoutineDateFormatted: formatDate(item.next_routine_date)
+        }))
+
+        setAllRows(normalized)
+        setRowCount(normalized.length)
+        setPagination(prev => ({ ...prev, pageIndex: 0 }))
+      } else {
+        showToast('error', res?.message || 'Failed to fetch KVI list')
+        setAllRows([])
+        setRowCount(0)
       }
-      if (toDate) {
-        data = data.filter(r => new Date(r.serviceDate) <= new Date(toDate))
-      }
-
-      // Search
-      if (searchText) {
-        const q = searchText.toLowerCase()
-        data = data.filter(r =>
-          r.customer.toLowerCase().includes(q) ||
-          r.address.toLowerCase().includes(q) ||
-          r.pest.toLowerCase().includes(q)
-        )
-      }
-
-      // Sort Newest First
-      data.sort((a, b) => b.id - a.id)
-
-      const start = pagination.pageIndex * pagination.pageSize
-      const end = start + pagination.pageSize
-
-      const paginated = data.slice(start, end).map((r, i) => ({
-        ...r,
-        sno: start + i + 1,
-        serviceDateFormatted: formatDate(r.serviceDate),
-        nextRoutineDateFormatted: formatDate(r.nextRoutineDate),
-        daysDiff:
-          (new Date(r.nextRoutineDate) - new Date(r.serviceDate)) /
-          (1000 * 60 * 60 * 24)
-      }))
-
-      setRows(paginated)
-      setRowCount(data.length)
+    } catch (err) {
+      console.error('kvi-finder fetch error:', err)
+      showToast('error', 'Error fetching KVI Finder list')
+      setAllRows([])
+      setRowCount(0)
     } finally {
-      setTimeout(() => setLoading(false), 180)
+      setLoading(false)
     }
   }
 
   useEffect(() => {
-    loadData()
-  }, [pagination.pageIndex, pagination.pageSize, fromDate, toDate, searchText])
+    fetchKVI()
+  }, [])
 
-  const handleEdit = id => router.push(`/admin/kiv/${id}/edit`)
-  const confirmDelete = () => {
-    showToast('delete', 'Deleted (UI only)')
-    setDeleteDialog({ open: false, row: null })
+  // -----------------------------
+  // FILTER + PAGINATION
+  // -----------------------------
+  const loadData = () => {
+    let data = [...allRows]
+
+    // DATE FILTER
+    if (fromDate) data = data.filter(r => new Date(r.serviceDate) >= new Date(fromDate))
+    if (toDate) data = data.filter(r => new Date(r.serviceDate) <= new Date(toDate))
+
+    // SEARCH
+    if (searchText) {
+      const q = searchText.toLowerCase()
+      data = data.filter(
+        r =>
+          r.customer?.toLowerCase().includes(q) ||
+          r.address?.toLowerCase().includes(q) ||
+          r.pest?.toLowerCase().includes(q)
+      )
+    }
+
+    // SORT NEWEST FIRST
+    data.sort((a, b) => b.id - a.id)
+
+    // PAGINATION
+    const start = pagination.pageIndex * pagination.pageSize
+    const end = start + pagination.pageSize
+
+    const pageData = data.slice(start, end)
+    setRows(pageData)
+    setRowCount(data.length)
   }
 
+  useEffect(() => {
+    if (!allRows.length) {
+      setRows([])
+      setRowCount(0)
+      return
+    }
+    loadData()
+  }, [allRows, pagination.pageIndex, pagination.pageSize, fromDate, toDate, searchText])
+
+  // -----------------------------
+  // TABLE COLUMNS
+  // -----------------------------
   const columnHelper = createColumnHelper()
 
   const columns = useMemo(
@@ -205,10 +207,13 @@ export default function KivFinderPage() {
         header: 'Action',
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original.id)}>
+            <IconButton
+              size='small'
+              color='primary'
+              onClick={() => router.push(`/admin/kiv/${info.row.original.id}/edit`)}
+            >
               <EditIcon />
             </IconButton>
-
             <IconButton
               size='small'
               color='error'
@@ -222,16 +227,12 @@ export default function KivFinderPage() {
 
       columnHelper.accessor('customer', { header: 'Customer' }),
       columnHelper.accessor('address', { header: 'Service Address' }),
-
       columnHelper.accessor('serviceDateFormatted', { header: 'Service Date' }),
       columnHelper.accessor('nextRoutineDateFormatted', { header: 'Next Routine Date' }),
-
       columnHelper.accessor('daysDiff', { header: 'Days Diff' }),
-
       columnHelper.accessor('appointment', { header: 'Appointment' }),
       columnHelper.accessor('pest', { header: 'Pest' }),
       columnHelper.accessor('technician', { header: 'Technician' }),
-
       columnHelper.accessor('degree', { header: 'Degree' }),
       columnHelper.accessor('purpose', { header: 'Purpose' })
     ],
@@ -258,6 +259,9 @@ export default function KivFinderPage() {
     getSortedRowModel: getSortedRowModel()
   })
 
+  // -----------------------------
+  // EXPORT CSV + PRINT
+  // -----------------------------
   const exportCSV = () => {
     const headers = columns.map(c => c.header).join(',')
     const csv = [
@@ -280,7 +284,7 @@ export default function KivFinderPage() {
 
     const link = document.createElement('a')
     link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
-    link.download = 'kiv_finder.csv'
+    link.download = 'kvi_finder.csv'
     link.click()
     setExportAnchorEl(null)
   }
@@ -289,7 +293,7 @@ export default function KivFinderPage() {
     const w = window.open('', '_blank')
     const html = `
       <html><body>
-      <h2>KIV Finder</h2>
+      <h2>KVI Finder Report</h2>
       <table border="1" style="width:100%;border-collapse:collapse;">
       <tr>${columns.map(c => `<th>${c.header}</th>`).join('')}</tr>
 
@@ -309,9 +313,7 @@ export default function KivFinderPage() {
       </tr>`
         )
         .join('')}
-      </table>
-      </body></html>
-    `
+      </table></body></html>`
 
     w.document.write(html)
     w.document.close()
@@ -319,19 +321,28 @@ export default function KivFinderPage() {
     setExportAnchorEl(null)
   }
 
+  // -----------------------------
+  // RENDER
+  // -----------------------------
   return (
     <Box>
       <Breadcrumbs sx={{ mb: 2 }}>
         <Link href='/'>Dashboard</Link>
-        <Typography>KIV Finder</Typography>
+        <Typography>KVI Finder</Typography>
       </Breadcrumbs>
 
       <Card sx={{ p: 3 }}>
         <CardHeader
+          sx={{
+            pb: 1.5,
+            pt: 1.5,
+            '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
+            '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
+          }}
           title={
             <Box display='flex' alignItems='center' gap={2}>
               <Typography variant='h5' sx={{ fontWeight: 600 }}>
-                KIV Finder
+                KVI Finder
               </Typography>
 
               <GlobalButton
@@ -349,10 +360,7 @@ export default function KivFinderPage() {
                   />
                 }
                 disabled={loading}
-                onClick={() => {
-                  setPagination({ ...pagination, pageIndex: 0 })
-                  loadData()
-                }}
+                onClick={() => fetchKVI()}
                 sx={{ textTransform: 'none', height: 36 }}
               >
                 {loading ? 'Refreshing...' : 'Refresh'}
@@ -371,11 +379,7 @@ export default function KivFinderPage() {
                 Export
               </GlobalButton>
 
-              <Menu
-                anchorEl={exportAnchorEl}
-                open={Boolean(exportAnchorEl)}
-                onClose={() => setExportAnchorEl(null)}
-              >
+              <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
                 <MenuItem onClick={exportPrint}>
                   <PrintIcon sx={{ mr: 1 }} /> Print
                 </MenuItem>
@@ -390,69 +394,87 @@ export default function KivFinderPage() {
         <Divider sx={{ mb: 4 }} />
 
         {/* FILTERS */}
-        <Box
-          sx={{
-            mb: 4,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-            flexWrap: 'wrap'
-          }}
-        >
-          <FormControl size='small' sx={{ width: 120 }}>
-            <Select
-              value={pagination.pageSize}
-              onChange={e =>
-                setPagination({
-                  ...pagination,
-                  pageSize: Number(e.target.value),
-                  pageIndex: 0
-                })
-              }
-            >
-              {[10, 25, 50, 100].map(n => (
-                <MenuItem key={n} value={n}>
-                  {n} entries
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+        {/* FILTERS (Same Style as Other Pages) */}
+        <Box sx={{ mb: 4 }}>
+          {/* DATE RANGE BLOCK */}
+          <Box sx={{ display: 'flex', flexDirection: 'column', width: 260, mb: 3 }}>
+            {/* Checkbox + Label */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+              <Checkbox
+                checked={!!fromDate || !!toDate}
+                onChange={e => {
+                  if (!e.target.checked) {
+                    setFromDate('')
+                    setToDate('')
+                  }
+                }}
+                size='small'
+              />
+              <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Date Range</Typography>
+            </Box>
 
-          <GlobalTextField
-            type='date'
-            label='From Date'
-            size='small'
-            sx={{ width: 220 }}
-            value={fromDate}
-            onChange={e => setFromDate(e.target.value)}
-          />
+            {/* Date Range Picker */}
+            <GlobalDateRange
+              label=''
+              start={fromDate}
+              end={toDate}
+              onSelectRange={({ start, end }) => {
+                setFromDate(start)
+                setToDate(end)
+              }}
+              disabled={!fromDate && !toDate}
+            />
+          </Box>
+          <Divider sx={{ mb: 4 }} />
 
-          <GlobalTextField
-            type='date'
-            label='To Date'
-            size='small'
-            sx={{ width: 220 }}
-            value={toDate}
-            onChange={e => setToDate(e.target.value)}
-          />
-
-          <DebouncedInput
-            value={searchText}
-            onChange={v => setSearchText(String(v))}
-            placeholder='Search customer, address, pest...'
-            sx={{ width: 340 }}
-            size='small'
-            variant='outlined'
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position='start'>
-                    <SearchIcon />
-                  </InputAdornment>
-                )
-              }
+          {/* ENTRIES + SEARCH ROW */}
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 3
             }}
-          />
+          >
+            {/* Entries Dropdown */}
+            <FormControl size='small' sx={{ width: 120 }}>
+              <Select
+                value={pagination.pageSize}
+                onChange={e =>
+                  setPagination(p => ({
+                    ...p,
+                    pageSize: Number(e.target.value),
+                    pageIndex: 0
+                  }))
+                }
+              >
+                {[10, 25, 50, 100].map(n => (
+                  <MenuItem key={n} value={n}>
+                    {n} entries
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            {/* Search Box */}
+            <DebouncedInput
+              value={searchText}
+              onChange={v => setSearchText(String(v))}
+              placeholder='Search customer, address, pest...'
+              sx={{ width: 340 }}
+              size='small'
+              variant='outlined'
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position='start'>
+                      <SearchIcon />
+                    </InputAdornment>
+                  )
+                }
+              }}
+            />
+          </Box>
         </Box>
 
         {/* TABLE */}
@@ -488,9 +510,7 @@ export default function KivFinderPage() {
                 table.getRowModel().rows.map(row => (
                   <tr key={row.id}>
                     {row.getVisibleCells().map(cell => (
-                      <td key={cell.id}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
+                      <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
                     ))}
                   </tr>
                 ))
@@ -505,11 +525,7 @@ export default function KivFinderPage() {
           </table>
         </div>
 
-        <TablePaginationComponent
-          totalCount={rowCount}
-          pagination={pagination}
-          setPagination={setPagination}
-        />
+        <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
       </Card>
 
       {/* DELETE DIALOG */}
@@ -521,16 +537,14 @@ export default function KivFinderPage() {
         </DialogTitle>
 
         <DialogContent>
-          <Typography sx={{ textAlign: 'center' }}>
-            Are you sure you want to delete this record?
-          </Typography>
+          <Typography sx={{ textAlign: 'center' }}>Are you sure you want to delete this record?</Typography>
         </DialogContent>
 
         <DialogActions sx={{ justifyContent: 'center', pb: 3 }}>
           <GlobalButton variant='outlined' onClick={() => setDeleteDialog({ open: false })}>
             Cancel
           </GlobalButton>
-          <GlobalButton variant='contained' color='error' onClick={confirmDelete}>
+          <GlobalButton variant='contained' color='error' onClick={() => showToast('delete', 'Deleted (UI only)')}>
             Delete
           </GlobalButton>
         </DialogActions>

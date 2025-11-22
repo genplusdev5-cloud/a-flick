@@ -27,7 +27,7 @@ import {
   InputAdornment
 } from '@mui/material'
 
-import { getCustomerList, deleteCustomer } from '@/api/customer'
+import { getCustomerList, deleteCustomer, getCustomerSummary } from '@/api/customer'
 import { getCustomerOrigin } from '@/api/customer/origin'
 import GlobalButton from '@/components/common/GlobalButton'
 
@@ -42,8 +42,9 @@ import FileDownloadIcon from '@mui/icons-material/FileDownload'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
-import ShoppingCartIcon from '@mui/icons-material/ShoppingCart'
-import MonetizationOnIcon from '@mui/icons-material/MonetizationOn'
+import CheckCircleIcon from '@mui/icons-material/CheckCircle'
+import CancelIcon from '@mui/icons-material/Cancel'
+
 import GroupIcon from '@mui/icons-material/Group'
 import BarChartIcon from '@mui/icons-material/BarChart'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
@@ -92,7 +93,7 @@ export default function CustomersPage() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const res = await getCustomerList()
+      const res = await getCustomerList(pagination.pageIndex + 1, pagination.pageSize)
 
       const list = res?.data?.results || res?.data?.data?.results || res?.data?.data || res?.data || []
 
@@ -162,6 +163,24 @@ export default function CustomersPage() {
       setDeleteDialog({ open: false, row: null })
     }
   }
+
+  const [summary, setSummary] = useState({
+    total_customers: 0,
+    total_myob: 0,
+    total_active: 0,
+    total_inactive: 0
+  })
+
+  useEffect(() => {
+    const loadSummary = async () => {
+      const res = await getCustomerSummary()
+      if (res.status === 'success') {
+        setSummary(res.data)
+      }
+    }
+
+    loadSummary()
+  }, [])
 
   // --- Table ---
   const columnHelper = createColumnHelper()
@@ -380,53 +399,85 @@ export default function CustomersPage() {
       </Breadcrumbs>
 
       {/* Stats Cards */}
-      <Card elevation={0} sx={{ mb: 4, boxShadow: 'none' }} variant='outlined'>
-        <CardContent>
-          <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
-            <Typography variant='h6'>All Customers</Typography>
-            <Typography variant='body2' color='text.secondary'>
-              Updated 1 month ago
-            </Typography>
-          </Box>
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={3}>
-              <Box display='flex' alignItems='center' gap={2}>
-                <BarChartIcon color='primary' fontSize='large' />
-                <Box>
-                  <Typography variant='h6'>230k</Typography>
-                  <Typography variant='body2'>Sales</Typography>
-                </Box>
+      <Card
+        sx={{
+          p: 3,
+          mb: 4,
+          borderRadius: 1,
+          boxShadow: 'none',
+          border: '1px solid #e0e0e0'
+        }}
+      >
+        <Typography variant='h6' fontWeight={600} mb={2}>
+          Customer Summary
+        </Typography>
+
+        <Grid
+          container
+          spacing={4}
+          justifyContent='center' // ⭐ Center horizontally
+          alignItems='center' // ⭐ Center vertically
+        >
+          {/* Total Customers */}
+          <Grid item xs={12} md={3}>
+            <Box display='flex' alignItems='center' gap={2} justifyContent='center'>
+              <GroupIcon sx={{ fontSize: 40, color: '#1976D2' }} />
+              <Box textAlign='center'>
+                <Typography variant='subtitle2' color='text.secondary'>
+                  Total Customers
+                </Typography>
+                <Typography variant='h5' fontWeight={700}>
+                  {summary.total_customers}
+                </Typography>
               </Box>
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <Box display='flex' alignItems='center' gap={2}>
-                <GroupIcon color='info' fontSize='large' />
-                <Box>
-                  <Typography variant='h6'>8.549k</Typography>
-                  <Typography variant='body2'>Renewed</Typography>
-                </Box>
-              </Box>
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <Box display='flex' alignItems='center' gap={2}>
-                <ShoppingCartIcon color='error' fontSize='large' />
-                <Box>
-                  <Typography variant='h6'>1.423k</Typography>
-                  <Typography variant='body2'>Rejected</Typography>
-                </Box>
-              </Box>
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <Box display='flex' alignItems='center' gap={2}>
-                <MonetizationOnIcon color='success' fontSize='large' />
-                <Box>
-                  <Typography variant='h6'>$9745</Typography>
-                  <Typography variant='body2'>Current</Typography>
-                </Box>
-              </Box>
-            </Grid>
+            </Box>
           </Grid>
-        </CardContent>
+
+          {/* MYOB Exported */}
+          <Grid item xs={12} md={3}>
+            <Box display='flex' alignItems='center' gap={2} justifyContent='center'>
+              <BarChartIcon sx={{ fontSize: 40, color: '#6A4FBF' }} />
+              <Box textAlign='center'>
+                <Typography variant='subtitle2' color='text.secondary'>
+                  MYOB Exported
+                </Typography>
+                <Typography variant='h5' fontWeight={700}>
+                  {summary.total_myob}
+                </Typography>
+              </Box>
+            </Box>
+          </Grid>
+
+          {/* Active */}
+          <Grid item xs={12} md={3}>
+            <Box display='flex' alignItems='center' gap={1} justifyContent='center'>
+              <CheckCircleIcon sx={{ fontSize: 32, color: 'success.main' }} />
+              <Box textAlign='center'>
+                <Typography variant='subtitle2' color='text.secondary'>
+                  Active
+                </Typography>
+                <Typography variant='h5' fontWeight={700} color='success.main'>
+                  {summary.total_active}
+                </Typography>
+              </Box>
+            </Box>
+          </Grid>
+
+          {/* Inactive */}
+          <Grid item xs={12} md={3}>
+            <Box display='flex' alignItems='center' gap={1} justifyContent='center'>
+              <CancelIcon sx={{ fontSize: 32, color: 'error.main' }} />
+              <Box textAlign='center'>
+                <Typography variant='subtitle2' color='text.secondary'>
+                  Inactive
+                </Typography>
+                <Typography variant='h5' fontWeight={700} color='error.main'>
+                  {summary.total_inactive}
+                </Typography>
+              </Box>
+            </Box>
+          </Grid>
+        </Grid>
       </Card>
 
       <Card sx={{ p: 3 }}>
@@ -527,7 +578,7 @@ export default function CustomersPage() {
               value={pagination.pageSize}
               onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
             >
-              {[10, 25, 50, 100].map(s => (
+              {[25, 50, 75, 100].map(s => (
                 <MenuItem key={s} value={s}>
                   {s} entries
                 </MenuItem>
