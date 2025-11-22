@@ -1,6 +1,8 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+
 import {
   Box,
   Button,
@@ -13,142 +15,109 @@ import {
   TableCell,
   TableBody,
   IconButton,
-  Dialog, // 💡 NEW: Import Dialog and related components
+  Dialog,
   DialogContent
 } from '@mui/material'
-import { useRouter } from 'next/navigation'
 
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
-import VisibilityIcon from '@mui/icons-material/Visibility' // 💡 NEW: Import VisibilityIcon
+import VisibilityIcon from '@mui/icons-material/Visibility'
 
-// Layout + Inputs (Assuming these paths are correct)
 import ContentLayout from '@/components/layout/ContentLayout'
 import CustomTextField from '@core/components/mui/TextField'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import { Autocomplete } from '@mui/material'
 
+import { getAllDropdowns } from '@/api/contract/dropdowns'
+import { updateContract } from '@/api/contract/update'
+import { getContractView } from '@/api/contract/viewStatus'
+
 // ----------------------------------------------------------------------
-// INDEXEDDB HELPER FUNCTIONS (New Implementation)
+// Helpers
 // ----------------------------------------------------------------------
 
-const DB_NAME = 'ContractDB'
-const DB_VERSION = 1
-const STORE_NAME = 'contracts'
-
-/**
- * Opens the IndexedDB database, creating the object store if it doesn't exist.
- * @returns {Promise<IDBDatabase>} The database instance.
- */
-const openDB = () => {
-  return new Promise((resolve, reject) => {
-    if (!('indexedDB' in window)) {
-      console.error('IndexedDB not supported.')
-      reject(new Error('IndexedDB not supported.'))
-      return
-    }
-
-    const request = indexedDB.open(DB_NAME, DB_VERSION)
-
-    request.onerror = event => {
-      console.error('Database error:', event.target.error)
-      reject(event.target.error)
-    }
-
-    request.onsuccess = event => {
-      resolve(event.target.result)
-    }
-
-    request.onupgradeneeded = event => {
-      const db = event.target.result
-      // Create an object store to hold information about contracts.
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id' })
-      }
-    }
-  })
-}
-
-/**
- * Saves a new contract to the IndexedDB.
- * @param {object} contract - The contract data to save.
- */
-const saveContractWithPestItems = async contract => {
+const formatDateToAPIDate = date => {
+  if (!date) return null
   try {
-    const db = await openDB()
-    const transaction = db.transaction([STORE_NAME], 'readwrite')
-    const store = transaction.objectStore(STORE_NAME)
-    const request = store.add(contract)
-
-    return new Promise((resolve, reject) => {
-      request.onsuccess = () => {
-        resolve()
-      }
-      request.onerror = event => {
-        console.error('Error saving contract to IndexedDB:', event.target.error)
-        reject(event.target.error)
-      }
-    })
-  } catch (error) {
-    console.error('Failed to open DB or save contract:', error)
+    const d = new Date(date)
+    if (isNaN(d.getTime())) return null
+    return d.toISOString().split('T')[0] // yyyy-mm-dd
+  } catch {
+    return null
   }
 }
 
-/**
- * Retrieves all contracts from IndexedDB.
- * @returns {Promise<Array<object>>} A promise that resolves to an array of contracts.
- */
-const getContractsWithPestItems = async () => {
-  try {
-    const db = await openDB()
-    const transaction = db.transaction([STORE_NAME], 'readonly')
-    const store = transaction.objectStore(STORE_NAME)
-    const request = store.getAll()
-
-    return new Promise((resolve, reject) => {
-      request.onsuccess = event => {
-        // Return contracts sorted by ID (latest first, similar to localStorage behavior)
-        resolve(event.target.result.reverse())
-      }
-      request.onerror = event => {
-        console.error('Error retrieving contracts from IndexedDB:', event.target.error)
-        reject(event.target.error)
-      }
-    })
-  } catch (error) {
-    console.error('Failed to open DB or get contracts:', error)
-    return []
+const getOptionLabelDefault = option => {
+  if (!option) return ''
+  if (typeof option === 'string') return option
+  if (typeof option === 'number') return String(option)
+  if (typeof option === 'object') {
+    return option.name || option.label || String(option.value ?? '')
   }
+  return String(option)
 }
 
-// Function to safely get contracts (NOW USES INDEXEDDB)
-const getContracts = async () => {
-  return await getContractsWithPestItems()
+const isOptionEqualToValueDefault = (option, value) => {
+  if (!option || !value) return false
+  if (typeof option === 'string' || typeof value === 'string') return option === value
+  if (typeof option === 'number' || typeof value === 'number') return option === value
+  if (option.id && value.id) return option.id === value.id
+  if (option.value && value.value) return option.value === value.value
+  return option === value
 }
 
-// Function to safely save contracts (NOW USES INDEXEDDB)
-const saveContracts = async contracts => {
-  // In the real application, you would typically save ONE new contract,
-  // not the entire array. The handleSubmit function below saves one.
-  // This function is kept here for reference but is not used in the final handleSubmit.
-  console.warn('saveContracts array function called - check implementation if saving entire array is intended.')
-  // For safety, this function will do nothing or be adapted if needed.
-}
+// ----------------------------------------------------------------------
+// Component
+// ----------------------------------------------------------------------
 
-export default function AddContractPage() {
+export default function EditContractPage() {
   const router = useRouter()
-
-  // Helper function to generate a simple unique ID
-  const generateUniqueId = () => Date.now().toString(36) + Math.random().toString(36).substring(2)
+  const { id } = useParams()
 
   // ----------------------------------------------------------------------
-  // State and Options
+  // Static dropdowns (UI only)
   // ----------------------------------------------------------------------
+
+  const salesModeOptions = [
+    { label: 'Confirmed Sales', value: 'confirmed_sales' },
+    { label: 'Quotation', value: 'quotation' }
+  ]
+
+  const contractTypeOptions = [
+    { label: 'Continuous Contract', value: 'Continuous Contract' },
+    { label: 'Limited Contract', value: 'Limited Contract' },
+    { label: 'Continuous Job', value: 'Continuous Job' },
+    { label: 'Job', value: 'Job' },
+    { label: 'Warranty', value: 'Warranty' },
+    { label: 'AMC update', value: 'AMC update' }
+  ]
+
+  const accountItemCodeOptions = ['1001 Insect Monitoring Traps', 'A-CA/FL', 'A-CA/MQ', 'A-ST/CR/RD/CA']
+
+  const industryOptions = ['Commercial', 'Food And Beverages', 'Residential']
+
+  const paymentTermOptions = ['0 days', '30 days']
+
+  const timeOptions = ['0:05', '0:10', '0:15', '0:20', '0:30']
+
+  // ----------------------------------------------------------------------
+  // State
+  // ----------------------------------------------------------------------
+
+  const [dropdowns, setDropdowns] = useState({
+    customers: [],
+    callTypes: [],
+    billingFreq: [],
+    serviceFreq: [],
+    pests: [],
+    chemicals: [],
+    employees: []
+  })
+
   const [formData, setFormData] = useState({
-    // Initializing all fields to sensible defaults
-    salesMode: '',
-    customer: '',
-    contractType: '',
+    salesMode: null, // object from salesModeOptions
+    customer: null, // object from dropdowns.customers
+    contractType: null, // object from contractTypeOptions
     coveredLocation: '',
     contractCode: '',
     serviceAddress: '',
@@ -161,128 +130,139 @@ export default function AddContractPage() {
     contactPerson: '',
     sitePhone: '',
     mobile: '',
-    callType: '',
+    callType: null, // from dropdowns.callTypes
     groupCode: '',
     startDate: new Date(),
     endDate: new Date(),
     reminderDate: new Date(),
     industry: '',
     contractValue: '',
-    technician: '',
+    technician: null, // employee object
     paymentTerm: '',
-    salesPerson: '',
-    supervisor: '',
-    billingFrequency: '',
+    salesPerson: null, // employee object
+    supervisor: null, // employee object
+    billingFrequency: null, // from dropdowns.billingFreq
     invoiceCount: '',
     invoiceRemarks: '',
     latitude: '',
     longitude: '',
-    file: null, // Keep file for actual File object/data if needed for backend
-    uploadedFileName: '', // 💡 NEW: To display file name
-    uploadedFileURL: '', // 💡 NEW: To hold temporary URL for preview
+    file: null,
+    uploadedFileName: '',
+    uploadedFileURL: '',
     billingRemarks: '',
     agreement1: '',
     agreement2: '',
     technicianRemarks: '',
-    appointmentRemarks: ''
+    appointmentRemarks: '',
+    // keep some original backend ids for safety if needed
+    industryId: null,
+    serviceFrequencyId: null
   })
 
-  // NEW STATE for the input fields for a single pest item
+  // Single pest item input
   const [currentPestItem, setCurrentPestItem] = useState({
+    id: null,
     pest: '',
+    pestId: null,
     frequency: '',
+    frequencyId: null,
     pestCount: '',
     pestValue: '',
     total: '',
     time: '',
     chemicals: '',
+    chemicalId: null,
     noOfItems: ''
   })
 
-  // NEW STATE for the list of pest items (The table/data grid)
+  // List of pest items
   const [pestItems, setPestItems] = useState([])
 
-  // NEW STATE: Tracks the ID of the item currently being edited
   const [editingItemId, setEditingItemId] = useState(null)
 
   const [reportEmailError, setReportEmailError] = useState(false)
   const [selectedFile, setSelectedFile] = useState('')
   const [isDragOver, setIsDragOver] = useState(false)
-  const [openDialog, setOpenDialog] = useState(false) // 💡 NEW: For file dialog
+  const [openDialog, setOpenDialog] = useState(false)
 
-  // Autocomplete Fields Definition (Unchanged)
-  const autocompleteFields = [
-    { name: 'salesMode', options: ['Confirmed Sales', 'Quotation'] },
-    { name: 'customer', options: ['GP Industries Pvt Ltd'] },
-    { name: 'contractType', options: ['Continuous Contract', 'Limited Contract', 'Continuous Job', 'Job', 'Warranty'] },
-    { name: 'accountItemCode', options: ['1001 Insect Monitoring Traps', 'A-CA/FL', 'A-CA/MQ', 'A-ST/CR/RD/CA'] },
-    { name: 'callType', options: ['Call & Fix', 'Schedule', 'SMS', 'E-mail'] },
-    { name: 'industry', options: ['Commercial', 'Food And Beverages', 'Residential'] },
-    { name: 'technician', options: ['Admin', 'Tech'] },
-    { name: 'paymentTerm', options: ['0 days', '30 days'] },
-    { name: 'salesPerson', options: ['Admin'] },
-    { name: 'supervisor', options: ['Admin'] },
-    { name: 'billingFrequency', options: ['Monthly-X12', 'Yearly-X1'] },
-    { name: 'pest', options: ['Bats', '1ILT'] },
-    { name: 'frequency', options: ['Monthly', 'Weekly'] },
-    { name: 'time', options: ['0:05', '0:10', '0:15'] }
+  const [loading, setLoading] = useState(false)
+
+  // ----------------------------------------------------------------------
+  // Autocomplete refs (for keyboard navigation)
+  // ----------------------------------------------------------------------
+
+  const autocompleteFieldNames = [
+    'salesMode',
+    'customer',
+    'contractType',
+    'accountItemCode',
+    'callType',
+    'industry',
+    'technician',
+    'paymentTerm',
+    'salesPerson',
+    'supervisor',
+    'billingFrequency',
+    'pest',
+    'frequency',
+    'time'
   ]
 
-  // Dynamic Refs and Open States for Autocomplete (Unchanged)
+  // ⬇️ MOVE THESE RIGHT HERE (Before forEach)
   const refs = {}
   const openStates = {}
   const setOpenStates = {}
 
-  autocompleteFields.forEach(({ name }) => {
+  // Then this block runs safely
+  autocompleteFieldNames.forEach(name => {
     refs[name + 'Ref'] = useRef(null)
     refs[name + 'InputRef'] = useRef(null)
-    // eslint-disable-next-line react-hooks/rules-of-hooks
+
     const [isOpen, setIsOpen] = useState(false)
+
     openStates[name + 'Open'] = isOpen
     setOpenStates[name + 'SetOpen'] = setIsOpen
   })
 
-  // Explicit Refs (Unchanged)
-  const coveredLocationRef = useRef(null),
-    contractCodeRef = useRef(null),
-    serviceAddressRef = useRef(null)
-  const postalCodeRef = useRef(null),
-    poNumberRef = useRef(null),
-    poExpiryRef = useRef(null)
-  const preferredTimeRef = useRef(null),
-    reportEmailRef = useRef(null),
-    contactPersonRef = useRef(null)
-  const sitePhoneRef = useRef(null),
-    mobileRef = useRef(null),
-    groupCodeRef = useRef(null)
-  const startDateRef = useRef(null),
-    endDateRef = useRef(null),
-    reminderDateRef = useRef(null)
-  const contractValueRef = useRef(null),
-    invoiceCountRef = useRef(null),
-    invoiceRemarksRef = useRef(null)
-  const latitudeRef = useRef(null),
-    longitudeRef = useRef(null),
-    fileInputRef = useRef(null)
+  // Explicit refs
+  const coveredLocationRef = useRef(null)
+  const contractCodeRef = useRef(null)
+  const serviceAddressRef = useRef(null)
+  const postalCodeRef = useRef(null)
+  const poNumberRef = useRef(null)
+  const poExpiryRef = useRef(null)
+  const preferredTimeRef = useRef(null)
+  const reportEmailRef = useRef(null)
+  const contactPersonRef = useRef(null)
+  const sitePhoneRef = useRef(null)
+  const mobileRef = useRef(null)
+  const groupCodeRef = useRef(null)
+  const startDateRef = useRef(null)
+  const endDateRef = useRef(null)
+  const reminderDateRef = useRef(null)
+  const contractValueRef = useRef(null)
+  const invoiceCountRef = useRef(null)
+  const invoiceRemarksRef = useRef(null)
+  const latitudeRef = useRef(null)
+  const longitudeRef = useRef(null)
+  const fileInputRef = useRef(null)
   const fileUploadButtonRef = useRef(null)
 
-  // NEW Refs for the Add Pest Item fields
-  const currentPestCountRef = useRef(null),
-    currentPestValueRef = useRef(null),
-    currentTotalRef = useRef(null)
-  const currentChemicalsRef = useRef(null),
-    currentNoOfItemsRef = useRef(null),
-    addPestButtonRef = useRef(null)
+  const currentPestCountRef = useRef(null)
+  const currentPestValueRef = useRef(null)
+  const currentTotalRef = useRef(null)
+  const currentChemicalsRef = useRef(null)
+  const currentNoOfItemsRef = useRef(null)
+  const addPestButtonRef = useRef(null)
 
-  const billingRemarksRef = useRef(null),
-    agreement1Ref = useRef(null),
-    agreement2Ref = useRef(null)
-  const technicianRemarksRef = useRef(null),
-    appointmentRemarksRef = useRef(null),
-    closeButtonRef = useRef(null)
+  const billingRemarksRef = useRef(null)
+  const agreement1Ref = useRef(null)
+  const agreement2Ref = useRef(null)
+  const technicianRemarksRef = useRef(null)
+  const appointmentRemarksRef = useRef(null)
+  const closeButtonRef = useRef(null)
   const saveButtonRef = useRef(null)
 
-  // Group all focusable element refs for keyboard navigation sequence (UPDATED)
   const focusableElementRefs = [
     refs.salesModeInputRef,
     refs.customerInputRef,
@@ -316,8 +296,7 @@ export default function AddContractPage() {
     latitudeRef,
     longitudeRef,
     fileUploadButtonRef,
-
-    // NEW Sequence for 'Add/Edit Pest' inputs
+    // Pest block
     refs.pestInputRef,
     refs.frequencyInputRef,
     currentPestCountRef,
@@ -327,8 +306,7 @@ export default function AddContractPage() {
     currentChemicalsRef,
     currentNoOfItemsRef,
     addPestButtonRef,
-
-    // Continue with the rest of the form
+    // Multiline / actions
     billingRemarksRef,
     agreement1Ref,
     agreement2Ref,
@@ -336,39 +314,12 @@ export default function AddContractPage() {
     appointmentRemarksRef,
     closeButtonRef,
     saveButtonRef
-  ].filter(ref => ref)
+  ].filter(Boolean)
 
   // ----------------------------------------------------------------------
-  // Handlers
+  // Focus helpers
   // ----------------------------------------------------------------------
 
-  const handleChange = e => {
-    setFormData({ ...formData, [e.target.name]: e.target.value })
-  }
-
-  // Handler for the current pest item input fields
-  const handleCurrentPestItemChange = e => {
-    const { name, value } = e.target
-    let updatedValue = value
-
-    // Auto-calculate Total (Pest Count * Pest Value)
-    if (name === 'pestCount' || name === 'pestValue') {
-      // Use Number() conversion here but keep the string value for state
-      const count = name === 'pestCount' ? Number(updatedValue || 0) : Number(currentPestItem.pestCount || 0)
-      const val = name === 'pestValue' ? Number(updatedValue || 0) : Number(currentPestItem.pestValue || 0)
-
-      setCurrentPestItem(prev => ({
-        ...prev,
-        [name]: updatedValue,
-        total: (count * val).toString()
-      }))
-      return
-    }
-
-    setCurrentPestItem(prev => ({ ...prev, [name]: updatedValue }))
-  }
-
-  // Focus management helper function (Unchanged)
   const focusNextElement = useCallback(
     currentRef => {
       const currentElement = currentRef.current
@@ -380,16 +331,12 @@ export default function AddContractPage() {
         for (let i = currentIndex + 1; i < focusableElementRefs.length; i++) {
           const nextRef = focusableElementRefs[i]
           const nextElement = nextRef.current
-
           if (nextElement) {
-            const nextAutocompleteField = autocompleteFields.find(field => refs[field.name + 'InputRef'] === nextRef)
-
+            const nextAutocompleteField = autocompleteFieldNames.find(name => refs[name + 'InputRef'] === nextRef)
             if (nextAutocompleteField) {
               nextElement.focus()
-              const setStateFunc = setOpenStates[nextAutocompleteField.name + 'SetOpen']
-              if (setStateFunc) {
-                setStateFunc(true)
-              }
+              const setStateFunc = setOpenStates[nextAutocompleteField + 'SetOpen']
+              if (setStateFunc) setStateFunc(true)
             } else {
               nextElement.focus()
             }
@@ -403,44 +350,168 @@ export default function AddContractPage() {
     [...Object.values(refs), ...Object.values(setOpenStates), focusableElementRefs]
   )
 
-  // Universal onKeyDown handler (Unchanged)
   const handleKeyDown = (e, currentRef, isMultiline = false) => {
     if (e.key === 'Enter') {
-      if (isMultiline && e.shiftKey) {
-        return
-      }
-
+      if (isMultiline && e.shiftKey) return
       e.preventDefault()
       focusNextElement(currentRef)
     }
   }
 
-  // Autocomplete change handler that also moves focus (Unchanged, for main form data)
+  const loadContract = async () => {
+    const res = await getContractView(id)
+    const data = res?.data?.data || res?.data || {}
+
+    console.log('Contract Data:', data)
+
+    // --- Map main form ---
+    setFormData(prev => ({
+      ...prev,
+      salesMode: salesModeOptions.find(o => o.value === data.sales_mode) || null,
+      customer: dropdowns.customers.find(c => c.id === data.customer_id) || null,
+      contractType: contractTypeOptions.find(c => c.value === data.contract_type) || null,
+      coveredLocation: data.covered_location || '',
+      contractCode: data.contract_code || '',
+      serviceAddress: data.service_address || '',
+      postalCode: data.postal_address || '',
+      accountItemCode: data.account_item_id || '',
+      poNumber: data.po_number || '',
+      poExpiry: data.po_expiry_date ? new Date(data.po_expiry_date) : new Date(),
+      preferredTime: data.preferred_time || '',
+      reportEmail: data.report_email || '',
+      contactPerson: data.contact_person_name || '',
+      sitePhone: data.phone || '',
+      mobile: data.mobile || '',
+      callType: dropdowns.callTypes.find(ct => ct.id === data.call_type_id) || null,
+      groupCode: data.group_code || '',
+      startDate: data.start_date ? new Date(data.start_date) : new Date(),
+      endDate: data.end_date ? new Date(data.end_date) : new Date(),
+      reminderDate: data.reminder_date ? new Date(data.reminder_date) : new Date(),
+      industry: data.category || '',
+      industryId: data.industry_id || null,
+      contractValue: data.contract_value || '',
+      technician: dropdowns.employees.find(e => e.id === data.technician_id) || null,
+      paymentTerm: data.billing_term || '',
+      salesPerson: dropdowns.employees.find(e => e.id === data.sales_person_id) || null,
+      supervisor: dropdowns.employees.find(e => e.id === data.supervisor_id) || null,
+      billingFrequency: dropdowns.billingFreq.find(b => b.id === data.billing_frequency_id) || null,
+      invoiceCount: data.invoice_count || '',
+      invoiceRemarks: data.invoice_remarks || '',
+      latitude: data.latitude || '',
+      longitude: data.longitude || '',
+      billingRemarks: data.billing_remarks || '',
+      agreement1: data.agreement_add_1 || '',
+      agreement2: data.agreement_add_2 || '',
+      technicianRemarks: data.technician_remarks || '',
+      appointmentRemarks: data.appointment_remarks || '',
+      uploadedFileName: data.file_name_display || '',
+      uploadedFileURL: data.floor_plan || ''
+    }))
+
+    // --- Pest items ---
+    const items = data.pest_items || []
+    setPestItems(
+      items.map(item => ({
+        id: item.id,
+        pest: item.pest,
+        pestId: item.pest_id,
+        frequency: item.frequency,
+        frequencyId: item.frequency_id,
+        pestValue: item.pest_value,
+        totalValue: item.total_value,
+        workTime: item.work_time,
+        chemicals: item.chemical || '',
+        chemicalId: item.chemical_id || '',
+        noOfItems: item.no_of_items || item.pest_service_count || '0'
+      }))
+    )
+  }
+
+  const loadDropdowns = async () => {
+    try {
+      const res = await getAllDropdowns()
+
+      const data = res?.data?.data || res?.data || {}
+
+      setDropdowns({
+        customers: data.customers || [],
+        callTypes: data.callTypes || [],
+        billingFreq: data.billingFreq || [],
+        serviceFreq: data.serviceFreq || [],
+        pests: data.pests || [],
+        chemicals: data.chemicals || [],
+        employees: data.employees || []
+      })
+
+      console.log('Dropdowns Loaded:', data)
+    } catch (error) {
+      console.error('Failed to load dropdowns:', error)
+    }
+  }
+
+  // ----------------------------------------------------------------------
+  // Data load (dropdowns + contract)
+  // ----------------------------------------------------------------------
+
+  useEffect(() => {
+    if (!id) return
+    loadDropdowns()
+  }, [id])
+
+  useEffect(() => {
+    if (dropdowns.customers.length === 0) return
+    loadContract()
+  }, [dropdowns])
+
+  // ----------------------------------------------------------------------
+  // Form handlers
+  // ----------------------------------------------------------------------
+
+  const handleChange = e => {
+    const { name, value } = e.target
+    setFormData(prev => ({ ...prev, [name]: value }))
+  }
+
   const handleAutocompleteChange = (name, newValue, currentInputRef) => {
     setFormData(prev => ({ ...prev, [name]: newValue }))
     const setStateFunc = setOpenStates[name + 'SetOpen']
-    if (setStateFunc) {
-      setStateFunc(false)
-    }
+    if (setStateFunc) setStateFunc(false)
     focusNextElement(currentInputRef)
   }
 
-  // NEW: Autocomplete change handler for CURRENT PEST ITEM
   const handleCurrentPestItemAutocompleteChange = (name, newValue, currentInputRef) => {
-    setCurrentPestItem(prev => ({ ...prev, [name]: newValue }))
-    const setStateFunc = setOpenStates[name + 'SetOpen']
-    if (setStateFunc) {
-      setStateFunc(false)
+    setCurrentPestItem(prev => ({
+      ...prev,
+      [name]: typeof newValue === 'string' ? newValue : newValue?.name || ''
+    }))
+
+    // also track IDs if possible
+    if (name === 'pest') {
+      const opt = dropdowns.pests.find(p => p === newValue || p?.id === newValue?.id || p?.name === newValue?.name)
+      setCurrentPestItem(prev => ({
+        ...prev,
+        pest: typeof newValue === 'string' ? newValue : newValue?.name || '',
+        pestId: opt?.id || null
+      }))
     }
+
+    if (name === 'frequency') {
+      const opt = dropdowns.serviceFreq.find(
+        f => f === newValue || f?.id === newValue?.id || f?.name === newValue?.name
+      )
+      setCurrentPestItem(prev => ({
+        ...prev,
+        frequency: typeof newValue === 'string' ? newValue : newValue?.name || '',
+        frequencyId: opt?.id || null
+      }))
+    }
+
+    const setStateFunc = setOpenStates[name + 'SetOpen']
+    if (setStateFunc) setStateFunc(false)
     focusNextElement(currentInputRef)
   }
 
-  // Autocomplete input change handler (Unchanged)
-  const handleAutocompleteInputChange = (name, options, newValue, reason) => {
-    if (reason === 'input' && !options.includes(newValue) && !autocompleteFields.find(f => f.name === name).freeSolo) {
-      return
-    }
-    // This handler must work for both formData and currentPestItem
+  const handleAutocompleteInputChange = (name, _options, newValue, _reason) => {
     if (['pest', 'frequency', 'time'].includes(name)) {
       setCurrentPestItem(prev => ({ ...prev, [name]: newValue }))
     } else {
@@ -448,22 +519,23 @@ export default function AddContractPage() {
     }
   }
 
-  // Datepicker change handler (Unchanged)
   const handleDateChange = (name, date, currentInputRef) => {
     setFormData(prev => ({ ...prev, [name]: date }))
     focusNextElement(currentInputRef)
   }
 
-  // 💡 FIXED/UPDATED File handler functions
+  // ----------------------------------------------------------------------
+  // File handlers
+  // ----------------------------------------------------------------------
+
   const handleNativeFileChange = e => {
     const file = e.target.files?.[0] || null
     if (file) {
       setSelectedFile(file.name)
-      // Create a temporary URL for preview, like in page A
       const fileURL = URL.createObjectURL(file)
       setFormData(prev => ({
         ...prev,
-        file: file,
+        file,
         uploadedFileName: file.name,
         uploadedFileURL: fileURL
       }))
@@ -476,7 +548,7 @@ export default function AddContractPage() {
         uploadedFileURL: ''
       }))
     }
-    e.target.value = null // Reset file input
+    e.target.value = null
     focusNextElement(fileUploadButtonRef)
   }
 
@@ -485,12 +557,11 @@ export default function AddContractPage() {
     setIsDragOver(false)
     const file = e.dataTransfer.files?.[0] || null
     if (file) {
-      // Use the logic from handleNativeFileChange
       setSelectedFile(file.name)
       const fileURL = URL.createObjectURL(file)
       setFormData(prev => ({
         ...prev,
-        file: file,
+        file,
         uploadedFileName: file.name,
         uploadedFileURL: fileURL
       }))
@@ -501,137 +572,207 @@ export default function AddContractPage() {
     e.preventDefault()
     setIsDragOver(true)
   }
+
   const handleDragLeave = e => {
     e.preventDefault()
     setIsDragOver(false)
   }
 
-  // 💡 NEW: Handler for viewing the uploaded file
   const handleViewFile = () => {
     if (formData.uploadedFileURL) setOpenDialog(true)
     else alert('No file available to view.')
   }
 
-  // 💡 NEW: Handler to close the dialog
   const handleCloseDialog = () => setOpenDialog(false)
 
+  // ----------------------------------------------------------------------
+  // Pest item handlers
+  // ----------------------------------------------------------------------
 
-  // Function to load an item for editing
+  const handleCurrentPestItemChange = e => {
+    const { name, value } = e.target
+
+    if (name === 'pestCount' || name === 'pestValue') {
+      const newCount = name === 'pestCount' ? value : currentPestItem.pestCount
+      const newVal = name === 'pestValue' ? value : currentPestItem.pestValue
+      const countNum = Number(newCount || 0)
+      const valNum = Number(newVal || 0)
+      setCurrentPestItem(prev => ({
+        ...prev,
+        [name]: value,
+        total: String(countNum * valNum)
+      }))
+      return
+    }
+
+    setCurrentPestItem(prev => ({ ...prev, [name]: value }))
+  }
+
   const handleEditPestItem = item => {
-    // Load item data into the current input state
     setCurrentPestItem({
+      id: item.id,
       pest: item.pest,
+      pestId: item.pestId || null,
       frequency: item.frequency,
-      pestCount: item.noOfItems, // Map 'noOfItems' back to 'pestCount' input
-      pestValue: item.pestValue,
-      total: item.totalValue,
-      time: item.workTime,
-      chemicals: item.chemicals,
-      noOfItems: item.noOfItems
+      frequencyId: item.frequencyId || null,
+      pestCount: item.noOfItems || '',
+      pestValue: item.pestValue || '',
+      total: item.totalValue || '',
+      time: item.workTime || '',
+      chemicals: item.chemicals || '',
+      chemicalId: item.chemicalId || null,
+      noOfItems: item.noOfItems || ''
     })
-
-    // Set the editing ID
     setEditingItemId(item.id)
-
-    // Focus on the first input field
     refs.pestInputRef.current?.focus()
   }
 
-  // Function to save (Add or Update) the current item to the list
   const handleSavePestItem = () => {
-    // Basic validation (Pest and Frequency are required)
     if (!currentPestItem.pest || !currentPestItem.frequency) {
       alert('Pest and Frequency are required to add/update an item.')
       return
     }
 
     const itemPayload = {
+      id: currentPestItem.id || null,
       pest: currentPestItem.pest,
+      pestId: currentPestItem.pestId || null,
       frequency: currentPestItem.frequency,
+      frequencyId: currentPestItem.frequencyId || null,
+      chemicals: currentPestItem.chemicals || '',
+      chemicalId: currentPestItem.chemicalId || null,
       pestValue: currentPestItem.pestValue || '0',
       totalValue: currentPestItem.total || '0',
-      workTime: currentPestItem.time || '0:00',
-      chemicals: currentPestItem.chemicals || '',
+      workTime: currentPestItem.time || '0',
       noOfItems: currentPestItem.noOfItems || currentPestItem.pestCount || '0'
     }
 
     if (editingItemId) {
-      // Logic for UPDATING an existing item
-      setPestItems(prev => prev.map(item => (item.id === editingItemId ? { ...itemPayload, id: item.id } : item)))
-      setEditingItemId(null) // Clear edit state
+      setPestItems(prev => prev.map(item => (item.id === editingItemId ? { ...item, ...itemPayload } : item)))
+      setEditingItemId(null)
     } else {
-      // Logic for ADDING a new item
-      setPestItems(prev => [...prev, { ...itemPayload, id: generateUniqueId() }])
+      setPestItems(prev => [...prev, { ...itemPayload, id: itemPayload.id || Date.now().toString() }])
     }
 
-    // Reset the current input fields
     setCurrentPestItem({
+      id: null,
       pest: '',
+      pestId: null,
       frequency: '',
+      frequencyId: null,
       pestCount: '',
       pestValue: '',
       total: '',
       time: '',
       chemicals: '',
+      chemicalId: null,
       noOfItems: ''
     })
-
-    // Focus back to the first field of the pest block
     refs.pestInputRef.current?.focus()
   }
 
-  // Function to delete an item from the list
-  const handleDeletePestItem = id => {
-    if (editingItemId === id) {
+  const handleDeletePestItem = idToDelete => {
+    if (editingItemId === idToDelete) {
       setEditingItemId(null)
       setCurrentPestItem({
+        id: null,
         pest: '',
+        pestId: null,
         frequency: '',
+        frequencyId: null,
         pestCount: '',
         pestValue: '',
         total: '',
         time: '',
         chemicals: '',
+        chemicalId: null,
         noOfItems: ''
       })
     }
-    setPestItems(prev => prev.filter(item => item.id !== id))
+    setPestItems(prev => prev.filter(item => item.id !== idToDelete))
   }
 
-  // Logic to Save to IndexedDB and Redirect
+  // ----------------------------------------------------------------------
+  // Submit / Update
+  // ----------------------------------------------------------------------
+
   const handleSubmit = async () => {
-    // Revoke the object URL after submission to free up memory
-    if (formData.uploadedFileURL) {
-        URL.revokeObjectURL(formData.uploadedFileURL);
-    }
-
-    const newContract = {
-      ...formData,
-      id: generateUniqueId(),
-      poExpiry: formData.poExpiry.toISOString(),
-      startDate: formData.startDate.toISOString(),
-      endDate: formData.endDate.toISOString(),
-      reminderDate: formData.reminderDate.toISOString(),
-      pestItems: pestItems, // Include the list of pest items
-      // Save only the filename and URL (if you were saving the file itself, this would change)
-      // For IndexedDB, saving the file data directly is complex. For now, we save the metadata.
-      file: null, // Don't save the large File object to DB
-    }
-
     try {
-      await saveContractWithPestItems(newContract)
+      setLoading(true)
+
+      if (formData.uploadedFileURL && formData.file) {
+        // if object URL created by this session, clean afterwards
+        URL.revokeObjectURL(formData.uploadedFileURL)
+      }
+
+      const payload = {
+        po_number: formData.poNumber || '',
+        po_expiry_date: formatDateToAPIDate(formData.poExpiry),
+        report_email: formData.reportEmail || '',
+        sales_mode: formData.salesMode?.value || null,
+        contract_code: formData.contractCode || '',
+        contract_type: formData.contractType?.value || '',
+        billing_term: formData.paymentTerm || '',
+        customer_id: formData.customer?.id || null,
+        covered_location: formData.coveredLocation || '',
+        service_address: formData.serviceAddress || '',
+        postal_address: formData.postalCode || '',
+        account_item_id: formData.accountItemCode || null,
+        contact_person_name: formData.contactPerson || '',
+        phone: formData.sitePhone || '',
+        mobile: formData.mobile || '',
+        call_type_id: formData.callType?.id || null,
+        preferred_time: formData.preferredTime || '',
+        industry_id: formData.industryId || null,
+        supervisor_id: formData.supervisor?.id || null,
+        sales_person_id: formData.salesPerson?.id || null,
+        technician_id: formData.technician?.id || null,
+        contract_value: formData.contractValue ? Number(formData.contractValue) : 0,
+        billing_frequency_id: formData.billingFrequency?.id || null,
+        service_frequency_id: formData.serviceFrequencyId || null,
+        invoice_count: formData.invoiceCount || '',
+        invoice_remarks: formData.invoiceRemarks || '',
+        latitude: formData.latitude || 0,
+        longitude: formData.longitude || 0,
+        agreement_add_1: formData.agreement1 || '',
+        agreement_add_2: formData.agreement2 || '',
+        billing_remarks: formData.billingRemarks || '',
+        appointment_remarks: formData.appointmentRemarks || '',
+        technician_remarks: formData.technicianRemarks || '',
+        group_code: formData.groupCode || '',
+        start_date: formatDateToAPIDate(formData.startDate),
+        end_date: formatDateToAPIDate(formData.endDate),
+        reminder_date: formatDateToAPIDate(formData.reminderDate),
+        file_name_display: formData.uploadedFileName || null,
+        floor_plan: formData.uploadedFileURL || null,
+        // map pest items
+        pest_items: pestItems.map(item => ({
+          id: item.id || null,
+          pest_id: item.pestId || null,
+          frequency_id: item.frequencyId || null,
+          chemical_id: item.chemicalId || null,
+          pest_value: item.pestValue || '0',
+          pest_service_count: item.noOfItems || '0',
+          total_value: item.totalValue || '0',
+          work_time: item.workTime || 0
+        }))
+      }
+
+      await updateContract(id, payload)
       router.push('/admin/contracts')
     } catch (error) {
-      alert('Failed to save contract to database. See console for details.')
-      console.error('Submission failed:', error)
+      console.error('Update contract error:', error)
+      alert('Failed to update contract. Please check console for details.')
+    } finally {
+      setLoading(false)
     }
   }
 
   // ----------------------------------------------------------------------
-  // Render Helper for Autocomplete (Unchanged)
+  // Render helpers
   // ----------------------------------------------------------------------
 
-  const renderAutocomplete = ({ name, label, options, gridProps = { xs: 12, md: 3 } }) => {
+  const renderAutocomplete = ({ name, label, options, gridProps = { xs: 12, md: 3 }, freeSolo = false }) => {
     const ref = refs[name + 'Ref']
     const inputRef = refs[name + 'InputRef']
     const isOpen = openStates[name + 'Open']
@@ -641,14 +782,16 @@ export default function AddContractPage() {
       <Grid item {...gridProps} key={name}>
         <Autocomplete
           ref={ref}
-          freeSolo={false}
-          options={options}
-          value={formData[name]}
+          freeSolo={freeSolo}
+          options={options || []}
+          value={formData[name] || null}
           open={isOpen}
           onFocus={() => setIsOpen(true)}
           onBlur={() => setIsOpen(false)}
           onOpen={() => setIsOpen(true)}
           onClose={() => setIsOpen(false)}
+          getOptionLabel={getOptionLabelDefault}
+          isOptionEqualToValue={isOptionEqualToValueDefault}
           onInputChange={(e, newValue, reason) => handleAutocompleteInputChange(name, options, newValue, reason)}
           onChange={(e, newValue) => handleAutocompleteChange(name, newValue, inputRef)}
           onKeyDown={e => handleKeyDown(e, inputRef)}
@@ -660,36 +803,38 @@ export default function AddContractPage() {
   }
 
   // ----------------------------------------------------------------------
-  // Form Structure (Updated File Upload Section)
+  // UI
   // ----------------------------------------------------------------------
 
   return (
     <ContentLayout
-      title={<Box sx={{ m: 2 }}>{'Add Contract'}</Box>}
+      title={<Box sx={{ m: 2 }}>{'Edit Contract'}</Box>}
       breadcrumbs={[
         { label: 'Dashboard', href: '/' },
         { label: 'Contracts', href: '/admin/contracts' },
-        { label: 'Add Contract' }
+        { label: 'Edit Contract' }
       ]}
     >
       <Card sx={{ p: 4, boxShadow: 'none' }} elevation={0}>
         <Grid container spacing={6}>
-          {/* ... (Existing form fields, rows 1-9) ... */}
+          {/* Row 1 */}
           {renderAutocomplete({
             name: 'salesMode',
             label: 'Sales Mode',
-            options: autocompleteFields.find(f => f.name === 'salesMode').options
+            options: salesModeOptions
           })}
           {renderAutocomplete({
             name: 'customer',
             label: 'Customer',
-            options: autocompleteFields.find(f => f.name === 'customer').options
+            options: dropdowns.customers
           })}
           {renderAutocomplete({
             name: 'contractType',
             label: 'Contract Type',
-            options: autocompleteFields.find(f => f.name === 'contractType').options
+            options: contractTypeOptions,
+            freeSolo: true
           })}
+
           <Grid item xs={12} md={3}>
             <CustomTextField
               fullWidth
@@ -701,6 +846,8 @@ export default function AddContractPage() {
               onKeyDown={e => handleKeyDown(e, coveredLocationRef)}
             />
           </Grid>
+
+          {/* Row 2 */}
           <Grid item xs={12} md={3}>
             <CustomTextField
               fullWidth
@@ -737,8 +884,10 @@ export default function AddContractPage() {
           {renderAutocomplete({
             name: 'accountItemCode',
             label: 'Account Item Code',
-            options: autocompleteFields.find(f => f.name === 'accountItemCode').options
+            options: accountItemCodeOptions
           })}
+
+          {/* Row 3 */}
           <Grid item xs={12} md={3}>
             <CustomTextField
               fullWidth
@@ -782,9 +931,8 @@ export default function AddContractPage() {
               onChange={e => {
                 const value = e.target.value
                 setFormData(prev => ({ ...prev, reportEmail: value }))
-                // Keep standard email validation
                 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-                setReportEmailError(value && !emailRegex.test(value))
+                setReportEmailError(Boolean(value && !emailRegex.test(value)))
               }}
               error={reportEmailError}
               helperText={reportEmailError ? 'Please enter a valid email address' : ''}
@@ -792,6 +940,8 @@ export default function AddContractPage() {
               onKeyDown={e => handleKeyDown(e, reportEmailRef)}
             />
           </Grid>
+
+          {/* Row 4 */}
           <Grid item xs={12} md={3}>
             <CustomTextField
               fullWidth
@@ -836,8 +986,10 @@ export default function AddContractPage() {
           {renderAutocomplete({
             name: 'callType',
             label: 'Call Type',
-            options: autocompleteFields.find(f => f.name === 'callType').options
+            options: dropdowns.callTypes
           })}
+
+          {/* Row 5 */}
           <Grid item xs={12} md={3}>
             <CustomTextField
               fullWidth
@@ -882,10 +1034,13 @@ export default function AddContractPage() {
               maxDate={formData.endDate}
             />
           </Grid>
+
+          {/* Row 6 */}
           {renderAutocomplete({
             name: 'industry',
             label: 'Industry',
-            options: autocompleteFields.find(f => f.name === 'industry').options
+            options: industryOptions,
+            freeSolo: true
           })}
           <Grid item xs={12} md={3}>
             <CustomTextField
@@ -902,30 +1057,32 @@ export default function AddContractPage() {
           {renderAutocomplete({
             name: 'technician',
             label: 'Technicians',
-            options: autocompleteFields.find(f => f.name === 'technician').options
+            options: dropdowns.employees.filter(e => e.designation === 'Technician')
           })}
           {renderAutocomplete({
             name: 'paymentTerm',
             label: 'Payment Term',
-            options: autocompleteFields.find(f => f.name === 'paymentTerm').options
+            options: paymentTermOptions
           })}
           {renderAutocomplete({
             name: 'salesPerson',
             label: 'Sales Person',
-            options: autocompleteFields.find(f => f.name === 'salesPerson').options,
+            options: dropdowns.employees.filter(e => e.designation === 'Sales'),
             gridProps: { xs: 12, md: 6 }
           })}
           {renderAutocomplete({
             name: 'supervisor',
             label: 'Supervisor',
-            options: autocompleteFields.find(f => f.name === 'supervisor').options,
+            options: dropdowns.employees.filter(e => e.designation === 'Supervisor'),
             gridProps: { xs: 12, md: 6 }
           })}
           {renderAutocomplete({
             name: 'billingFrequency',
             label: 'Billing Frequency',
-            options: autocompleteFields.find(f => f.name === 'billingFrequency').options
+            options: dropdowns.billingFreq
           })}
+
+          {/* Row 7 */}
           <Grid item xs={12} md={3}>
             <CustomTextField
               fullWidth
@@ -971,7 +1128,7 @@ export default function AddContractPage() {
             />
           </Grid>
 
-          {/* 💡 UPDATED FILE UPLOAD SECTION - Includes View Button */}
+          {/* File upload */}
           <Grid item xs={12} md={6}>
             <Typography variant='body2' sx={{ mb: 1, fontWeight: 500 }}>
               Upload File
@@ -1014,7 +1171,6 @@ export default function AddContractPage() {
                 </Typography>
               </Button>
 
-              {/* View Button, visible if a file URL exists */}
               {formData.uploadedFileURL && (
                 <IconButton
                   color='primary'
@@ -1027,36 +1183,32 @@ export default function AddContractPage() {
               )}
             </Box>
           </Grid>
-          {/* 💡 END UPDATED FILE UPLOAD SECTION */}
 
-
-          {/* --- PEST ITEM INPUTS (Updated) --- */}
+          {/* Pest items block title */}
           <Grid item xs={12}>
             <Typography variant='h6' sx={{ mb: 4, mt: 4 }}>
               Pest Item Details ({editingItemId ? 'Editing Mode' : 'Add Mode'})
             </Typography>
           </Grid>
 
-          {/* Row 10 - Pest, Frequency, Pest Count, Pest Value, Total */}
+          {/* Pest row 1 */}
           <Grid item xs={12} md={2.4}>
-            {/* Pest Autocomplete */}
             <Autocomplete
               ref={refs.pestRef}
               freeSolo={false}
-              options={autocompleteFields.find(f => f.name === 'pest').options}
-              value={currentPestItem.pest}
+              options={dropdowns.pests}
+              value={
+                dropdowns.pests.find(p => p.name === currentPestItem.pest || p.id === currentPestItem.pestId) || null
+              }
               open={openStates.pestOpen}
               onFocus={() => setOpenStates.pestSetOpen(true)}
               onBlur={() => setOpenStates.pestSetOpen(false)}
               onOpen={() => setOpenStates.pestSetOpen(true)}
               onClose={() => setOpenStates.pestSetOpen(false)}
+              getOptionLabel={getOptionLabelDefault}
+              isOptionEqualToValue={isOptionEqualToValueDefault}
               onInputChange={(e, newValue, reason) =>
-                handleAutocompleteInputChange(
-                  'pest',
-                  autocompleteFields.find(f => f.name === 'pest').options,
-                  newValue,
-                  reason
-                )
+                handleAutocompleteInputChange('pest', dropdowns.pests, newValue, reason)
               }
               onChange={(e, newValue) => handleCurrentPestItemAutocompleteChange('pest', newValue, refs.pestInputRef)}
               onKeyDown={e => handleKeyDown(e, refs.pestInputRef)}
@@ -1064,25 +1216,26 @@ export default function AddContractPage() {
               renderInput={params => <CustomTextField {...params} label='Pest' inputRef={refs.pestInputRef} />}
             />
           </Grid>
+
           <Grid item xs={12} md={2.4}>
-            {/* Frequency Autocomplete */}
             <Autocomplete
               ref={refs.frequencyRef}
               freeSolo={false}
-              options={autocompleteFields.find(f => f.name === 'frequency').options}
-              value={currentPestItem.frequency}
+              options={dropdowns.serviceFreq}
+              value={
+                dropdowns.serviceFreq.find(
+                  f => f.name === currentPestItem.frequency || f.id === currentPestItem.frequencyId
+                ) || null
+              }
               open={openStates.frequencyOpen}
               onFocus={() => setOpenStates.frequencySetOpen(true)}
               onBlur={() => setOpenStates.frequencySetOpen(false)}
               onOpen={() => setOpenStates.frequencySetOpen(true)}
               onClose={() => setOpenStates.frequencySetOpen(false)}
+              getOptionLabel={getOptionLabelDefault}
+              isOptionEqualToValue={isOptionEqualToValueDefault}
               onInputChange={(e, newValue, reason) =>
-                handleAutocompleteInputChange(
-                  'frequency',
-                  autocompleteFields.find(f => f.name === 'frequency').options,
-                  newValue,
-                  reason
-                )
+                handleAutocompleteInputChange('frequency', dropdowns.serviceFreq, newValue, reason)
               }
               onChange={(e, newValue) =>
                 handleCurrentPestItemAutocompleteChange('frequency', newValue, refs.frequencyInputRef)
@@ -1094,8 +1247,8 @@ export default function AddContractPage() {
               )}
             />
           </Grid>
+
           <Grid item xs={12} md={2.4}>
-            {/* Pest Count */}
             <CustomTextField
               fullWidth
               label='Pest Count'
@@ -1106,8 +1259,8 @@ export default function AddContractPage() {
               onKeyDown={e => handleKeyDown(e, currentPestCountRef)}
             />
           </Grid>
+
           <Grid item xs={12} md={2.4}>
-            {/* Pest Value */}
             <CustomTextField
               type='text'
               fullWidth
@@ -1119,8 +1272,8 @@ export default function AddContractPage() {
               onKeyDown={e => handleKeyDown(e, currentPestValueRef)}
             />
           </Grid>
+
           <Grid item xs={12} md={2.4}>
-            {/* Total */}
             <CustomTextField
               fullWidth
               label='Total'
@@ -1133,26 +1286,22 @@ export default function AddContractPage() {
             />
           </Grid>
 
-          {/* Row 11 - Time, Chemicals, No of Items, +ADD/UPDATE PEST Button */}
+          {/* Pest row 2 */}
           <Grid item xs={12} md={3}>
-            {/* Time Autocomplete */}
             <Autocomplete
               ref={refs.timeRef}
               freeSolo={false}
-              options={autocompleteFields.find(f => f.name === 'time').options}
-              value={currentPestItem.time}
+              options={timeOptions}
+              value={currentPestItem.time || ''}
               open={openStates.timeOpen}
               onFocus={() => setOpenStates.timeSetOpen(true)}
               onBlur={() => setOpenStates.timeSetOpen(false)}
               onOpen={() => setOpenStates.timeSetOpen(true)}
               onClose={() => setOpenStates.timeSetOpen(false)}
+              getOptionLabel={getOptionLabelDefault}
+              isOptionEqualToValue={isOptionEqualToValueDefault}
               onInputChange={(e, newValue, reason) =>
-                handleAutocompleteInputChange(
-                  'time',
-                  autocompleteFields.find(f => f.name === 'time').options,
-                  newValue,
-                  reason
-                )
+                handleAutocompleteInputChange('time', timeOptions, newValue, reason)
               }
               onChange={(e, newValue) => handleCurrentPestItemAutocompleteChange('time', newValue, refs.timeInputRef)}
               onKeyDown={e => handleKeyDown(e, refs.timeInputRef)}
@@ -1160,8 +1309,8 @@ export default function AddContractPage() {
               renderInput={params => <CustomTextField {...params} label='Time' inputRef={refs.timeInputRef} />}
             />
           </Grid>
+
           <Grid item xs={12} md={3}>
-            {/* Chemicals */}
             <CustomTextField
               fullWidth
               label='Chemicals'
@@ -1172,8 +1321,8 @@ export default function AddContractPage() {
               onKeyDown={e => handleKeyDown(e, currentChemicalsRef)}
             />
           </Grid>
+
           <Grid item xs={12} md={3}>
-            {/* No of Items */}
             <CustomTextField
               type='text'
               fullWidth
@@ -1185,31 +1334,26 @@ export default function AddContractPage() {
               onKeyDown={e => handleKeyDown(e, currentNoOfItemsRef)}
             />
           </Grid>
+
           <Grid item xs={12} md={3} sx={{ display: 'flex', alignItems: 'flex-end' }}>
             <Button
               variant='contained'
               fullWidth
-              onClick={handleSavePestItem} // Use the new save handler
-              // Change icon based on mode
+              onClick={handleSavePestItem}
               ref={addPestButtonRef}
               onKeyDown={e => handleKeyDown(e, addPestButtonRef)}
-              // --- CHANGES MADE HERE ---
-              color={editingItemId ? 'success' : 'primary'} // UPDATE PEST is now 'success' (green)
-              // -------------------------
+              color={editingItemId ? 'success' : 'primary'}
             >
-              {editingItemId ? 'UPDATE PEST' : 'ADD PEST'} {/* Change text based on mode */}
+              {editingItemId ? 'UPDATE PEST' : 'ADD PEST'}
             </Button>
           </Grid>
 
-          {/* ---------------------------------------------------- */}
-          {/* --- PEST ITEMS TABLE (MUI DESIGN - Left Aligned) --- */}
-          {/* ---------------------------------------------------- */}
+          {/* Pest items table */}
           <Grid item xs={12} sx={{ mt: 4 }}>
             <Box sx={{ overflowX: 'auto', border: '1px solid #e0e0e0', borderRadius: 1 }}>
               <Table sx={{ minWidth: 950 }}>
                 <TableHead>
                   <TableRow>
-                    {/* All headers are left-aligned or explicitly set */}
                     <TableCell sx={{ width: '5%' }}>#</TableCell>
                     <TableCell align='center' sx={{ width: '10%' }}>
                       Action
@@ -1226,24 +1370,15 @@ export default function AddContractPage() {
                 <TableBody>
                   {pestItems.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} align='center' sx={{ fontStyle: '', color: 'text.secondary' }}>
+                      <TableCell colSpan={9} align='center' sx={{ color: 'text.secondary' }}>
                         No pest added
                       </TableCell>
                     </TableRow>
                   ) : (
                     pestItems.map((item, index) => (
-                      <TableRow
-                        key={item.id}
-                        // --- CHANGES MADE HERE ---
-                        // Removed orange highlight for editing row
-                        sx={{ backgroundColor: editingItemId === item.id ? 'inherit' : 'inherit' }}
-                        // -------------------------
-                      >
-                        {/* Data cells are now left-aligned */}
+                      <TableRow key={item.id}>
                         <TableCell>{index + 1}</TableCell>
                         <TableCell align='center'>
-                          {/* Action Buttons remain centered */}
-
                           <IconButton
                             size='small'
                             color='error'
@@ -1254,7 +1389,6 @@ export default function AddContractPage() {
                           </IconButton>
                           <IconButton
                             size='small'
-                            color=''
                             onClick={() => handleEditPestItem(item)}
                             disabled={editingItemId === item.id}
                             sx={{ p: 1 }}
@@ -1276,9 +1410,8 @@ export default function AddContractPage() {
               </Table>
             </Box>
           </Grid>
-          {/* --- END PEST ITEMS TABLE --- */}
 
-          {/* Row 12 - Multiline Text Fields (Unchanged) */}
+          {/* Multiline rows */}
           <Grid item xs={4}>
             <CustomTextField
               multiline
@@ -1318,6 +1451,7 @@ export default function AddContractPage() {
               onKeyDown={e => handleKeyDown(e, agreement2Ref, true)}
             />
           </Grid>
+
           <Grid item xs={6}>
             <CustomTextField
               multiline
@@ -1350,26 +1484,22 @@ export default function AddContractPage() {
             <Button variant='outlined' onClick={() => router.push('/admin/contracts')} ref={closeButtonRef}>
               Close
             </Button>
-            <Button variant='contained' onClick={handleSubmit} ref={saveButtonRef}>
-              Save
+            <Button variant='contained' onClick={handleSubmit} ref={saveButtonRef} disabled={loading}>
+              {loading ? 'Saving...' : 'Save'}
             </Button>
           </Grid>
         </Grid>
       </Card>
 
-      {/* 💡 NEW: Image Dialog for file preview */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth='md' fullWidth>
-      <DialogContent sx={{ p: 0, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <DialogContent sx={{ p: 0, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           {formData.uploadedFileURL && (
             <img
               src={formData.uploadedFileURL}
               alt='Uploaded File Preview'
-                style={{ width: '100%', height: 'auto', objectFit: 'contain' }}
+              style={{ width: '100%', height: 'auto', objectFit: 'contain' }}
             />
-
-
-
-       )}
+          )}
         </DialogContent>
       </Dialog>
     </ContentLayout>

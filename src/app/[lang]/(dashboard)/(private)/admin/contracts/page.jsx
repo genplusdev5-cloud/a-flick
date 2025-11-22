@@ -201,7 +201,11 @@ export default function ContractsPage() {
     loadData()
   }, [customerFilter, typeFilter, statusFilter, pagination.pageIndex, pagination.pageSize, searchText])
 
-  const handleEdit = id => router.push(`/admin/contracts/${id}/edit`)
+  const handleEdit = row => {
+    router.push(`/en/admin/contracts/${row.id}/edit`)
+
+  }
+
   const confirmDelete = async () => {
     if (deleteDialog.row) {
       await deleteContractApi(deleteDialog.row.id)
@@ -236,7 +240,7 @@ export default function ContractsPage() {
             </IconButton>
 
             {/* ✏️ Edit */}
-            <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original.id)}>
+            <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
               <EditIcon />
             </IconButton>
 

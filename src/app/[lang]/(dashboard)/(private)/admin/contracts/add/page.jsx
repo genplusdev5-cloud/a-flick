@@ -286,58 +286,33 @@ export default function AddContractPage() {
     try {
       const data = await getAllDropdowns()
 
-      setDropdowns({
-        customers: data.customers,
-        callTypes: data.callTypes,
-        industries: data.industries,
-        employees: data.employees,
-        billingFrequencies: data.billingFreq,
-        serviceFrequency: data.serviceFreq,
-        pests: data.pests,
-        chemicals: data.chemicals
-      })
+      console.log('DROPDOWNS LOADED SUCCESSFULLY:', data) // ← MUST SEE THIS IN CONSOLE!
 
-      // 🔥 DO NOT mutate autocompleteFields array
-      //    Instead update your dynamic state only
+      setDropdowns(prev => ({
+        ...prev,
+        customers: data.customers.map(name => ({ name })),
+        callTypes: data.callTypes.map(name => ({ name })),
+        billingFrequencies: data.billingFreq.map(name => ({ name })),
+        serviceFrequency: data.serviceFreq.map(name => ({ name })),
+        pests: data.pests.map(name => ({ name })),
+        employees: data.employees || []
+      }))
+
+      // Update dynamic fields with actual names
       const updatedFields = autocompleteFields.map(f => {
-        if (f.name === 'customer') return { ...f, options: data.customers?.map(c => c.name) || [] }
-
-        if (f.name === 'callType') return { ...f, options: data.callTypes?.map(c => c.name) || [] }
-
-        if (f.name === 'industry') return { ...f, options: data.industries?.map(i => i.name) || [] }
-
-        if (f.name === 'technician')
-          return {
-            ...f,
-            options: data.employees?.filter(e => e.designation === 'Technician')?.map(e => e.nick_name || e.name) || []
-          }
-
-        if (f.name === 'supervisor')
-          return {
-            ...f,
-            options:
-              data.employees
-                ?.filter(e => e.designation?.toLowerCase() === 'supervisor')
-                ?.map(e => e.nick_name || e.name) || []
-          }
-
-        if (f.name === 'billingFrequency') return { ...f, options: data.billingFreq?.map(b => b.name) || [] }
-
-        if (f.name === 'pest') return { ...f, options: data.pests?.map(p => p.name) || [] }
-
-        if (f.name === 'frequency') return { ...f, options: data.serviceFreq?.map(f => f.name) || [] }
-
-        if (f.name === 'chemicals') return { ...f, options: data.chemicals?.map(c => c.name) || [] }
-
+        if (f.name === 'customer') return { ...f, options: data.customers || [] }
+        if (f.name === 'callType') return { ...f, options: data.callTypes || [] }
+        if (f.name === 'billingFrequency') return { ...f, options: data.billingFreq || [] }
+        if (f.name === 'frequency') return { ...f, options: data.serviceFreq || [] }
+        if (f.name === 'pest') return { ...f, options: data.pests || [] }
         return f
       })
 
       setDynamicAutocompleteFields(updatedFields)
     } catch (error) {
-      console.error('Dropdown load error', error)
+      console.error('Dropdown load failed', error)
     }
   }
-
   // ----------------------------------------------------------------------
   // Handlers
   // ----------------------------------------------------------------------
