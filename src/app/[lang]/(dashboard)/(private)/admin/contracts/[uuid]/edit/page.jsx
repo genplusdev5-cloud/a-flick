@@ -72,7 +72,7 @@ const isOptionEqualToValueDefault = (option, value) => {
 
 export default function EditContractPage() {
   const router = useRouter()
-  const { id } = useParams()
+  const { uuid } = useParams() // ← CHANGE THIS LINE ONLY
 
   // ----------------------------------------------------------------------
   // Static dropdowns (UI only)
@@ -359,7 +359,7 @@ export default function EditContractPage() {
   }
 
   const loadContract = async () => {
-    const res = await getContractView(id)
+    const res = await getContractView(uuid)
     const data = res?.data?.data || res?.data || {}
 
     console.log('Contract Data:', data)
@@ -453,15 +453,20 @@ export default function EditContractPage() {
   // Data load (dropdowns + contract)
   // ----------------------------------------------------------------------
 
-  useEffect(() => {
-    if (!id) return
-    loadDropdowns()
-  }, [id])
+// ----------------------------------------------------------------------
+// Data load (dropdowns + contract)
+// ----------------------------------------------------------------------
 
-  useEffect(() => {
-    if (dropdowns.customers.length === 0) return
-    loadContract()
-  }, [dropdowns])
+useEffect(() => {
+  if (!uuid) return
+  loadDropdowns()
+}, [uuid])
+
+useEffect(() => {
+  if (dropdowns.customers.length === 0) return
+  if (dropdowns.callTypes.length === 0) return
+  loadContract()
+}, [dropdowns, uuid]) // uuid add panniruken extra safety-ku
 
   // ----------------------------------------------------------------------
   // Form handlers
@@ -758,7 +763,7 @@ export default function EditContractPage() {
         }))
       }
 
-      await updateContract(id, payload)
+      await updateContract(uuid, payload)
       router.push('/admin/contracts')
     } catch (error) {
       console.error('Update contract error:', error)

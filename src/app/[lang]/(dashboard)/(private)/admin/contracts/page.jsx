@@ -114,18 +114,24 @@ export default function ContractsPage() {
   const searchParams = useSearchParams()
   const encodedCustomerId = searchParams.get('customer')
   const decodedCustomerId = encodedCustomerId ? parseInt(atob(encodedCustomerId)) : null
+  const [uuidFilter, setUuidFilter] = useState(null)
 
   const [customerFilter, setCustomerFilter] = useState(null)
   const [typeFilter, setTypeFilter] = useState(null)
   const [statusFilter, setStatusFilter] = useState(null)
 
-  const loadData = async () => {
+  const loadData = async (extraFilters = {}) => {
     setLoading(true)
     try {
-      const filters = {}
+      // 👇 base filters from state + anything extra you pass
+      const filters = { ...extraFilters }
+
       if (customerFilter?.id) filters.customer_id = customerFilter.id
       if (typeFilter) filters.contract_type = typeFilter
       if (statusFilter) filters.contract_status = statusFilter
+
+      // 🔹 UUID filter from state (either from URL or search)
+      if (uuidFilter) filters.uuid = uuidFilter
 
       console.log('🧠 Filters Sent →', filters)
 
@@ -139,6 +145,7 @@ export default function ContractsPage() {
 
       const normalized = paginated.map((item, idx) => ({
         ...item,
+        uuid: item.uuid,  // Explicit add
         sno: start + idx + 1,
         customer: item.customer_id || '',
         contractCode: item.contract_code || '',
@@ -199,11 +206,10 @@ export default function ContractsPage() {
   // Load contracts whenever filters / pagination / search changes
   useEffect(() => {
     loadData()
-  }, [customerFilter, typeFilter, statusFilter, pagination.pageIndex, pagination.pageSize, searchText])
+  }, [customerFilter, typeFilter, statusFilter, uuidFilter, pagination.pageIndex, pagination.pageSize, searchText])
 
   const handleEdit = row => {
-    router.push(`/en/admin/contracts/${row.id}/edit`)
-
+    router.push(`/admin/contracts/${row.uuid}/edit`)
   }
 
   const confirmDelete = async () => {
@@ -234,7 +240,7 @@ export default function ContractsPage() {
             <IconButton
               size='small'
               color='info'
-              onClick={() => router.push(`/admin/contracts/${info.row.original.id}/view`)}
+              onClick={() => router.push(`/admin/contracts/${info.row.original.uuid}/view`)}
             >
               <VisibilityIcon />
             </IconButton>
@@ -628,22 +634,21 @@ export default function ContractsPage() {
           <DebouncedInput
             value={searchText}
             onChange={v => {
-              setSearchText(String(v))
+              const value = String(v)
+
+              // 🔹 type: uuid:5478f8d4-c6ce-11f0-9171-fe7e4a53ce8c
+              if (value.startsWith('uuid:')) {
+                const uid = value.replace('uuid:', '').trim()
+                setUuidFilter(uid) // ✅ store in state
+                setSearchText('') // clear normal search
+                setPagination(p => ({ ...p, pageIndex: 0 }))
+                return
+              }
+
+              setSearchText(value)
               setPagination(p => ({ ...p, pageIndex: 0 }))
             }}
-            placeholder='Search customer, code, address, pests...'
-            sx={{ width: 340 }}
-            variant='outlined'
-            size='small'
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position='start'>
-                    <SearchIcon />
-                  </InputAdornment>
-                )
-              }
-            }}
+            placeholder="Search customer, code, address, pests... (or type 'uuid:XXXX')"
           />
         </Box>
 

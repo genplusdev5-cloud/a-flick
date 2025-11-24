@@ -44,6 +44,15 @@ export default function ProductInventory({ onTabChange }) {
               iconPosition='start'
               className='!justify-start !items-center text-left'
             />
+
+            <Tab
+              value='contract'
+              label='Contract'
+              icon={<i className='tabler-file-description' />}
+              iconPosition='start'
+              className='!justify-start !items-center text-left'
+            />
+
             <Tab
               value='pest'
               label='Pests'

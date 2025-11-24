@@ -4,23 +4,25 @@ export const getContractList = async (filters = {}) => {
   try {
     const params = new URLSearchParams()
 
-    if (filters.customer_id) params.append("customer_id", filters.customer_id)
-    if (filters.contract_type) params.append("contract_type", filters.contract_type)
-    if (filters.contract_status) params.append("contract_status", filters.contract_status)
+    // 🔹 1) UUID filter
+    if (filters.uuid) params.append('uuid', filters.uuid)
+
+    // 🔹 2) Other filters – IMPORTANT: key names must match Postman
+    if (filters.customer_id) params.append('customer_id', filters.customer_id)
+    if (filters.contract_type) params.append('contract_type', filters.contract_type)
+    if (filters.contract_status) params.append('contract_status', filters.contract_status)
 
     const query = params.toString()
-    const url = query ? `contract-list/?${query}` : "contract-list/"
+    const url = query ? `contract-list/?${query}` : 'contract-list/'
 
-    console.log("📡 Fetching:", url)
+    console.log('📡 Fetching:', url)
 
     const res = await api.get(url)
+    const results = res?.data?.data?.results
 
-    const results = res.data?.data?.results
     return Array.isArray(results) ? results : []
   } catch (error) {
-    console.error("❌ Contract list API error:", error)
+    console.error('❌ Contract list API error:', error)
     return []
   }
 }
-
-

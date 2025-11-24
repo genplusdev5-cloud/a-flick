@@ -1,5 +1,6 @@
 import api from '@/utils/axiosInstance'
 
 export default function addTicket(payload) {
-  return api.post('ticket-add/', payload)
+  // ✅ Correct API endpoint
+  return api.post('schedule/', payload)
 }

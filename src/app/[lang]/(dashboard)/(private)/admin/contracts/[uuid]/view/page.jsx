@@ -1,7 +1,18 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
+import { getContractDetails } from '@/api/contract' // <-- Create this API if not exists
 
 import Grid from '@mui/material/Grid2'
+import { Tooltip, Drawer } from '@mui/material'
+
+import { terminateContract } from '@/api/contract/icons/terminate'
+import { holdContract } from '@/api/contract/icons/hold'
+import { renewContract } from '@/api/contract/icons/renew'
+
+import RenewDrawer from '@/components/service-pages/contract-actions/RenewDrawer'
+import HoldDrawer from '@/components/service-pages/contract-actions/HoldDrawer'
+import TerminateDrawer from '@/components/service-pages/contract-actions/TerminateDrawer'
 
 import PestListPage from './pest/PestListPage'
 import ServiceRequestListPage from './service-request/ServiceRequestListPage'
@@ -11,6 +22,7 @@ import FileManagerListPage from './file/FileManagerListPage'
 import CallLogListPage from './call-log/CallLogListPage'
 import TodoListPage from './todo-list/TodoListPage'
 import SiteRiskPage from './site-risk/SiteRiskPage'
+import ContractViewPage from './contract/page'
 
 // MUI Imports
 import { Card, CardContent, Typography, Box } from '@mui/material'
@@ -30,6 +42,42 @@ import SalesOverview from '@/views/dashboards/analytics/SalesOverview'
 
 export default function Project() {
   const [activeTab, setActiveTab] = useState('dashboard')
+  const [openTerminate, setOpenTerminate] = useState(false)
+  const [openHold, setOpenHold] = useState(false)
+  const [openRenew, setOpenRenew] = useState(false)
+
+  const { uuid } = useParams()
+  const [contract, setContract] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const res = await getContractDetails(uuid)
+        setContract(res)
+      } catch (err) {
+        console.error('Error loading contract:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (uuid) loadData()
+  }, [uuid])
+
+  const loadContractData = async () => {
+    try {
+      const res = await getContractDetails(uuid)
+      setContract(res)
+    } catch (err) {
+      console.error('Error loading contract:', err)
+    }
+  }
+
+  useEffect(() => {
+  if (uuid) loadContractData()
+}, [uuid])
+
 
   // or 'pest'
 
@@ -37,6 +85,10 @@ export default function Project() {
     switch (activeTab) {
       case 'dashboard':
         return <TabContentSwiper />
+
+      case 'contract':
+        return <ContractViewPage />
+
       case 'pest':
         return <PestListPage />
 
@@ -81,52 +133,108 @@ export default function Project() {
             {/* 1 Card — Full Width Card Start */}
             <Grid item xs={12}>
               <CardContent className='!p-0'>
-                {' '}
-                {/* remove default padding if needed */}
                 {/* Main row with left text and right icons */}
                 <div className='flex items-start justify-between w-full'>
-                  {/* Left side content */}
+                  {/* LEFT SIDE CONTENT */}
                   <div className='flex items-center gap-2'>
+                    {/* Contract Code */}
                     <Typography variant='h4' fontWeight='600' className='text-gray-800'>
-                      #PR30214
+                      #{contract?.contract_code || '--'}
                     </Typography>
 
                     <div className='w-px h-6 bg-gray-400 mx-2' />
 
+                    {/* Category / Package */}
                     <Typography variant='h4' fontWeight='600' className='text-gray-800'>
-                      Pkg: Digital Marketing
+                      Pkg: {contract?.category || 'N/A'}
                     </Typography>
 
                     <div className='w-px h-6 bg-gray-400 mx-2' />
 
-                    {/* Active Status with green dot */}
-                    <Typography variant='body1' fontWeight='500' className='flex items-center gap-2 text-green-600'>
-                      <span className='w-2.5 h-2.5 rounded-full bg-green-600 inline-block' />
-                      Active
+                    {/* Status */}
+                    <Typography
+                      variant='body1'
+                      fontWeight='500'
+                      className={`flex items-center gap-2 ${
+                        contract?.contract_status?.toLowerCase() === 'current' ? 'text-green-600' : 'text-yellow-600'
+                      }`}
+                    >
+                      <span
+                        className={`w-2.5 h-2.5 rounded-full ${
+                          contract?.contract_status?.toLowerCase() === 'current' ? 'bg-green-600' : 'bg-yellow-500'
+                        } inline-block`}
+                      />
+                      {contract?.contract_status || 'Unknown'}
                     </Typography>
                   </div>
 
+                  {/* CENTER — Activity Timeline */}
                   <Grid sx={{ width: '920px' }}>
                     <div className='flex items-center gap-2 mt-1'>
                       <UserActivityTimeLine />
                     </div>
                   </Grid>
 
-                  {/* Right side icons */}
-                  <div className='flex items-center gap-3'>
-                    <IconButton size='small' className='bg-primary text-white hover:bg-primary/90'>
-                      <i className='tabler-printer text-[18px]' />
-                    </IconButton>
-                    <IconButton size='small' className='bg-primary text-white hover:bg-primary/90'>
-                      <i className='tabler-share text-[18px]' />
-                    </IconButton>
-                    <IconButton size='small' className='bg-primary text-white hover:bg-primary/90'>
-                      <i className='tabler-copy text-[18px]' />
-                    </IconButton>
+                  {/* RIGHT SIDE ICONS */}
+                  <div className='flex items-center gap-3 shrink-0'>
+                    <Tooltip title='Terminate'>
+                      <IconButton
+                        size='small'
+                        className='bg-primary text-white hover:bg-primary/90'
+                        onClick={() => setOpenTerminate(true)}
+                      >
+                        <i className='tabler-trash text-[18px]' />
+                      </IconButton>
+                    </Tooltip>
+
+                    <Tooltip title='Hold'>
+                      <IconButton
+                        size='small'
+                        className='bg-primary text-white hover:bg-primary/90'
+                        onClick={() => setOpenHold(true)}
+                      >
+                        <i className='tabler-hand-stop text-[18px]' />
+                      </IconButton>
+                    </Tooltip>
+
+                    <Tooltip title='Renew'>
+                      <IconButton
+                        size='small'
+                        className='bg-primary text-white hover:bg-primary/90'
+                        onClick={() => setOpenRenew(true)}
+                      >
+                        <i className='tabler-refresh text-[18px]' />
+                      </IconButton>
+                    </Tooltip>
+
+                    <Tooltip title='Schedule Request'>
+                      <IconButton size='small' className='bg-primary text-white hover:bg-primary/90'>
+                        <i className='tabler-calendar-plus text-[18px]' />
+                      </IconButton>
+                    </Tooltip>
+
+                    <Tooltip title='Service Schedule Print'>
+                      <IconButton size='small' className='bg-primary text-white hover:bg-primary/90'>
+                        <i className='tabler-printer text-[18px]' />
+                      </IconButton>
+                    </Tooltip>
+
+                    <Tooltip title='Agreement'>
+                      <IconButton size='small' className='bg-primary text-white hover:bg-primary/90'>
+                        <i className='tabler-file-description text-[18px]' />
+                      </IconButton>
+                    </Tooltip>
+
+                    <Tooltip title='MTBS Agreement'>
+                      <IconButton size='small' className='bg-primary text-white hover:bg-primary/90'>
+                        <i className='tabler-file-text text-[18px]' />
+                      </IconButton>
+                    </Tooltip>
                   </div>
                 </div>
               </CardContent>
             </Grid>
+
             {/* 1 Card — Full Width Card End */}
           </Grid>
           {/* 1 grid end */}
@@ -310,6 +418,43 @@ export default function Project() {
         {/* right Content Starts */}
       </div>
       {/* Tabs End */}
+
+      <Drawer
+        anchor='right'
+        open={openTerminate}
+        onClose={() => setOpenTerminate(false)}
+        PaperProps={{
+          sx: { width: 380, p: 3 }
+        }}
+      >
+        <TerminateDrawer
+          contractId={contract?.id}
+          onClose={() => setOpenTerminate(false)}
+          reload={() => console.log('Reload contract after termination')}
+        />
+      </Drawer>
+
+      <Drawer
+        anchor='right'
+        open={openHold}
+        onClose={() => setOpenHold(false)}
+        PaperProps={{ sx: { width: 380, p: 3 } }}
+      >
+        <HoldDrawer
+          contractId={contract?.id}
+          onClose={() => setOpenHold(false)}
+          reload={() => console.log('Reload contract after hold')}
+        />
+      </Drawer>
+
+      <Drawer
+        anchor='right'
+        open={openRenew}
+        onClose={() => setOpenRenew(false)}
+        PaperProps={{ sx: { width: 380, p: 3 } }}
+      >
+        <RenewDrawer contractId={contract?.id} onClose={() => setOpenRenew(false)} reload={loadContractData} />
+      </Drawer>
     </>
   )
 }
