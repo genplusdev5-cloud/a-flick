@@ -14,11 +14,13 @@ const CalendarWrapper = ({ selectedEmployee }) => {
 
   // Map backend event → FullCalendar event (with extendedProps)
   const mapEvent = ev => {
-    const isLunch = ev.type === 'lunch'
     const isTicket = ev.type === 'ticket'
 
+    // Backend ALWAYS gives numeric ticket_id or id
+    const realTicketId = ev.ticket_id || ev.id
+
     return {
-      id: ev.id, // backend ID itself
+      id: isTicket ? `ticket-${realTicketId}` : ev.id, // 🔥 STRING ID FOR TICKET
       title: ev.title,
       start: ev.start,
       end: ev.end ?? ev.start,
@@ -30,13 +32,13 @@ const CalendarWrapper = ({ selectedEmployee }) => {
       extendedProps: {
         type: ev.type,
 
+        // Ticket real DB ID
+        ticket_id: realTicketId, // 🔥 NUMERIC
+
+        // Lunch
         db_id: ev.lunch_id || ev.real_lunch_id || null,
 
-        // ticket
-        ticket_id: ev.ticket_id, // BEST & CORRECT
         technician_id: Number(ev.resourceId),
-
-        calendar: isLunch ? 'Lunch' : ev.type,
 
         ...ev
       }

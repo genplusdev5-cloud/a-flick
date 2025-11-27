@@ -114,11 +114,31 @@ const Calendar = ({
 
         const events = res.data?.data || []
 
-        dispatch(setEvents(events))
-
         const api = calendarRef.current?.getApi()
+
+        // NORMALIZE EVERY EVENT BEFORE ADDING
+        const normalized = events.map(ev => ({
+          id: ev.type === 'ticket' ? `ticket-${ev.ticket_id || ev.id}` : ev.id,
+          title: ev.title,
+          start: ev.start,
+          end: ev.end ?? ev.start,
+          backgroundColor: ev.backgroundColor,
+          borderColor: ev.borderColor,
+          editable: ev.editable ?? true,
+          resourceId: ev.resourceId,
+          extendedProps: {
+            ...ev,
+            type: ev.type,
+            ticket_id: ev.ticket_id || ev.id,
+            db_id: ev.lunch_id || ev.real_lunch_id || null,
+            technician_id: Number(ev.resourceId)
+          }
+        }))
+
         api?.removeAllEvents()
-        api?.addEventSource(events)
+        api?.addEventSource(normalized)
+
+        dispatch(setEvents(normalized)) // Only THIS one stays
       } catch (err) {
         console.error('Failed to load events', err)
       }
@@ -159,7 +179,7 @@ const Calendar = ({
       resourceTimelinePlugin
     ],
 
-    initialView: 'resourceTimeGridDay',
+    initialView: 'timeGridWeek',
     resources,
     resourceAreaWidth: '200px',
     resourceAreaHeaderContent: 'Employees',
@@ -191,19 +211,29 @@ const Calendar = ({
        DRAG & DROP
     ------------------------------------------------------------- */
     eventDrop: async info => {
+      console.log('DROP EVENT RAW:', info.event, info.event.extendedProps)
       try {
         const { event, oldEvent } = info
         const data = event.extendedProps
 
         // ---------- TICKET ----------
-        // ---------- TICKET ----------
         if (data.type === 'ticket') {
-          let ticketId =
-            data.ticket_id ||
-            (typeof event.id === 'string' && event.id.startsWith('ticket-') ? Number(event.id.split('-')[1]) : null)
+          let ticketId = null
+
+          // 1. EXTENDED PROPS (if exists, good)
+          if (data.ticket_id && Number(data.ticket_id)) {
+            ticketId = Number(data.ticket_id)
+          }
+
+          // 2. FROM event.id = "ticket-73832"
+          if (!ticketId && typeof event.id === 'string' && event.id.includes('-')) {
+            ticketId = Number(event.id.split('-').pop())
+          }
+
+          console.log('🔥 FINAL TICKET ID =', ticketId)
 
           if (!ticketId) {
-            console.error('Missing ticket ID', event)
+            console.error('❌ STILL MISSING TICKET ID', data, event)
             info.revert()
             return
           }
@@ -217,12 +247,7 @@ const Calendar = ({
             to_employee_id: data.technician_id
           })
 
-          // Only update extendedProps if needed — NEVER change event.id
           event.setExtendedProp('ticket_id', ticketId)
-
-          // Optional: update title/color if needed
-          // event.setProp('title', 'New Title') // safe
-          // event.setProp('backgroundColor', '#ff9f89') // safe
 
           showToast('Ticket updated', 'success')
         }
@@ -272,8 +297,14 @@ const Calendar = ({
           }
         }
 
-        dispatch(updateEvent(event))
-        dispatch(filterEvents())
+        // 🔥 KEEP EVENT IN UI
+        event.setProp('resourceId', event.getResources()[0].id)
+
+        // 🔥 FORCE RELOAD FROM BACKEND
+        const api = calendarRef.current.getApi()
+        const view = api.view
+
+        loadEvents(toApiDate(view.activeStart), toApiDate(view.activeEnd))
       } catch (err) {
         console.error('eventDrop error', err)
         showToast('Update failed', 'error')
