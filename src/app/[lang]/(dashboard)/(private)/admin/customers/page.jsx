@@ -30,6 +30,8 @@ import {
 import { getCustomerList, deleteCustomer, getCustomerSummary } from '@/api/customer'
 import { getCustomerOrigin } from '@/api/customer/origin'
 import GlobalButton from '@/components/common/GlobalButton'
+import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
+import { getCompanyList } from '@/api/company'
 
 import { showToast } from '@/components/common/Toasts'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
@@ -89,13 +91,33 @@ export default function CustomersPage() {
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
   const [originMap, setOriginMap] = useState({})
 
-  // Load data
+  const [filterOrigin, setFilterOrigin] = useState(null)
+  const [filterMyob, setFilterMyob] = useState(null)
+  const [companyOptions, setCompanyOptions] = useState([])
+  const [sorting, setSorting] = useState([])
+
   const loadData = async () => {
     setLoading(true)
     try {
-      const res = await getCustomerList(pagination.pageIndex + 1, pagination.pageSize)
+      const params = {
+        page: pagination.pageIndex + 1,
+        page_size: pagination.pageSize,
+        search: searchText.trim()
+      }
 
-      const list = res?.data?.results || res?.data?.data?.results || res?.data?.data || res?.data || []
+      // ⭐ APPLY ORIGIN FILTER
+      if (filterOrigin?.id) {
+        params.company = filterOrigin.id
+      }
+
+      // ⭐ APPLY MYOB FILTER
+      if (filterMyob?.value) {
+        params.myob_status = filterMyob.value
+      }
+
+      const res = await getCustomerList(params)
+
+      const list = res?.results || res?.data?.results || res?.data || []
 
       const normalized = list.map((item, index) => ({
         sno: index + 1,
@@ -103,7 +125,7 @@ export default function CustomersPage() {
         cardId: item.customer_code || '',
         abssName: item.business_name || '',
         myobStatus: item.myob_status || 'Not Exported',
-        status: item.status || 'Active', // NEW
+        status: item.status || 'Active',
         name: item.name,
         email: item.billing_email || item.email || '',
         phone: item.billing_phone || item.pic_phone || '',
@@ -114,13 +136,30 @@ export default function CustomersPage() {
       }))
 
       setRows(normalized)
-      setRowCount(normalized.length)
+      setRowCount(res?.count || normalized.length)
     } catch (err) {
       showToast('error', 'Failed to load customers')
     } finally {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    const loadCompanies = async () => {
+      try {
+        const list = await getCompanyList()
+        const mapped = list.map(c => ({
+          id: c.id,
+          label: c.name,
+          value: c.name
+        }))
+        setCompanyOptions(mapped)
+      } catch (err) {
+        console.error('Company list error', err)
+      }
+    }
+    loadCompanies()
+  }, [])
 
   useEffect(() => {
     const loadOrigins = async () => {
@@ -140,7 +179,7 @@ export default function CustomersPage() {
 
   useEffect(() => {
     loadData()
-  }, [pagination.pageIndex, pagination.pageSize, searchText])
+  }, [pagination.pageIndex, pagination.pageSize, searchText, filterOrigin, filterMyob])
 
   const handleEdit = id => {
     const encodedId = btoa(id.toString())
@@ -320,9 +359,8 @@ export default function CustomersPage() {
     columns,
     manualPagination: true,
     pageCount: Math.ceil(rowCount / pagination.pageSize),
-    state: { globalFilter: searchText, pagination },
-    onGlobalFilterChange: setSearchText,
-    onPaginationChange: setPagination,
+    state: { globalFilter: searchText, pagination, sorting },
+    onSortingChange: setSorting,
     globalFilterFn: fuzzyFilter,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -572,19 +610,74 @@ export default function CustomersPage() {
         )}
 
         <Divider sx={{ mb: 2 }} />
-        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-          <FormControl size='small' sx={{ width: 140 }}>
-            <Select
-              value={pagination.pageSize}
-              onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
-            >
-              {[25, 50, 75, 100].map(s => (
-                <MenuItem key={s} value={s}>
-                  {s} entries
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+        <Box
+          sx={{
+            mb: 3,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'nowrap',
+            gap: 2
+          }}
+        >
+          {/* LEFT SIDE FILTERS */}
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-end', // ⭐ FIX: Align by bottom (input line)
+              mb: 2,
+              gap: 2,
+              flexWrap: 'nowrap'
+            }}
+          >
+            {/* 25 Entries */}
+            <FormControl size='small' sx={{ width: 140 }}>
+              <Select
+                value={pagination.pageSize}
+                onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
+              >
+                {[25, 50, 75, 100].map(s => (
+                  <MenuItem key={s} value={s}>
+                    {s} entries
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            {/* Origin */}
+            <Box sx={{ width: 200 }}>
+              <GlobalAutocomplete
+                label='Origin'
+                placeholder='Select Origin'
+                options={companyOptions}
+                value={filterOrigin}
+                onChange={val => {
+                  setFilterOrigin(val)
+                  setPagination(p => ({ ...p, pageIndex: 0 }))
+                }}
+              />
+            </Box>
+
+            {/* MYOB */}
+            <Box sx={{ width: 200 }}>
+              <GlobalAutocomplete
+                label='MYOB Status'
+                placeholder='Select'
+                options={[
+                  { id: 1, label: 'Exported', value: 'Exported' },
+                  { id: 2, label: 'Not Exported', value: 'Not Exported' }
+                ]}
+                value={filterMyob}
+                onChange={val => {
+                  setFilterMyob(val)
+                  setPagination(p => ({ ...p, pageIndex: 0 }))
+                }}
+              />
+            </Box>
+          </Box>
+
+          {/* SEARCH RIGHT SIDE */}
           <DebouncedInput
             value={searchText}
             onChange={v => {
@@ -606,6 +699,7 @@ export default function CustomersPage() {
             }}
           />
         </Box>
+
         <div className='overflow-x-auto'>
           <table className={styles.table}>
             <thead>

@@ -1,10 +1,13 @@
 import api from '@/utils/axiosInstance'
 
-export const getCustomerList = async (page = 1, pageSize = 25) => {
+export const getCustomerList = async (params = {}) => {
   const res = await api.get('customer-list/', {
     params: {
-      page,
-      page_size: pageSize
+      page: params.page || 1,
+      page_size: params.page_size || 25,
+      search: params.search || '',
+      company: params.company || '',
+      myob_status: params.myob_status || ''
     }
   })
 

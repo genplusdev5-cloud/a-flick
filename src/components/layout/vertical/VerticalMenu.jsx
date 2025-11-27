@@ -134,6 +134,19 @@ const VerticalMenu = ({ scrollMenu }) => {
           View Contract Status
         </MenuItem>
 
+        {/* ✅ Attendance */}
+        <SubMenu label='Attendance' icon={<i className='tabler-user-check' />}>
+          <MenuItem href={`/${locale}/admin/attendance/slots`}>Slots</MenuItem>
+          <MenuItem href={`/${locale}/admin/attendance/attendance`}>Attendance</MenuItem>
+          <MenuItem href={`/${locale}/admin/attendance/schedule`}>Schedule</MenuItem>
+          <MenuItem href={`/${locale}/admin/attendance/hr-project-report`}>HR & Project Report</MenuItem>
+          <MenuItem href={`/${locale}/admin/attendance/hr-report`}>HR Report</MenuItem>
+          <MenuItem href={`/${locale}/admin/attendance/timesheet`}>Attendance Timesheet</MenuItem>
+          {/* <MenuItem href={`/${locale}/admin/attendance/timesheet-with-leave`}>Attendance Timesheet With Leave</MenuItem> */}
+          <MenuItem href={`/${locale}/admin/attendance/payslip-summary`}>Payslip Summary Report</MenuItem>
+          {/* <MenuItem href={`/${locale}/admin/attendance/salary-report`}>Salary Report</MenuItem> */}
+        </SubMenu>
+
         {/* ✅ Suppliers & Stock */}
         {/* {showHeadings && <SectionHeader label="Suppliers & Stock" />} */}
 
