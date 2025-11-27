@@ -7,8 +7,6 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
 
-import { getAllDropdowns } from '@/api/dropdowns/single'
-
 import { getCustomerOrigin } from '@/api/customer/origin'
 import { showToast } from '@/components/common/Toasts'
 

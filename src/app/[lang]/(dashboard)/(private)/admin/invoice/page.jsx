@@ -21,12 +21,14 @@ import {
   TextField,
   Select,
   MenuList,
+  FormControlLabel,
   InputAdornment,
   Pagination,
   Checkbox
 } from '@mui/material'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
+import GlobalDateRange from '@/components/common/GlobalDateRange'
 
 // Table
 import {
@@ -110,6 +112,10 @@ export default function InvoiceListPageFull() {
   const [salesPersonFilter, setSalesPersonFilter] = useState('')
   const [customerFilter, setCustomerFilter] = useState('')
   const [contractFilter, setContractFilter] = useState('')
+  const [startDate, setStartDate] = useState(new Date())
+  const [endDate, setEndDate] = useState(new Date())
+  const [dateFilter, setDateFilter] = useState(true)
+  const [dateRange, setDateRange] = useState([null, null])
   const [searchText, setSearchText] = useState('')
 
   // pagination
@@ -301,7 +307,7 @@ export default function InvoiceListPageFull() {
           title={
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
               {/* LEFT: Page Title + Refresh */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                 <Typography variant='h5' sx={{ fontWeight: 600 }}>
                   Invoice List
                 </Typography>
@@ -333,38 +339,38 @@ export default function InvoiceListPageFull() {
           action={null}
         />
 
+        <Divider sx={{ mb: 2 }} />
+
         {/* ============================================= */}
         {/*                   FILTERS                     */}
         {/* ============================================= */}
         <Box px={3} pb={2}>
+          {/* 4 Columns per row */}
           <Box
             sx={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
+              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)', lg: 'repeat(4, 1fr)' },
               gap: 2,
               alignItems: 'end',
               mb: 2
             }}
           >
-            {/* Date Filter */}
-            <Box>
-              <Box display='flex' alignItems='center' gap={1} sx={{ mb: 1 }}>
-                <Checkbox
-                  size='small'
-                  checked={dateFilterEnabled}
-                  onChange={e => setDateFilterEnabled(e.target.checked)}
-                />
-                <Typography variant='body2' sx={{ fontWeight: 600 }}>
-                  Date
-                </Typography>
-              </Box>
-
-              <AppReactDatepicker
-                selected={filterDate}
-                onChange={d => setFilterDate(d)}
-                dateFormat='dd/MM/yyyy'
-                customInput={<CustomTextField size='small' fullWidth disabled={!dateFilterEnabled} />}
+            {/* Date Filter + Range */}
+            <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+              <FormControlLabel
+                control={<Checkbox checked={dateFilter} onChange={e => setDateFilter(e.target.checked)} />}
+                label='Date Filter'
               />
+
+              <Box sx={{ width: 380 }}>
+                <GlobalDateRange
+                  label=''
+                  start={dateRange[0]}
+                  end={dateRange[1]}
+                  onSelectRange={({ start, end }) => setDateRange([start, end])}
+                  disabled={!dateFilter}
+                />
+              </Box>
             </Box>
 
             {/* Origin */}

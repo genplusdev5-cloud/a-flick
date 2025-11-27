@@ -39,6 +39,7 @@ import { deleteTmMaterialRequest } from '@/api/materialRequest/delete'
 import CustomTextField from '@core/components/mui/TextField'
 import CustomAutocomplete from '@core/components/mui/Autocomplete'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
+import GlobalDateRange from '@/components/common/GlobalDateRange'
 
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import { Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material'
@@ -519,94 +520,71 @@ export default function MaterialRequestPage() {
             display: 'grid',
             gridTemplateColumns: '260px repeat(4, 220px)',
             columnGap: 3,
-            rowGap: 0,
-            mb: 3,
-            alignItems: 'center'
+            rowGap: 1,
+            mb: 3
           }}
         >
-          {/* LABEL ROW */}
+          {/* ---------- ROW 1: LABELS ---------- */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Typography variant='body2' sx={{ fontWeight: 500 }}>
-              Date Range
+              Date Filter
             </Typography>
-
-            <Checkbox
-              size='small'
-              checked={enableDateFilter}
-              onChange={e => setEnableDateFilter(e.target.checked)}
-              sx={{ p: 0, mt: '-2px' }}
-            />
+            <Checkbox size='small' checked={enableDateFilter} onChange={e => setEnableDateFilter(e.target.checked)} />
           </Box>
 
           <Typography variant='body2' sx={{ fontWeight: 500 }}>
             Request Status
           </Typography>
-
           <Typography variant='body2' sx={{ fontWeight: 500 }}>
             From Location/Supplier
           </Typography>
-
           <Typography variant='body2' sx={{ fontWeight: 500 }}>
             To Location/Supplier
           </Typography>
-
           <Typography variant='body2' sx={{ fontWeight: 500 }}>
             Requested By
           </Typography>
 
-          {/* INPUT ROW */}
-          <AppReactDatepicker
-            selectsRange
-            startDate={startDate}
-            endDate={endDate}
-            onChange={dates => {
-              if (enableDateFilter && dates) {
-                setStartDate(dates[0])
-                setEndDate(dates[1])
-              }
-            }}
-            disabled={!enableDateFilter}
-            readOnly={!enableDateFilter}
-            customInput={
-              <CustomTextField
-                size='small'
-                fullWidth
-                sx={{
-                  backgroundColor: 'white',
-                  height: 40,
-                  '& .MuiInputBase-root': { height: 40 }
-                }}
-                value={`${format(startDate, 'dd/MM/yyyy')} - ${format(endDate, 'dd/MM/yyyy')}`}
-              />
-            }
-          />
+          {/* ---------- ROW 2: INPUTS ---------- */}
+          <Box sx={{ width: '100%' }}>
+            <GlobalDateRange
+              label=''
+              start={startDate}
+              end={endDate}
+              onSelectRange={({ start, end }) => {
+                setStartDate(start)
+                setEndDate(end)
+              }}
+              disabled={!enableDateFilter}
+            />
+          </Box>
 
           <CustomAutocomplete
             options={['Waiting', 'Pending', 'Rejected', 'Approved', 'Issued', 'Completed', 'Declined']}
             value={requestStatus || null}
             onChange={(e, val) => setRequestStatus(val || '')}
-            renderInput={p => <CustomTextField {...p} size='small' sx={{ '& .MuiInputBase-root': { height: 40 } }} />}
+            renderInput={p => <CustomTextField {...p} size='small' />}
           />
 
           <CustomAutocomplete
             options={['Stock-TECH STOCK 1', 'Supplier-ABC']}
             value={fromLocation || null}
             onChange={(e, val) => setFromLocation(val || '')}
-            renderInput={p => <CustomTextField {...p} size='small' sx={{ '& .MuiInputBase-root': { height: 40 } }} />}
+            renderInput={p => <CustomTextField {...p} size='small' />}
           />
 
           <CustomAutocomplete
             options={['Stock-TECH STOCK 1', 'Stock-TECH STOCK 2', 'Site-A', 'Site-B', 'Site-C']}
             value={toLocation || null}
             onChange={(e, val) => setToLocation(val || '')}
-            renderInput={p => <CustomTextField {...p} size='small' sx={{ '& .MuiInputBase-root': { height: 40 } }} />}
+            renderInput={p => <CustomTextField {...p} size='small' />}
           />
 
           <CustomAutocomplete
             options={['Admin', 'Tech', 'John Doe', 'Jane Smith']}
             value={requestedBy || null}
             onChange={(e, val) => setRequestedBy(val || '')}
-            renderInput={p => <CustomTextField {...p} size='small' sx={{ '& .MuiInputBase-root': { height: 40 } }} />}
+            renderInput={p => <CustomTextField {...p} size='small' />}
           />
         </Box>
 
