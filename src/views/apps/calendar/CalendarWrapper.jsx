@@ -12,19 +12,36 @@ const CalendarWrapper = ({ selectedEmployee }) => {
   const dispatch = useDispatch()
   const [calendarApi, setCalendarApi] = useState(null)
 
-  const mapEvent = ev => ({
-    id: `${ev.id || ev.title}_${ev.start}_${ev.end}_${Math.random()}`,
-    title: ev.title,
-    start: ev.start,
-    end: ev.end ?? ev.start,
-    backgroundColor: ev.backgroundColor,
-    borderColor: ev.borderColor,
-    editable: ev.editable ?? false,
-    extendedProps: {
-      calendar: ev.type ? ev.type.charAt(0).toUpperCase() + ev.type.slice(1) : 'Holiday',
-      ...ev
+  // Map backend event → FullCalendar event (with extendedProps)
+  const mapEvent = ev => {
+    const isLunch = ev.type === 'lunch'
+    const isTicket = ev.type === 'ticket'
+
+    return {
+      id: ev.id, // backend ID itself
+      title: ev.title,
+      start: ev.start,
+      end: ev.end ?? ev.start,
+      backgroundColor: ev.backgroundColor,
+      borderColor: ev.borderColor,
+      editable: ev.editable ?? true,
+      resourceId: ev.resourceId,
+
+      extendedProps: {
+        type: ev.type,
+
+        db_id: ev.lunch_id || ev.real_lunch_id || null,
+
+        // ticket
+        ticket_id: ev.ticket_id, // BEST & CORRECT
+        technician_id: Number(ev.resourceId),
+
+        calendar: isLunch ? 'Lunch' : ev.type,
+
+        ...ev
+      }
     }
-  })
+  }
 
   const fetchEvents = useCallback(
     async (from_date, to_date) => {
@@ -63,7 +80,7 @@ const CalendarWrapper = ({ selectedEmployee }) => {
 
     calendarApi.on('datesSet', handle)
     return () => calendarApi.off('datesSet', handle)
-  }, [calendarApi, selectedEmployee])
+  }, [calendarApi, selectedEmployee, fetchEvents])
 
   return (
     <Card>

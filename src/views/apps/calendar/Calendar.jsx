@@ -1,100 +1,153 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
-import { listCalendarEvents } from '@/api/calendar'
+import { useEffect, useRef, useCallback } from 'react'
 import { useTheme } from '@mui/material/styles'
 import FullCalendar from '@fullcalendar/react'
-import listPlugin from '@fullcalendar/list'
+
+import interactionPlugin from '@fullcalendar/interaction'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
-import interactionPlugin from '@fullcalendar/interaction'
-
-import { filterEvents, selectedEvent, updateEvent, setEvents } from '@/redux-store/slices/calendar'
+import listPlugin from '@fullcalendar/list'
 
 import resourcePlugin from '@fullcalendar/resource'
 import resourceDayGridPlugin from '@fullcalendar/resource-daygrid'
 import resourceTimelinePlugin from '@fullcalendar/resource-timeline'
 import resourceTimeGridPlugin from '@fullcalendar/resource-timegrid'
 
-const Calendar = props => {
-  const {
-    calendarStore,
-    calendarApi,
-    setCalendarApi,
-    calendarsColor,
-    dispatch,
-    handleAddEventSidebarToggle,
-    handleLeftSidebarToggle,
-    selectedEmployees = []
-  } = props
+import { updateSchedule } from '@/api/calendar/schedule/update'
+import { listCalendarEvents } from '@/api/calendar'
+import { setEvents, filterEvents, selectedEvent, updateEvent } from '@/redux-store/slices/calendar'
 
+import { getEmployeeLunchList, updateEmployeeLunch, addEmployeeLunch } from '@/api/calendar/lunch'
+
+import { showToast } from '@/components/common/Toasts'
+
+/* -------------------------------------------------------------
+   HELPERS
+------------------------------------------------------------- */
+
+// Convert Date / date-like → 'YYYY-MM-DD'
+const toApiDate = value => {
+  const d = new Date(value)
+  if (isNaN(d)) return null
+
+  return d.toISOString().slice(0, 10)
+}
+
+// Convert 12:00:00+05:30 → 12:00
+const cleanTime = (t = '') => {
+  if (!t) return ''
+
+  const raw = t.split('+')[0].trim() // remove timezone
+
+  // backend expects HH:MM
+  return raw.length === 8 ? raw.slice(0, 5) : raw
+}
+
+// Extract 'HH:MM' from ISO / date-time string
+// '2025-11-27T13:00:00+05:30' → '13:00'
+const toApiTime = value => {
+  if (!value) return null
+
+  const str = String(value)
+  const parts = str.split('T')
+  const timeWithZone = parts[1] || parts[0]
+  const noZone = timeWithZone.split('+')[0].trim()
+
+  // we only want HH:MM, backend will append :00
+  return noZone.slice(0, 5)
+}
+
+// For matching DB row which stores 'HH:MM:00'
+const toDbTime = hhmm => {
+  if (!hhmm) return null
+  return hhmm.length === 5 ? `${hhmm}:00` : hhmm
+}
+
+// Find existing lunch rows for an employee on a date
+const findLunchRows = async (employeeId, date) => {
+  try {
+    const res = await getEmployeeLunchList({ employee_id: employeeId })
+    const rows = res?.data?.results || res?.data?.data?.results || []
+
+    return rows.filter(r => Number(r.employee_id) === Number(employeeId) && r.date === date)
+  } catch (err) {
+    console.error('findLunchRows error:', err)
+    return []
+  }
+}
+
+/* -------------------------------------------------------------
+   MAIN CALENDAR COMPONENT
+------------------------------------------------------------- */
+
+const Calendar = ({
+  calendarStore,
+  calendarApi,
+  setCalendarApi,
+  dispatch,
+  handleAddEventSidebarToggle,
+  selectedEmployees = []
+}) => {
   const calendarRef = useRef()
   const theme = useTheme()
 
+  /* INIT */
   useEffect(() => {
     if (!calendarApi) {
       setCalendarApi(calendarRef.current?.getApi())
     }
-  }, [])
+  }, [calendarApi, setCalendarApi])
 
-  useEffect(() => {
-    if (Array.isArray(selectedEmployees) && selectedEmployees.length > 0) {
-      loadEvents()
-    } else {
-      dispatch(setEvents([]))
-      const api = calendarRef.current?.getApi?.()
-      api?.removeAllEvents?.()
-      api?.refetchEvents?.()
-    }
-  }, [selectedEmployees])
+  /* LOAD EVENTS */
+  const loadEvents = useCallback(
+    async (from_date, to_date) => {
+      try {
+        if (!selectedEmployees.length) {
+          dispatch(setEvents([]))
+          calendarRef.current?.getApi()?.removeAllEvents()
+          return
+        }
 
-  const loadEvents = async () => {
-    try {
-      const from_date = '2025-11-01'
-      const to_date = '2026-01-12'
+        const employee_id = selectedEmployees.map(e => e.id).join(',')
+        const res = await listCalendarEvents({ from_date, to_date, employee_id })
 
-      const employee_id = selectedEmployees.map(e => e.id).join(',')
+        const events = res.data?.data || []
 
-      const res = await listCalendarEvents({
-        from_date,
-        to_date,
-        employee_id
-      })
+        dispatch(setEvents(events))
 
-      let events = res.data?.data || []
-
-      events = events.map(ev => ({
-        ...ev,
-        start: ev.start?.includes('T') ? ev.start : ev.start + 'T00:00:00',
-        end: ev.end?.includes('T') ? ev.end : ev.end + 'T00:00:00'
-      }))
-
-      dispatch(setEvents(events))
-
-      const api = calendarRef.current?.getApi()
-      if (api) {
-        api.removeAllEvents()
-        api.addEventSource(events)
+        const api = calendarRef.current?.getApi()
+        api?.removeAllEvents()
+        api?.addEventSource(events)
+      } catch (err) {
+        console.error('Failed to load events', err)
       }
-    } catch (err) {
-      console.error('Failed to load calendar events', err)
-    }
-  }
+    },
+    [dispatch, selectedEmployees]
+  )
 
-  // -----------------------------
-  // RESOURCES (EMPLOYEES LIST)
-  // -----------------------------
+  /* RELOAD WHEN EMPLOYEE FILTER CHANGES */
+  useEffect(() => {
+    const api = calendarRef.current?.getApi()
+    if (!api) return
+
+    const view = api.view
+    const from = toApiDate(view.activeStart)
+    const to = toApiDate(view.activeEnd)
+
+    loadEvents(from, to)
+  }, [selectedEmployees, loadEvents])
+
+  /* RESOURCES COLUMN */
   const resources = selectedEmployees.map(emp => ({
     id: String(emp.id),
     title: emp.name
   }))
 
-  // -----------------------------
-  // FULLCALENDAR OPTIONS
-  // -----------------------------
+  /* -------------------------------------------------------------
+     FULLCALENDAR OPTIONS
+  ------------------------------------------------------------- */
   const calendarOptions = {
-    events: calendarStore.events ? [...calendarStore.events] : [],
-
     plugins: [
       interactionPlugin,
       dayGridPlugin,
@@ -103,72 +156,202 @@ const Calendar = props => {
       resourcePlugin,
       resourceDayGridPlugin,
       resourceTimeGridPlugin,
-      resourceTimelinePlugin // ← THIS WAS MISSING!
+      resourceTimelinePlugin
     ],
 
-    // -----------------------------
-    // MAIN FIX → SHOW EMPLOYEES ON LEFT
-    // -----------------------------
-    resources: resources,
+    initialView: 'resourceTimeGridDay',
+    resources,
     resourceAreaWidth: '200px',
     resourceAreaHeaderContent: 'Employees',
     resourceLabelContent: arg => arg.resource.title,
 
-    initialView: 'timeGridWeek', // 👈 DEFAULT WEEK VIEW
-
     headerToolbar: {
       left: 'today prev,next',
       center: 'title',
-      right: 'resourceTimeGridDay,timeGridWeek,dayGridMonth' // 👈 removed 'resourceTimelineThreeDay'
+      right: 'resourceTimeGridDay,timeGridWeek,dayGridMonth'
     },
 
-    views: {
-      resourceTimeGridDay: {
-        type: 'resourceTimeGrid',
-        buttonText: 'Day'
-      }
+    datesSet(arg) {
+      const from = arg.startStr.slice(0, 10)
+      const to = arg.endStr.slice(0, 10)
+      loadEvents(from, to)
     },
 
     editable: true,
+    events: calendarStore.events || [],
 
-    eventDidMount(info) {
-      const bg = info.event.extendedProps?.backgroundColor || info.event.backgroundColor
-      const border = info.event.extendedProps?.borderColor || info.event.borderColor
-      if (bg) info.el.style.backgroundColor = bg
-      if (border) info.el.style.border = `1px solid ${border}`
-      info.el.style.borderRadius = '6px'
-      info.el.style.padding = '2px 6px'
-    },
-
-    eventClassNames({ event }) {
-      const calendarType = event._def.extendedProps?.calendar || event._def.extendedProps?.type
-      const colorName = calendarsColor[calendarType] || 'info'
-      return [`event-bg-${colorName}`]
-    },
-
-    eventClick({ event: clickedEvent, jsEvent }) {
-      jsEvent?.preventDefault?.()
-      dispatch(selectedEvent(clickedEvent))
+    /* OPEN DRAWER ON CLICK */
+    eventClick({ event, jsEvent }) {
+      jsEvent.preventDefault()
+      dispatch(selectedEvent(event))
       handleAddEventSidebarToggle()
     },
 
-    customButtons: {
-      sidebarToggle: {
-        icon: 'tabler tabler-menu-2',
-        click() {
-          handleLeftSidebarToggle()
+    /* -------------------------------------------------------------
+       DRAG & DROP
+    ------------------------------------------------------------- */
+    eventDrop: async info => {
+      try {
+        const { event, oldEvent } = info
+        const data = event.extendedProps
+
+        // ---------- TICKET ----------
+        // ---------- TICKET ----------
+        if (data.type === 'ticket') {
+          let ticketId =
+            data.ticket_id ||
+            (typeof event.id === 'string' && event.id.startsWith('ticket-') ? Number(event.id.split('-')[1]) : null)
+
+          if (!ticketId) {
+            console.error('Missing ticket ID', event)
+            info.revert()
+            return
+          }
+
+          await updateSchedule({
+            id: ticketId,
+            schedule_date: toApiDate(event.start),
+            schedule_start_time: toApiTime(event.startStr),
+            schedule_end_time: toApiTime(event.endStr),
+            from_employee_id: data.technician_id,
+            to_employee_id: data.technician_id
+          })
+
+          // Only update extendedProps if needed — NEVER change event.id
+          event.setExtendedProp('ticket_id', ticketId)
+
+          // Optional: update title/color if needed
+          // event.setProp('title', 'New Title') // safe
+          // event.setProp('backgroundColor', '#ff9f89') // safe
+
+          showToast('Ticket updated', 'success')
         }
+
+        // ---------- LUNCH ----------
+        /* ------------------ LUNCH UPDATE ------------------ */
+        if (data.type === 'lunch') {
+          const employeeId = Number(event.getResources()[0].id)
+
+          const newDate = event.startStr.slice(0, 10)
+          const newStart = cleanTime(event.startStr.split('T')[1])
+          const newEnd = cleanTime(event.endStr.split('T')[1])
+
+          const lunchId = data.db_id || null // <-- IMPORTANT: use backend lunch ID
+
+          // After update/create lunch
+          if (lunchId) {
+            // Update
+            await updateEmployeeLunch(lunchId, {
+              employee_id: employeeId,
+              date: newDate,
+              start_time: newStart,
+              end_time: newEnd
+            })
+
+            // 🔥 CRITICAL FIX → change UI event.id = DB ID
+            event.setProp('id', lunchId)
+            event.setExtendedProp('db_id', lunchId)
+
+            showToast('Lunch updated', 'success')
+          } else {
+            // Create
+            const res = await addEmployeeLunch({
+              employee_id: employeeId,
+              date: newDate,
+              start_time: newStart,
+              end_time: newEnd
+            })
+
+            const newId = res.data.id
+
+            // 🔥 CRITICAL FIX → assign REAL DB ID
+            event.setProp('id', newId)
+            event.setExtendedProp('db_id', newId)
+
+            showToast('Lunch created', 'success')
+          }
+        }
+
+        dispatch(updateEvent(event))
+        dispatch(filterEvents())
+      } catch (err) {
+        console.error('eventDrop error', err)
+        showToast('Update failed', 'error')
       }
     },
 
-    eventDrop({ event: droppedEvent }) {
-      dispatch(updateEvent(droppedEvent))
-      dispatch(filterEvents())
-    },
+    /* -------------------------------------------------------------
+       RESIZE
+    ------------------------------------------------------------- */
+    eventResize: async info => {
+      try {
+        const { event, prevEvent } = info
+        const data = event.extendedProps
+        const base = prevEvent || event
 
-    eventResize({ event: resizedEvent }) {
-      dispatch(updateEvent(resizedEvent))
-      dispatch(filterEvents())
+        // ---------- TICKET ----------
+        // ---------- TICKET ----------
+        if (data.type === 'ticket') {
+          let ticketId =
+            data.ticket_id ||
+            (typeof event.id === 'string' && event.id.startsWith('ticket-') ? Number(event.id.split('-')[1]) : null)
+
+          if (!ticketId) {
+            console.error('Missing ticket ID', event)
+            info.revert()
+            return
+          }
+
+          await updateSchedule({
+            id: ticketId,
+            schedule_date: toApiDate(event.start),
+            schedule_start_time: toApiTime(event.startStr),
+            schedule_end_time: toApiTime(event.endStr),
+            from_employee_id: data.technician_id,
+            to_employee_id: data.technician_id
+          })
+
+          // Only update extendedProps if needed — NEVER change event.id
+          event.setExtendedProp('ticket_id', ticketId)
+
+          // Optional: update title/color if needed
+          // event.setProp('title', 'New Title') // safe
+          // event.setProp('backgroundColor', '#ff9f89') // safe
+
+          showToast('Ticket updated', 'success')
+        }
+        // ---------- LUNCH ----------
+        if (data.type === 'lunch') {
+          const employeeId = Number(event.getResources()[0].id)
+          const date = toApiDate(base.start)
+
+          const rows = await findLunchRows(employeeId, date)
+
+          const baseStartHHMM = toApiTime(base.startStr)
+          const baseStartDB = toDbTime(baseStartHHMM)
+          const matched = rows.find(r => r.start_time === baseStartDB)
+
+          const lunchId = matched ? matched.id : 0
+
+          const newStartHHMM = toApiTime(event.startStr)
+          const newEndHHMM = toApiTime(event.endStr)
+
+          await updateEmployeeLunch(lunchId, {
+            employee_id: employeeId,
+            date,
+            start_time: newStartHHMM,
+            end_time: newEndHHMM
+          })
+
+          showToast('Lunch resized successfully', 'success')
+        }
+
+        dispatch(updateEvent(event))
+        dispatch(filterEvents())
+      } catch (err) {
+        console.error('eventResize error', err)
+        showToast('Update failed', 'error')
+      }
     },
 
     ref: calendarRef,
