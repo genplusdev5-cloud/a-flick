@@ -12,6 +12,7 @@ import {
   Button,
   Typography,
   IconButton,
+  FormControlLabel,
   Breadcrumbs,
   Divider,
   Chip,
@@ -24,6 +25,7 @@ import {
 } from '@mui/material'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
+import GlobalDateRange from '@/components/common/GlobalDateRange'
 
 // Table
 import {
@@ -41,7 +43,7 @@ import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import tableStyles from '@core/styles/table.module.css'
 
 // API
-import { getInvoiceList, getInvoiceDropdowns } from '@/api/invoice' // adjust path if needed
+import { getInvoiceSummary, getInvoiceDropdowns } from '@/api/invoice' // adjust path if needed
 
 import { showToast } from '@/components/common/Toasts'
 
@@ -56,11 +58,10 @@ export default function InvoiceListPageFull() {
   const [loading, setLoading] = useState(false)
 
   // ── Filters ──────────────────────────────────
-  const [dateFilterEnabled, setDateFilterEnabled] = useState(false)
-  const [filterDate, setFilterDate] = useState(new Date())
+
   const [originFilter, setOriginFilter] = useState(null)
   const [contractTypeFilter, setContractTypeFilter] = useState('')
-  const [invoiceStatusFilter, setInvoiceStatusFilter] = useState('')
+  const [invoiceStatusFilter, setInvoiceStatusFilter] = useState(null)
   const [serviceFreqFilter, setServiceFreqFilter] = useState('')
   const [billingFreqFilter, setBillingFreqFilter] = useState('')
   const [contractLevelFilter, setContractLevelFilter] = useState('')
@@ -70,9 +71,13 @@ export default function InvoiceListPageFull() {
   const [contractFilter, setContractFilter] = useState('')
   const [searchText, setSearchText] = useState('')
   const [totalCount, setTotalCount] = useState(0)
+  const [customerSpecificContracts, setCustomerSpecificContracts] = useState(null)
+  const [dateFilter, setDateFilter] = useState(false) // renamed from dateFilterEnabled
+  const today = new Date()
+  const [dateRange, setDateRange] = useState([null, null])
 
   // ── Pagination ───────────────────────────────
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 })
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
 
   const loadContractsForCustomer = async customerId => {
     try {
@@ -89,56 +94,39 @@ export default function InvoiceListPageFull() {
     }
   }
 
-  // ── Build query params for invoice-list API ─────────────────
   const buildListParams = () => {
     const params = {
       page: pagination.pageIndex + 1,
-      page_size: pagination.pageSize
+      page_size: pagination.pageSize,
+      invoice_type: 'new'
     }
 
-    // DATE
-    if (dateFilterEnabled && filterDate) {
-      params.invoice_date = format(filterDate, 'yyyy-MM-dd')
+    // DATE RANGE FILTER — THIS IS THE MAGIC
+    if (dateFilter && dateRange[0]) {
+      params.from_date = format(dateRange[0], 'yyyy-MM-dd')
+      if (dateRange[1]) {
+        params.to_date = format(dateRange[1], 'yyyy-MM-dd')
+      } else {
+        params.to_date = format(dateRange[0], 'yyyy-MM-dd') // same day if only start selected
+      }
     }
 
-    // ORIGIN
     if (originFilter?.id) params.company_id = originFilter.id
-
-    // CONTRACT TYPE
     if (contractTypeFilter?.id) params.contract_type = contractTypeFilter.id
-
-    // INVOICE STATUS (Yes / No)
     if (invoiceStatusFilter?.label) {
-      params.is_issued = invoiceStatusFilter.label === 'Yes' ? 1 : 0
+      params.invoice_status = invoiceStatusFilter.label === 'Yes' ? 1 : 0
     }
-
-    // SERVICE FREQUENCY
-    if (serviceFreqFilter?.id) params.service_frequency = serviceFreqFilter.id
-
-    // BILLING FREQUENCY
-    if (billingFreqFilter?.id) params.billing_frequency = billingFreqFilter.id
-
-    // CONTRACT LEVEL
+    if (serviceFreqFilter?.id) params.service_frequency_id = serviceFreqFilter.id
+    if (billingFreqFilter?.id) params.billing_frequency_id = billingFreqFilter.id
     if (contractLevelFilter?.id) params.contract_level = contractLevelFilter.id
-
-    // INVOICE TYPE
     if (invoiceTypeFilter?.id) params.invoice_type = invoiceTypeFilter.id
-
-    // SALES PERSON
     if (salesPersonFilter?.id) params.sales_person_id = salesPersonFilter.id
-
-    // CUSTOMER
     if (customerFilter?.id) params.customer_id = customerFilter.id
-
-    // CONTRACT
     if (contractFilter?.id) params.contract_id = contractFilter.id
-
-    // SEARCH TEXT
     if (searchText) params.search = searchText
 
     return params
   }
-
   const buildFilters = () => {
     const params = {
       page: pagination.pageIndex + 1,
@@ -174,34 +162,61 @@ export default function InvoiceListPageFull() {
       .filter((item, index, array) => array.findIndex(x => x.id === item.id) === index)
   }
 
+  // ── DEDUPE FUNCTION (Add this once, above processedDropdowns) ──
+  const dedupeById = items => {
+    if (!Array.isArray(items)) return []
+    const seen = new Map()
+    return items.reduce((acc, item) => {
+      const id = item?.id
+      if (id != null && !seen.has(id)) {
+        seen.set(id, true)
+        acc.push({
+          id,
+          label: item.label || item.name || String(id)
+        })
+      }
+      return acc
+    }, [])
+  }
+
   // ── Load List + Dropdowns ─────────────────────
+
   const loadEverything = async () => {
     setLoading(true)
     try {
       const params = buildListParams()
 
-      const [listRes, dropdownRes] = await Promise.all([getInvoiceList(params), getInvoiceDropdowns()])
+      const [listRes, dropdownRes] = await Promise.all([
+        getInvoiceSummary(params), // ← changed here
+        getInvoiceDropdowns()
+      ])
 
-      // CORRECT response handling
-      const results = listRes?.results || []
-      const count = listRes?.count || 0
+      // Response structure is SAME as before
+      const apiData = listRes?.data || listRes
+      const results = apiData?.results || []
+      const count = apiData?.count || 0
+
+      // ... rest of the code remains EXACTLY the same (dropdowns, mapping, etc.)
+      // No need to touch anything else!
 
       const ddWrapper = dropdownRes?.data || dropdownRes || {}
       const dd = ddWrapper?.data || {}
 
       const processedDropdowns = {
-        origins: normalizeList(dd.company?.name, 'name'),
-        billing_frequencies: normalizeList(dd.billing_frequency?.name, 'name'),
-        service_frequencies: normalizeList(dd.service_frequency?.name, 'name'),
-        customers: normalizeList(dd.customer?.label, 'label'),
-        contracts: normalizeList(dd.contract_list?.label, 'label'),
-        sales_persons: normalizeList(dd.sales_person?.name, 'name'),
-        contract_levels: normalizeList(dd.contract_level?.name, 'name'),
-        invoice_statuses: normalizeList(dd.invoice_status?.name, 'name'),
-        contract_types: normalizeList(dd.contract_type?.name, 'name'),
-        invoice_types: normalizeList(dd.invoice_type?.name, 'name')
+        origins: dedupeById(dd.company?.name || []),
+        billing_frequencies: dedupeById(dd.billing_frequency?.name || []),
+        service_frequencies: dedupeById(dd.service_frequency?.name || []),
+        customers: dedupeById(dd.customer?.label || []),
+        contracts: customerSpecificContracts ? customerSpecificContracts : dedupeById(dd.contract_list?.label || []),
+        sales_persons: dedupeById(dd.sales_person?.name || []),
+        contract_levels: dedupeById(dd.contract_level?.name || []),
+        invoice_statuses: [
+          { id: 1, label: 'Yes' },
+          { id: 0, label: 'No' }
+        ],
+        contract_types: dedupeById(dd.contract_type?.name || []),
+        invoice_types: dedupeById(dd.invoice_type?.name || [])
       }
-
       setDropdownData(processedDropdowns)
       setData(results.map(inv => mapInvoice(inv, processedDropdowns)))
       setTotalCount(count)
@@ -213,13 +228,14 @@ export default function InvoiceListPageFull() {
     }
   }
 
-  // இதை useEffect(() => { loadEverything() }, [pagination...]) க்கு கீழ போடுங்க
   useEffect(() => {
     loadEverything()
   }, [
     pagination.pageIndex,
     pagination.pageSize,
-    dateFilterEnabled ? format(filterDate, 'yyyy-MM-dd') : null,
+    dateFilter, // ← new
+    dateRange[0], // ← new
+    dateRange[1], // ← new
     originFilter?.id,
     contractTypeFilter?.id,
     invoiceStatusFilter?.label,
@@ -244,25 +260,40 @@ export default function InvoiceListPageFull() {
     invDate: inv.invoice_date || null,
     invNo: inv.invoice_number || '-',
 
-    origin: dd.origins?.find(o => o.id == inv.company_id)?.label || inv.company_name || 'Unknown',
+    // Fix: invoice_frequency_id is STRING "2", but dropdown id is number
+    invFrequency: dd.billing_frequencies?.find(f => String(f.id) === String(inv.invoice_frequency_id))?.label || '-',
 
-    invFrequency:
-      dd.billing_frequencies?.find(f => f.id == inv.billing_frequency_id || f.id == inv.invoice_frequency_id)?.label ||
-      '-',
+    // service_frequency sometimes null
+    svcFrequency: dd.service_frequencies?.find(f => String(f.id) === String(inv.service_frequency))?.label || '-',
 
-    svcFrequency: dd.service_frequencies?.find(f => f.id == inv.service_frequency)?.label || '-',
-    contractLevel: dd.contract_levels?.find(c => c.id == inv.contract_level)?.label || '-',
-    invoiceType: dd.invoice_types?.find(t => t.id == inv.invoice_type)?.label || '-',
-    contractType: dd.contract_types?.find(t => t.id == inv.contract_type)?.label || '-',
-    salesPerson: dd.sales_persons?.find(s => s.id == inv.sales_person_id)?.label || '-',
+    // These fields are NOT in API → so we use fallback from other data if possible
+    contractCode: inv.contract_code || `CON-${inv.contract_id}` || '-',
+    customerName: inv.customer_name || dd.customers?.find(c => c.id === inv.customer_id)?.label || 'Unknown Customer',
+    billingName: inv.billing_name || inv.customer_name || 'N/A',
+    address: inv.service_address || 'Not Available',
+    cardId: inv.card_id || '-',
+    poNo: inv.po_number || '-',
+    accountItemCode: inv.account_item_code || '-',
 
-    customerName: dd.customers?.find(c => c.id == inv.customer_id)?.label || inv.customer_name || '-',
-    contractCode: dd.contracts?.find(c => c.id == inv.contract_id)?.label || inv.contract_code || '-',
+    // No.Of Value Services & Last SVC Date → NOT in this API response
+    noOfServices: inv.no_of_services || '-',
+    lastSvcDate: inv.last_service_date || null,
 
     amount: inv.amount || 0,
     tax: inv.gst || 0,
+    // Fix: taxAmount column expects this
+    taxAmount: inv.gst || 0,
+
     total: (inv.amount || 0) + (inv.gst || 0),
-    issued: inv.is_issued === 1 || inv.is_issued === true
+
+    issued: inv.is_issued === 1 || inv.is_issued === true,
+
+    // These are in API but not mapped before
+    contractLevel: dd.contract_levels?.find(cl => String(cl.id) === String(inv.contract_level))?.label || '-',
+
+    invoiceType: inv.invoice_type || '-',
+
+    salesPerson: dd.sales_persons?.find(s => String(s.id) === String(inv.sales_person_id))?.label || '-'
   })
 
   // ── Dropdown options from API (fallback to empty array) ─────
@@ -361,84 +392,29 @@ export default function InvoiceListPageFull() {
     ],
     [pagination.pageIndex, pagination.pageSize]
   )
-
   const table = useReactTable({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel()
+    getSortedRowModel: getSortedRowModel(),
+
+    // CORRECT — manual pagination
+    manualPagination: true,
+    pageCount: Math.ceil(totalCount / pagination.pageSize),
+    state: {
+      pagination
+    },
+    onPaginationChange: setPagination
   })
 
-  // ── Filtering (same logic as before) ─────────────────────
-  const filteredRows = useMemo(() => {
-    return data.filter(r => {
-      const combined = `${r.invNo} ${r.contractCode} ${r.billingName} ${r.address} ${r.invFrequency}`.toLowerCase()
-
-      // SEARCH
-      if (searchText && !combined.includes(searchText.toLowerCase())) return false
-
-      // DATE FILTER
-      if (dateFilterEnabled) {
-        const rowDate = new Date(r.invDate).toDateString()
-        if (rowDate !== filterDate.toDateString()) return false
-      }
-
-      // ORIGIN
-      if (originFilter && r.origin !== originFilter.label) return false
-
-      // CONTRACT TYPE
-      if (contractTypeFilter && r.contractType !== contractTypeFilter.label) return false
-
-      // INVOICE STATUS (Issued: Yes/No)
-      if (invoiceStatusFilter) {
-        const status = r.issued ? 'Yes' : 'No'
-        if (status !== invoiceStatusFilter.label) return false
-      }
-
-      // SERVICE FREQUENCY
-      if (serviceFreqFilter && r.svcFrequency !== serviceFreqFilter.label) return false
-
-      // BILLING FREQUENCY
-      if (billingFreqFilter && r.invFrequency !== billingFreqFilter.label) return false
-
-      // CONTRACT LEVEL
-      if (contractLevelFilter && r.contractLevel !== contractLevelFilter.label) return false
-
-      // INVOICE TYPE
-      if (invoiceTypeFilter && r.invoiceType !== invoiceTypeFilter.label) return false
-
-      // SALES PERSON
-      if (salesPersonFilter && r.salesPerson !== salesPersonFilter.label) return false
-
-      // CUSTOMER
-      if (customerFilter && r.customerName !== customerFilter.label) return false
-
-      // CONTRACT
-      if (contractFilter && r.contractCode !== contractFilter.label) return false
-
-      return true
-    })
-  }, [
-    data,
-    searchText,
-    dateFilterEnabled,
-    filterDate,
-    originFilter,
-    contractTypeFilter,
-    invoiceStatusFilter,
-    serviceFreqFilter,
-    billingFreqFilter,
-    contractLevelFilter,
-    invoiceTypeFilter,
-    salesPersonFilter,
-    customerFilter,
-    contractFilter
-  ])
+  useEffect(() => {
+    const today = new Date()
+    setDateRange([today, today])
+  }, [])
 
   const pageIndex = pagination.pageIndex
   const pageSize = pagination.pageSize
   const pageCount = Math.ceil(totalCount / pageSize)
-  const paginated = filteredRows // backend already paginated
 
   // Reset page when filters remove all rows
   useEffect(() => {
@@ -492,119 +468,180 @@ export default function InvoiceListPageFull() {
               </Box>
             </Box>
           }
-          sx={{ pb: 1.5, pt: 1.5 }}
+          sx={{ pb: 1.5, pt: 1.5, mb: 2 }}
         />
 
+        <Divider sx={{ mb: 2 }} />
+
         {/* FILTERS */}
-        <Box px={3} pb={2}>
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 2, alignItems: 'end', mb: 2 }}>
-            {/* Date */}
-            <Box>
-              <Box display='flex' alignItems='center' gap={1} sx={{ mb: 1 }}>
+        <Box px={3} pb={3}>
+          <Grid container spacing={3}>
+            {/* Row 1 */}
+            <Grid item xs={12} sm={6} md={3}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Checkbox
+                  checked={dateFilter}
+                  onChange={e => {
+                    setDateFilter(e.target.checked)
+                    if (!e.target.checked) {
+                      setDateRange([null, null])
+                    } else {
+                      const today = new Date()
+                      setDateRange([today, today]) // 👉 Enable pannumbodhum today set aagum
+                    }
+                  }}
                   size='small'
-                  checked={dateFilterEnabled}
-                  onChange={e => setDateFilterEnabled(e.target.checked)}
                 />
-                <Typography variant='body2' sx={{ fontWeight: 600 }}>
-                  Date
-                </Typography>
+                <Typography sx={{ mb: 0.5, fontWeight: 500 }}>Date Filter</Typography>
               </Box>
-              <AppReactDatepicker
-                selected={filterDate}
-                onChange={d => setFilterDate(d)}
-                dateFormat='dd/MM/yyyy'
-                customInput={<CustomTextField size='small' fullWidth disabled={!dateFilterEnabled} />}
+
+              <GlobalDateRange
+                start={dateRange[0]}
+                end={dateRange[1]}
+                onSelectRange={({ start, end }) => setDateRange([start, end])}
+                disabled={!dateFilter}
+                size='small'
               />
-            </Box>
+            </Grid>
 
-            <CustomAutocomplete
-              options={originOptions}
-              value={originFilter || null}
-              onChange={(_, v) => setOriginFilter(v || '')}
-              renderInput={p => <CustomTextField {...p} label='Origin' size='small' />}
-            />
-            <CustomAutocomplete
-              options={contractTypeOptions}
-              value={contractTypeFilter || null}
-              onChange={(_, v) => setContractTypeFilter(v || '')}
-              renderInput={p => <CustomTextField {...p} label='Contract Type' size='small' />}
-            />
-            <CustomAutocomplete
-              options={invoiceStatusOptions}
-              value={invoiceStatusFilter || null}
-              onChange={(_, v) => setInvoiceStatusFilter(v || '')}
-              renderInput={p => <CustomTextField {...p} label='Invoice Status' size='small' />}
-            />
-            <CustomAutocomplete
-              options={serviceFreqOptions}
-              value={serviceFreqFilter || null}
-              onChange={(_, v) => setServiceFreqFilter(v || '')}
-              renderInput={p => <CustomTextField {...p} label='Service Frequency' size='small' />}
-            />
-            <CustomAutocomplete
-              options={billingFreqOptions}
-              value={billingFreqFilter || null}
-              onChange={(_, v) => setBillingFreqFilter(v || '')}
-              renderInput={p => <CustomTextField {...p} label='Billing Frequency' size='small' />}
-            />
-            <CustomAutocomplete
-              options={contractLevelOptions}
-              value={contractLevelFilter || null}
-              onChange={(_, v) => setContractLevelFilter(v || '')}
-              renderInput={p => <CustomTextField {...p} label='Contract Level' size='small' />}
-            />
-            <CustomAutocomplete
-              options={invoiceTypeOptions}
-              value={invoiceTypeFilter || null}
-              onChange={(_, v) => setInvoiceTypeFilter(v || '')}
-              renderInput={p => <CustomTextField {...p} label='Invoice Type' size='small' />}
-            />
-            <CustomAutocomplete
-              options={salesPersonOptions}
-              value={salesPersonFilter || null}
-              onChange={(_, v) => setSalesPersonFilter(v || '')}
-              renderInput={p => <CustomTextField {...p} label='Sales Person' size='small' />}
-            />
-            <CustomAutocomplete
-              options={customerOptions}
-              value={customerFilter || null}
-              getOptionLabel={option => option?.label || ''}
-              isOptionEqualToValue={(option, value) => option.id === value.id}
-              renderOption={(props, option) => (
-                <li {...props} key={option.id}>
-                  {option.label}
-                </li>
-              )}
-              onChange={(_, v) => {
-                setCustomerFilter(v)
-                if (v?.id) {
-                  getInvoiceDropdowns({ customer_id: v.id }).then(res => {
-                    const dd = res.data?.data || {}
-                    setDropdownData(prev => ({
-                      ...prev,
-                      contracts: normalizeList(dd.contract_list?.label, 'label')
-                    }))
-                  })
-                }
-              }}
-              renderInput={params => <CustomTextField {...params} label='Customer' size='small' />}
-            />
+            <Grid item xs={12} sm={6} md={3}>
+              <CustomAutocomplete
+                options={originOptions}
+                value={originFilter || null}
+                onChange={(_, v) => setOriginFilter(v || null)}
+                getOptionLabel={opt => opt?.label || ''}
+                renderInput={p => <CustomTextField {...p} label='Origin' size='small' />}
+              />
+            </Grid>
 
-            <CustomAutocomplete
-              options={contractOptions}
-              value={contractFilter || null}
-              getOptionLabel={opt => opt?.label || ''}
-              isOptionEqualToValue={(a, b) => a.id === b.id}
-              onChange={(_, v) => setContractFilter(v)}
-              renderOption={(props, option) => (
-                <li {...props} key={option.id}>
-                  {option.label}
-                </li>
-              )}
-              renderInput={params => <CustomTextField {...params} label='Contract' size='small' />}
-            />
-          </Box>
+            <Grid item xs={12} sm={6} md={3}>
+              <CustomAutocomplete
+                options={contractTypeOptions}
+                value={contractTypeFilter || null}
+                onChange={(_, v) => setContractTypeFilter(v || null)}
+                getOptionLabel={opt => opt?.label || ''}
+                renderInput={p => <CustomTextField {...p} label='Contract Type' size='small' />}
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6} md={3}>
+              <CustomAutocomplete
+                options={invoiceStatusOptions}
+                value={invoiceStatusFilter || null}
+                onChange={(_, v) => setInvoiceStatusFilter(v || null)}
+                getOptionLabel={opt => opt?.label || ''}
+                renderInput={p => <CustomTextField {...p} label='Invoice Status' size='small' />}
+              />
+            </Grid>
+
+            {/* Row 2 */}
+            <Grid item xs={12} sm={6} md={3}>
+              <CustomAutocomplete
+                options={serviceFreqOptions}
+                value={serviceFreqFilter || null}
+                onChange={(_, v) => setServiceFreqFilter(v || null)}
+                getOptionLabel={opt => opt?.label || ''}
+                renderInput={p => <CustomTextField {...p} label='Service Frequency' size='small' />}
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6} md={3}>
+              <CustomAutocomplete
+                options={billingFreqOptions}
+                value={billingFreqFilter || null}
+                onChange={(_, v) => setBillingFreqFilter(v || null)}
+                getOptionLabel={opt => opt?.label || ''}
+                renderInput={p => <CustomTextField {...p} label='Billing Frequency' size='small' />}
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6} md={3}>
+              <CustomAutocomplete
+                options={contractLevelOptions}
+                value={contractLevelFilter || null}
+                onChange={(_, v) => setContractLevelFilter(v || null)}
+                getOptionLabel={opt => opt?.label || ''}
+                renderInput={p => <CustomTextField {...p} label='Contract Level' size='small' />}
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6} md={3}>
+              <CustomAutocomplete
+                options={invoiceTypeOptions}
+                value={invoiceTypeFilter || null}
+                onChange={(_, v) => setInvoiceTypeFilter(v || null)}
+                getOptionLabel={opt => opt?.label || ''}
+                renderInput={p => <CustomTextField {...p} label='Invoice Type' size='small' />}
+              />
+            </Grid>
+
+            {/* Row 3 */}
+            <Grid item xs={12} sm={6} md={3}>
+              <CustomAutocomplete
+                options={salesPersonOptions}
+                value={salesPersonFilter || null}
+                onChange={(_, v) => setSalesPersonFilter(v || null)}
+                getOptionLabel={opt => opt?.label || ''}
+                renderInput={p => <CustomTextField {...p} label='Sales Person' size='small' />}
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6} md={3}>
+              <CustomAutocomplete
+                options={customerOptions}
+                value={customerFilter || null}
+                getOptionLabel={option => option?.label || ''}
+                isOptionEqualToValue={(option, value) => option?.id === value?.id}
+                onChange={(_, v) => {
+                  setCustomerFilter(v || null)
+                  setContractFilter(null)
+
+                  if (v?.id) {
+                    // Load contracts for this customer AND save it separately
+                    getInvoiceDropdowns({ customer_id: v.id })
+                      .then(res => {
+                        const dd = res?.data?.data || {}
+                        const contracts = dedupeById(dd.contract_list?.label || [])
+                        setCustomerSpecificContracts(contracts) // ← SAVE HERE
+                        setDropdownData(prev => ({ ...prev, contracts }))
+                      })
+                      .catch(() => {
+                        showToast('error', 'Failed to load contracts')
+                        setCustomerSpecificContracts([])
+                        setDropdownData(prev => ({ ...prev, contracts: [] }))
+                      })
+                  } else {
+                    // Customer cleared → go back to all contracts
+                    setCustomerSpecificContracts(null)
+                    // This will be handled in loadEverything
+                  }
+                }}
+                renderOption={(props, option) => (
+                  <li {...props} key={option.id}>
+                    {option.label}
+                  </li>
+                )}
+                renderInput={params => <CustomTextField {...params} label='Customer' size='small' />}
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6} md={3} mb={2}>
+              <CustomAutocomplete
+                options={contractOptions}
+                value={contractFilter || null}
+                getOptionLabel={opt => opt?.label || ''}
+                isOptionEqualToValue={(a, b) => a?.id === b?.id}
+                onChange={(_, v) => setContractFilter(v || null)}
+                // THIS LINE IS THE FIX
+                renderOption={(props, option) => (
+                  <li {...props} key={option.id}>
+                    {option.label}
+                  </li>
+                )}
+                renderInput={params => <CustomTextField {...params} label='Contract' size='small' />}
+              />
+            </Grid>
+          </Grid>
 
           <Divider sx={{ mb: 2 }} />
 

@@ -5,59 +5,64 @@ import { format } from 'date-fns'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import CustomTextField from '@core/components/mui/TextField'
 
-const formatDate = date => (date ? format(date, 'dd-MM-yyyy') : '')
+const formatDate = date => (date ? format(date, 'dd/MM/yyyy') : '')
 
-const GlobalDateRange = ({
-  label = 'Date Range',
-  onSelectRange,
-  start,
-  end,
-  disabled = false   // ✅ NEW
-}) => {
+const GlobalDateRange = ({ label = '', onSelectRange, start, end, disabled = false }) => {
   const [localStart, setLocalStart] = useState(start)
   const [localEnd, setLocalEnd] = useState(end)
 
-  // Sync selected range back to parent
+  // 🛑 Prevent infinite loop
   useEffect(() => {
-    if (!disabled && onSelectRange && localStart && localEnd) {
-      onSelectRange({ start: localStart, end: localEnd })
+    if (start !== localStart) setLocalStart(start)
+    if (end !== localEnd) setLocalEnd(end)
+  }, [start, end])
+
+  // 🛑 Prevent infinite loop parent sync
+  useEffect(() => {
+    if (!disabled && localStart && localEnd) {
+      if (start !== localStart || end !== localEnd) {
+        onSelectRange?.({ start: localStart, end: localEnd })
+      }
     }
   }, [localStart, localEnd, disabled])
 
   const onChange = dates => {
-    if (disabled) return     // 🚫 Ignore changes when disabled
-
+    if (disabled) return
     const [s, e] = dates
     setLocalStart(s)
     setLocalEnd(e)
   }
 
-  const CustomInput = forwardRef(({ value, onClick }, ref) => (
+  const safeStart = localStart || new Date()
+  const safeEnd = localEnd || safeStart
+
+  const displayValue = `${formatDate(safeStart)} - ${formatDate(safeEnd)}`
+
+  const CustomInput = forwardRef(({ onClick }, ref) => (
     <CustomTextField
       fullWidth
       label={label}
       inputRef={ref}
-      value={value}
-      onClick={disabled ? undefined : onClick} // disable click
+      value={displayValue}
+      onClick={disabled ? undefined : onClick}
       readOnly
       disabled={disabled}
-      sx={{ cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.6 : 1 }}
+      sx={{
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.6 : 1
+      }}
     />
   ))
 
   return (
     <AppReactDatepicker
       selectsRange
+      disabled={disabled}
       startDate={localStart}
       endDate={localEnd}
       onChange={onChange}
       shouldCloseOnSelect={false}
-      disabled={disabled}  // ✅ IMPORTANT
-      customInput={
-        <CustomInput
-          value={`${formatDate(localStart)} - ${formatDate(localEnd)}`}
-        />
-      }
+      customInput={<CustomInput />}
     />
   )
 }
