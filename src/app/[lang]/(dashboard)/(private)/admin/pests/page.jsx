@@ -536,14 +536,14 @@ export default function PestPage() {
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
             <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
-              <EditIcon fontSize='small' />
+              <i className='tabler-edit text-blue-600 text-lg' />
             </IconButton>
             <IconButton
               size='small'
               color='error'
               onClick={() => setDeleteDialog({ open: true, row: info.row.original, isSub: false })}
             >
-              <DeleteIcon fontSize='small' />
+              <i className='tabler-trash text-red-600 text-lg' />
             </IconButton>
           </Box>
         )

@@ -212,14 +212,14 @@ export default function KivFinderPage() {
               color='primary'
               onClick={() => router.push(`/admin/kiv/${info.row.original.id}/edit`)}
             >
-              <EditIcon />
+              <i className='tabler-edit text-blue-600 text-lg' />
             </IconButton>
             <IconButton
               size='small'
               color='error'
               onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
             >
-              <DeleteIcon />
+              <i className='tabler-trash text-red-600 text-lg' />
             </IconButton>
           </Box>
         )

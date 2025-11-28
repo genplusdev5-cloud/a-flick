@@ -354,11 +354,11 @@ export default function SlotsPage() {
                           color='primary'
                           onClick={() => handleEdit(row)} // <-- ADD THIS
                         >
-                          <EditIcon />
+                          <i className='tabler-edit text-blue-600 text-lg' />
                         </IconButton>
 
                         <IconButton size='small' color='error' onClick={() => handleDelete(row.id)}>
-                          <DeleteIcon />
+                          <i className='tabler-trash text-red-600 text-lg' />
                         </IconButton>
                       </Box>
                     </td>

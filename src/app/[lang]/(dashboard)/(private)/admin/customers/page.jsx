@@ -235,7 +235,7 @@ export default function CustomersPage() {
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
             <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original.id)}>
-              <EditIcon />
+              <i className='tabler-edit text-blue-600 text-lg' />
             </IconButton>
 
             <IconButton
@@ -243,7 +243,7 @@ export default function CustomersPage() {
               color='error'
               onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
             >
-              <DeleteIcon />
+              <i className='tabler-trash text-red-600 text-lg' />
             </IconButton>
           </Box>
         )

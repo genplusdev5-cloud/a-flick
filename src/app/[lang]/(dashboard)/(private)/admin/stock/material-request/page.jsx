@@ -287,11 +287,11 @@ export default function MaterialRequestPage() {
                 color='primary'
                 onClick={() => router.push(`/admin/stock/material-request/${encodedId}/edit`)}
               >
-                <EditIcon fontSize='small' />
+                <i className='tabler-edit text-blue-600 text-lg' />
               </IconButton>
 
               <IconButton size='small' color='error' onClick={() => setDeleteDialog({ open: true, row: row.original })}>
-                <DeleteIcon fontSize='small' />
+                <i className='tabler-trash text-red-600 text-lg' />
               </IconButton>
             </Box>
           )

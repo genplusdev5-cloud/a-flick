@@ -281,10 +281,10 @@ export default function AttendanceSchedulePage() {
                     <td>
                       <Box sx={{ display: 'flex', gap: 1 }}>
                         <IconButton size='small' color='primary'>
-                          <EditIcon />
+                          <i className='tabler-edit text-blue-600 text-lg' />
                         </IconButton>
                         <IconButton size='small' color='error'>
-                          <DeleteIcon />
+                          <i className='tabler-trash text-red-600 text-lg' />
                         </IconButton>
                       </Box>
                     </td>

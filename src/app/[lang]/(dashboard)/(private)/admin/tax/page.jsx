@@ -323,14 +323,14 @@ export default function TaxPage() {
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
             <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
-              <EditIcon />
+              <i className='tabler-edit text-blue-600 text-lg' />
             </IconButton>
             <IconButton
               size='small'
               color='error'
               onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
             >
-              <DeleteIcon />
+              <i className='tabler-trash text-red-600 text-lg' />
             </IconButton>
           </Box>
         )
@@ -798,7 +798,7 @@ export default function TaxPage() {
           <DialogCloseButton
             onClick={() => setDeleteDialog({ open: false, row: null })}
             disableRipple
-            sx={{ position: 'absolute', right: 1, top: 1 }}
+            
           >
             <i className='tabler-x' />
           </DialogCloseButton>

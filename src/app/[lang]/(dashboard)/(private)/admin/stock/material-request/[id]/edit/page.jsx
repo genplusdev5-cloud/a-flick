@@ -350,7 +350,9 @@ export default function EditMaterialRequestPage() {
           <Box my={4} sx={{ borderTop: '1px solid #ddd' }} />
 
           {/* Item Entry */}
-          <Typography variant='subtitle1' gutterBottom>Item Details</Typography>
+          <Typography variant='subtitle1' gutterBottom>
+            Item Details
+          </Typography>
           <Grid container spacing={3} mb={3}>
             <Grid item xs={12} md={3}>
               <Autocomplete
@@ -369,9 +371,7 @@ export default function EditMaterialRequestPage() {
                 getOptionLabel={o => o?.name || ''}
                 value={dropdowns.uoms.find(u => u.name === formData.unit) || null}
                 onChange={(e, v) => handleChange('unit', v?.name || '')}
-                renderInput={params => (
-                  <CustomTextField {...params} label={requiredLabel('Unit')} inputRef={unitRef} />
-                )}
+                renderInput={params => <CustomTextField {...params} label={requiredLabel('Unit')} inputRef={unitRef} />}
               />
             </Grid>
             <Grid item xs={12} md={2}>
@@ -405,7 +405,9 @@ export default function EditMaterialRequestPage() {
               <TableBody>
                 {items.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} align='center'>No items added</TableCell>
+                    <TableCell colSpan={6} align='center'>
+                      No items added
+                    </TableCell>
                   </TableRow>
                 ) : (
                   items.map((item, idx) => (
@@ -413,10 +415,10 @@ export default function EditMaterialRequestPage() {
                       <TableCell>{idx + 1}</TableCell>
                       <TableCell>
                         <IconButton size='small' onClick={() => handleEditItem(idx)}>
-                          <EditIcon fontSize='small' />
+                          <i className='tabler-edit text-blue-600 text-lg' />
                         </IconButton>
                         <IconButton size='small' onClick={() => handleDeleteItem(idx)}>
-                          <DeleteIcon fontSize='small' color='error' />
+                          <i className='tabler-trash text-red-600 text-lg' />
                         </IconButton>
                       </TableCell>
                       <TableCell>{item.chemical}</TableCell>

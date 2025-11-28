@@ -63,31 +63,30 @@ export default function AttendancePage() {
 
   const router = useRouter()
 
-// Inside your component — replace fetchAttendances
-const fetchAttendances = async () => {
-  try {
-    setLoading(true)
+  // Inside your component — replace fetchAttendances
+  const fetchAttendances = async () => {
+    try {
+      setLoading(true)
 
-    const params = {
-      page: pagination.pageIndex + 1,
-      page_size: pagination.pageSize,
-      search: searchText.trim() || undefined,
-      start_date: dateFilter && dateRange[0] ? format(dateRange[0], 'yyyy-MM-dd') : undefined,
-      end_date: dateFilter && dateRange[1] ? format(dateRange[1], 'yyyy-MM-dd') : undefined
+      const params = {
+        page: pagination.pageIndex + 1,
+        page_size: pagination.pageSize,
+        search: searchText.trim() || undefined,
+        start_date: dateFilter && dateRange[0] ? format(dateRange[0], 'yyyy-MM-dd') : undefined,
+        end_date: dateFilter && dateRange[1] ? format(dateRange[1], 'yyyy-MM-dd') : undefined
+      }
+
+      // Remove undefined fields
+      Object.keys(params).forEach(key => params[key] === undefined && delete params[key])
+
+      const res = await getAttendanceList(params)
+      setRows(res?.data?.results || [])
+    } catch (error) {
+      console.error('Failed to fetch attendance:', error.response?.data || error)
+    } finally {
+      setLoading(false)
     }
-
-    // Remove undefined fields
-    Object.keys(params).forEach(key => params[key] === undefined && delete params[key])
-
-    const res = await getAttendanceList(params)
-    setRows(res?.data?.results || [])
-  } catch (error) {
-    console.error('Failed to fetch attendance:', error.response?.data || error)
-  } finally {
-    setLoading(false)
   }
-}
-
 
   useEffect(() => {
     fetchAttendances()
@@ -310,10 +309,10 @@ const fetchAttendances = async () => {
                           color='primary'
                           onClick={() => router.push(`/admin/attendance/attendance/edit/${row.id}`)}
                         >
-                          <EditIcon />
+                          <i className='tabler-edit text-blue-600 text-lg' />
                         </IconButton>
                         <IconButton size='small' color='error' onClick={() => handleDelete(row.id)}>
-                          <DeleteIcon />
+                          <i className='tabler-trash text-red-600 text-lg' />
                         </IconButton>
                       </Box>
                     </td>

@@ -146,42 +146,37 @@ export default function EmployeeLeavePage() {
   const statusRef = useRef(null)
 
   // Load rows
-const loadData = async () => {
-  setLoading(true)
-  try {
-    const res = await getEmployeeLeaveList({
-      page: pagination.pageIndex + 1,
-      page_size: pagination.pageSize,
-      search: searchText || ''
-    })
+  const loadData = async () => {
+    setLoading(true)
+    try {
+      const res = await getEmployeeLeaveList({
+        page: pagination.pageIndex + 1,
+        page_size: pagination.pageSize,
+        search: searchText || ''
+      })
 
-    const results = res?.data?.results || []
+      const results = res?.data?.results || []
 
-    const formatted = results.map((item, idx) => ({
-      sno: idx + 1 + pagination.pageIndex * pagination.pageSize,
-      id: item.id,
-      employee: item.employee_name || '-',
-      supervisor: item.supervisor || '-',
-      leaveType: item.leave_type || '-',
-      fromDate: item.leave_date ? new Date(item.leave_date) : '-',
-      toDate: item.to_date ? new Date(item.to_date) : '-',
-      status:
-        item.is_approved === 1
-          ? 'Approved'
-          : item.is_approved === 0
-          ? 'Rejected'
-          : 'Pending',
-      is_active: item.is_active
-    }))
+      const formatted = results.map((item, idx) => ({
+        sno: idx + 1 + pagination.pageIndex * pagination.pageSize,
+        id: item.id,
+        employee: item.employee_name || '-',
+        supervisor: item.supervisor || '-',
+        leaveType: item.leave_type || '-',
+        fromDate: item.leave_date ? new Date(item.leave_date) : '-',
+        toDate: item.to_date ? new Date(item.to_date) : '-',
+        status: item.is_approved === 1 ? 'Approved' : item.is_approved === 0 ? 'Rejected' : 'Pending',
+        is_active: item.is_active
+      }))
 
-    setRows(formatted)
-    setRowCount(res?.data?.count || 0)
-  } catch (err) {
-    console.error(err)
-  } finally {
-    setLoading(false)
+      setRows(formatted)
+      setRowCount(res?.data?.count || 0)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
   }
-}
 
   const handleDrawerClose = () => {
     if (!isEdit) {
@@ -220,66 +215,66 @@ const loadData = async () => {
   }
 
   const handleSubmit = async e => {
-  e.preventDefault();
+    e.preventDefault()
 
-  if (!formData.employee_id || !formData.leaveType) {
-    showToast('warning', 'Employee and Leave Type are required');
-    return;
-  }
-
-  setLoading(true);
-  try {
-    const formatDate = d => {
-      if (!d) return null;
-      const x = new Date(d);
-      return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
-    };
-
-    const payload = {
-      id: formData.id || null,
-      employee_id: Number(formData.employee_id),
-      supervisor_id: formData.supervisor_id ? Number(formData.supervisor_id) : null,
-      leave_type_id: Number(formData.leaveType),
-      leave_date: formatDate(formData.leave_date),
-      to_date: formatDate(formData.to_date),
-      start_time: formData.start_time
-        ? `${formData.start_time.length === 5 ? formData.start_time + ':00' : formData.start_time}`
-        : '00:00:00',
-      end_time: formData.end_time
-        ? `${formData.end_time.length === 5 ? formData.end_time + ':00' : formData.end_time}`
-        : '00:00:00',
-      from_ampm: String(formData.from_ampm || 'AM').trim(),
-      to_ampm: String(formData.to_ampm || 'PM').trim(),
-      is_approved: formData.status === 'Approved' ? 1 : formData.status === 'Rejected' ? 0 : null,
-      is_active: 1,
-      status: 1,
-      created_by: 1,
-      updated_by: 1
-    };
-
-    console.log("🧾 Payload before submit:", payload);
-
-    if (isEdit && formData.id) {
-      await updateEmployeeLeave(payload);
-      showToast('success', 'Leave updated successfully');
-    } else {
-      await addEmployeeLeave(payload);
-      showToast('success', 'Leave added successfully');
+    if (!formData.employee_id || !formData.leaveType) {
+      showToast('warning', 'Employee and Leave Type are required')
+      return
     }
 
-    // 🔥 Order VERY important
-    resetForm();              // ✅ 1. Clear form
-    setUnsavedAddData(null);  // ✅ 2. Clear temp saved data
-    setDrawerOpen(false);     // ✅ 3. Close drawer
+    setLoading(true)
+    try {
+      const formatDate = d => {
+        if (!d) return null
+        const x = new Date(d)
+        return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+      }
 
-    await loadData();
-  } catch (err) {
-    console.error("❌ Error:", err);
-    showToast('error', 'Failed to save leave');
-  } finally {
-    setLoading(false);
+      const payload = {
+        id: formData.id || null,
+        employee_id: Number(formData.employee_id),
+        supervisor_id: formData.supervisor_id ? Number(formData.supervisor_id) : null,
+        leave_type_id: Number(formData.leaveType),
+        leave_date: formatDate(formData.leave_date),
+        to_date: formatDate(formData.to_date),
+        start_time: formData.start_time
+          ? `${formData.start_time.length === 5 ? formData.start_time + ':00' : formData.start_time}`
+          : '00:00:00',
+        end_time: formData.end_time
+          ? `${formData.end_time.length === 5 ? formData.end_time + ':00' : formData.end_time}`
+          : '00:00:00',
+        from_ampm: String(formData.from_ampm || 'AM').trim(),
+        to_ampm: String(formData.to_ampm || 'PM').trim(),
+        is_approved: formData.status === 'Approved' ? 1 : formData.status === 'Rejected' ? 0 : null,
+        is_active: 1,
+        status: 1,
+        created_by: 1,
+        updated_by: 1
+      }
+
+      console.log('🧾 Payload before submit:', payload)
+
+      if (isEdit && formData.id) {
+        await updateEmployeeLeave(payload)
+        showToast('success', 'Leave updated successfully')
+      } else {
+        await addEmployeeLeave(payload)
+        showToast('success', 'Leave added successfully')
+      }
+
+      // 🔥 Order VERY important
+      resetForm() // ✅ 1. Clear form
+      setUnsavedAddData(null) // ✅ 2. Clear temp saved data
+      setDrawerOpen(false) // ✅ 3. Close drawer
+
+      await loadData()
+    } catch (err) {
+      console.error('❌ Error:', err)
+      showToast('error', 'Failed to save leave')
+    } finally {
+      setLoading(false)
+    }
   }
-};
 
   const handleDateChange = (date, field) => {
     if (field === 'fromDate' && formData.toDate && date > formData.toDate) {
@@ -470,14 +465,14 @@ const loadData = async () => {
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
             <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
-              <EditIcon />
+              <i className='tabler-edit text-blue-600 text-lg' />
             </IconButton>
             <IconButton
               size='small'
               color='error'
               onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
             >
-              <DeleteIcon />
+              <i className='tabler-trash text-red-600 text-lg' />
             </IconButton>
           </Box>
         )

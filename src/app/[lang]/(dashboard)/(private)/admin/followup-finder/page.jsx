@@ -225,14 +225,14 @@ export default function FollowupFinderPage() {
       cell: info => (
         <Box sx={{ display: 'flex', gap: 1 }}>
           <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original.id)}>
-            <EditIcon />
+            <i className='tabler-edit text-blue-600 text-lg' />
           </IconButton>
           <IconButton
             size='small'
             color='error'
             onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
           >
-            <DeleteIcon />
+            <i className='tabler-trash text-red-600 text-lg' />
           </IconButton>
         </Box>
       )
@@ -341,7 +341,7 @@ export default function FollowupFinderPage() {
 
       <Card sx={{ p: 3 }}>
         <CardHeader
-         sx={{
+          sx={{
             pb: 1.5,
             pt: 1.5,
             '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },

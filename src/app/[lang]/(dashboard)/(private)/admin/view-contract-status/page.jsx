@@ -239,14 +239,40 @@ export default function ContractStatusPage() {
         enableSorting: false
       }),
       columnHelper.display({
-        id: 'actions',
+        id: 'actions_column',
         header: 'Actions',
-        cell: () => (
-          <IconButton size='small'>
-            <MoreVertIcon />
-          </IconButton>
-        ),
-        meta: { width: '80px', align: 'center' }
+        meta: { width: '120px', align: 'center' }, // 👈 FIXED WIDTH
+
+        cell: ({ row }) => {
+          const item = row.original
+
+          return (
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center', // 👈 PERFECT CENTER
+                gap: 1.5,
+                width: '100%'
+              }}
+            >
+              {/* 👁 VIEW */}
+              <IconButton size='small' sx={{ p: 0.8 }} onClick={() => router.push(`/admin/contracts/${item.id}/view`)}>
+                <i className='tabler-eye text-gray-600 text-[18px]' />
+              </IconButton>
+
+              {/* ✏ EDIT */}
+              <IconButton size='small' sx={{ p: 0.8 }} onClick={() => handleEdit(item)}>
+                <i className='tabler-edit text-blue-600 text-[18px]' />
+              </IconButton>
+
+              {/* 🗑 DELETE */}
+              <IconButton size='small' sx={{ p: 0.8 }} onClick={() => setDeleteDialog({ open: true, row: item })}>
+                <i className='tabler-trash text-red-600 text-[18px]' />
+              </IconButton>
+            </Box>
+          )
+        }
       }),
       columnHelper.accessor('customer', { header: 'Customer', meta: { width: '150px' } }),
       columnHelper.accessor('services', { header: 'Services', meta: { width: '160px' } }),

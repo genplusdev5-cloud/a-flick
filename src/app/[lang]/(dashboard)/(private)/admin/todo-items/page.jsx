@@ -146,19 +146,18 @@ export default function TodoItemsPage() {
   }
 
   useEffect(() => {
-  if (!drawerOpen) {
-    if (closeReason === "save" || closeReason === "cancel") {
-      // clear form
-      setFormData({
-        id: null,
-        title: "",
-        status: "Active"
-      })
+    if (!drawerOpen) {
+      if (closeReason === 'save' || closeReason === 'cancel') {
+        // clear form
+        setFormData({
+          id: null,
+          title: '',
+          status: 'Active'
+        })
+      }
+      // if manual close → DO NOTHING (keep data)
     }
-    // if manual close → DO NOTHING (keep data)
-  }
-}, [drawerOpen])
-
+  }, [drawerOpen])
 
   useEffect(() => {
     loadData()
@@ -166,24 +165,23 @@ export default function TodoItemsPage() {
 
   // Drawer
   const toggleDrawer = () => setDrawerOpen(p => !p)
-const handleAdd = () => {
-  // If closed manually (outside click), keep data
-  if (closeReason === null) {
-    // keep formData
-  } else {
-    // If save or cancel → clear form
-    setFormData({
-      id: null,
-      title: "",
-      status: "Active"
-    })
+  const handleAdd = () => {
+    // If closed manually (outside click), keep data
+    if (closeReason === null) {
+      // keep formData
+    } else {
+      // If save or cancel → clear form
+      setFormData({
+        id: null,
+        title: '',
+        status: 'Active'
+      })
+    }
+
+    setIsEdit(false)
+    setDrawerOpen(true)
+    setCloseReason(null) // reset after opening
   }
-
-  setIsEdit(false)
-  setDrawerOpen(true)
-  setCloseReason(null) // reset after opening
-}
-
 
   // 🔹 Handle field change + cache unsaved draft
   const handleFieldChange = (field, value) => {
@@ -244,11 +242,10 @@ const handleAdd = () => {
     }
   }
 
- const handleCancel = () => {
-  setCloseReason("cancel")   // mark CANCEL
-  setDrawerOpen(false)
-}
-
+  const handleCancel = () => {
+    setCloseReason('cancel') // mark CANCEL
+    setDrawerOpen(false)
+  }
 
   const handleSubmit = async e => {
     e.preventDefault()
@@ -310,14 +307,14 @@ const handleAdd = () => {
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
             <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
-              <EditIcon />
+              <i className='tabler-edit text-blue-600 text-lg' />
             </IconButton>
             <IconButton
               size='small'
               color='error'
               onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
             >
-              <DeleteIcon />
+              <i className='tabler-trash text-red-600 text-lg' />
             </IconButton>
           </Box>
         )

@@ -455,10 +455,10 @@ export default function AddMaterialRequestPage() {
                       <TableCell>{i + 1}</TableCell>
                       <TableCell>
                         <IconButton size='small' onClick={() => handleEditItem(i)}>
-                          <EditIcon />
+                          <i className='tabler-edit text-blue-600 text-lg' />
                         </IconButton>
                         <IconButton size='small' onClick={() => handleDeleteItem(i)}>
-                          <DeleteIcon color='error' />
+                          <i className='tabler-trash text-red-600 text-lg' />
                         </IconButton>
                       </TableCell>
                       <TableCell>{item.chemical}</TableCell>

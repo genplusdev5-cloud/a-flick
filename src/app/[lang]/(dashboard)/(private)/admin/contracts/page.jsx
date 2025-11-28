@@ -145,7 +145,7 @@ export default function ContractsPage() {
 
       const normalized = paginated.map((item, idx) => ({
         ...item,
-        uuid: item.uuid,  // Explicit add
+        uuid: item.uuid, // Explicit add
         sno: start + idx + 1,
         customer: item.customer_id || '',
         contractCode: item.contract_code || '',
@@ -242,12 +242,12 @@ export default function ContractsPage() {
               color='info'
               onClick={() => router.push(`/admin/contracts/${info.row.original.uuid}/view`)}
             >
-              <VisibilityIcon />
+              <i className='tabler-eye text-gray-600 text-lg' />
             </IconButton>
 
             {/* ✏️ Edit */}
             <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
-              <EditIcon />
+              <i className='tabler-edit text-blue-600 text-lg' />
             </IconButton>
 
             {/* 🗑️ Delete */}
@@ -256,7 +256,7 @@ export default function ContractsPage() {
               color='error'
               onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
             >
-              <DeleteIcon />
+              <i className='tabler-trash text-red-600 text-lg' />
             </IconButton>
           </Box>
         )

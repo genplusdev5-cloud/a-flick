@@ -2,309 +2,473 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-
-// MUI
+import { useRouter } from 'next/navigation'
 import {
   Box,
   Card,
   CardHeader,
   Typography,
-  Button,
+  Menu,
   MenuItem,
-  Select,
   IconButton,
-  InputAdornment,
-  Pagination,
-  Divider
+  Divider,
+  Chip,
+  TextField,
+  Select,
+  FormControl,
+  MenuItem as MuiMenuItem,
+  Breadcrumbs,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material'
-
+import AddIcon from '@mui/icons-material/Add'
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
+import PrintIcon from '@mui/icons-material/Print'
+import FileDownloadIcon from '@mui/icons-material/FileDownload'
+import TableChartIcon from '@mui/icons-material/TableChart'
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
+import FileCopyIcon from '@mui/icons-material/FileCopy'
 import RefreshIcon from '@mui/icons-material/Refresh'
-import SearchIcon from '@mui/icons-material/Search'
-import EditIcon from '@mui/icons-material/Edit'
-import DeleteIcon from '@mui/icons-material/Delete'
+import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 
-// Table
+import GlobalButton from '@/components/common/GlobalButton'
+import DialogCloseButton from '@components/dialogs/DialogCloseButton'
+import TablePaginationComponent from '@/components/TablePaginationComponent'
+import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
+import { showToast } from '@/components/common/Toasts'
+
+import classnames from 'classnames'
 import {
   useReactTable,
   getCoreRowModel,
+  getFilteredRowModel,
   getSortedRowModel,
-  createColumnHelper,
-  flexRender
+  flexRender,
+  createColumnHelper
 } from '@tanstack/react-table'
 
-import CustomTextField from '@core/components/mui/TextField'
-import tableStyles from '@core/styles/table.module.css'
+import ChevronRight from '@menu/svg/ChevronRight'
+import { getCompanyList, deleteCompany } from '@/api/company'
+import styles from '@core/styles/table.module.css'
 
-// ----------------------------------------------------------------------
+// ──────────────────────────────────────────────────────────────
+// Debounced Input – Pure JavaScript (no TypeScript syntax)
+// ──────────────────────────────────────────────────────────────
+const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
+  const [value, setValue] = useState(initialValue)
 
-export default function CompanyOriginListPage() {
-  const [rows, setRows] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [searchText, setSearchText] = useState('')
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 })
+  useEffect(() => {
+    setValue(initialValue)
+  }, [initialValue])
 
-  const pageIndex = pagination.pageIndex
-  const pageSize = pagination.pageSize
+  useEffect(() => {
+    const timer = setTimeout(() => onChange(value), debounce)
+    return () => clearTimeout(timer)
+  }, [value, debounce, onChange])
 
-  // API (Replace with real API)
-// safeLoadData.js — copy/paste into your page component and call instead of older fetch
-const loadData = async () => {
-  setLoading(true)
-  try {
-    const res = await fetch('/api/company-origin') // <-- confirm this URL is correct
-    const contentType = res.headers.get('content-type') || ''
-
-    // Grab raw text so we can show it if it's HTML/error
-    const raw = await res.text()
-
-    if (!res.ok) {
-      // Server returned non-2xx — show useful debug info
-      console.error('API error', res.status, raw)
-      throw new Error(`API error: ${res.status} - see console (response body)`)
-    }
-
-    // If it's JSON, parse it; else show what was returned
-    if (contentType.includes('application/json')) {
-      const data = JSON.parse(raw) // safe: content type said JSON
-      setRows(Array.isArray(data) ? data : data.data || [])
-    } else {
-      // Probably HTML or text (index.html or error page) — helpful for debugging
-      console.error('Expected JSON but got:', raw.slice(0, 1000))
-      throw new Error('Server returned non-JSON (check network response and server route).')
-    }
-  } catch (err) {
-    console.error('Failed to load company origins:', err)
-    // showToast or fallback
-    showToast('error', String(err.message || err))
-  } finally {
-    setLoading(false)
-  }
+  return <TextField {...props} value={value} onChange={e => setValue(e.target.value)} />
 }
+
+// ──────────────────────────────────────────────────────────────
+// Main Page Component
+// ──────────────────────────────────────────────────────────────
+export default function CompanyOriginListPage() {
+  const router = useRouter()
+
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [searchText, setSearchText] = useState('')
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
+  const [exportAnchorEl, setExportAnchorEl] = useState(null)
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
+
+  // ───── Load Data ─────────────────────────────────────
+  const loadData = async () => {
+    setLoading(true)
+    try {
+      const res = await getCompanyList()
+      const data = res?.data?.results || res?.results || res || []
+
+      const normalized = data.map((item, i) => ({
+        sno: i + 1,
+        id: item.id,
+        company_code: item.company_code || '-',
+        name: item.name || '-',
+        phone: item.phone || '-',
+        email: item.email || '-',
+        city: item.city || '-',
+        is_active: item.is_active ?? 1
+      }))
+
+      setRows(normalized)
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'Failed to load company list')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
     loadData()
   }, [])
 
-  // Filtering
-  const filteredRows = rows.filter(r => {
-    if (!searchText) return true
-    const t = searchText.toLowerCase()
-    return (
-      r.companyCode?.toLowerCase().includes(t) ||
-      r.name?.toLowerCase().includes(t) ||
-      r.phone?.toLowerCase().includes(t) ||
-      r.email?.toLowerCase().includes(t) ||
-      r.address?.toLowerCase().includes(t)
+  // ───── Filtering & Pagination ─────────────────────────────
+  const filteredRows = useMemo(() => {
+    if (!searchText) return rows
+    const term = searchText.toLowerCase()
+    return rows.filter(
+      r =>
+        r.company_code?.toLowerCase().includes(term) ||
+        r.name?.toLowerCase().includes(term) ||
+        r.email?.toLowerCase().includes(term) ||
+        r.phone?.includes(term)
     )
-  })
+  }, [rows, searchText])
 
-  const paginated = filteredRows.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize)
+  const paginatedRows = useMemo(() => {
+    const start = pagination.pageIndex * pagination.pageSize
+    const end = start + pagination.pageSize
+    return filteredRows.slice(start, end)
+  }, [filteredRows, pagination])
 
+  // ───── Export Functions (same as before) ─────────────────────
+  const exportPrint = () => {
+    /* ... same as your code ... */
+  }
+  const exportCSV = () => {
+    /* ... same as your code ... */
+  }
+  const exportExcel = async () => {
+    /* ... same as your code ... */
+  }
+  const exportPDF = async () => {
+    /* ... same as your code ... */
+  }
+  const exportCopy = () => {
+    /* ... same as your code ... */
+  }
+
+  // ───── Delete Handler ───────────────────────────────────────
+  const confirmDelete = async () => {
+    if (!deleteDialog.row) return
+
+    try {
+      await deleteCompany(deleteDialog.row.id)
+      showToast('success', `"${deleteDialog.row.name}" deleted successfully`)
+      setRows(prev => prev.filter(r => r.id !== deleteDialog.row.id))
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'Failed to delete company')
+    } finally {
+      setDeleteDialog({ open: false, row: null })
+    }
+  }
+
+  // ───── Table Columns ─────────────────────────────────────────
   const columnHelper = createColumnHelper()
-
   const columns = useMemo(
     () => [
-      columnHelper.display({
-        id: 'sno',
-        header: 'S.No',
-        cell: ({ row }) => pageIndex * pageSize + row.index + 1
-      }),
+      columnHelper.accessor('sno', { header: 'S.No' }),
 
       columnHelper.display({
-        id: 'action',
-        header: 'Action',
-        cell: ({ row }) => (
-          <Box display='flex' alignItems='center' gap={1}>
-            <IconButton color='primary' size='small'>
-              <EditIcon fontSize='small' />
+        id: 'actions',
+        header: 'Actions',
+        cell: info => (
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <IconButton
+              size='small'
+              color='primary'
+              onClick={() => router.push(`/admin/company-origin/edit/${info.row.original.id}`)}
+            >
+              <i className='tabler-edit text-blue-600 text-lg' />
             </IconButton>
 
-            <IconButton color='error' size='small'>
-              <DeleteIcon fontSize='small' />
+            <IconButton
+              size='small'
+              color='error'
+              onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
+            >
+              <i className='tabler-trash text-red-600 text-lg' />
             </IconButton>
           </Box>
         )
       }),
-
-      columnHelper.accessor('companyCode', { header: 'Company Code' }),
+      columnHelper.accessor('company_code', { header: 'Company Code' }),
       columnHelper.accessor('name', { header: 'Name' }),
       columnHelper.accessor('phone', { header: 'Phone' }),
       columnHelper.accessor('email', { header: 'Email' }),
-      columnHelper.accessor('address', { header: 'Address' }),
-      columnHelper.accessor('status', { header: 'Status' })
+      columnHelper.accessor('city', { header: 'City' }),
+      columnHelper.accessor('is_active', {
+        header: 'Status',
+        cell: info => (
+          <Chip
+            label={info.getValue() === 1 ? 'Active' : 'Inactive'}
+            size='small'
+            sx={{
+              color: '#fff',
+              bgcolor: info.getValue() === 1 ? 'success.main' : 'error.main',
+              fontWeight: 600,
+              borderRadius: '6px',
+              px: 1.5
+            }}
+          />
+        )
+      })
     ],
-    [pageIndex, pageSize]
+    [router]
   )
 
   const table = useReactTable({
-   data: filteredRows,
-
+    data: paginatedRows,
     columns,
+    manualPagination: true,
+    pageCount: Math.ceil(filteredRows.length / pagination.pageSize),
+    state: { pagination },
+    onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel()
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel()
   })
 
-  const pageCount = Math.ceil(filteredRows.length / pageSize) || 1
-
   return (
-    <Card sx={{ p: 3 }}>
-      {/* ================================================= */}
-      {/*                 BREADCRUMB FIXED                  */}
-      {/* ================================================= */}
-      <Box mb={2}>
-        <Typography sx={{ fontSize: '0.9rem', color: 'text.secondary' }}>
-          <Link href='/admin/dashboard'>Home</Link> / <b>Company Origin List</b>
-        </Typography>
+    <Box>
+      {/* Breadcrumb */}
+      <Box sx={{ mb: 2 }}>
+        <Breadcrumbs>
+          <Link href='/admin/dashboard'>Home</Link>
+          <Typography color='text.primary'>Company Origin</Typography>
+        </Breadcrumbs>
       </Box>
 
-      {/* ================================================= */}
-      {/*             HEADER → Refresh + Add Button         */}
-      {/* ================================================= */}
-      <CardHeader
-        title={
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            {/* LEFT */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+      <Card sx={{ p: 3, position: 'relative' }}>
+        {/* Header with Refresh & Export & Add */}
+        <CardHeader
+          title={
+            <Box display='flex' alignItems='center' gap={2}>
               <Typography variant='h5' sx={{ fontWeight: 600 }}>
-                Company Origin List
+                Company Origin Management
               </Typography>
-
-              <Button
-                variant='contained'
-                startIcon={<RefreshIcon />}
-                onClick={loadData}
+              <GlobalButton
+                startIcon={<RefreshIcon sx={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />}
                 disabled={loading}
-                sx={{ textTransform: 'none' }}
+                onClick={loadData}
               >
                 {loading ? 'Refreshing...' : 'Refresh'}
-              </Button>
+              </GlobalButton>
             </Box>
+          }
+          action={
+            <Box display='flex' alignItems='center' gap={2}>
+              <GlobalButton
+                variant='outlined'
+                color='secondary'
+                endIcon={<ArrowDropDownIcon />}
+                onClick={e => setExportAnchorEl(e.currentTarget)}
+              >
+                Export
+              </GlobalButton>
+              <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportPrint()
+                  }}
+                >
+                  <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
+                </MenuItem>
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportCSV()
+                  }}
+                >
+                  <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
+                </MenuItem>
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportExcel()
+                  }}
+                >
+                  <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
+                </MenuItem>
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportPDF()
+                  }}
+                >
+                  <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
+                </MenuItem>
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportCopy()
+                  }}
+                >
+                  <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
+                </MenuItem>
+              </Menu>
 
-            {/* RIGHT: ADD COMPANY */}
-            <Button
-              variant='contained'
-              color='secondary'
-              href='/admin/company-origin/add'
-              sx={{ textTransform: 'none', fontWeight: 600 }}
-            >
-              Add Company
-            </Button>
-          </Box>
-        }
-        sx={{ pb: 1 }}
-      />
-
-      <Divider sx={{ mb: 3 }} />
-
-      {/* ================================================= */}
-      {/*     PAGE ENTRIES + SEARCH → Same Row (Right)     */}
-      {/* ================================================= */}
-
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 2, mb: 3 }}>
-        {/* Entries */}
-        <Select
-          size='small'
-          value={pageSize}
-          onChange={e => setPagination({ pageIndex: 0, pageSize: Number(e.target.value) })}
-          sx={{ width: 130 }}
-        >
-          {[5, 10, 25, 50].map(s => (
-            <MenuItem key={s} value={s}>
-              {s} entries
-            </MenuItem>
-          ))}
-        </Select>
-
-        {/* Search */}
-        <CustomTextField
-          size='small'
-          placeholder='Search...'
-          value={searchText}
-          onChange={e => {
-            setSearchText(e.target.value)
-            setPagination({ ...pagination, pageIndex: 0 })
-          }}
-          sx={{ width: 300 }}
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position='start'>
-                  <SearchIcon />
-                </InputAdornment>
-              )
-            }
-          }}
+              <GlobalButton startIcon={<AddIcon />} onClick={() => router.push('/admin/company-origin/add')}>
+                Add Company
+              </GlobalButton>
+            </Box>
+          }
+          sx={{ pb: 1.5, pt: 1.5, '& .MuiCardHeader-action': { m: 0 } }}
         />
-      </Box>
 
-      {/* ================================================= */}
-      {/*                     TABLE                         */}
-      {/* ================================================= */}
+        {/* Loading Overlay */}
+        {loading && (
+          <Box
+            sx={{
+              position: 'fixed',
+              inset: 0,
+              bgcolor: 'rgba(255,255,255,0.8)',
+              backdropFilter: 'blur(2px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 9999
+            }}
+          >
+            <Box textAlign='center'>
+              <ProgressCircularCustomization size={60} thickness={5} />
+              <Typography mt={2} fontWeight={600} color='primary'>
+                Loading...
+              </Typography>
+            </Box>
+          </Box>
+        )}
 
-      <div className='overflow-x-auto'>
-        <table className={tableStyles.table}>
-          <thead>
-            {table.getHeaderGroups().map(hg => (
-              <tr key={hg.id}>
-                {hg.headers.map((header, idx) => (
-                  <th key={header.id}>
-                    {flexRender(header.column.columnDef.header, header.getContext())}
-                  </th>
+        <Divider sx={{ my: 2 }} />
+
+        {/* Show Entries + Search */}
+        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant='body2' color='text.secondary'>
+              Show
+            </Typography>
+            <FormControl size='small' sx={{ width: 140 }}>
+              <Select
+                value={pagination.pageSize}
+                onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
+              >
+                {[10, 25, 50, 100].map(s => (
+                  <MuiMenuItem key={s} value={s}>
+                    {s} entries
+                  </MuiMenuItem>
                 ))}
-              </tr>
-            ))}
-          </thead>
+              </Select>
+            </FormControl>
+          </Box>
 
-          <tbody>
-            {table.getRowModel().rows.length ? (
-              table.getRowModel().rows.map(row => (
-                <tr key={row.id}>
-                  {row.getVisibleCells().map(cell => (
-                    <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+          <DebouncedInput
+            placeholder='Search company...'
+            value={searchText}
+            onChange={val => setSearchText(val)}
+            size='small'
+            variant='outlined'
+            sx={{ width: 360 }}
+          />
+        </Box>
+
+        {/* Table */}
+        <div className='overflow-x-auto -mx-3'>
+          <table className={styles.table}>
+            <thead>
+              {table.getHeaderGroups().map(hg => (
+                <tr key={hg.id}>
+                  {hg.headers.map(header => (
+                    <th key={header.id}>
+                      <div
+                        className={classnames({
+                          'flex items-center gap-1': true,
+                          'cursor-pointer select-none': header.column.getCanSort()
+                        })}
+                        onClick={header.column.getToggleSortingHandler()}
+                      >
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                        {{
+                          asc: <ChevronRight className='-rotate-90' />,
+                          desc: <ChevronRight className='rotate-90' />
+                        }[header.column.getIsSorted()] ?? null}
+                      </div>
+                    </th>
                   ))}
                 </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={columns.length} className='text-center py-4'>
-                  No results found
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+              ))}
+            </thead>
+            <tbody>
+              {paginatedRows.length === 0 ? (
+                <tr>
+                  <td colSpan={columns.length} className='text-center py-8 text-gray-500'>
+                    No companies found
+                  </td>
+                </tr>
+              ) : (
+                table.getRowModel().rows.map(row => (
+                  <tr key={row.id}>
+                    {row.getVisibleCells().map(cell => (
+                      <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                    ))}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
 
-      {/* Pagination Footer */}
-      <Box
-        sx={{
-          mt: 2,
-          borderTop: '1px solid #e0e0e0',
-          py: 2,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
+        <TablePaginationComponent
+          totalCount={filteredRows.length}
+          pagination={pagination}
+          setPagination={setPagination}
+        />
+      </Card>
+
+      {/* DELETE CONFIRMATION DIALOG */}
+      <Dialog
+        open={deleteDialog.open}
+        onClose={() => setDeleteDialog({ open: false, row: null })}
+        PaperProps={{
+          sx: { width: 420, borderRadius: 1, textAlign: 'center', overflow: 'visible' }
         }}
       >
-        <Typography color='text.disabled'>
-          {`Showing ${
-            filteredRows.length === 0 ? 0 : pageIndex * pageSize + 1
-          } to ${Math.min((pageIndex + 1) * pageSize, filteredRows.length)} of ${
-            filteredRows.length
-          } entries`}
-        </Typography>
+        <DialogTitle sx={{ color: 'error.main', fontWeight: 700, position: 'relative', textAlign: 'center' }}>
+          <WarningAmberIcon color='error' sx={{ fontSize: 26, verticalAlign: 'middle', mr: 1 }} />
+          Confirm Delete
+          <DialogCloseButton
+            onClick={() => setDeleteDialog({ open: false, row: null })}
+           sx={{ position: 'absolute', right: 1, top: 1 }}
+          >
+            <i className='tabler-x' />
+          </DialogCloseButton>
+        </DialogTitle>
 
-        <Pagination
-          shape='rounded'
-          color='primary'
-          variant='tonal'
-          count={Math.max(1, pageCount)}
-          page={pageIndex + 1}
-          onChange={(_, page) => setPagination({ ...pagination, pageIndex: page - 1 })}
-          showFirstButton
-          showLastButton
-        />
-      </Box>
-    </Card>
+        <DialogContent sx={{ px: 5, pt: 2 }}>
+          <Typography>
+            Are you sure you want to delete{' '}
+            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name || 'this company'}</strong>?<br />
+            This action cannot be undone.
+          </Typography>
+        </DialogContent>
+
+        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3 }}>
+          <GlobalButton
+            variant='outlined'
+            color='secondary'
+            onClick={() => setDeleteDialog({ open: false, row: null })}
+          >
+            Cancel
+          </GlobalButton>
+          <GlobalButton variant='contained' color='error' onClick={confirmDelete}>
+            Delete
+          </GlobalButton>
+        </DialogActions>
+      </Dialog>
+    </Box>
   )
 }

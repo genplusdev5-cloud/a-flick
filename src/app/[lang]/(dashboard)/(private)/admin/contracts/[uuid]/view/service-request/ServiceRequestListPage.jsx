@@ -170,82 +170,76 @@ export default function ServiceRequestListPage() {
   const handleCloseDrawer = () => setDrawerOpen(false)
 
   // Columns
- const columns = [
-  { id: 'sno', header: 'ID' },
+  const columns = [
+    { id: 'sno', header: 'ID' },
 
-  {
-    id: 'actions',
-    header: 'Action',
-    cell: row => (
-      <Box sx={{ display: 'flex', gap: 1 }}>
-        <IconButton size='small' color='info'>
-          <VisibilityIcon />
-        </IconButton>
+    {
+      id: 'actions',
+      header: 'Action',
+      cell: row => (
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <IconButton size='small' color='info'>
+            <i className='tabler-eye text-gray-600 text-lg' />
+          </IconButton>
 
-        <IconButton size='small' color='primary' onClick={() => handleOpenEdit(row)}>
-          <EditIcon />
-        </IconButton>
+          <IconButton size='small' color='primary' onClick={() => handleOpenEdit(row)}>
+            <i className='tabler-edit text-blue-600 text-lg' />
+          </IconButton>
 
-        <IconButton size='small' color='error' onClick={() => handleDelete(row.id)}>
-          <DeleteIcon />
-        </IconButton>
-      </Box>
-    )
-  },
+          <IconButton size='small' color='error' onClick={() => handleDelete(row.id)}>
+            <i className='tabler-trash text-red-600 text-lg' />
+          </IconButton>
+        </Box>
+      )
+    },
 
-  { id: 'ticketNo', header: 'Ticket No' },
-  { id: 'scheduleDate', header: 'Schedule Date' },
-  { id: 'day', header: 'Day' },
-  { id: 'appointmentIn', header: 'Appointment In' },
-  { id: 'appointmentOut', header: 'Appointment Out' },
-  { id: 'pestCode', header: 'Pest Code' },
-  { id: 'technician', header: 'Technician' },
-  { id: 'prodVal', header: 'Prod. Val', cell: r => `₹ ${r.prodVal}` },
-  { id: 'customer', header: 'Customer ID' },
-  { id: 'serviceAddress', header: 'Service Address' },
-  { id: 'postalCode', header: 'Postal Code' },
-  { id: 'contactPerson', header: 'Contact Person' },
-  { id: 'phone', header: 'Phone' },
-  { id: 'contractCode', header: 'Contract Code' },
-  { id: 'remarks', header: 'Remarks' },
-  { id: 'serviceType', header: 'Service Type' },
+    { id: 'ticketNo', header: 'Ticket No' },
+    { id: 'scheduleDate', header: 'Schedule Date' },
+    { id: 'day', header: 'Day' },
+    { id: 'appointmentIn', header: 'Appointment In' },
+    { id: 'appointmentOut', header: 'Appointment Out' },
+    { id: 'pestCode', header: 'Pest Code' },
+    { id: 'technician', header: 'Technician' },
+    { id: 'prodVal', header: 'Prod. Val', cell: r => `₹ ${r.prodVal}` },
+    { id: 'customer', header: 'Customer ID' },
+    { id: 'serviceAddress', header: 'Service Address' },
+    { id: 'postalCode', header: 'Postal Code' },
+    { id: 'contactPerson', header: 'Contact Person' },
+    { id: 'phone', header: 'Phone' },
+    { id: 'contractCode', header: 'Contract Code' },
+    { id: 'remarks', header: 'Remarks' },
+    { id: 'serviceType', header: 'Service Type' },
 
-  {
-    id: 'scheduleStatus',
-    header: 'Schedule Status',
-    cell: row => (
-      <Chip
-        label={row.scheduleStatus}
-        size='small'
-        color={row.scheduleStatus === 'Pending' ? 'warning' : 'success'}
-      />
-    )
-  },
+    {
+      id: 'scheduleStatus',
+      header: 'Schedule Status',
+      cell: row => (
+        <Chip
+          label={row.scheduleStatus}
+          size='small'
+          color={row.scheduleStatus === 'Pending' ? 'warning' : 'success'}
+        />
+      )
+    },
 
-  {
-    id: 'appointmentStatus',
-    header: 'Appointment Status',
-    cell: row => (
-      <Chip
-        label={row.appointmentStatus}
-        size='small'
-        color={row.appointmentStatus === 'Done' ? 'success' : 'warning'}
-      />
-    )
-  },
+    {
+      id: 'appointmentStatus',
+      header: 'Appointment Status',
+      cell: row => (
+        <Chip
+          label={row.appointmentStatus}
+          size='small'
+          color={row.appointmentStatus === 'Done' ? 'success' : 'warning'}
+        />
+      )
+    },
 
-  {
-    id: 'status',
-    header: 'Status',
-    cell: row => (
-      <Chip
-        label={row.status}
-        size='small'
-        color={row.status === 'Active' ? 'success' : 'default'}
-      />
-    )
-  }
-];
+    {
+      id: 'status',
+      header: 'Status',
+      cell: row => <Chip label={row.status} size='small' color={row.status === 'Active' ? 'success' : 'default'} />
+    }
+  ]
 
   // Filter
   const filtered = rows.filter(r => JSON.stringify(r).toLowerCase().includes(searchText.toLowerCase()))

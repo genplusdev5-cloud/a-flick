@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Grid,
   Card,
@@ -25,53 +25,77 @@ import CustomTextField from '@core/components/mui/TextField'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import { Autocomplete } from '@mui/material'
 
-import { addCompany } from '@/api/company' // un API import
+import { getCompanyDetails, updateCompany } from '@/api/company'
+import { useParams, useRouter } from 'next/navigation'
 import { showToast } from '@/components/common/Toasts'
-import { useRouter } from 'next/navigation'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-const initialCompanyFormData = {
-  companyCode: '',
-  companyName: '',
-  phone: '',
-  email: '',
-  taxNumber: '',
-  addressLine1: '',
-  addressLine2: '',
-  city: '',
-  glContractAccount: '',
-  glJobAccount: '',
-  glContJobAccount: '',
-  glWarrantyAccount: '',
-  uenNumber: '',
-  gstNumber: '',
-  invoicePrefixCode: '',
-  invoiceStartNumber: '',
-  contractPrefixCode: '',
-  status: 'Active',
-  bankName: '',
-  bankAccountNumber: '',
-  bankCode: '',
-  swiftCode: '',
-  accountingDate: null,
-  uploadedFileName: '',
-  uploadedFileURL: ''
-}
-
-export default function CompanyOriginAddPage() {
-  const router = useRouter()
+export default function CompanyOriginEditPage() {
   const fileInputRef = useRef(null)
+  const { id } = useParams()
+  const router = useRouter()
 
-  const [formData, setFormData] = useState(initialCompanyFormData)
-  const [selectedFile, setSelectedFile] = useState(null)
+  const [formData, setFormData] = useState(null)
+  const [selectedFile, setSelectedFile] = useState(null) // actual File object
+  const [previewUrl, setPreviewUrl] = useState('') // for preview
   const [openDialog, setOpenDialog] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [taxNumberOpen, setTaxNumberOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
 
   const taxNumberOptions = ['TN-001', 'TN-002', 'TN-003', 'Others']
 
-  // Input Handlers
+  // FETCH COMPANY ON MOUNT
+  useEffect(() => {
+    if (id) loadCompany()
+  }, [id])
+
+  const loadCompany = async () => {
+    if (!id) return
+    setLoading(true)
+    try {
+      const res = await getCompanyDetails(id)
+      const data = res.data || res
+
+      setFormData({
+        companyCode: data.company_code || '',
+        companyName: data.name || '',
+        phone: data.phone || '',
+        email: data.email || '',
+        taxNumber: data.tax_id || '',
+        addressLine1: data.address_line_1 || '',
+        addressLine2: data.address_line_2 || '',
+        city: data.city || '',
+        glContractAccount: data.gl_contract || '',
+        glJobAccount: data.gl_job || '',
+        glContJobAccount: data.gl_continuous_job || '',
+        glWarrantyAccount: data.gl_warranty || '',
+        uenNumber: data.uen_number || '',
+        gstNumber: data.gst_number || '',
+        invoicePrefixCode: data.invoice_prefix || '',
+        invoiceStartNumber: data.invoice_start_number || '',
+        contractPrefixCode: data.contract_prefix || '',
+        status: data.is_active === 1 ? 'Active' : 'Inactive',
+        bankName: data.bank_name || '',
+        bankAccountNumber: data.bank_account || '',
+        bankCode: data.bank_code || '',
+        swiftCode: data.swift_code || '',
+        accountingDate: data.bill_start_date ? new Date(data.bill_start_date) : null
+      })
+
+      // Existing logo preview
+      if (data.logo) {
+        setPreviewUrl(data.logo)
+      }
+    } catch (err) {
+      showToast('error', 'Failed to load company details')
+      router.push('/admin/company-origin')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // HANDLERS
   const handleChange = e => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
@@ -103,105 +127,87 @@ export default function CompanyOriginAddPage() {
     setFormData(prev => ({ ...prev, accountingDate: date }))
   }
 
-  // File Upload
   const handleFileChange = e => {
     const file = e.target.files[0]
     if (!file) return
 
-    // Optional: Validate file type & size
     if (!file.type.startsWith('image/')) {
-      showToast('error', 'Please upload an image file')
+      showToast('error', 'Please upload a valid image')
       return
     }
     if (file.size > 5 * 1024 * 1024) {
-      showToast('error', 'Image size should be less than 5MB')
+      showToast('error', 'Image must be under 5MB')
       return
     }
 
-    const fileURL = URL.createObjectURL(file)
     setSelectedFile(file)
-    setFormData(prev => ({
-      ...prev,
-      uploadedFileName: file.name,
-      uploadedFileURL: fileURL
-    }))
+    const url = URL.createObjectURL(file)
+    setPreviewUrl(url)
   }
 
-  const handleViewLogo = () => setOpenDialog(true)
-  const handleCloseDialog = () => setOpenDialog(false)
-
-  // Refresh Form
-  const handleRefresh = () => {
-    setLoading(true)
-    setTimeout(() => {
-      setFormData(initialCompanyFormData)
-      setSelectedFile(null)
-      if (fileInputRef.current) fileInputRef.current.value = ''
-      setLoading(false)
-      showToast('info', 'Form cleared')
-    }, 600)
-  }
-
-  // Save Company - API Call
+  // SAVE / UPDATE
   const handleSave = async () => {
-    // Basic Validation
-    if (!formData.companyCode.trim()) return showToast('warning', 'Company Code is required')
-    if (!formData.companyName.trim()) return showToast('warning', 'Company Name is required')
-    if (!formData.email.trim()) return showToast('warning', 'Email is required')
-    if (formData.email && !EMAIL_REGEX.test(formData.email)) return showToast('warning', 'Enter valid email')
-    if (!formData.phone.trim()) return showToast('warning', 'Phone is required')
+    if (!formData.companyCode.trim()) return showToast('warning', 'Company Code required')
+    if (!formData.companyName.trim()) return showToast('warning', 'Company Name required')
+    if (!formData.email.trim()) return showToast('warning', 'Email required')
+    if (formData.email && !EMAIL_REGEX.test(formData.email)) return showToast('warning', 'Invalid email')
 
-    setLoading(true)
-
+    setSaving(true)
     try {
       const payload = new FormData()
 
-      // Append all text fields
+      // Text fields
       payload.append('company_code', formData.companyCode.trim())
       payload.append('name', formData.companyName.trim())
-      payload.append('phone', formData.phone.replace(/\s+/g, ''))
+      payload.append('phone', formData.phone.replace(/\s/g, ''))
       payload.append('email', formData.email.trim())
-      payload.append('tax_number', formData.taxNumber || '')
-      payload.append('address_line1', formData.addressLine1.trim())
-      payload.append('address_line2', formData.addressLine2.trim())
-      payload.append('city', formData.city.trim())
-      payload.append('gl_contract_account', formData.glContractAccount)
-      payload.append('gl_job_account', formData.glJobAccount)
-      payload.append('gl_cont_job_account', formData.glContJobAccount)
-      payload.append('gl_warranty_account', formData.glWarrantyAccount)
+      payload.append('tax_id', formData.taxNumber || '')
+      payload.append('address_line_1', formData.addressLine1)
+      payload.append('address_line_2', formData.addressLine2)
+      payload.append('city', formData.city)
+      payload.append('gl_contract', formData.glContractAccount)
+      payload.append('gl_job', formData.glJobAccount)
+      payload.append('gl_continuous_job', formData.glContJobAccount)
+      payload.append('gl_warranty', formData.glWarrantyAccount)
       payload.append('uen_number', formData.uenNumber)
       payload.append('gst_number', formData.gstNumber)
-      payload.append('invoice_prefix_code', formData.invoicePrefixCode)
+      payload.append('invoice_prefix', formData.invoicePrefixCode)
       payload.append('invoice_start_number', formData.invoiceStartNumber || '1')
-      payload.append('contract_prefix_code', formData.contractPrefixCode)
-      payload.append('status', formData.status === 'Active' ? 1 : 0)
+      payload.append('contract_prefix', formData.contractPrefixCode)
+      payload.append('is_active', formData.status === 'Active' ? 1 : 0)
       payload.append('bank_name', formData.bankName)
-      payload.append('bank_account_number', formData.bankAccountNumber)
+      payload.append('bank_account', formData.bankAccountNumber)
       payload.append('bank_code', formData.bankCode)
       payload.append('swift_code', formData.swiftCode)
 
       if (formData.accountingDate) {
-        const formattedDate = formData.accountingDate.toISOString().split('T')[0] // YYYY-MM-DD
-        payload.append('accounting_date', formattedDate)
+        payload.append('bill_start_date', formData.accountingDate.toISOString().split('T')[0])
       }
 
-      // Append logo if uploaded
-      // Append logo if uploaded - CORRECT WAY
+      // Only append logo if user selected a new one
       if (selectedFile) {
-        payload.append('company_logo', selectedFile) // 99% idhu work aagum
+        payload.append('logo', selectedFile) // backend field name
+        // OR try: payload.append('company_logo', selectedFile) if above fails
       }
 
-      const response = await addCompany(payload)
+      await updateCompany(id, payload)
 
-      showToast('success', 'Company added successfully!')
-      router.push('/admin/company-origin') // redirect to list page
+      showToast('success', 'Company updated successfully!')
+      router.push('/admin/company-origin')
     } catch (err) {
-      console.error('Add Company Error:', err)
-      const msg = err.response?.data?.message || err.message || 'Failed to add company'
+      const msg = err.response?.data?.message || err.response?.data?.error?.logo?.[0] || 'Update failed'
       showToast('error', msg)
     } finally {
-      setLoading(false)
+      setSaving(false)
     }
+  }
+
+  if (loading) {
+    return (
+      <Box display='flex' justifyContent='center' alignItems='center' minHeight='70vh'>
+        <CircularProgress />
+      </Box>
+    )
   }
 
   return (
@@ -219,51 +225,47 @@ export default function CompanyOriginAddPage() {
           >
             Company Origin
           </Typography>
-          <Typography color='text.primary'>Add Company</Typography>
+          <Typography color='text.primary'>Edit Company</Typography>
         </Breadcrumbs>
       </Box>
 
       <Card sx={{ p: { xs: 4, md: 6 }, borderRadius: 2, boxShadow: 3 }}>
-        {/* Header */}
         <Box display='flex' justifyContent='space-between' alignItems='center' mb={5}>
           <Typography variant='h5' fontWeight={600}>
-            Add Company Origin
+            Edit Company Origin
           </Typography>
-
           <Button
             variant='contained'
-            color='error'
-            startIcon={loading ? <CircularProgress size={20} color='inherit' /> : <RefreshIcon />}
-            onClick={handleRefresh}
-            disabled={loading}
+            color='secondary'
+            startIcon={<RefreshIcon />}
+            onClick={loadCompany}
+            disabled={saving}
           >
             Refresh
           </Button>
         </Box>
 
         <Grid container spacing={5}>
-          {/* Basic Info */}
-          <Grid item xs={12} sm={6} md={3}>
+          {/* All Fields - Same as Add Page */}
+          <Grid item xs={12} md={3}>
             <CustomTextField
               fullWidth
-              label='Company Code *'
+              label='Code *'
               name='companyCode'
               value={formData.companyCode}
               onChange={handleChange}
-              disabled={loading}
             />
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} md={3}>
             <CustomTextField
               fullWidth
-              label='Company Name *'
+              label='Name *'
               name='companyName'
               value={formData.companyName}
               onChange={handleCompanyNameChange}
-              disabled={loading}
             />
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} md={3}>
             <CustomTextField
               fullWidth
               label='Phone *'
@@ -271,10 +273,9 @@ export default function CompanyOriginAddPage() {
               value={formData.phone}
               onChange={handlePhoneChange}
               placeholder='12345 67890'
-              disabled={loading}
             />
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} md={3}>
             <CustomTextField
               fullWidth
               label='Email *'
@@ -283,18 +284,15 @@ export default function CompanyOriginAddPage() {
               onChange={handleChange}
               error={formData.email && !EMAIL_REGEX.test(formData.email)}
               helperText={formData.email && !EMAIL_REGEX.test(formData.email) ? 'Invalid email' : ''}
-              disabled={loading}
             />
           </Grid>
 
-          {/* Tax Number */}
           <Grid item xs={12} md={3}>
             <Autocomplete
               options={taxNumberOptions}
               value={formData.taxNumber || null}
-              onChange={(e, val) => setFormData(prev => ({ ...prev, taxNumber: val || '' }))}
+              onChange={(e, v) => setFormData(prev => ({ ...prev, taxNumber: v || '' }))}
               renderInput={params => <CustomTextField {...params} label='Tax Number' />}
-              disabled={loading}
             />
           </Grid>
 
@@ -321,65 +319,55 @@ export default function CompanyOriginAddPage() {
             <CustomTextField fullWidth label='City' name='city' value={formData.city} onChange={handleCityChange} />
           </Grid>
 
-          {/* GL Accounts */}
-          {['glContractAccount', 'glJobAccount', 'glContJobAccount', 'glWarrantyAccount'].map(field => (
-            <Grid item xs={12} md={3} key={field}>
+          {/* GL Fields */}
+          {['glContractAccount', 'glJobAccount', 'glContJobAccount', 'glWarrantyAccount'].map(f => (
+            <Grid item xs={12} md={3} key={f}>
               <CustomTextField
                 fullWidth
-                label={field.replace(/([A-Z])/g, ' $1').trim()}
-                name={field}
-                value={formData[field]}
+                label={f.replace(/([A-Z])/g, ' $1').trim()}
+                name={f}
+                value={formData[f]}
                 onChange={handleChange}
               />
             </Grid>
           ))}
 
           {/* Other Fields */}
-          {[
-            { name: 'uenNumber', label: 'UEN Number' },
-            { name: 'gstNumber', label: 'GST Reg. Number' },
-            { name: 'invoicePrefixCode', label: 'Invoice Prefix' },
-            { name: 'invoiceStartNumber', label: 'Invoice Start No.', type: 'number' },
-            { name: 'contractPrefixCode', label: 'Contract Prefix' }
-          ].map(f => (
-            <Grid item xs={12} md={3} key={f.name}>
+          {['uenNumber', 'gstNumber', 'invoicePrefixCode', 'invoiceStartNumber', 'contractPrefixCode'].map(f => (
+            <Grid item xs={12} md={3} key={f}>
               <CustomTextField
                 fullWidth
-                label={f.label}
-                name={f.name}
-                value={formData[f.name]}
-                onChange={f.name === 'invoiceStartNumber' ? handleInvoiceStartNumberChange : handleChange}
+                label={f === 'invoiceStartNumber' ? 'Invoice Start No.' : f.replace(/([A-Z])/g, ' $1').trim()}
+                name={f}
+                value={formData[f]}
+                onChange={f === 'invoiceStartNumber' ? handleInvoiceStartNumberChange : handleChange}
               />
             </Grid>
           ))}
 
-          {/* Bank Details */}
-          {['bankName', 'bankAccountNumber', 'bankCode', 'swiftCode'].map(field => (
-            <Grid item xs={12} md={3} key={field}>
+          {/* Bank */}
+          {['bankName', 'bankAccountNumber', 'bankCode', 'swiftCode'].map(f => (
+            <Grid item xs={12} md={3} key={f}>
               <CustomTextField
                 fullWidth
-                label={field.replace(/([A-Z])/g, ' $1').trim()}
-                name={field}
-                value={formData[field]}
+                label={f.replace(/([A-Z])/g, ' $1').trim()}
+                name={f}
+                value={formData[f]}
                 onChange={handleChange}
               />
             </Grid>
           ))}
 
-          {/* Date & Status */}
           <Grid item xs={12} md={3}>
             <AppReactDatepicker
               selected={formData.accountingDate}
               onChange={handleDateChange}
               dateFormat='dd/MM/yyyy'
-              placeholderText='DD/MM/YYYY'
               customInput={
                 <CustomTextField
                   fullWidth
                   label='Accounting Date'
-                  InputProps={{
-                    startAdornment: <CalendarTodayIcon />
-                  }}
+                  InputProps={{ startAdornment: <CalendarTodayIcon /> }}
                 />
               }
             />
@@ -399,7 +387,7 @@ export default function CompanyOriginAddPage() {
             </CustomTextField>
           </Grid>
 
-          {/* Logo Upload */}
+          {/* Logo */}
           <Grid item xs={12} md={6}>
             <Typography variant='body2' fontWeight={500} mb={1}>
               Company Logo
@@ -412,11 +400,11 @@ export default function CompanyOriginAddPage() {
                 onChange={handleFileChange}
                 accept='image/*'
               />
-              <Button variant='outlined' onClick={() => fileInputRef.current?.click()} fullWidth disabled={loading}>
-                {selectedFile ? selectedFile.name : 'Choose Logo'}
+              <Button variant='outlined' onClick={() => fileInputRef.current?.click()} fullWidth>
+                {selectedFile ? selectedFile.name : previewUrl ? 'Change Logo' : 'Choose Logo'}
               </Button>
-              {selectedFile && (
-                <IconButton color='primary' onClick={handleViewLogo}>
+              {previewUrl && (
+                <IconButton color='primary' onClick={() => setOpenDialog(true)}>
                   <VisibilityIcon />
                 </IconButton>
               )}
@@ -424,37 +412,31 @@ export default function CompanyOriginAddPage() {
           </Grid>
         </Grid>
 
-        {/* Action Buttons */}
         <Box mt={6} display='flex' justifyContent='flex-end' gap={2}>
-          <Button
-            variant='outlined'
-            onClick={handleRefresh}
-            disabled={loading}
-            startIcon={loading ? <CircularProgress size={20} /> : null}
-          >
+          <Button variant='outlined' onClick={loadCompany} disabled={saving}>
             Cancel
           </Button>
           <Button
             variant='contained'
             onClick={handleSave}
-            disabled={loading}
-            startIcon={loading ? <CircularProgress size={20} color='inherit' /> : null}
+            disabled={saving}
+            startIcon={saving ? <CircularProgress size={20} color='inherit' /> : null}
           >
-            {loading ? 'Saving...' : 'Save Company'}
+            {saving ? 'Updating...' : 'Update Company'}
           </Button>
         </Box>
       </Card>
 
-      {/* Logo Preview Dialog */}
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth='sm' fullWidth>
+      {/* Preview Dialog */}
+      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth='sm' fullWidth>
         <IconButton
-          onClick={handleCloseDialog}
+          onClick={() => setOpenDialog(false)}
           sx={{ position: 'absolute', right: 8, top: 8, bgcolor: 'background.paper' }}
         >
           <CloseIcon />
         </IconButton>
         <DialogContent sx={{ p: 0 }}>
-          <img src={formData.uploadedFileURL} alt='Logo Preview' style={{ width: '100%', borderRadius: 8 }} />
+          <img src={previewUrl} alt='Logo' style={{ width: '100%', borderRadius: 8 }} />
         </DialogContent>
       </Dialog>
     </Box>

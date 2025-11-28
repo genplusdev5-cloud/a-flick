@@ -12,6 +12,7 @@ import {
   Divider,
   InputAdornment,
   Breadcrumbs,
+  IconButton,
   TextField,
   MenuItem,
   Pagination,
@@ -94,21 +95,39 @@ export default function ServiceRequestPage() {
         meta: { width: '60px' }
       }),
       columnHelper.display({
-        id: 'action',
-        header: 'Action',
-        cell: info => (
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <EditIcon
-              sx={{ cursor: 'pointer', color: 'primary.main' }}
-              onClick={() => handleEdit(info.row.original.id)}
-            />
-            <DeleteIcon
-              sx={{ cursor: 'pointer', color: 'error.main' }}
-              onClick={() => handleDelete(info.row.original.id)}
-            />
-          </Box>
-        ),
-        meta: { width: '80px' }
+        id: 'actions',
+        header: 'Actions',
+        meta: { width: '110px', align: 'center' },
+
+        cell: ({ row }) => {
+          const item = row.original
+
+          return (
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 1.2
+              }}
+            >
+              {/* 👁 VIEW */}
+              <IconButton size='small' onClick={() => router.push(`/admin/contracts/${item.id}/view`)}>
+                <i className='tabler-eye text-gray-600 text-[18px]' />
+              </IconButton>
+
+              {/* ✏ EDIT */}
+              <IconButton size='small' onClick={() => handleEdit(item)}>
+                <i className='tabler-edit text-blue-600 text-[18px]' />
+              </IconButton>
+
+              {/* 🗑 DELETE */}
+              <IconButton size='small' onClick={() => setDeleteDialog({ open: true, row: item })}>
+                <i className='tabler-trash text-red-600 text-[18px]' />
+              </IconButton>
+            </Box>
+          )
+        }
       }),
       columnHelper.accessor('scheduleDate', {
         header: 'Schedule Date',
