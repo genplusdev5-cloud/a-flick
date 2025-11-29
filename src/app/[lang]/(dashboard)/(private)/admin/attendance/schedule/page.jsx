@@ -176,7 +176,7 @@ export default function AttendanceSchedulePage() {
             </Box>
 
             {/* Refresh Button */}
-            <GlobalButton variant='contained' color='primary' sx={{ height: 40 }}>
+            <GlobalButton variant='contained' color='secondary' sx={{ height: 40 }}>
               Refresh
             </GlobalButton>
 

@@ -515,6 +515,7 @@ export default function ServiceFrequencyPage() {
               <GlobalButton
                 startIcon={
                   <RefreshIcon
+
                     sx={{
                       animation: loading ? 'spin 1s linear infinite' : 'none',
                       '@keyframes spin': {

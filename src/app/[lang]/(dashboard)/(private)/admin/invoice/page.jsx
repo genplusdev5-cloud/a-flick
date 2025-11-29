@@ -355,7 +355,34 @@ export default function InvoiceListPageFull() {
       columnHelper.accessor('invNo', { header: 'INV.No' }),
       columnHelper.accessor('invFrequency', { header: 'INV.Frequency' }),
       columnHelper.accessor('svcFrequency', { header: 'SVC Frequency' }),
-      columnHelper.accessor('noOfServices', { header: 'No.Of Value Services' }),
+      columnHelper.accessor('noOfServices', {
+        header: 'No.Of Value Services',
+        cell: info => {
+          const count = info.getValue() || 0
+
+          return (
+            <Button
+              variant='contained'
+              color='secondary'
+              size='small'
+              sx={{
+                minWidth: 80,
+                py: 1,
+                fontWeight: 600,
+                fontSize: '0.8rem',
+                textTransform: 'none',
+                borderRadius: '8px',
+                boxShadow: 2
+              }}
+            >
+              <Box sx={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
+                <span style={{ fontSize: '0.65rem', opacity: 0.9 }}>Service</span>
+                <span style={{ fontSize: '1rem', fontWeight: 700 }}>{count}</span>
+              </Box>
+            </Button>
+          )
+        }
+      }),
       columnHelper.accessor('lastSvcDate', {
         header: 'Last SVC Date',
         cell: info => {

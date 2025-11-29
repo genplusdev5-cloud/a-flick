@@ -56,6 +56,8 @@ import SearchIcon from '@mui/icons-material/Search'
 import { useRouter } from 'next/navigation'
 import { toast } from 'react-toastify'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
+import ServicePlanDrawer from './service-plan/ServicePlanDrawer'
+
 import classnames from 'classnames'
 import { rankItem } from '@tanstack/match-sorter-utils'
 import {
@@ -111,8 +113,13 @@ export default function ContractsPage() {
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
   const [customerOptions, setCustomerOptions] = useState([])
 
+  const [openDrawer, setOpenDrawer] = useState(false)
+  const [selectedContract, setSelectedContract] = useState(null)
+
   const searchParams = useSearchParams()
+  const newContractId = searchParams.get('openDrawer')
   const encodedCustomerId = searchParams.get('customer')
+
   const decodedCustomerId = encodedCustomerId ? parseInt(atob(encodedCustomerId)) : null
   const [uuidFilter, setUuidFilter] = useState(null)
 
@@ -145,21 +152,39 @@ export default function ContractsPage() {
 
       const normalized = paginated.map((item, idx) => ({
         ...item,
-        uuid: item.uuid, // Explicit add
+        original_id: item.id, // keep real DB id
+        uuid: item.uuid, // explicit uuid
         sno: start + idx + 1,
-        customer: item.customer_id || '',
+
+        // Try to map proper customer name (backend may give different shapes)
+        customer: item.customer_name || item.customer?.name || item.customer || '',
+
         contractCode: item.contract_code || '',
         serviceAddress: item.service_address || '',
         contractType: item.contract_type || '',
-        postalCode: item.postal_address || '',
+
+        postalCode: item.postal_address || item.postal_code || '',
+        productValue: item.product_value || 0,
         contractValue: item.contract_value || 0,
+
         contactName: item.contact_person_name || '',
         contactPhone: item.phone || '',
         mobile: item.mobile || '',
-        pestList: item.pest_items?.map(p => p.pest_id).join(', ') || 'N/A',
+
+        // Services column – use pest names if available
+        services: item.pest_items?.map(p => p.pest_name || p.pest || '').filter(Boolean) || [],
+
+        // Pests column – show nice string
+        pestList:
+          item.pest_items
+            ?.map(p => p.pest_name || p.pest || '')
+            .filter(Boolean)
+            .join(', ') || 'N/A',
+
         startDate: item.start_date ? new Date(item.start_date).toLocaleDateString('en-GB') : '',
         endDate: item.end_date ? new Date(item.end_date).toLocaleDateString('en-GB') : '',
-        contractStatus: item.contract_status || 'N/A'
+
+        contractStatus: item.contract_status || item.status || 'N/A'
       }))
 
       setRows(normalized)
@@ -188,6 +213,16 @@ export default function ContractsPage() {
       setCustomerOptions([])
     }
   }
+
+  useEffect(() => {
+    if (newContractId && rows.length) {
+      const c = rows.find(r => String(r.original_id) === String(newContractId))
+      if (c) {
+        setSelectedContract(c)
+        setOpenDrawer(true)
+      }
+    }
+  }, [rows, newContractId])
 
   useEffect(() => {
     if (decodedCustomerId && customerOptions.length > 0) {
@@ -768,6 +803,13 @@ export default function ContractsPage() {
           </GlobalButton>
         </DialogActions>
       </Dialog>
+      
+      <ServicePlanDrawer
+        open={openDrawer}
+        onClose={() => setOpenDrawer(false)}
+        contract={selectedContract}
+        pestOptions={selectedContract?.pest_items || []}
+      />
     </Box>
   )
 }

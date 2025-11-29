@@ -798,7 +798,7 @@ export default function TaxPage() {
           <DialogCloseButton
             onClick={() => setDeleteDialog({ open: false, row: null })}
             disableRipple
-            
+
           >
             <i className='tabler-x' />
           </DialogCloseButton>

@@ -262,14 +262,14 @@ export default function ContractStatusPage() {
               </IconButton>
 
               {/* ✏ EDIT */}
-              <IconButton size='small' sx={{ p: 0.8 }} onClick={() => handleEdit(item)}>
+              {/* <IconButton size='small' sx={{ p: 0.8 }} onClick={() => handleEdit(item)}>
                 <i className='tabler-edit text-blue-600 text-[18px]' />
-              </IconButton>
+              </IconButton> */}
 
               {/* 🗑 DELETE */}
-              <IconButton size='small' sx={{ p: 0.8 }} onClick={() => setDeleteDialog({ open: true, row: item })}>
+              {/* <IconButton size='small' sx={{ p: 0.8 }} onClick={() => setDeleteDialog({ open: true, row: item })}>
                 <i className='tabler-trash text-red-600 text-[18px]' />
-              </IconButton>
+              </IconButton> */}
             </Box>
           )
         }
