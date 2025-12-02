@@ -11,6 +11,7 @@ import {
   Table,
   TableHead,
   TableRow,
+  Divider,
   TableCell,
   TableBody,
   IconButton,
@@ -20,6 +21,8 @@ import {
 
 import { getAllDropdowns } from '@/api/contract/dropdowns'
 import { addContractApi } from '@/api/contract/add'
+import { getContractDates } from '@/api/contract/getDates'
+
 
 import { useRouter } from 'next/navigation'
 
@@ -426,9 +429,61 @@ export default function AddContractPage() {
   }
 
   // Datepicker change handler (Unchanged)
-  const handleDateChange = (name, date, currentInputRef) => {
+  const handleDateChange = async (name, date, currentInputRef) => {
     setFormData(prev => ({ ...prev, [name]: date }))
+
+    // Only when START DATE changes → call API
+    if (name === 'startDate') {
+      try {
+        const payload = {
+          start_date: date?.toISOString().split('T')[0],
+          contract_type: formData.contractType || '',
+          frequency: formData.billingFrequency || ''
+        }
+
+        const res = await getContractDates(payload)
+
+        if (res?.data?.status === 'success') {
+          const apiData = res.data.data
+
+          setFormData(prev => ({
+            ...prev,
+            endDate: new Date(apiData.end_date),
+            reminderDate: new Date(apiData.reminder_date)
+          }))
+        }
+      } catch (e) {
+        console.error('Date Calculation API failed', e)
+      }
+    }
+
     focusNextElement(currentInputRef)
+  }
+
+  const recalcDates = async () => {
+    if (!formData.startDate) return
+
+    try {
+      const payload = {
+        start_date: formData.startDate.toISOString().split('T')[0],
+        contract_type: formData.contractType || '',
+        frequency: formData.billingFrequency || ''
+      }
+
+      const res = await getContractDates(payload)
+
+      if (res?.data?.status === 'success') {
+        const apiData = res.data.data
+
+        setFormData(prev => ({
+          ...prev,
+          endDate: new Date(apiData.end_date),
+          reminderDate: new Date(apiData.reminder_date)
+        }))
+      }
+    } catch (err) {
+      console.error(err)
+    }
   }
 
   // 💡 FIXED/UPDATED File handler functions
@@ -888,8 +943,9 @@ export default function AddContractPage() {
             name: 'salesPerson',
             label: 'Sales Person',
             options: autocompleteFields.find(f => f.name === 'salesPerson').options,
-            gridProps: { xs: 12, md: 6 }
+            gridProps: { xs: 12, md: 3 }
           })}
+
           {renderAutocomplete({
             name: 'supervisor',
             label: 'Supervisor',
@@ -899,6 +955,14 @@ export default function AddContractPage() {
                 ?.map(e => e.nick_name || e.name)
             )
           })}
+
+          {/* --- FREQUENCY  ITEM INPUTS (Updated) --- */}
+          <Grid item xs={12}>
+            <Typography variant='h6' sx={{ mb: 4, mt: 4 }}>
+              Billing
+            </Typography>
+            <Divider sx={{ mb: 2 }} />
+          </Grid>
 
           {renderAutocomplete({
             name: 'billingFrequency',
@@ -917,7 +981,7 @@ export default function AddContractPage() {
               onKeyDown={e => handleKeyDown(e, invoiceCountRef)}
             />
           </Grid>
-          <Grid item xs={12} md={3}>
+          <Grid item xs={12} md={6}>
             <CustomTextField
               fullWidth
               label='Invoice Remarks'
@@ -1007,13 +1071,15 @@ export default function AddContractPage() {
               )}
             </Box>
           </Grid>
+
           {/* 💡 END UPDATED FILE UPLOAD SECTION */}
 
           {/* --- PEST ITEM INPUTS (Updated) --- */}
           <Grid item xs={12}>
             <Typography variant='h6' sx={{ mb: 4, mt: 4 }}>
-              Pest Item Details ({editingItemId ? 'Editing Mode' : 'Add Mode'})
+              Pest
             </Typography>
+            <Divider sx={{ mb: 2 }} />
           </Grid>
 
           {/* Row 10 - Pest, Frequency, Pest Count, Pest Value, Total */}
