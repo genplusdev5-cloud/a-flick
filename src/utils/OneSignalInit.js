@@ -48,7 +48,7 @@ export default async function runOneSignal() {
       console.log('🔥 Web Push Token:', token)
 
       // Send token to backend
-      await fetch('http://your-backend.com/save-push-token', {
+      await fetch('https://aflick.genpest360.com/api/player-add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token })
