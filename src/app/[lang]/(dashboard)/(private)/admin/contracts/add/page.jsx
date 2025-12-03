@@ -23,7 +23,6 @@ import { getAllDropdowns } from '@/api/contract/dropdowns'
 import { addContractApi } from '@/api/contract/add'
 import { getContractDates } from '@/api/contract/getDates'
 
-
 import { useRouter } from 'next/navigation'
 
 import DeleteIcon from '@mui/icons-material/Delete'
@@ -396,7 +395,8 @@ export default function AddContractPage() {
   const handleAutocompleteChange = (name, newValue, currentInputRef) => {
     setFormData(prev => ({
       ...prev,
-      [name]: typeof newValue === 'string' ? newValue : (newValue ?? '')
+      [name]: typeof newValue === 'string' ? newValue : newValue?.name || '',
+      [`${name}Id`]: newValue?.id || '' // 🔥 STORE ID PROPERLY
     }))
 
     const setStateFunc = setOpenStates[name + 'SetOpen']
@@ -415,6 +415,12 @@ export default function AddContractPage() {
     focusNextElement(currentInputRef)
   }
 
+  const convertTimeToMinutes = str => {
+    if (!str) return 0
+    const [h, m] = str.split(':').map(Number)
+    return h * 60 + m
+  }
+
   // Autocomplete input change handler (Unchanged)
   const handleAutocompleteInputChange = (name, options, newValue, reason) => {
     if (reason === 'input' && !options.includes(newValue) && !autocompleteFields.find(f => f.name === name).freeSolo) {
@@ -422,7 +428,11 @@ export default function AddContractPage() {
     }
     // This handler must work for both formData and currentPestItem
     if (['pest', 'frequency', 'time'].includes(name)) {
-      setCurrentPestItem(prev => ({ ...prev, [name]: newValue }))
+      setCurrentPestItem(prev => ({
+        ...prev,
+        [name]: newValue?.name || newValue,
+        [`${name}Id`]: newValue?.id || 0
+      }))
     } else {
       setFormData(prev => ({ ...prev, [name]: newValue }))
     }
@@ -633,25 +643,78 @@ export default function AddContractPage() {
   const handleSubmit = async () => {
     try {
       const payload = {
-        ...formData,
-        pestItems: pestItems,
-        poExpiry: formData.poExpiry?.toISOString(),
-        startDate: formData.startDate?.toISOString(),
-        endDate: formData.endDate?.toISOString(),
-        reminderDate: formData.reminderDate?.toISOString()
+        parent_id: '0',
+        level: 1,
+
+        name: formData.contractName || '',
+        report_email: formData.reportEmail || '',
+        company_id: localStorage.getItem('company') || '',
+        sales_mode: formData.salesMode?.toLowerCase().replace(' ', '_') || '',
+        contract_code: formData.contractCode || '',
+        covered_location: formData.coveredLocation || '',
+        service_address: formData.serviceAddress || '',
+        postal_address: formData.postalCode || '',
+        contact_person_name: formData.contactPerson || '',
+        phone: formData.sitePhone?.replace(' ', '') || '',
+        mobile: formData.mobile?.replace(' ', '') || '',
+        call_type_id: formData.callTypeId || '',
+        preferred_time: (formData.preferredTime || '00:00') + ':00',
+
+        industry_id: formData.industryId || '',
+        contract_type: formData.contractType?.toLowerCase() || '',
+        commencement_date: formData.startDate?.toISOString().split('T')[0],
+        start_date: formData.startDate?.toISOString().split('T')[0],
+        end_date: formData.endDate?.toISOString().split('T')[0],
+        reminder_date: formData.reminderDate?.toISOString().split('T')[0],
+
+        sales_person_id: formData.salesPersonId || '',
+        technician_id: formData.technicianId || '',
+        supervisor_id: formData.supervisorId || '',
+
+        contract_value: Number(formData.contractValue || 0),
+        billing_frequency_id: formData.billingFrequencyId || '',
+        invoice_count: formData.invoiceCount || '',
+        invoice_remarks: formData.invoiceRemarks || '',
+
+        latitude: Number(formData.latitude || 0),
+        longitude: Number(formData.longitude || 0),
+
+        agreement_add_1: formData.agreement1 || '',
+        agreement_add_2: formData.agreement2 || '',
+        billing_remarks: formData.billingRemarks || '',
+        appointment_remarks: formData.appointmentRemarks || '',
+        technician_remarks: formData.technicianRemarks || '',
+
+        // 🔥 PEST ITEMS CORRECT MAPPING
+        pest_items: pestItems.map(item => ({
+          pest: item.pest,
+          frequency: item.frequency,
+          chemical: item.chemicals || '',
+          customer_id: formData.customerId,
+          pest_id: item.pestId || 0,
+          frequency_id: item.frequencyId || 0,
+          no_location: Number(item.noOfItems || 0),
+          chemical_id: item.chemicalId || '0',
+          pest_value: item.pestValue || '0',
+          pest_service_count: item.noOfItems || '1',
+          total_value: item.totalValue || item.total,
+          work_time: Number(item.time?.replace(':', '')) || 0
+        }))
       }
+
+      console.log('📌 FINAL PAYLOAD:', payload)
 
       const res = await addContractApi(payload)
 
       if (res?.status === 'success') {
-        alert('Contract Added Successfully!')
+        showToast('success', 'Contract Added Successfully!')
         router.push('/admin/contracts')
       } else {
-        alert('Failed to add contract')
+        showToast('error', 'Failed to add contract')
       }
     } catch (error) {
-      console.error(error)
-      alert('Error while saving contract')
+      console.error('❌ Submit Error:', error)
+      showToast('error', 'Error while saving contract')
     }
   }
 
@@ -1405,7 +1468,7 @@ export default function AddContractPage() {
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth='md' fullWidth>
         <DialogContent sx={{ p: 0, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           {formData.uploadedFileURL && (
-            <img
+            <img 
               src={formData.uploadedFileURL}
               alt='Uploaded File Preview'
               style={{ width: '100%', height: 'auto', objectFit: 'contain' }}
