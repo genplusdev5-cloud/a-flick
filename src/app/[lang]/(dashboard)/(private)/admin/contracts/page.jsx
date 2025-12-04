@@ -215,21 +215,31 @@ export default function ContractsPage() {
   }
 
   useEffect(() => {
-    if (!newContractId) return
+    const url = new URL(window.location.href)
+    const idFromURL = url.searchParams.get('openDrawer')
 
-    const contract = rows.find(
-      r => String(r.original_id) === String(newContractId) || String(r.id) === String(newContractId)
-    )
+    if (!idFromURL || rows.length === 0) return
 
-    if (contract) {
-      setSelectedContract(contract)
-      setOpenDrawer(true)
+    const contract =
+      rows.find(r => String(r.id) === String(idFromURL)) || rows.find(r => String(r.original_id) === String(idFromURL))
 
-      const url = new URL(window.location.href)
-      url.searchParams.delete('openDrawer')
-      window.history.replaceState({}, '', url)
+    if (!contract) {
+      // If rows not loaded yet → retry after 300ms
+      setTimeout(() => {
+        const newUrl = new URL(window.location.href)
+        const newId = newUrl.searchParams.get('openDrawer')
+        if (newId) loadData()
+      }, 300)
+      return
     }
-  }, [rows, newContractId])
+
+    setSelectedContract(contract)
+    setOpenDrawer(true)
+
+    // Remove param after opening drawer
+    url.searchParams.delete('openDrawer')
+    window.history.replaceState({}, '', url)
+  }, [rows])
 
   useEffect(() => {
     if (decodedCustomerId && customerOptions.length > 0) {
