@@ -56,5 +56,5 @@ export const getAllDropdowns = async () => {
       chemicals: [],
       employees: []
     }
-  }
+  }  
 }

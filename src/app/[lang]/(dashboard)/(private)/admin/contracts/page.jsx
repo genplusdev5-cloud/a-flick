@@ -371,34 +371,35 @@ export default function ContractsPage() {
         header: 'Pests'
       }),
 
-      columnHelper.accessor('contractStatus', {
-        id: 'contract_status_column',
-        header: 'Contract Status',
-        cell: info => {
-          const status = (info.getValue() || '').toLowerCase()
+columnHelper.accessor('contractStatus', {
+  id: 'contract_status_column',
+  header: 'Contract Status',
+  cell: info => {
+    const raw = info.getValue()
+    const status = raw ? String(raw).toLowerCase() : ''   // ✅ SAFE
 
-          let color = 'default'
-          if (status === 'current') color = 'success'
-          else if (status === 'renewed') color = 'info'
-          else if (status === 'hold') color = 'warning'
-          else if (status === 'terminated') color = 'error'
-          else if (status === 'expired') color = 'error'
+    let color = 'default'
+    if (status === 'current') color = 'success'
+    else if (status === 'renewed') color = 'info'
+    else if (status === 'hold') color = 'warning'
+    else if (status === 'terminated') color = 'error'
+    else if (status === 'expired') color = 'error'
 
-          return (
-            <Chip
-              label={info.getValue() || 'N/A'}
-              size='small'
-              color={color}
-              variant='filled'
-              sx={{
-                fontWeight: 600,
-                textTransform: 'capitalize',
-                borderRadius: '6px'
-              }}
-            />
-          )
-        }
-      })
+    return (
+      <Chip
+        label={raw || 'N/A'}
+        size='small'
+        color={color}
+        sx={{
+          fontWeight: 600,
+          textTransform: 'capitalize',
+          borderRadius: '6px'
+        }}
+      />
+    )
+  }
+})
+
     ],
     []
   )
@@ -803,7 +804,7 @@ export default function ContractsPage() {
           </GlobalButton>
         </DialogActions>
       </Dialog>
-      
+
       <ServicePlanDrawer
         open={openDrawer}
         onClose={() => setOpenDrawer(false)}
