@@ -1,5 +1,5 @@
 import OneSignal from 'react-onesignal'
-import api from '@/utils/axiosInstance'   // <-- YOUR AXIOS INSTANCE
+import api from '@/utils/axiosInstance'
 
 export default async function runOneSignal() {
   await OneSignal.init({
@@ -18,7 +18,7 @@ export default async function runOneSignal() {
         'badge.background': '#e53935',
         'badge.foreground': '#ffffff'
       },
-      showCredit: false
+      showCredit: false,
     },
 
     promptOptions: {
@@ -29,25 +29,34 @@ export default async function runOneSignal() {
         acceptButtonText: 'Enable',
         cancelButtonText: 'Later',
         backgroundColor: '#ffffff',
-        textColor: '#333333'
-      }
+        textColor: '#333333',
+      },
+    },
+  });
+
+  // ⭐ Use OneSignal v16 style player ID
+  const playerId = OneSignal?.User?.PushSubscription?.id;
+  console.log("🔥 OneSignal Player ID:", playerId);
+
+  if (!playerId) return;
+
+  try {
+    // ✔ Get employee_id (change based on your login logic)
+    const employeeId = localStorage.getItem("employee_id");
+
+    if (!employeeId) {
+      console.error("❌ No employee_id in localStorage!");
+      return;
     }
-  })
 
-  // SUBSCRIBE
-  OneSignal.on('subscriptionChange', async isSubscribed => {
-    if (!isSubscribed) return
+    // ⭐ Backend expects EXACT payload
+    await api.post("player-add/", {
+      employee_id: Number(employeeId),
+      player_id: playerId,
+    });
 
-    try {
-      const token = await OneSignal.getUserId()
-      console.log("🔥 Web Push Token:", token)
-
-      // ⭐ Send using AXIOS → AUTH TOKEN auto attach ஆகும்
-      await api.post('player-add/', { token })
-
-      console.log("✅ Player added successfully")
-    } catch (err) {
-      console.error("❌ Player add failed:", err)
-    }
-  })
+    console.log("✅ Player ID sent successfully");
+  } catch (err) {
+    console.error("❌ Failed to send player ID:", err);
+  }
 }
