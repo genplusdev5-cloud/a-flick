@@ -14,7 +14,9 @@ import {
   Divider,
   TableCell,
   TableBody,
+  Checkbox,
   IconButton,
+  FormControlLabel,
   Dialog,
   DialogContent
 } from '@mui/material'
@@ -39,7 +41,7 @@ import CustomTextField from '@core/components/mui/TextField'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import { Autocomplete } from '@mui/material'
 import { getContractDropdowns, createContract } from '@/api/contract/add'
-import { getContractDates } from '@/api/contract'
+import { getContractDates, getInvoiceCount } from '@/api/contract'
 
 // Autocomplete Fields Definition (Unchanged)
 
@@ -150,6 +152,7 @@ export default function AddContractPage() {
   const [selectedFile, setSelectedFile] = useState('')
   const [isDragOver, setIsDragOver] = useState(false)
   const [openDialog, setOpenDialog] = useState(false) // 💡 NEW: For file dialog
+  const [copyCustomerAddress, setCopyCustomerAddress] = useState(false)
 
   const cleanOptions = arr => [...new Set(arr.filter(v => v !== null && v !== undefined && v !== ''))]
 
@@ -465,11 +468,6 @@ export default function AddContractPage() {
   }
 
   // // Datepicker change handler (Unchanged)
-  // const handleDateChange = async (name, date, currentInputRef) => {
-  //   setFormData(prev => ({ ...prev, [name]: date }))
-
-  //   focusNextElement(currentInputRef)
-  // }
 
   // 💡 FIXED/UPDATED File handler functions
   const handleNativeFileChange = e => {
@@ -525,6 +523,9 @@ export default function AddContractPage() {
 
   const handleDateChange = async (name, date, currentInputRef) => {
     setFormData(prev => ({ ...prev, [name]: date }))
+    if (name === 'startDate' || name === 'endDate') {
+      setTimeout(updateInvoiceCount, 0)
+    }
 
     // Only when START DATE changes → call API to auto-fill endDate & reminderDate
     if (name === 'startDate' && date) {
@@ -755,12 +756,16 @@ export default function AddContractPage() {
       // 🔥 Actual Backend Call
       const response = await createContract(payload)
 
-      if (response?.data?.status === true) {
+      if (response?.data?.status === 'success') {
+        const id = response?.data?.data?.id
         showToast('success', 'Contract Added Successfully!')
-        router.push('/admin/contracts')
+
+        setTimeout(() => {
+          router.replace(`/en/admin/contracts?openDrawer=${id}`)
+        }, 400)
       } else {
         console.error('❌ Backend Error:', response)
-        showToast('error', response?.data?.message || 'Error while saving contract')
+        showToast('error', response?.data?.message || 'Error while saving contract!')
       }
     } catch (error) {
       console.error('❌ Submit Error:', error)
@@ -814,6 +819,29 @@ export default function AddContractPage() {
         />
       </Grid>
     )
+  }
+
+  const updateInvoiceCount = async () => {
+    try {
+      if (!formData.startDate || !formData.endDate || !formData.billingFrequencyId) return
+
+      const payload = {
+        start_date: formData.startDate?.toISOString().split('T')[0],
+        end_date: formData.endDate?.toISOString().split('T')[0],
+        billing_frequency_id: Number(formData.billingFrequencyId)
+      }
+
+      const res = await getInvoiceCount(payload)
+
+      if (res?.data?.status === 'success') {
+        setFormData(prev => ({
+          ...prev,
+          invoiceCount: res.data.data?.invoice_count || 0
+        }))
+      }
+    } catch (error) {
+      console.error('❌ Invoice Count API Error:', error)
+    }
   }
 
   // ----------------------------------------------------------------------
@@ -888,11 +916,35 @@ export default function AddContractPage() {
             </Typography>
             <Divider sx={{ mb: 2 }} />
           </Grid>
+          <Grid item xs={12} sx={{ display: 'flex', alignItems: 'center', mb: -1 }}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={copyCustomerAddress}
+                  onChange={e => {
+                    setCopyCustomerAddress(e.target.checked)
+
+                    if (e.target.checked) {
+                      const selected = dropdowns.customers.find(c => c.id === Number(formData.customerId))
+
+                      setFormData(prev => ({
+                        ...prev,
+                        serviceAddress: selected?.address || '',
+                        postalCode: selected?.postal_code || ''
+                      }))
+                    }
+                  }}
+                />
+              }
+              label='Copy from Customer'
+              sx={{ ml: -1 }}
+            />
+          </Grid>
 
           <Grid item xs={12} md={3} key='service-address-field'>
             <CustomTextField
               fullWidth
-              label='Service Address (Copy from Customer)'
+              label='Service Address '
               name='serviceAddress'
               value={formData.serviceAddress}
               onChange={handleChange}
@@ -1113,21 +1165,59 @@ export default function AddContractPage() {
             <Divider sx={{ mb: 2 }} />
           </Grid>
 
-          {renderAutocomplete({
-            name: 'billingFrequency',
-            label: 'Billing Frequency',
-            options: dropdowns.billingFrequencies
-          })}
+          <Grid item xs={12} md={3}>
+            <Autocomplete
+              options={dropdowns.billingFrequencies}
+              getOptionLabel={option => option?.name || ''}
+              isOptionEqualToValue={(opt, val) => opt.id === val.id}
+              value={dropdowns.billingFrequencies.find(o => o.id === formData.billingFrequencyId) || null}
+              onChange={async (e, newValue) => {
+                const selectedId = newValue?.id ?? null
+
+                setFormData(prev => ({
+                  ...prev,
+                  billingFrequency: newValue?.name || '',
+                  billingFrequencyId: selectedId
+                }))
+
+                if (!selectedId) return
+
+                const payload = {
+                  start_date: formData.startDate?.toISOString().split('T')[0],
+                  end_date: formData.endDate?.toISOString().split('T')[0],
+                  billing_frequency_id: Number(selectedId)
+                }
+
+                const res = await getInvoiceCount(payload)
+
+                if (res?.data?.status === 'success') {
+                  const count = res.data.data?.invoice_count || 0
+                  console.log('Invoice Count State =>', count)
+
+                  setFormData(prev => ({
+                    ...prev,
+                    invoiceCount: count
+                  }))
+                }
+              }}
+              renderInput={params => (
+                <CustomTextField {...params} label='Billing Frequency' inputRef={refs.billingFrequencyInputRef} />
+              )}
+              onKeyDown={e => handleKeyDown(e, refs.billingFrequencyInputRef)}
+            />
+          </Grid>
 
           <Grid item xs={12} md={3} key='invoice-count-field'>
             <CustomTextField
               fullWidth
               label='No. of Invoice'
               name='invoiceCount'
-              value={formData.invoiceCount || ''}
-              onChange={handleChange}
+              value={formData.invoiceCount !== '' ? String(formData.invoiceCount) : ''}
+              onChange={() => {}} // prevent warning
               inputRef={invoiceCountRef}
-              onKeyDown={e => handleKeyDown(e, invoiceCountRef)}
+              InputProps={{
+                readOnly: true
+              }}
             />
           </Grid>
           <Grid item xs={12} md={6} key='invoice-remarks-field'>

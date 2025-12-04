@@ -215,12 +215,19 @@ export default function ContractsPage() {
   }
 
   useEffect(() => {
-    if (newContractId && rows.length) {
-      const c = rows.find(r => String(r.original_id) === String(newContractId))
-      if (c) {
-        setSelectedContract(c)
-        setOpenDrawer(true)
-      }
+    if (!newContractId) return
+
+    const contract = rows.find(
+      r => String(r.original_id) === String(newContractId) || String(r.id) === String(newContractId)
+    )
+
+    if (contract) {
+      setSelectedContract(contract)
+      setOpenDrawer(true)
+
+      const url = new URL(window.location.href)
+      url.searchParams.delete('openDrawer')
+      window.history.replaceState({}, '', url)
     }
   }, [rows, newContractId])
 
@@ -371,35 +378,34 @@ export default function ContractsPage() {
         header: 'Pests'
       }),
 
-columnHelper.accessor('contractStatus', {
-  id: 'contract_status_column',
-  header: 'Contract Status',
-  cell: info => {
-    const raw = info.getValue()
-    const status = raw ? String(raw).toLowerCase() : ''   // ✅ SAFE
+      columnHelper.accessor('contractStatus', {
+        id: 'contract_status_column',
+        header: 'Contract Status',
+        cell: info => {
+          const raw = info.getValue()
+          const status = raw ? String(raw).toLowerCase() : '' // ✅ SAFE
 
-    let color = 'default'
-    if (status === 'current') color = 'success'
-    else if (status === 'renewed') color = 'info'
-    else if (status === 'hold') color = 'warning'
-    else if (status === 'terminated') color = 'error'
-    else if (status === 'expired') color = 'error'
+          let color = 'default'
+          if (status === 'current') color = 'success'
+          else if (status === 'renewed') color = 'info'
+          else if (status === 'hold') color = 'warning'
+          else if (status === 'terminated') color = 'error'
+          else if (status === 'expired') color = 'error'
 
-    return (
-      <Chip
-        label={raw || 'N/A'}
-        size='small'
-        color={color}
-        sx={{
-          fontWeight: 600,
-          textTransform: 'capitalize',
-          borderRadius: '6px'
-        }}
-      />
-    )
-  }
-})
-
+          return (
+            <Chip
+              label={raw || 'N/A'}
+              size='small'
+              color={color}
+              sx={{
+                fontWeight: 600,
+                textTransform: 'capitalize',
+                borderRadius: '6px'
+              }}
+            />
+          )
+        }
+      })
     ],
     []
   )
