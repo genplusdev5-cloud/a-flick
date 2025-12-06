@@ -765,7 +765,7 @@ export default function ContractViewPage() {
                   pr: 1 // 👈 LITTLE RIGHT PADDING (OPTIONAL)
                 }}
               >
-                <GlobalButton variant='outlined' onClick={() => showToast('info', 'Closed')}>
+                <GlobalButton color='secondary' onClick={() => showToast('info', 'Closed')}>
                   Close
                 </GlobalButton>
                 <GlobalButton variant='contained' onClick={handleSave}>
