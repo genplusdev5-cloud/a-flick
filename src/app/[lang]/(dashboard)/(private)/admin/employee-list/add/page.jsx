@@ -535,6 +535,16 @@ export default function AddEmployeePage() {
               value={nickname}
               placeholder='Nick name'
               onChange={handleChange}
+              required
+              sx={{
+                '& .MuiFormLabel-asterisk': {
+                  color: '#e91e63 !important',
+                  fontWeight: 700
+                },
+                '& .MuiInputLabel-root.Mui-required': {
+                  color: 'inherit'
+                }
+              }}
               inputRef={nicknameRef}
               onKeyDown={e => handleKeyDown(e, nicknameRef)}
             />
@@ -550,6 +560,16 @@ export default function AddEmployeePage() {
               onChange={handleChange}
               inputRef={nameRef}
               onKeyDown={e => handleKeyDown(e, nameRef)}
+              required
+              sx={{
+                '& .MuiFormLabel-asterisk': {
+                  color: '#e91e63 !important',
+                  fontWeight: 700
+                },
+                '& .MuiInputLabel-root.Mui-required': {
+                  color: 'inherit'
+                }
+              }}
             />
           </Grid>
           {/* Row 2: Department (4), Designation (4), User Role (4) */}
@@ -576,6 +596,16 @@ export default function AddEmployeePage() {
               name='finger_print_id'
               value={fingerPrintId}
               onChange={e => setFingerPrintId(e.target.value)}
+              required
+              sx={{
+                '& .MuiFormLabel-asterisk': {
+                  color: '#e91e63 !important',
+                  fontWeight: 700
+                },
+                '& .MuiInputLabel-root.Mui-required': {
+                  color: 'inherit'
+                }
+              }}
             />
           </Grid>
 
@@ -586,6 +616,16 @@ export default function AddEmployeePage() {
               name='employee_code'
               value={employeeCode}
               onChange={e => setEmployeeCode(e.target.value)}
+              required
+              sx={{
+                '& .MuiFormLabel-asterisk': {
+                  color: '#e91e63 !important',
+                  fontWeight: 700
+                },
+                '& .MuiInputLabel-root.Mui-required': {
+                  color: 'inherit'
+                }
+              }}
             />
           </Grid>
 
@@ -596,6 +636,16 @@ export default function AddEmployeePage() {
               name='nationality'
               value={nationality}
               onChange={e => setNationality(e.target.value)}
+              required
+              sx={{
+                '& .MuiFormLabel-asterisk': {
+                  color: '#e91e63 !important',
+                  fontWeight: 700
+                },
+                '& .MuiInputLabel-root.Mui-required': {
+                  color: 'inherit'
+                }
+              }}
             />
           </Grid>
 
@@ -623,6 +673,16 @@ export default function AddEmployeePage() {
               InputLabelProps={{ shrink: true }}
               inputRef={lunchTimeRef}
               onKeyDown={e => handleKeyDown(e, lunchTimeRef)}
+              required
+              sx={{
+                '& .MuiFormLabel-asterisk': {
+                  color: '#e91e63 !important',
+                  fontWeight: 700
+                },
+                '& .MuiInputLabel-root.Mui-required': {
+                  color: 'inherit'
+                }
+              }}
             />
           </Grid>
 
@@ -732,6 +792,16 @@ export default function AddEmployeePage() {
               helperText={emailError ? 'Please enter a valid email address' : ''}
               inputRef={emailRef}
               onKeyDown={e => handleKeyDown(e, emailRef)}
+              required
+              sx={{
+                '& .MuiFormLabel-asterisk': {
+                  color: '#e91e63 !important',
+                  fontWeight: 700
+                },
+                '& .MuiInputLabel-root.Mui-required': {
+                  color: 'inherit'
+                }
+              }}
             />
           </Grid>
           <Grid item xs={12} md={4}>
@@ -745,6 +815,16 @@ export default function AddEmployeePage() {
               onChange={handleChange}
               inputRef={passwordRef}
               onKeyDown={e => handleKeyDown(e, passwordRef)}
+              required
+              sx={{
+                '& .MuiFormLabel-asterisk': {
+                  color: '#e91e63 !important',
+                  fontWeight: 700
+                },
+                '& .MuiInputLabel-root.Mui-required': {
+                  color: 'inherit'
+                }
+              }}
             />
           </Grid>
           <Grid item xs={12} md={4}>
@@ -762,6 +842,16 @@ export default function AddEmployeePage() {
               }}
               inputRef={phoneRef}
               onKeyDown={e => handleKeyDown(e, phoneRef)}
+              required
+              sx={{
+                '& .MuiFormLabel-asterisk': {
+                  color: '#e91e63 !important',
+                  fontWeight: 700
+                },
+                '& .MuiInputLabel-root.Mui-required': {
+                  color: 'inherit'
+                }
+              }}
             />
           </Grid>
 
@@ -776,6 +866,16 @@ export default function AddEmployeePage() {
               placeholderText='Select DOB'
               dateFormat='dd/MM/yyyy'
               customInput={<GlobalTextField label='DOB' fullWidth inputRef={dobRef} />}
+              required
+              sx={{
+                '& .MuiFormLabel-asterisk': {
+                  color: '#e91e63 !important',
+                  fontWeight: 700
+                },
+                '& .MuiInputLabel-root.Mui-required': {
+                  color: 'inherit'
+                }
+              }}
             />
           </Grid>
           <Grid item xs={12} md={4}>
@@ -790,6 +890,16 @@ export default function AddEmployeePage() {
               onChange={handleChange}
               inputRef={targetDayRef}
               onKeyDown={e => handleKeyDown(e, targetDayRef)}
+              required
+              sx={{
+                '& .MuiFormLabel-asterisk': {
+                  color: '#e91e63 !important',
+                  fontWeight: 700
+                },
+                '& .MuiInputLabel-root.Mui-required': {
+                  color: 'inherit'
+                }
+              }}
             />
           </Grid>
           <Grid item xs={12} md={4}>
@@ -803,6 +913,16 @@ export default function AddEmployeePage() {
               onChange={handleChange}
               inputRef={targetNightRef}
               onKeyDown={e => handleKeyDown(e, targetNightRef)}
+              required
+              sx={{
+                '& .MuiFormLabel-asterisk': {
+                  color: '#e91e63 !important',
+                  fontWeight: 700
+                },
+                '& .MuiInputLabel-root.Mui-required': {
+                  color: 'inherit'
+                }
+              }}
             />
           </Grid>
 
@@ -831,6 +951,16 @@ export default function AddEmployeePage() {
               onChange={handleChange}
               inputRef={vehicleNumberRef}
               onKeyDown={e => handleKeyDown(e, vehicleNumberRef)}
+              required
+              sx={{
+                '& .MuiFormLabel-asterisk': {
+                  color: '#e91e63 !important',
+                  fontWeight: 700
+                },
+                '& .MuiInputLabel-root.Mui-required': {
+                  color: 'inherit'
+                }
+              }}
             />
           </Grid>
           <Grid item xs={12} md={4}>
@@ -878,7 +1008,7 @@ export default function AddEmployeePage() {
 
           {/* Actions */}
           <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 4, pt: 8 }}>
-            <GlobalButton variant='outlined' onClick={() => router.push('/admin/employee-list')} ref={closeButtonRef}>
+            <GlobalButton color='secondary' onClick={() => router.push('/admin/employee-list')} ref={closeButtonRef}>
               Close
             </GlobalButton>
             <GlobalButton variant='contained' onClick={handleSubmit} ref={saveButtonRef}>

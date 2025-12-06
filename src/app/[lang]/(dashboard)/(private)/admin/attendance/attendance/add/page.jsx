@@ -268,7 +268,7 @@ export default function AddAttendancePage() {
       title={<Box sx={{ m: 2 }}>Add Attendance</Box>}
       breadcrumbs={[
         { label: 'Dashboard', href: '/admin/dashboards' },
-        { label: 'Attendance', href: '/admin/attendance' },
+        { label: 'Attendance', href: '/admin/attendance/attendance' },
         { label: 'Add Attendance' }
       ]}
     >
@@ -592,7 +592,7 @@ export default function AddAttendancePage() {
 
           {/* Buttons */}
           <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-            <GlobalButton variant='outlined' color='secondary' onClick={handleClose}>
+            <GlobalButton color='secondary' onClick={handleClose}>
               Close
             </GlobalButton>
             <GlobalButton variant='contained' onClick={handleSave}>

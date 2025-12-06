@@ -25,6 +25,7 @@ import {
 } from '@mui/material'
 
 import { getContractList, deleteContractApi } from '@/api/contract'
+import api from '@/utils/axiosInstance'
 
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import { useSearchParams } from 'next/navigation'
@@ -33,6 +34,10 @@ import { useSearchParams } from 'next/navigation'
 import CustomAutocomplete from '@core/components/mui/Autocomplete'
 import CustomTextField from '@core/components/mui/TextField'
 import { getCustomerNamesForList } from '@/api/contract/listDropdowns'
+
+import TableChartIcon from '@mui/icons-material/TableChart'
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
+import FileCopyIcon from '@mui/icons-material/FileCopy'
 
 // 🔥 Global UI Components (use everywhere)
 import GlobalButton from '@/components/common/GlobalButton'
@@ -215,31 +220,44 @@ export default function ContractsPage() {
   }
 
   useEffect(() => {
-    const url = new URL(window.location.href)
-    const idFromURL = url.searchParams.get('openDrawer')
+    const uuidParam = searchParams.get('openDrawer')
+    console.log('📌 URL UUID:', uuidParam)
 
-    if (!idFromURL || rows.length === 0) return
+    if (!uuidParam) return
 
-    const contract =
-      rows.find(r => String(r.id) === String(idFromURL)) || rows.find(r => String(r.original_id) === String(idFromURL))
+    const loadContract = async () => {
+      try {
+        console.log('🚀 Fetching by UUID...')
 
-    if (!contract) {
-      // If rows not loaded yet → retry after 300ms
-      setTimeout(() => {
-        const newUrl = new URL(window.location.href)
-        const newId = newUrl.searchParams.get('openDrawer')
-        if (newId) loadData()
-      }, 300)
-      return
+        const res = await api.get('contract/', {
+          params: { uuid: uuidParam }
+        })
+        const json = res.data
+
+        console.log('🔍 API Response:', json)
+
+        if (json?.data?.length > 0) {
+          const contract = json.data[0]
+          console.log('🎯 Contract Found:', contract)
+
+          setSelectedContract(contract)
+          setOpenDrawer(true)
+          console.log('🟢 Drawer State ->', true, contract)
+
+          // URL la param remove panna
+          const url = new URL(window.location.href)
+          url.searchParams.delete('openDrawer')
+          window.history.replaceState({}, '', url)
+        } else {
+          console.warn('⚠ No contract found for UUID!')
+        }
+      } catch (error) {
+        console.error('❌ Contract fetch error:', error)
+      }
     }
 
-    setSelectedContract(contract)
-    setOpenDrawer(true)
-
-    // Remove param after opening drawer
-    url.searchParams.delete('openDrawer')
-    window.history.replaceState({}, '', url)
-  }, [rows])
+    loadContract()
+  }, [searchParams])
 
   useEffect(() => {
     if (decodedCustomerId && customerOptions.length > 0) {
@@ -299,7 +317,7 @@ export default function ContractsPage() {
 
             {/* ✏️ Edit */}
             <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
-              <i className='tabler-edit text-blue-600 text-lg' />
+              <i className='tabler-edit ' />
             </IconButton>
 
             {/* 🗑️ Delete */}
@@ -553,23 +571,60 @@ export default function ContractsPage() {
           action={
             <Box display='flex' alignItems='center' gap={2}>
               <GlobalButton
-                variant='outlined'
                 color='secondary'
                 endIcon={<ArrowDropDownIcon />}
                 onClick={e => setExportAnchorEl(e.currentTarget)}
-                disabled={!rows.length}
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
                 Export
               </GlobalButton>
-              <Menu anchorEl={exportAnchorEl} open={exportOpen} onClose={() => setExportAnchorEl(null)}>
-                <MenuItem onClick={exportPrint}>
+              <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportPrint()
+                  }}
+                >
                   <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
                 </MenuItem>
-                <MenuItem onClick={exportCSV}>
+
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportCSV()
+                  }}
+                >
                   <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
                 </MenuItem>
+
+                <MenuItem
+                  onClick={async () => {
+                    setExportAnchorEl(null)
+                    await exportExcel()
+                  }}
+                >
+                  <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
+                </MenuItem>
+
+                <MenuItem
+                  onClick={async () => {
+                    setExportAnchorEl(null)
+                    await exportPDF()
+                  }}
+                >
+                  <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
+                </MenuItem>
+
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportCopy()
+                  }}
+                >
+                  <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
+                </MenuItem>
               </Menu>
+
               <GlobalButton
                 variant='contained'
                 startIcon={<AddIcon />}
@@ -804,7 +859,6 @@ export default function ContractsPage() {
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
           <GlobalButton
             onClick={() => setDeleteDialog({ open: false })}
-            variant='tonal'
             color='secondary'
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
           >

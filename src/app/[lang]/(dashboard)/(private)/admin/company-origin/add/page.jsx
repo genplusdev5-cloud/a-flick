@@ -232,7 +232,7 @@ export default function CompanyOriginAddPage() {
 
           <Button
             variant='contained'
-            color='error'
+            color='primary'
             startIcon={loading ? <CircularProgress size={20} color='inherit' /> : <RefreshIcon />}
             onClick={handleRefresh}
             disabled={loading}
@@ -246,44 +246,84 @@ export default function CompanyOriginAddPage() {
           <Grid item xs={12} sm={6} md={3}>
             <CustomTextField
               fullWidth
-              label='Company Code *'
+              label='Company Code '
               name='companyCode'
               value={formData.companyCode}
               onChange={handleChange}
               disabled={loading}
+              required
+              sx={{
+                '& .MuiFormLabel-asterisk': {
+                  color: '#e91e63 !important',
+                  fontWeight: 700
+                },
+                '& .MuiInputLabel-root.Mui-required': {
+                  color: 'inherit'
+                }
+              }}
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
             <CustomTextField
               fullWidth
-              label='Company Name *'
+              label='Company Name '
               name='companyName'
               value={formData.companyName}
               onChange={handleCompanyNameChange}
               disabled={loading}
+              required
+              sx={{
+                '& .MuiFormLabel-asterisk': {
+                  color: '#e91e63 !important',
+                  fontWeight: 700
+                },
+                '& .MuiInputLabel-root.Mui-required': {
+                  color: 'inherit'
+                }
+              }}
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
             <CustomTextField
               fullWidth
-              label='Phone *'
+              label='Phone '
               name='phone'
               value={formData.phone}
               onChange={handlePhoneChange}
               placeholder='12345 67890'
               disabled={loading}
+              required
+              sx={{
+                '& .MuiFormLabel-asterisk': {
+                  color: '#e91e63 !important',
+                  fontWeight: 700
+                },
+                '& .MuiInputLabel-root.Mui-required': {
+                  color: 'inherit'
+                }
+              }}
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
             <CustomTextField
               fullWidth
-              label='Email *'
+              label='Email '
               name='email'
               value={formData.email}
               onChange={handleChange}
               error={formData.email && !EMAIL_REGEX.test(formData.email)}
               helperText={formData.email && !EMAIL_REGEX.test(formData.email) ? 'Invalid email' : ''}
               disabled={loading}
+              required
+              sx={{
+                '& .MuiFormLabel-asterisk': {
+                  color: '#e91e63 !important',
+                  fontWeight: 700
+                },
+                '& .MuiInputLabel-root.Mui-required': {
+                  color: 'inherit'
+                }
+              }}
             />
           </Grid>
 
@@ -330,6 +370,16 @@ export default function CompanyOriginAddPage() {
                 name={field}
                 value={formData[field]}
                 onChange={handleChange}
+                required
+                sx={{
+                  '& .MuiFormLabel-asterisk': {
+                    color: '#e91e63 !important',
+                    fontWeight: 700
+                  },
+                  '& .MuiInputLabel-root.Mui-required': {
+                    color: 'inherit'
+                  }
+                }}
               />
             </Grid>
           ))}
@@ -349,6 +399,16 @@ export default function CompanyOriginAddPage() {
                 name={f.name}
                 value={formData[f.name]}
                 onChange={f.name === 'invoiceStartNumber' ? handleInvoiceStartNumberChange : handleChange}
+                required
+                sx={{
+                  '& .MuiFormLabel-asterisk': {
+                    color: '#e91e63 !important',
+                    fontWeight: 700
+                  },
+                  '& .MuiInputLabel-root.Mui-required': {
+                    color: 'inherit'
+                  }
+                }}
               />
             </Grid>
           ))}
@@ -362,6 +422,16 @@ export default function CompanyOriginAddPage() {
                 name={field}
                 value={formData[field]}
                 onChange={handleChange}
+                required
+                sx={{
+                  '& .MuiFormLabel-asterisk': {
+                    color: '#e91e63 !important',
+                    fontWeight: 700
+                  },
+                  '& .MuiInputLabel-root.Mui-required': {
+                    color: 'inherit'
+                  }
+                }}
               />
             </Grid>
           ))}
@@ -384,21 +454,6 @@ export default function CompanyOriginAddPage() {
               }
             />
           </Grid>
-
-          <Grid item xs={12} md={3}>
-            <CustomTextField
-              select
-              fullWidth
-              label='Status'
-              name='status'
-              value={formData.status}
-              onChange={handleChange}
-            >
-              <MenuItem value='Active'>Active</MenuItem>
-              <MenuItem value='Inactive'>Inactive</MenuItem>
-            </CustomTextField>
-          </Grid>
-
           {/* Logo Upload */}
           <Grid item xs={12} md={6}>
             <Typography variant='body2' fontWeight={500} mb={1}>
@@ -428,6 +483,7 @@ export default function CompanyOriginAddPage() {
         <Box mt={6} display='flex' justifyContent='flex-end' gap={2}>
           <Button
             variant='outlined'
+            color='secondary'
             onClick={handleRefresh}
             disabled={loading}
             startIcon={loading ? <CircularProgress size={20} /> : null}

@@ -39,6 +39,10 @@ import FileDownloadIcon from '@mui/icons-material/FileDownload'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import RefreshIcon from '@mui/icons-material/Refresh'
+
+import TableChartIcon from '@mui/icons-material/TableChart'
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
+import FileCopyIcon from '@mui/icons-material/FileCopy'
 import CustomTextField from '@core/components/mui/TextField'
 import { toast } from 'react-toastify'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
@@ -413,7 +417,7 @@ export default function IndustryPage() {
           title={
             <Box display='flex' alignItems='center' gap={2}>
               <Typography variant='h5' sx={{ fontWeight: 600 }}>
-                Industry Management
+                Industry
               </Typography>
               <GlobalButton
                 variant='contained'
@@ -455,7 +459,6 @@ export default function IndustryPage() {
           action={
             <Box display='flex' alignItems='center' gap={2}>
               <GlobalButton
-                variant='outlined'
                 color='secondary'
                 endIcon={<ArrowDropDownIcon />}
                 onClick={e => setExportAnchorEl(e.currentTarget)}
@@ -463,14 +466,53 @@ export default function IndustryPage() {
               >
                 Export
               </GlobalButton>
-              <Menu anchorEl={exportAnchorEl} open={exportOpen} onClose={() => setExportAnchorEl(null)}>
-                <MenuItem onClick={exportPrint}>
+              <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportPrint()
+                  }}
+                >
                   <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
                 </MenuItem>
-                <MenuItem onClick={exportCSV}>
+
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportCSV()
+                  }}
+                >
                   <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
                 </MenuItem>
+
+                <MenuItem
+                  onClick={async () => {
+                    setExportAnchorEl(null)
+                    await exportExcel()
+                  }}
+                >
+                  <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
+                </MenuItem>
+
+                <MenuItem
+                  onClick={async () => {
+                    setExportAnchorEl(null)
+                    await exportPDF()
+                  }}
+                >
+                  <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
+                </MenuItem>
+
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportCopy()
+                  }}
+                >
+                  <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
+                </MenuItem>
               </Menu>
+
               <GlobalButton
                 variant='contained'
                 startIcon={<AddIcon />}
@@ -603,11 +645,20 @@ export default function IndustryPage() {
                 <GlobalTextField
                   fullWidth
                   required
-                  label='Industry Name'
+                  label=' Name'
                   placeholder='Enter industry name'
                   value={formData.name}
                   inputRef={nameRef}
                   onChange={e => handleFieldChange('name', e.target.value.replace(/[^a-zA-Z\s]/g, ''))}
+                  sx={{
+                    '& .MuiFormLabel-asterisk': {
+                      color: '#e91e63 !important',
+                      fontWeight: 700
+                    },
+                    '& .MuiInputLabel-root.Mui-required': {
+                      color: 'inherit'
+                    }
+                  }}
                 />
               </Grid>
 
@@ -640,11 +691,11 @@ export default function IndustryPage() {
 
             {/* Footer Buttons */}
             <Box mt={4} display='flex' gap={2}>
+              <GlobalButton color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
+                Cancel
+              </GlobalButton>
               <GlobalButton type='submit' variant='contained' fullWidth disabled={loading}>
                 {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
-              </GlobalButton>
-              <GlobalButton variant='outlined' color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
-                Cancel
               </GlobalButton>
             </Box>
           </form>
@@ -704,7 +755,6 @@ export default function IndustryPage() {
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
           <GlobalButton
             onClick={() => setDeleteDialog({ open: false, row: null })}
-            variant='tonal'
             color='secondary'
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
           >

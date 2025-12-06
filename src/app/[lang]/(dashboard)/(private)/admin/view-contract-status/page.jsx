@@ -56,6 +56,7 @@ import {
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
+import { getAllDropdowns } from '@/api/contract/dropdowns'
 
 // Debounced Input
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
@@ -68,6 +69,18 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
   return <TextField {...props} value={value} onChange={e => setValue(e.target.value)} />
 }
 
+const contractStatusOptions = [
+  { label: 'Current', value: 'Current' },
+  { label: 'Expired', value: 'Expired' },
+  { label: 'Hold', value: 'Hold' },
+  { label: 'Terminated', value: 'Terminated' }
+]
+
+const renewalOptions = [
+  { label: 'New', value: 'New' },
+  { label: 'Renewed', value: 'Renewed' }
+]
+
 // ───────────────────────────────────────────
 // Main Component
 // ───────────────────────────────────────────
@@ -79,14 +92,20 @@ export default function ContractStatusPage() {
   const [dateFilter, setDateFilter] = useState({ start: null, end: null })
 
   const [filterByDate, setFilterByDate] = useState(false)
-  const [originFilter, setOriginFilter] = useState('')
-  const [customerFilter, setCustomerFilter] = useState('')
-  const [contractTypeFilter, setContractTypeFilter] = useState('')
-  const [invoiceFrequencyFilter, setInvoiceFrequencyFilter] = useState('')
-  const [contractStatusFilter, setContractStatusFilter] = useState('')
-  const [renewalFilter, setRenewalFilter] = useState('')
+  const [originFilter, setOriginFilter] = useState(null)
+  const [customerFilter, setCustomerFilter] = useState(null)
+  const [contractTypeFilter, setContractTypeFilter] = useState(null)
+  const [invoiceFrequencyFilter, setInvoiceFrequencyFilter] = useState(null)
+  const [contractStatusFilter, setContractStatusFilter] = useState(null)
+  const [renewalFilter, setRenewalFilter] = useState(null)
+
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
   const [loading, setLoading] = useState(false)
+
+  const [originOptions, setOriginOptions] = useState([])
+  const [customerOptions, setCustomerOptions] = useState([])
+  const [contractTypeOptions, setContractTypeOptions] = useState([])
+  const [invoiceOptions, setInvoiceOptions] = useState([])
 
   const originRef = useRef()
   const customerRef = useRef()
@@ -101,11 +120,11 @@ export default function ContractStatusPage() {
     try {
       // 1️⃣ CALL API WITH FILTERS + PAGINATION
       const params = {
-        customer_id: customerFilter || undefined,
         contract_type: contractTypeFilter || undefined,
         contract_status: contractStatusFilter || undefined,
         invoice_frequency: invoiceFrequencyFilter || undefined,
-        company_id: originFilter || undefined,
+        customer_id: customerFilter?.value || undefined,
+        company_id: originFilter?.value || undefined,
         is_renewed: renewalFilter || undefined,
 
         // date filter
@@ -175,39 +194,6 @@ export default function ContractStatusPage() {
     }
   }
 
-  // 🔥 Autocomplete Options (Required by GlobalAutocomplete)
-  const originOptions = [
-    { label: 'Genplus Innovations', value: 'Genplus Innovations' },
-    { label: 'Pest Masters', value: 'Pest Masters' }
-  ]
-
-  const customerOptions = [
-    { label: 'GP Industries Pvt Ltd', value: 'GP Industries Pvt Ltd' },
-    { label: 'Acme Corp', value: 'Acme Corp' }
-  ]
-
-  const contractTypeOptions = [
-    { label: 'Limited Contract', value: 'Limited Contract' },
-    { label: 'Annual Contract', value: 'Annual Contract' }
-  ]
-
-  const invoiceOptions = [
-    { label: 'Monthly', value: 'Monthly' },
-    { label: 'Yearly', value: 'Yearly' }
-  ]
-
-  const contractStatusOptions = [
-    { label: 'Current', value: 'Current' },
-    { label: 'Expired', value: 'Expired' },
-    { label: 'Hold', value: 'Hold' },
-    { label: 'Terminated', value: 'Terminated' }
-  ]
-
-  const renewalOptions = [
-    { label: 'New', value: 'New' },
-    { label: 'Renewed', value: 'Renewed' }
-  ]
-
   // STEP 2: Filter change aana page 1 ku po
   useEffect(() => {
     setPagination(prev => ({ ...prev, pageIndex: 0 }))
@@ -223,6 +209,53 @@ export default function ContractStatusPage() {
     contractStatusFilter,
     renewalFilter
   ])
+
+  useEffect(() => {
+    const fetchDropdowns = async () => {
+      try {
+        const response = await getAllDropdowns()
+
+        console.log('Dropdown Full Response >>> ', response.data)
+
+        const dropdownData = response?.data?.data // 👈 FIX HERE
+
+        if (!dropdownData) return
+
+        setOriginOptions(
+          dropdownData.company?.name?.map(item => ({
+            label: item.name,
+            value: item.id
+          })) || []
+        )
+
+        setCustomerOptions(
+          dropdownData.customer?.name?.map(item => ({
+            label: item.name,
+            value: item.id
+          })) || []
+        )
+
+        setContractTypeOptions(
+          dropdownData.contract_type?.name?.map(item => ({
+            label: item.name,
+            value: item.id
+          })) || []
+        )
+
+        setInvoiceOptions(
+          dropdownData.billing_frequency?.name?.map(item => ({
+            label: item.name,
+            value: item.id
+          })) || []
+        )
+      } catch (err) {
+        console.error('Dropdown fetch failed:', err)
+        showToast('error', 'Failed to load filters')
+      }
+    }
+
+    fetchDropdowns()
+  }, [])
 
   // STEP 3: Page number or page size maatrina data load pannu
   useEffect(() => {

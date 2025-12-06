@@ -45,6 +45,9 @@ import PrintIcon from '@mui/icons-material/Print'
 import FileDownloadIcon from '@mui/icons-material/FileDownload'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import RefreshIcon from '@mui/icons-material/Refresh'
+import FileCopyIcon from '@mui/icons-material/FileCopy'
+import TableChartIcon from '@mui/icons-material/TableChart'
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
 
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalTextField from '@/components/common/GlobalTextField'
@@ -510,12 +513,11 @@ export default function ServiceFrequencyPage() {
           title={
             <Box display='flex' alignItems='center' gap={2}>
               <Typography variant='h5' sx={{ fontWeight: 600 }}>
-                Service Frequency Management
+                Service Frequency
               </Typography>
               <GlobalButton
                 startIcon={
                   <RefreshIcon
-
                     sx={{
                       animation: loading ? 'spin 1s linear infinite' : 'none',
                       '@keyframes spin': {
@@ -546,7 +548,6 @@ export default function ServiceFrequencyPage() {
           action={
             <Box display='flex' alignItems='center' gap={2}>
               <GlobalButton
-                variant='outlined'
                 color='secondary'
                 endIcon={<ArrowDropDownIcon />}
                 onClick={e => setExportAnchorEl(e.currentTarget)}
@@ -554,12 +555,50 @@ export default function ServiceFrequencyPage() {
                 Export
               </GlobalButton>
 
-              <Menu anchorEl={exportAnchorEl} open={exportOpen} onClose={() => setExportAnchorEl(null)}>
-                <MenuItem onClick={exportPrint}>
+              <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportPrint()
+                  }}
+                >
                   <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
                 </MenuItem>
-                <MenuItem onClick={exportCSV}>
+
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportCSV()
+                  }}
+                >
                   <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
+                </MenuItem>
+
+                <MenuItem
+                  onClick={async () => {
+                    setExportAnchorEl(null)
+                    await exportExcel()
+                  }}
+                >
+                  <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
+                </MenuItem>
+
+                <MenuItem
+                  onClick={async () => {
+                    setExportAnchorEl(null)
+                    await exportPDF()
+                  }}
+                >
+                  <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
+                </MenuItem>
+
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportCopy()
+                  }}
+                >
+                  <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
                 </MenuItem>
               </Menu>
 
@@ -705,6 +744,15 @@ export default function ServiceFrequencyPage() {
                   placeholder='Enter service frequency name'
                   value={formData.serviceFrequency}
                   onChange={e => handleFieldChange('serviceFrequency', e.target.value)}
+                  sx={{
+                    '& .MuiFormLabel-asterisk': {
+                      color: '#e91e63 !important',
+                      fontWeight: 700
+                    },
+                    '& .MuiInputLabel-root.Mui-required': {
+                      color: 'inherit'
+                    }
+                  }}
                 />
               </Grid>
 
@@ -713,6 +761,7 @@ export default function ServiceFrequencyPage() {
                   label='Increment Type'
                   value={formData.incrementType}
                   onChange={e => handleFieldChange('incrementType', e.target.value)}
+                  required
                   options={[
                     { value: 'Year', label: 'Year' },
                     { value: 'Month', label: 'Month' },
@@ -730,6 +779,16 @@ export default function ServiceFrequencyPage() {
                   placeholder='Enter number of increments'
                   value={formData.noOfIncrements}
                   onChange={e => handleFieldChange('noOfIncrements', e.target.value)}
+                  required
+                  sx={{
+                    '& .MuiFormLabel-asterisk': {
+                      color: '#e91e63 !important',
+                      fontWeight: 700
+                    },
+                    '& .MuiInputLabel-root.Mui-required': {
+                      color: 'inherit'
+                    }
+                  }}
                 />
               </Grid>
 
@@ -740,6 +799,16 @@ export default function ServiceFrequencyPage() {
                   placeholder='Enter backlog age'
                   value={formData.backlogAge}
                   onChange={e => handleFieldChange('backlogAge', e.target.value)}
+                  required
+                  sx={{
+                    '& .MuiFormLabel-asterisk': {
+                      color: '#e91e63 !important',
+                      fontWeight: 700
+                    },
+                    '& .MuiInputLabel-root.Mui-required': {
+                      color: 'inherit'
+                    }
+                  }}
                 />
               </Grid>
 
@@ -751,6 +820,15 @@ export default function ServiceFrequencyPage() {
                   placeholder='Enter frequency code'
                   value={formData.frequencyCode}
                   onChange={e => handleFieldChange('frequencyCode', e.target.value)}
+                  sx={{
+                    '& .MuiFormLabel-asterisk': {
+                      color: '#e91e63 !important',
+                      fontWeight: 700
+                    },
+                    '& .MuiInputLabel-root.Mui-required': {
+                      color: 'inherit'
+                    }
+                  }}
                 />
               </Grid>
 
@@ -762,6 +840,15 @@ export default function ServiceFrequencyPage() {
                   placeholder='Enter display frequency'
                   value={formData.displayFrequency}
                   onChange={e => handleFieldChange('displayFrequency', e.target.value)}
+                  sx={{
+                    '& .MuiFormLabel-asterisk': {
+                      color: '#e91e63 !important',
+                      fontWeight: 700
+                    },
+                    '& .MuiInputLabel-root.Mui-required': {
+                      color: 'inherit'
+                    }
+                  }}
                 />
               </Grid>
 
@@ -772,6 +859,16 @@ export default function ServiceFrequencyPage() {
                   placeholder='Enter sort order'
                   value={formData.sortOrder}
                   onChange={e => handleFieldChange('sortOrder', e.target.value)}
+                  required
+                  sx={{
+                    '& .MuiFormLabel-asterisk': {
+                      color: '#e91e63 !important',
+                      fontWeight: 700
+                    },
+                    '& .MuiInputLabel-root.Mui-required': {
+                      color: 'inherit'
+                    }
+                  }}
                 />
               </Grid>
 
@@ -801,11 +898,12 @@ export default function ServiceFrequencyPage() {
             </Grid>
 
             <Box mt={4} display='flex' gap={2}>
+              <GlobalButton color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
+                Cancel
+              </GlobalButton>
+
               <GlobalButton type='submit' variant='contained' fullWidth disabled={loading}>
                 {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
-              </GlobalButton>
-              <GlobalButton variant='outlined' color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
-                Cancel
               </GlobalButton>
             </Box>
           </form>
@@ -863,11 +961,7 @@ export default function ServiceFrequencyPage() {
 
         {/* Centered buttons */}
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-          <GlobalButton
-            variant='outlined'
-            color='secondary'
-            onClick={() => setDeleteDialog({ open: false, row: null })}
-          >
+          <GlobalButton color='secondary' onClick={() => setDeleteDialog({ open: false, row: null })}>
             Cancel
           </GlobalButton>
 

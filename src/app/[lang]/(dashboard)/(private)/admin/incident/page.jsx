@@ -47,6 +47,10 @@ import TablePaginationComponent from '@/components/TablePaginationComponent'
 import classnames from 'classnames'
 import { rankItem } from '@tanstack/match-sorter-utils'
 
+import TableChartIcon from '@mui/icons-material/TableChart'
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
+import FileCopyIcon from '@mui/icons-material/FileCopy'
+
 // 🔥 Global UI Components (use everywhere)
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalTextField from '@/components/common/GlobalTextField'
@@ -442,7 +446,7 @@ export default function IncidentPage() {
           title={
             <Box display='flex' alignItems='center' gap={2}>
               <Typography variant='h5' sx={{ fontWeight: 600 }}>
-                Incident Management
+                Incident
               </Typography>
               <GlobalButton
                 variant='contained'
@@ -484,7 +488,6 @@ export default function IncidentPage() {
           action={
             <Box display='flex' alignItems='center' gap={2}>
               <GlobalButton
-                variant='outlined'
                 color='secondary'
                 endIcon={<ArrowDropDownIcon />}
                 onClick={e => setExportAnchorEl(e.currentTarget)}
@@ -492,14 +495,53 @@ export default function IncidentPage() {
               >
                 Export
               </GlobalButton>
-              <Menu anchorEl={exportAnchorEl} open={exportOpen} onClose={() => setExportAnchorEl(null)}>
-                <MenuItem onClick={exportPrint}>
+              <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportPrint()
+                  }}
+                >
                   <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
                 </MenuItem>
-                <MenuItem onClick={exportCSV}>
+
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportCSV()
+                  }}
+                >
                   <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
                 </MenuItem>
+
+                <MenuItem
+                  onClick={async () => {
+                    setExportAnchorEl(null)
+                    await exportExcel()
+                  }}
+                >
+                  <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
+                </MenuItem>
+
+                <MenuItem
+                  onClick={async () => {
+                    setExportAnchorEl(null)
+                    await exportPDF()
+                  }}
+                >
+                  <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
+                </MenuItem>
+
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportCopy()
+                  }}
+                >
+                  <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
+                </MenuItem>
               </Menu>
+
               <GlobalButton
                 variant='contained'
                 startIcon={<AddIcon />}
@@ -641,11 +683,20 @@ export default function IncidentPage() {
                 <GlobalTextField
                   fullWidth
                   required
-                  label='Incident Name'
+                  label=' Name'
                   placeholder='Enter incident name'
                   value={formData.name}
                   inputRef={nameRef}
                   onChange={e => handleFieldChange('name', e.target.value.replace(/[^a-zA-Z\s]/g, ''))}
+                  sx={{
+                    '& .MuiFormLabel-asterisk': {
+                      color: '#e91e63 !important',
+                      fontWeight: 700
+                    },
+                    '& .MuiInputLabel-root.Mui-required': {
+                      color: 'inherit'
+                    }
+                  }}
                 />
               </Grid>
 
@@ -678,11 +729,11 @@ export default function IncidentPage() {
 
             {/* Drawer Footer */}
             <Box mt={4} display='flex' gap={2}>
+              <GlobalButton color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
+                Cancel
+              </GlobalButton>
               <GlobalButton type='submit' variant='contained' fullWidth disabled={loading}>
                 {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
-              </GlobalButton>
-              <GlobalButton variant='outlined' color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
-                Cancel
               </GlobalButton>
             </Box>
           </form>
@@ -741,8 +792,7 @@ export default function IncidentPage() {
         {/* Centered Buttons */}
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
           <GlobalButton
-            onClick={() => setDeleteDialog({ open: false, row: null })}
-            variant='tonal'
+            onClick={() => setDeleteDialog({ open: false, row: null })} 
             color='secondary'
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
           >

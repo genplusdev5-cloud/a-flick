@@ -118,14 +118,13 @@ export default function AddCustomerPage() {
       try {
         const data = await getAllDropdowns()
 
-       const safeArray = val => {
-  if (!val) return [];
-  if (Array.isArray(val)) return val;
-  if (val.name && Array.isArray(val.name)) return val.name;
-  if (val.results && Array.isArray(val.results)) return val.results;
-  return [];
-};
-
+        const safeArray = val => {
+          if (!val) return []
+          if (Array.isArray(val)) return val
+          if (val.name && Array.isArray(val.name)) return val.name
+          if (val.results && Array.isArray(val.results)) return val.results
+          return []
+        }
 
         setDropdowns({
           employees: safeArray(data.employee?.name),
@@ -734,7 +733,7 @@ export default function AddCustomerPage() {
 
                 <Divider sx={{ mt: 4 }} />
                 <Box mt={2} p={2} display='flex' gap={2} justifyContent='flex-end'>
-                  <GlobalButton variant='outlined' onClick={handleFinalCancel}>
+                  <GlobalButton color='secondary' onClick={handleFinalCancel}>
                     Cancel
                   </GlobalButton>
                   <GlobalButton variant='contained' onClick={handleFinalSave}>

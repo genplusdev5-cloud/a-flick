@@ -16,6 +16,7 @@ import {
   Drawer,
   Chip,
   Select,
+  Menu,
   FormControl,
   InputAdornment,
   TextField,
@@ -27,6 +28,11 @@ import { showToast } from '@/components/common/Toasts'
 import GlobalSelect from '@/components/common/GlobalSelect'
 import CustomTextField from '@core/components/mui/TextField'
 
+import TableChartIcon from '@mui/icons-material/TableChart'
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
+import FileCopyIcon from '@mui/icons-material/FileCopy'
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
+
 import { addSlot, getSlotList, getSlotDetails, updateSlot, deleteSlot } from '@/api/slot'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import FileDownloadIcon from '@mui/icons-material/FileDownload'
@@ -37,6 +43,7 @@ import EditIcon from '@mui/icons-material/Edit'
 import CloseIcon from '@mui/icons-material/Close'
 import DeleteIcon from '@mui/icons-material/Delete'
 import SearchIcon from '@mui/icons-material/Search'
+import PrintIcon from '@mui/icons-material/Print'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 
 import styles from '@core/styles/table.module.css'
@@ -52,6 +59,7 @@ export default function SlotsPage() {
 
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [isEdit, setIsEdit] = useState(false)
+  const [exportAnchorEl, setExportAnchorEl] = useState(null)
 
   const [formData, setFormData] = useState({
     id: null,
@@ -243,22 +251,61 @@ export default function SlotsPage() {
             </Box>
           }
           action={
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              {/* EXPORT BUTTON */}
+            <Box display='flex' alignItems='center' gap={2}>
               <GlobalButton
-                variant='outlined'
                 color='secondary'
-                startIcon={<FileDownloadIcon />}
-                onClick={handleExport}
-                sx={{
-                  textTransform: 'none',
-                  fontWeight: 500,
-                  px: 2.5,
-                  height: 36
-                }}
+                endIcon={<ArrowDropDownIcon />}
+                onClick={e => setExportAnchorEl(e.currentTarget)}
+                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
                 Export
               </GlobalButton>
+              <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportPrint()
+                  }}
+                >
+                  <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
+                </MenuItem>
+
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportCSV()
+                  }}
+                >
+                  <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
+                </MenuItem>
+
+                <MenuItem
+                  onClick={async () => {
+                    setExportAnchorEl(null)
+                    await exportExcel()
+                  }}
+                >
+                  <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
+                </MenuItem>
+
+                <MenuItem
+                  onClick={async () => {
+                    setExportAnchorEl(null)
+                    await exportPDF()
+                  }}
+                >
+                  <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
+                </MenuItem>
+
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportCopy()
+                  }}
+                >
+                  <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
+                </MenuItem>
+              </Menu>
 
               {/* ADD BUTTON */}
               <GlobalButton
@@ -301,7 +348,7 @@ export default function SlotsPage() {
               >
                 {[10, 25, 50, 75, 100].map(s => (
                   <MenuItem key={s} value={s}>
-                    Show {s} entries
+                    {s} entries
                   </MenuItem>
                 ))}
               </Select>
@@ -354,7 +401,7 @@ export default function SlotsPage() {
                           color='primary'
                           onClick={() => handleEdit(row)} // <-- ADD THIS
                         >
-                          <i className='tabler-edit text-blue-600 text-lg' />
+                          <i className='tabler-edit ' />
                         </IconButton>
 
                         <IconButton size='small' color='error' onClick={() => handleDelete(row.id)}>
@@ -419,10 +466,20 @@ export default function SlotsPage() {
             <Grid container spacing={4}>
               <Grid item xs={12}>
                 <GlobalTextField
-                  label='Slot Name'
+                  label='Name'
                   placeholder='Enter slot name'
                   value={formData.name}
                   onChange={e => setFormData({ ...formData, name: e.target.value })}
+                  required
+                  sx={{
+                    '& .MuiFormLabel-asterisk': {
+                      color: '#e91e63 !important',
+                      fontWeight: 700
+                    },
+                    '& .MuiInputLabel-root.Mui-required': {
+                      color: 'inherit'
+                    }
+                  }}
                 />
               </Grid>
 
@@ -458,6 +515,16 @@ export default function SlotsPage() {
                   placeholder='Enter OT value'
                   value={formData.ot_value}
                   onChange={e => setFormData({ ...formData, ot_value: e.target.value })}
+                  required
+                  sx={{
+                    '& .MuiFormLabel-asterisk': {
+                      color: '#e91e63 !important',
+                      fontWeight: 700
+                    },
+                    '& .MuiInputLabel-root.Mui-required': {
+                      color: 'inherit'
+                    }
+                  }}
                 />
               </Grid>
 
@@ -468,6 +535,16 @@ export default function SlotsPage() {
                   type='time'
                   value={formData.start_time}
                   onChange={e => setFormData({ ...formData, start_time: e.target.value })}
+                  required
+                  sx={{
+                    '& .MuiFormLabel-asterisk': {
+                      color: '#e91e63 !important',
+                      fontWeight: 700
+                    },
+                    '& .MuiInputLabel-root.Mui-required': {
+                      color: 'inherit'
+                    }
+                  }}
                 />
               </Grid>
 
@@ -477,6 +554,16 @@ export default function SlotsPage() {
                   type='time'
                   value={formData.end_time}
                   onChange={e => setFormData({ ...formData, end_time: e.target.value })}
+                  required
+                  sx={{
+                    '& .MuiFormLabel-asterisk': {
+                      color: '#e91e63 !important',
+                      fontWeight: 700
+                    },
+                    '& .MuiInputLabel-root.Mui-required': {
+                      color: 'inherit'
+                    }
+                  }}
                 />
               </Grid>
 
@@ -487,6 +574,16 @@ export default function SlotsPage() {
                   placeholder='e.g. 8'
                   value={formData.work_hours}
                   onChange={e => setFormData({ ...formData, work_hours: e.target.value })}
+                  required
+                  sx={{
+                    '& .MuiFormLabel-asterisk': {
+                      color: '#e91e63 !important',
+                      fontWeight: 700
+                    },
+                    '& .MuiInputLabel-root.Mui-required': {
+                      color: 'inherit'
+                    }
+                  }}
                 />
               </Grid>
 
@@ -496,6 +593,16 @@ export default function SlotsPage() {
                   placeholder='e.g. 30'
                   value={formData.lunch}
                   onChange={e => setFormData({ ...formData, lunch: e.target.value })}
+                  required
+                  sx={{
+                    '& .MuiFormLabel-asterisk': {
+                      color: '#e91e63 !important',
+                      fontWeight: 700
+                    },
+                    '& .MuiInputLabel-root.Mui-required': {
+                      color: 'inherit'
+                    }
+                  }}
                 />
               </Grid>
               <Grid item xs={12}>
@@ -514,12 +621,11 @@ export default function SlotsPage() {
 
             {/* BUTTONS */}
             <Box mt={4} display='flex' gap={2}>
-              <GlobalButton type='submit' fullWidth>
-                {isEdit ? 'Update Slot' : 'Save Slot'}
-              </GlobalButton>
-
-              <GlobalButton variant='outlined' color='secondary' fullWidth onClick={handleCancel}>
+              <GlobalButton color='secondary' fullWidth onClick={handleCancel}>
                 Cancel
+              </GlobalButton>
+              <GlobalButton type='submit' fullWidth>
+                {isEdit ? 'Update ' : 'Save '}
               </GlobalButton>
             </Box>
           </form>

@@ -16,6 +16,7 @@ import {
   TextField,
   InputAdornment,
   FormControlLabel,
+  Menu,
   Checkbox,
   IconButton
 } from '@mui/material'
@@ -25,6 +26,12 @@ import { getAttendanceList, deleteAttendance } from '@/api/attendance'
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
 import GlobalDateRange from '@/components/common/GlobalDateRange'
+
+import PrintIcon from '@mui/icons-material/Print'
+import TableChartIcon from '@mui/icons-material/TableChart'
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
+import FileCopyIcon from '@mui/icons-material/FileCopy'
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 
 import RefreshIcon from '@mui/icons-material/Refresh'
 import FileDownloadIcon from '@mui/icons-material/FileDownload'
@@ -57,6 +64,7 @@ export default function AttendancePage() {
   const [dateFilter, setDateFilter] = useState(true)
   const [dateRange, setDateRange] = useState([null, null])
   const [loading, setLoading] = useState(false)
+  const [exportAnchorEl, setExportAnchorEl] = useState(null)
 
   const customerOptions = ['Customer 1', 'Customer 2']
   const serviceAddressOptions = ['Address 1', 'Address 2']
@@ -154,22 +162,61 @@ export default function AttendancePage() {
             </Box>
           }
           action={
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              {/* EXPORT */}
+            <Box display='flex' alignItems='center' gap={2}>
               <GlobalButton
-                variant='outlined'
                 color='secondary'
-                startIcon={<FileDownloadIcon />}
-                onClick={() => showToast('info', 'Export coming soon...')}
-                sx={{
-                  textTransform: 'none',
-                  fontWeight: 500,
-                  px: 2.5,
-                  height: 36
-                }}
+                endIcon={<ArrowDropDownIcon />}
+                onClick={e => setExportAnchorEl(e.currentTarget)}
+                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
                 Export
               </GlobalButton>
+              <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportPrint()
+                  }}
+                >
+                  <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
+                </MenuItem>
+
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportCSV()
+                  }}
+                >
+                  <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
+                </MenuItem>
+
+                <MenuItem
+                  onClick={async () => {
+                    setExportAnchorEl(null)
+                    await exportExcel()
+                  }}
+                >
+                  <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
+                </MenuItem>
+
+                <MenuItem
+                  onClick={async () => {
+                    setExportAnchorEl(null)
+                    await exportPDF()
+                  }}
+                >
+                  <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
+                </MenuItem>
+
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportCopy()
+                  }}
+                >
+                  <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
+                </MenuItem>
+              </Menu>
 
               {/* ADD */}
               <GlobalButton
@@ -309,7 +356,7 @@ export default function AttendancePage() {
                           color='primary'
                           onClick={() => router.push(`/admin/attendance/attendance/edit/${row.id}`)}
                         >
-                          <i className='tabler-edit text-blue-600 text-lg' />
+                          <i className='tabler-edit' />
                         </IconButton>
                         <IconButton size='small' color='error' onClick={() => handleDelete(row.id)}>
                           <i className='tabler-trash text-red-600 text-lg' />

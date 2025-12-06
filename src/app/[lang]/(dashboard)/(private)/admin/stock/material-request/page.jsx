@@ -460,16 +460,14 @@ export default function MaterialRequestPage() {
           action={
             <Button
               variant='contained'
-              color='secondary'
+              color='primary'
               startIcon={<AddIcon />}
               onClick={() => router.push('/admin/stock/material-request/add')}
               sx={{
                 textTransform: 'none',
                 fontWeight: 500,
                 px: 2.5,
-                height: 36,
-                backgroundColor: '#8B0000',
-                '&:hover': { backgroundColor: '#700000' }
+                height: 36
               }}
             >
               Add Request

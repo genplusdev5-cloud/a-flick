@@ -477,7 +477,7 @@ export default function TaxPage() {
           title={
             <Box display='flex' alignItems='center' gap={2}>
               <Typography variant='h5' sx={{ fontWeight: 600 }}>
-                Tax Management
+                Tax
               </Typography>
               <GlobalButton
                 startIcon={
@@ -506,7 +506,6 @@ export default function TaxPage() {
           action={
             <Box display='flex' alignItems='center' gap={2}>
               <GlobalButton
-                variant='outlined'
                 color='secondary'
                 endIcon={<ArrowDropDownIcon />}
                 onClick={e => setExportAnchorEl(e.currentTarget)}
@@ -713,6 +712,15 @@ export default function TaxPage() {
                   inputRef={nameRef}
                   required
                   onChange={e => handleFieldChange('name', e.target.value)}
+                  sx={{
+                    '& .MuiFormLabel-asterisk': {
+                      color: '#e91e63 !important',
+                      fontWeight: 700
+                    },
+                    '& .MuiInputLabel-root.Mui-required': {
+                      color: 'inherit'
+                    }
+                  }}
                 />
               </Grid>
 
@@ -723,6 +731,15 @@ export default function TaxPage() {
                   value={formData.tax_value}
                   required
                   onChange={e => handleFieldChange('tax_value', e.target.value.replace(/[^0-9.]/g, ''))}
+                  sx={{
+                    '& .MuiFormLabel-asterisk': {
+                      color: '#e91e63 !important',
+                      fontWeight: 700
+                    },
+                    '& .MuiInputLabel-root.Mui-required': {
+                      color: 'inherit'
+                    }
+                  }}
                 />
               </Grid>
 
@@ -753,12 +770,12 @@ export default function TaxPage() {
             </Grid>
 
             <Box mt={4} display='flex' gap={2}>
-              <GlobalButton type='submit' fullWidth disabled={loading}>
-                {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
+              <GlobalButton color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
+                Cancel
               </GlobalButton>
 
-              <GlobalButton variant='outlined' color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
-                Cancel
+              <GlobalButton type='submit' fullWidth disabled={loading}>
+                {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
               </GlobalButton>
             </Box>
           </form>
@@ -795,11 +812,7 @@ export default function TaxPage() {
         >
           <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
           Confirm Delete
-          <DialogCloseButton
-            onClick={() => setDeleteDialog({ open: false, row: null })}
-            disableRipple
-
-          >
+          <DialogCloseButton onClick={() => setDeleteDialog({ open: false, row: null })} disableRipple>
             <i className='tabler-x' />
           </DialogCloseButton>
         </DialogTitle>
@@ -816,11 +829,7 @@ export default function TaxPage() {
 
         {/* Centered buttons */}
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-          <GlobalButton
-            variant='outlined'
-            color='secondary'
-            onClick={() => setDeleteDialog({ open: false, row: null })}
-          >
+          <GlobalButton color='secondary' onClick={() => setDeleteDialog({ open: false, row: null })}>
             Cancel
           </GlobalButton>
 
@@ -829,8 +838,6 @@ export default function TaxPage() {
           </GlobalButton>
         </DialogActions>
       </Dialog>
-
-      {/* NO TOASTCONTAINER HERE — MOVED TO LAYOUT */}
     </Box>
   )
 }

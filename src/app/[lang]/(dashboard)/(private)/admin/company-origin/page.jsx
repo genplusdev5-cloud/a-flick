@@ -249,7 +249,7 @@ export default function CompanyOriginListPage() {
           title={
             <Box display='flex' alignItems='center' gap={2}>
               <Typography variant='h5' sx={{ fontWeight: 600 }}>
-                Company Origin Management
+                Company Origin
               </Typography>
               <GlobalButton
                 startIcon={<RefreshIcon sx={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />}
@@ -263,7 +263,6 @@ export default function CompanyOriginListPage() {
           action={
             <Box display='flex' alignItems='center' gap={2}>
               <GlobalButton
-                variant='outlined'
                 color='secondary'
                 endIcon={<ArrowDropDownIcon />}
                 onClick={e => setExportAnchorEl(e.currentTarget)}
@@ -442,7 +441,7 @@ export default function CompanyOriginListPage() {
           Confirm Delete
           <DialogCloseButton
             onClick={() => setDeleteDialog({ open: false, row: null })}
-           sx={{ position: 'absolute', right: 1, top: 1 }}
+            sx={{ position: 'absolute', right: 1, top: 1 }}
           >
             <i className='tabler-x' />
           </DialogCloseButton>
@@ -457,11 +456,7 @@ export default function CompanyOriginListPage() {
         </DialogContent>
 
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3 }}>
-          <GlobalButton
-            variant='outlined'
-            color='secondary'
-            onClick={() => setDeleteDialog({ open: false, row: null })}
-          >
+          <GlobalButton color='secondary' onClick={() => setDeleteDialog({ open: false, row: null })}>
             Cancel
           </GlobalButton>
           <GlobalButton variant='contained' color='error' onClick={confirmDelete}>

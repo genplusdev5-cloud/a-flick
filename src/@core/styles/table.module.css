@@ -108,3 +108,33 @@
     outline: 1px solid var(--mui-palette-primary-main);
   }
 }
+
+/* ===========================
+   Sticky First Two Columns
+   =========================== */
+
+/* 1️⃣ Sticky S.No Column */
+.table thead th:first-child,
+.table tbody td:first-child {
+  position: sticky;
+  inset-inline-start: 0; /* RTL Safe */
+  z-index: 5;
+  background: #fff;
+  box-shadow: 2px 0 3px rgba(0, 0, 0, 0.05);
+}
+
+/* 2️⃣ Sticky Actions Column */
+.table thead th:nth-child(2),
+.table tbody td:nth-child(2) {
+  position: sticky;
+  inset-inline-start: 70px; /* Matches width of S.No column */
+  z-index: 5;
+  background: #fff;
+  box-shadow: 2px 0 3px rgba(0, 0, 0, 0.05);
+}
+
+/* Keep header above body elements */
+.table thead th {
+  z-index: 10;
+}
+

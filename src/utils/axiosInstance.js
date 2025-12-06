@@ -7,7 +7,7 @@ if (baseURL && !baseURL.endsWith('/')) baseURL += '/'
 const api = axios.create({
   baseURL,
   timeout: 20000,
-  headers: { 'Content-Type': 'application/json' } // இது இப்போ safe ஆ இருக்கும்
+  headers: { 'Content-Type': 'application/json' }
 })
 
 // FILE UPLOAD FIX – MOST IMPORTANT!

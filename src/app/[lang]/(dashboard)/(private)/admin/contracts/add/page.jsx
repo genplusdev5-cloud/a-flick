@@ -690,7 +690,6 @@ export default function AddContractPage() {
       const payload = {
         parent_id: 0,
         level: 1,
-        // company_id: 4,
         customer_id: Number(formData.customerId) || null,
 
         name: formData.contractName || '',
@@ -753,23 +752,27 @@ export default function AddContractPage() {
 
       console.log('📌 FINAL PAYLOAD:', payload)
 
+      // ===================================
       // 🔥 Actual Backend Call
+      // ===================================
       const response = await createContract(payload)
 
       if (response?.data?.status === 'success') {
-        const id = response?.data?.data?.id
+        const newUuid = response.data.data.uuid // ✔ correct ID
+
         showToast('success', 'Contract Added Successfully!')
 
+        // ⭐ Redirect to list page with drawer auto-open
         setTimeout(() => {
-          router.replace(`/en/admin/contracts?openDrawer=${id}`)
-        }, 400)
+          router.push(`/admin/contracts?openDrawer=${newUuid}`)
+        }, 500)
       } else {
         console.error('❌ Backend Error:', response)
         showToast('error', response?.data?.message || 'Error while saving contract!')
       }
     } catch (error) {
       console.error('❌ Submit Error:', error)
-      showToast('error', 'Error while saving contract')
+      showToast('error', 'Error while saving contract!')
     }
   }
 
@@ -1604,7 +1607,7 @@ export default function AddContractPage() {
             sx={{ display: 'flex', justifyContent: 'flex-end', gap: 4, pt: 8 }}
             key='form-action-buttons'
           >
-            <GlobalButton variant='outlined' onClick={() => router.push('/admin/contracts')} ref={closeButtonRef}>
+            <GlobalButton color='secondary' onClick={() => router.push('/admin/contracts')} ref={closeButtonRef}>
               Close
             </GlobalButton>
             <GlobalButton variant='contained' onClick={handleSubmit} ref={saveButtonRef}>

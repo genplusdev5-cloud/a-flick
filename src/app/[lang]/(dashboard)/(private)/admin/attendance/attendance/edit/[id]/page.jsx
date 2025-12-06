@@ -562,7 +562,6 @@ export default function EditAttendancePage() {
 
           <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
             <GlobalButton
-              variant='outlined'
               color='secondary'
               onClick={() => router.push('/admin/attendance/attendance')}
             >

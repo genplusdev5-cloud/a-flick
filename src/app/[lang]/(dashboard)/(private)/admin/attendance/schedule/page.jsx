@@ -13,6 +13,7 @@ import {
   Select,
   MenuItem,
   Checkbox,
+  Menu,
   FormControlLabel,
   TextField,
   InputAdornment,
@@ -23,6 +24,13 @@ import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalDateRange from '@/components/common/GlobalDateRange'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
+
+import PrintIcon from '@mui/icons-material/Print'
+import TableChartIcon from '@mui/icons-material/TableChart'
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
+import FileCopyIcon from '@mui/icons-material/FileCopy'
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
+import FileDownloadIcon from '@mui/icons-material/FileDownload'
 
 import SearchIcon from '@mui/icons-material/Search'
 import EditIcon from '@mui/icons-material/Edit'
@@ -44,6 +52,7 @@ export default function AttendanceSchedulePage() {
   const [dateRange, setDateRange] = useState([new Date(), new Date()])
   const [startDate, setStartDate] = useState(new Date())
   const [endDate, setEndDate] = useState(addDays(new Date(), 7))
+  const [exportAnchorEl, setExportAnchorEl] = useState(null)
 
   const CustomDateInput = ({ label, start, end, ...rest }, ref) => {
     const startDateFormatted = format(start, 'dd/MM/yyyy')
@@ -176,12 +185,12 @@ export default function AttendanceSchedulePage() {
             </Box>
 
             {/* Refresh Button */}
-            <GlobalButton variant='contained' color='secondary' sx={{ height: 40 }}>
+            <GlobalButton variant='contained' color='primary' sx={{ height: 40 }}>
               Refresh
             </GlobalButton>
 
             {/* Global Change */}
-            <GlobalButton variant='contained' color='info' sx={{ height: 40 }}>
+            <GlobalButton variant='contained' color='secondary' sx={{ height: 40 }}>
               Global Change
             </GlobalButton>
           </Box>
@@ -212,9 +221,60 @@ export default function AttendanceSchedulePage() {
           {/* LEFT SIDE: EXPORT + ENTRIES */}
           <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 2 }}>
             {/* Export Button */}
-            <GlobalButton variant='outlined' color='secondary'>
-              Export Attendance
+            <GlobalButton
+              color='secondary'
+              endIcon={<ArrowDropDownIcon />}
+              onClick={e => setExportAnchorEl(e.currentTarget)}
+              sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+            >
+              Export
             </GlobalButton>
+            <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
+              <MenuItem
+                onClick={() => {
+                  setExportAnchorEl(null)
+                  exportPrint()
+                }}
+              >
+                <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
+              </MenuItem>
+
+              <MenuItem
+                onClick={() => {
+                  setExportAnchorEl(null)
+                  exportCSV()
+                }}
+              >
+                <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
+              </MenuItem>
+
+              <MenuItem
+                onClick={async () => {
+                  setExportAnchorEl(null)
+                  await exportExcel()
+                }}
+              >
+                <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
+              </MenuItem>
+
+              <MenuItem
+                onClick={async () => {
+                  setExportAnchorEl(null)
+                  await exportPDF()
+                }}
+              >
+                <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
+              </MenuItem>
+
+              <MenuItem
+                onClick={() => {
+                  setExportAnchorEl(null)
+                  exportCopy()
+                }}
+              >
+                <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
+              </MenuItem>
+            </Menu>
 
             {/* Show Entries */}
             <FormControl size='small' sx={{ width: 150 }}>
@@ -230,7 +290,7 @@ export default function AttendanceSchedulePage() {
               >
                 {[10, 25, 50, 75, 100].map(num => (
                   <MenuItem key={num} value={num}>
-                    Show {num} entries
+                    {num} entries
                   </MenuItem>
                 ))}
               </Select>
@@ -281,7 +341,7 @@ export default function AttendanceSchedulePage() {
                     <td>
                       <Box sx={{ display: 'flex', gap: 1 }}>
                         <IconButton size='small' color='primary'>
-                          <i className='tabler-edit text-blue-600 text-lg' />
+                          <i className='tabler-edit' />
                         </IconButton>
                         <IconButton size='small' color='error'>
                           <i className='tabler-trash text-red-600 text-lg' />

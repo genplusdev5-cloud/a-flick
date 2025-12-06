@@ -50,6 +50,9 @@ import { toast } from 'react-toastify'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 import classnames from 'classnames'
 import { rankItem } from '@tanstack/match-sorter-utils'
+import TableChartIcon from '@mui/icons-material/TableChart'
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
+import FileCopyIcon from '@mui/icons-material/FileCopy'
 
 // 🔥 Global UI Components (use everywhere)
 import GlobalButton from '@/components/common/GlobalButton'
@@ -310,7 +313,7 @@ export default function BillingFrequencyPage() {
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
             <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
-              <i className='tabler-edit text-blue-600 text-lg' />
+              <i className='tabler-edit' />
             </IconButton>
             <IconButton
               size='small'
@@ -440,7 +443,7 @@ export default function BillingFrequencyPage() {
           title={
             <Box display='flex' alignItems='center' gap={2}>
               <Typography variant='h5' sx={{ fontWeight: 600 }}>
-                Billing Frequency Management
+                Billing Frequency
               </Typography>
               <GlobalButton
                 startIcon={
@@ -475,7 +478,6 @@ export default function BillingFrequencyPage() {
           action={
             <Box display='flex' alignItems='center' gap={2}>
               <GlobalButton
-                variant='outlined'
                 color='secondary'
                 endIcon={<ArrowDropDownIcon />}
                 onClick={e => setExportAnchorEl(e.currentTarget)}
@@ -483,14 +485,53 @@ export default function BillingFrequencyPage() {
                 Export
               </GlobalButton>
 
-              <Menu anchorEl={exportAnchorEl} open={exportOpen} onClose={() => setExportAnchorEl(null)}>
-                <MenuItem onClick={exportPrint}>
+              <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportPrint()
+                  }}
+                >
                   <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
                 </MenuItem>
-                <MenuItem onClick={exportCSV}>
+
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportCSV()
+                  }}
+                >
                   <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
                 </MenuItem>
+
+                <MenuItem
+                  onClick={async () => {
+                    setExportAnchorEl(null)
+                    await exportExcel()
+                  }}
+                >
+                  <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
+                </MenuItem>
+
+                <MenuItem
+                  onClick={async () => {
+                    setExportAnchorEl(null)
+                    await exportPDF()
+                  }}
+                >
+                  <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
+                </MenuItem>
+
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportCopy()
+                  }}
+                >
+                  <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
+                </MenuItem>
               </Menu>
+
               <GlobalButton startIcon={<AddIcon />} onClick={handleAdd}>
                 Add Frequency
               </GlobalButton>
@@ -622,6 +663,15 @@ export default function BillingFrequencyPage() {
                   placeholder='Enter billing frequency name'
                   value={formData.billingFrequency}
                   onChange={e => handleFieldChange('billingFrequency', e.target.value)}
+                  sx={{
+                    '& .MuiFormLabel-asterisk': {
+                      color: '#e91e63 !important',
+                      fontWeight: 700
+                    },
+                    '& .MuiInputLabel-root.Mui-required': {
+                      color: 'inherit'
+                    }
+                  }}
                 />
               </Grid>
 
@@ -650,6 +700,16 @@ export default function BillingFrequencyPage() {
                   placeholder='Enter number of increments'
                   value={formData.noOfIncrements}
                   onChange={e => handleFieldChange('noOfIncrements', e.target.value.replace(/[^0-9]/g, ''))}
+                  required
+                  sx={{
+                    '& .MuiFormLabel-asterisk': {
+                      color: '#e91e63 !important',
+                      fontWeight: 700
+                    },
+                    '& .MuiInputLabel-root.Mui-required': {
+                      color: 'inherit'
+                    }
+                  }}
                 />
               </Grid>
 
@@ -661,6 +721,16 @@ export default function BillingFrequencyPage() {
                   placeholder='Enter backlog age'
                   value={formData.backlogAge}
                   onChange={e => handleFieldChange('backlogAge', e.target.value.replace(/[^0-9]/g, ''))}
+                  required
+                  sx={{
+                    '& .MuiFormLabel-asterisk': {
+                      color: '#e91e63 !important',
+                      fontWeight: 700
+                    },
+                    '& .MuiInputLabel-root.Mui-required': {
+                      color: 'inherit'
+                    }
+                  }}
                 />
               </Grid>
 
@@ -668,11 +738,20 @@ export default function BillingFrequencyPage() {
               <Grid item xs={12}>
                 <CustomTextFieldWrapper
                   fullWidth
-                  required
                   label='Frequency Code'
                   placeholder='Enter frequency code'
                   value={formData.frequencyCode}
                   onChange={e => handleFieldChange('frequencyCode', e.target.value)}
+                  required
+                  sx={{
+                    '& .MuiFormLabel-asterisk': {
+                      color: '#e91e63 !important',
+                      fontWeight: 700
+                    },
+                    '& .MuiInputLabel-root.Mui-required': {
+                      color: 'inherit'
+                    }
+                  }}
                 />
               </Grid>
 
@@ -684,6 +763,16 @@ export default function BillingFrequencyPage() {
                   placeholder='Enter sort order'
                   value={formData.sortOrder}
                   onChange={e => handleFieldChange('sortOrder', e.target.value.replace(/[^0-9]/g, ''))}
+                  required
+                  sx={{
+                    '& .MuiFormLabel-asterisk': {
+                      color: '#e91e63 !important',
+                      fontWeight: 700
+                    },
+                    '& .MuiInputLabel-root.Mui-required': {
+                      color: 'inherit'
+                    }
+                  }}
                 />
               </Grid>
 
@@ -715,12 +804,12 @@ export default function BillingFrequencyPage() {
             </Grid>
 
             <Box mt={4} display='flex' gap={2}>
-              <GlobalButton type='submit' fullWidth disabled={loading}>
-                {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
+              <GlobalButton color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
+                Cancel
               </GlobalButton>
 
-              <GlobalButton variant='outlined' color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
-                Cancel
+              <GlobalButton type='submit' fullWidth disabled={loading}>
+                {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
               </GlobalButton>
             </Box>
           </form>
@@ -781,11 +870,7 @@ export default function BillingFrequencyPage() {
 
         {/* Centered buttons */}
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-          <GlobalButton
-            variant='outlined'
-            color='secondary'
-            onClick={() => setDeleteDialog({ open: false, row: null })}
-          >
+          <GlobalButton color='secondary' onClick={() => setDeleteDialog({ open: false, row: null })}>
             Cancel
           </GlobalButton>
 

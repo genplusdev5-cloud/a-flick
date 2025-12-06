@@ -464,7 +464,7 @@ export default function EditEmployeePage() {
 
           {/* Buttons */}
           <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
-            <GlobalButton variant='outlined' onClick={() => router.back()}>
+            <GlobalButton color='secondary' onClick={() => router.back()}>
               Cancel
             </GlobalButton>
 
