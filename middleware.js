@@ -5,44 +5,43 @@ export async function middleware(req) {
   const { nextUrl } = req
   const { pathname } = nextUrl
 
-  // Redirect root "/" → default locale "/en/login"
-  if (pathname === '/') {
-    return NextResponse.redirect(new URL('/en/login', req.url))
-  }
+  // Public Allowed Routes
+  const publicRoutes = [
+    '/',
+    '/login',
+    '/auth',
+    '/admin/login'
+  ]
 
-  // Allow next internals, API routes and static files
+  // Allow Next.js internal/static/api files
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/static') ||
     pathname.startsWith('/api') ||
-    pathname.startsWith('/fonts') ||
-    pathname.startsWith('/images') ||
     pathname.startsWith('/favicon') ||
-    pathname.startsWith('/.well-known')
+    pathname.startsWith('/images') ||
+    pathname.startsWith('/fonts')
   ) {
     return NextResponse.next()
   }
 
-  // Allow login/auth routes to load freely without token
-  if (pathname.includes('/login') || pathname.includes('/auth')) {
+  // Allow login and public routes
+  if (publicRoutes.some(route => pathname.includes(route))) {
     return NextResponse.next()
   }
 
-  // Get token using next-auth/jwt
+  // Check NextAuth Token
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
 
-  if (token) {
-    return NextResponse.next() // User authenticated
-  }
+  if (token) return NextResponse.next()
 
-  // Detect locale from url (/en/... , /fr/... , etc)
-  const localeMatch = pathname.match(/^\/(en|fr|ar)(?:\/|$)/)
+  // Find locale
+  const localeMatch = pathname.match(/^\/(en|ar|fr)(?:\/|$)/)
   const locale = localeMatch ? localeMatch[1] : 'en'
 
-  // Redirect to correct login page
   return NextResponse.redirect(new URL(`/${locale}/login`, req.url))
 }
 
 export const config = {
-  matcher: ['/:path*']
+  matcher: ['/((?!_next|static|api|favicon|fonts|images).*)']
 }
