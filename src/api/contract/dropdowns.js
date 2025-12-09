@@ -1,4 +1,4 @@
-// api/contract/dropdowns.js
+// src/api/contract/dropdowns.js
 import api from '@/utils/axiosInstance'
 
 export const getAllDropdowns = async () => {
@@ -10,11 +10,9 @@ export const getAllDropdowns = async () => {
       params: { company, branch, dropdown: true, page_size: 500 }
     })
 
-    // THIS IS THE EXACT PATH FROM YOUR RESPONSE
-    const raw = res?.data?.data?.data || {}
+    const raw = res?.data?.data?.data || res?.data?.data || {}
 
-    // Helper to extract name array from { name: [...] } structure
-    const extractNames = (field) => {
+    const extractNames = field => {
       if (!field) return []
       if (Array.isArray(field)) return field.map(item => item.name || item)
       if (field.name && Array.isArray(field.name)) {
@@ -23,31 +21,35 @@ export const getAllDropdowns = async () => {
       return []
     }
 
-    // Extract customers (might be direct array or object)
-    const customers = raw.customer
-      ? Array.isArray(raw.customer)
-        ? raw.customer.map(c => c.name || c)
-        : raw.customer.name
-        ? raw.customer.name.map(c => c.name || c)
-        : []
-      : []
-
     return {
-      customers,
+      companies:
+        raw.company?.name?.map(item => ({
+          label: item.name,
+          value: item.id
+        })) || [],
+
+      customers:
+        raw.customer?.name?.map(item => ({
+          label: item.name?.trim(),
+          value: item.id
+        })) || [],
+
       callTypes: extractNames(raw.calltype),
-      billingFreq: extractNames(raw.billing_frequency),
+      billingFreq:
+        raw.billing_frequency?.name?.map(item => ({
+          label: item.name,
+          value: item.id
+        })) || [],
+
       serviceFreq: extractNames(raw.service_frequency),
       pests: extractNames(raw.pest),
-      chemicals: [], // not in response
-      employees: [
-        ...(raw.technician?.name || []).map(t => ({ ...t, designation: 'Technician' })),
-        ...(raw.supervisor?.name || []).map(s => ({ ...s, designation: 'Supervisor' })),
-        ...(raw.sales?.name || []).map(sa => ({ ...sa, designation: 'Sales' }))
-      ]
+      chemicals: [],
+      employees: []
     }
   } catch (err) {
     console.error('Dropdown API Error:', err.response?.data || err)
     return {
+      companies: [],
       customers: [],
       callTypes: [],
       billingFreq: [],

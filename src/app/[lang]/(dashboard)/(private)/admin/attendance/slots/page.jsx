@@ -54,7 +54,7 @@ import ChevronRight from '@menu/svg/ChevronRight'
 
 export default function SlotsPage() {
   const [rows, setRows] = useState([])
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 })
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
   const [searchText, setSearchText] = useState('')
 
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -77,7 +77,17 @@ export default function SlotsPage() {
     try {
       const res = await getSlotList(pagination.pageIndex + 1, pagination.pageSize, searchText)
 
-      setRows(res?.data?.results || []) // FIXED
+      console.log('Full API Response:', res.data) // Remove after fix
+
+      // Correct path based on your actual response
+      const slots = res?.data?.data?.results || []
+      const total = res?.data?.data?.count || 0
+
+      setRows(slots)
+      setPagination(prev => ({
+        ...prev,
+        totalCount: total
+      }))
     } catch (error) {
       showToast('error', 'Failed to load slots')
     }
@@ -121,6 +131,23 @@ export default function SlotsPage() {
     setDrawerOpen(true)
   }
 
+  const handleDelete = async id => {
+    if (!window.confirm('Are you sure you want to delete this slot? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      await deleteSlot(id)
+      showToast('success', 'Slot deleted successfully')
+
+      // Refresh list after delete
+      fetchSlots()
+    } catch (error) {
+      const msg = error?.response?.data?.message || error?.message || 'Failed to delete'
+      showToast('error', msg)
+    }
+  }
+
   const handleRefresh = () => {
     fetchSlots()
     showToast('info', 'Slots refreshed')
@@ -150,7 +177,6 @@ export default function SlotsPage() {
 
     try {
       if (isEdit) {
-        // UPDATE
         await updateSlot(formData.id, {
           name: formData.name,
           is_ot: formData.is_ot ? 1 : 0,
@@ -160,12 +186,11 @@ export default function SlotsPage() {
           end_time: formData.end_time,
           work_hours: formData.work_hours,
           lunch: formData.lunch,
-          is_active: formData.is_active // ✅ FIXED
+          is_active: formData.is_active
         })
 
         showToast('success', 'Slot updated successfully')
       } else {
-        // ADD
         await addSlot({
           name: formData.name,
           is_ot: formData.is_ot ? 1 : 0,
@@ -175,12 +200,13 @@ export default function SlotsPage() {
           end_time: formData.end_time,
           work_hours: formData.work_hours,
           lunch: formData.lunch,
-          is_active: formData.is_active // ✅ FIXED
+          is_active: formData.is_active
         })
 
         showToast('success', 'Slot added successfully')
       }
 
+      setPagination(prev => ({ ...prev, pageIndex: 0 })) // 🔥🔥
       toggleDrawer()
       fetchSlots()
     } catch (error) {
@@ -346,7 +372,7 @@ export default function SlotsPage() {
                 value={pagination.pageSize}
                 onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
               >
-                {[10, 25, 50, 75, 100].map(s => (
+                {[25, 50, 75, 100].map(s => (
                   <MenuItem key={s} value={s}>
                     {s} entries
                   </MenuItem>
@@ -439,7 +465,11 @@ export default function SlotsPage() {
         </div>
 
         {/* Pagination */}
-        <TablePaginationComponent totalCount={rows.length} pagination={pagination} setPagination={setPagination} />
+        <TablePaginationComponent
+          totalCount={pagination.totalCount} // 🔥 correct value
+          pagination={pagination}
+          setPagination={setPagination}
+        />
       </Card>
 
       <Drawer
@@ -605,18 +635,26 @@ export default function SlotsPage() {
                   }}
                 />
               </Grid>
-              <Grid item xs={12}>
-                <GlobalSelect
-                  label='Status'
-                  value={formData.is_active === 1 ? 'Active' : 'Inactive'}
-                  onChange={e =>
-                    setFormData({
-                      ...formData,
-                      is_active: e.target.value === 'Active' ? 1 : 0
-                    })
-                  }
-                />
-              </Grid>
+
+              {/* STATUS - ONLY IN EDIT MODE */}
+              {isEdit && (
+                <Grid item xs={12}>
+                  <GlobalSelect
+                    label='Status'
+                    value={formData.is_active === 1 ? 'Active' : 'Inactive'}
+                    onChange={e =>
+                      setFormData({
+                        ...formData,
+                        is_active: e.target.value === 'Active' ? 1 : 0
+                      })
+                    }
+                    menuItems={[
+                      { value: 'Active', label: 'Active' },
+                      { value: 'Inactive', label: 'Inactive' }
+                    ]}
+                  />
+                </Grid>
+              )}
             </Grid>
 
             {/* BUTTONS */}

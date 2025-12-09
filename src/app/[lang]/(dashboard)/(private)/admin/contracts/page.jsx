@@ -62,6 +62,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'react-toastify'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 import ServicePlanDrawer from './service-plan/ServicePlanDrawer'
+import { getTicketBackendDataApi } from '@/api/schedule'
 
 import classnames from 'classnames'
 import { rankItem } from '@tanstack/match-sorter-utils'
@@ -108,6 +109,16 @@ const CONTRACT_STATUS = [
 // Component
 // ───────────────────────────────────────────
 export default function ContractsPage() {
+  const [planDrawer, setPlanDrawer] = useState({
+    open: false,
+    contract: null,
+    pestOptions: []
+  })
+
+  const closePlanDrawer = () => {
+    setPlanDrawer({ open: false, contract: null, pestOptions: [] })
+  }
+
   const router = useRouter()
   const [rows, setRows] = useState([])
   const [rowCount, setRowCount] = useState(0)
@@ -131,6 +142,39 @@ export default function ContractsPage() {
   const [customerFilter, setCustomerFilter] = useState(null)
   const [typeFilter, setTypeFilter] = useState(null)
   const [statusFilter, setStatusFilter] = useState(null)
+
+  const openPlanDrawer = async item => {
+    try {
+      setLoading(true)
+
+      // Always use UUID
+      const res = await getTicketBackendDataApi({ uuid: item.uuid })
+      const backend = res?.data || {}
+
+      setPlanDrawer({
+        open: true,
+        contract: {
+          id: item.id,
+          uuid: item.uuid,
+          contract_code: backend.contract_code || item.contractCode || '',
+          start_date: backend.start_date || null,
+          end_date: backend.end_date || null,
+          time: backend.time || '09:00'
+        },
+        pestOptions:
+          backend?.pest?.map(p => ({
+            pest_id: p.pest_id,
+            frequency_id: p.frequency_id,
+            display: p.display
+          })) || []
+      })
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'Failed to load schedule setup')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const loadData = async (extraFilters = {}) => {
     setLoading(true)
@@ -302,34 +346,44 @@ export default function ContractsPage() {
       }),
 
       columnHelper.display({
-        id: 'actions_column',
+        id: 'actions',
         header: 'Actions',
-        cell: info => (
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            {/* 👁️ View */}
-            <IconButton
-              size='small'
-              color='info'
-              onClick={() => router.push(`/admin/contracts/${info.row.original.uuid}/view`)}
-            >
-              <i className='tabler-eye text-gray-600 text-lg' />
-            </IconButton>
+        meta: { width: '130px', align: 'center' },
 
-            {/* ✏️ Edit */}
-            <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
-              <i className='tabler-edit ' />
-            </IconButton>
+        cell: ({ row }) => {
+          const item = row.original // ⭐ THIS IS REQUIRED
 
-            {/* 🗑️ Delete */}
-            <IconButton
-              size='small'
-              color='error'
-              onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
+          return (
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 1.2
+              }}
             >
-              <i className='tabler-trash text-red-600 text-lg' />
-            </IconButton>
-          </Box>
-        )
+              {/* 👁 VIEW */}
+              <IconButton size='small' onClick={() => router.push(`/admin/contracts/${item.id}/view`)}>
+                <i className='tabler-eye text-gray-600 text-[18px]' />
+              </IconButton>
+
+              {/* ✏ EDIT */}
+              <IconButton size='small' onClick={() => handleEdit(item)}>
+                <i className='tabler-edit text-blue-600 text-[18px]' />
+              </IconButton>
+
+              {/* 📅 SCHEDULE */}
+              <IconButton size='small' onClick={() => openPlanDrawer(item)}>
+                <i className='tabler-calendar text-green-600 text-[18px]' />
+              </IconButton>
+
+              {/* 🗑 DELETE */}
+              <IconButton size='small' onClick={() => setDeleteDialog({ open: true, row: item })}>
+                <i className='tabler-trash text-red-600 text-[18px]' />
+              </IconButton>
+            </Box>
+          )
+        }
       }),
 
       columnHelper.accessor('customer', {
@@ -876,10 +930,10 @@ export default function ContractsPage() {
       </Dialog>
 
       <ServicePlanDrawer
-        open={openDrawer}
-        onClose={() => setOpenDrawer(false)}
-        contract={selectedContract}
-        pestOptions={selectedContract?.pest_items || []}
+        open={planDrawer.open}
+        onClose={closePlanDrawer}
+        contract={planDrawer.contract}
+        pestOptions={planDrawer.pestOptions}
       />
     </Box>
   )

@@ -13,7 +13,11 @@ import {
   InputAdornment,
   Breadcrumbs,
   IconButton,
+  DialogContent,
+  DialogActions,
   TextField,
+  Dialog,
+  DialogTitle,
   MenuItem,
   Pagination,
   FormControl,
@@ -21,10 +25,12 @@ import {
   Checkbox
 } from '@mui/material'
 import { getTicketList } from '@/api/ticket'
+import { getContractList } from '@/api/contract' // ⬅️ add import
 
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
 import AddIcon from '@mui/icons-material/Add'
+import { getAttendanceDropdowns } from '@/api/attendance/dropdowns'
 
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
@@ -36,6 +42,9 @@ import CustomAutocomplete from '@core/components/mui/Autocomplete'
 import { toast, ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { showToast } from '@/components/common/Toasts'
+import WarningAmberIcon from '@mui/icons-material/WarningAmber'
+import DialogCloseButton from '@components/dialogs/DialogCloseButton'
+import GlobalButton from '@/components/common/GlobalButton'
 
 import {
   useReactTable,
@@ -68,8 +77,11 @@ export default function ServiceRequestPage() {
   const [customerFilter, setCustomerFilter] = useState('')
   const [contractFilter, setContractFilter] = useState('')
   const [technicianFilter, setTechnicianFilter] = useState('')
+  const [supervisorFilter, setSupervisorFilter] = useState('')
   const [appointmentStatusFilter, setAppointmentStatusFilter] = useState('')
   const [appointmentTypeFilter, setAppointmentTypeFilter] = useState('')
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
+  const [contractOptions, setContractOptions] = useState([])
 
   const [searchText, setSearchText] = useState('')
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 })
@@ -79,12 +91,62 @@ export default function ServiceRequestPage() {
   const contractRef = useRef(null)
   const techRef = useRef(null)
 
-  // autocomplete options (dummy)
-  const customers = ['GP Industries Pvt Ltd', 'Acme Corp', 'Tech Solutions']
-  const contracts = ['CON-2025-001', 'CON-2024-045', 'CON-2023-010']
-  const technicians = ['John Doe', 'Priya Sharma', 'A. Kumar']
-  const appointmentStatuses = ['Pending', 'Done', 'Cancelled']
-  const appointmentTypes = ['Initial', 'Follow-up', 'Emergency']
+  const [customerOptions, setCustomerOptions] = useState([])
+  const [technicianOptions, setTechnicianOptions] = useState([])
+  const [supervisorOptions, setSupervisorOptions] = useState([])
+  const [attendanceOptions, setAttendanceOptions] = useState([])
+
+  const loadDropdowns = async () => {
+    try {
+      const attendanceRes = await getAttendanceDropdowns()
+
+      const dd = attendanceRes?.data?.data || {}
+
+      const customerList = dd?.customer?.name || []
+      const technicianList = dd?.technician?.name || []
+      const supervisorList = dd?.supervisor?.name || []
+      const attendanceList = dd?.attendance?.label || []
+
+      setCustomerOptions(customerList.map(c => ({ id: c.id, label: c.name || '' })))
+      setTechnicianOptions(technicianList.map(t => ({ id: t.id, label: t.name || '' })))
+      setSupervisorOptions(supervisorList.map(s => ({ id: s.id, label: s.name || '' })))
+      setAttendanceOptions(attendanceList.map(a => ({ id: a.id, label: a.label || '' })))
+    } catch (err) {
+      console.error('Dropdown fetch failed => ', err)
+      showToast('error', 'Failed to load dropdowns')
+    }
+  }
+
+  useEffect(() => {
+    loadDropdowns() // only dropdown fetch
+    setRows([]) // table empty on load
+    setRowCount(0)
+  }, [])
+
+  const confirmDelete = async () => {
+    try {
+      const id = deleteDialog.row?.id
+      if (!id) return
+
+      setLoading(true)
+
+      const res = await deleteSchedule(id) // 🔥 REAL DELETE API CALL
+
+      showToast('success', res?.message || 'Deleted successfully')
+
+      // Close Dialog
+      setDeleteDialog({ open: false, row: null })
+
+      // Refresh Table
+      await fetchTicketsFromApi()
+      loadData(true)
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'Failed to delete item')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // columns
   const columnHelper = createColumnHelper()
@@ -217,135 +279,135 @@ export default function ServiceRequestPage() {
   )
 
   const mapTicketToRow = ticket => {
-    const scheduleDate = ticket.schedule_date
+    const scheduleDate = ticket.start_date // format: "01-03-2025"
 
-    const prodVal = (ticket.pest_items || []).reduce((sum, p) => sum + (p.pest_value || 0), 0)
+    const prodVal = (ticket.pest_items || []).reduce((sum, p) => sum + Number(p.pest_value || 0), 0)
 
     return {
       id: ticket.id,
-      scheduleDate,
-      day: scheduleDate ? format(new Date(scheduleDate), 'EEE') : '',
-      timeIn: ticket.schedule_start_time,
-      timeOut: ticket.schedule_end_time,
-      pestCode: ticket.name || '',
+
+      // ✔ Schedule info
+      scheduleDate: scheduleDate,
+      day: scheduleDate ? format(new Date(scheduleDate.split('-').reverse().join('-')), 'EEE') : '',
+      timeIn: ticket.preferred_time || '',
+      timeOut: '', // No field available in API
+
+      // ✔ Columns visible in UI
+      pestCode: ticket.pest_items?.[0]?.pest || '',
       technician: ticket.technician_id || '',
-      prodVal,
-      customer: ticket.customer_id || '',
+      customer: ticket.customer || '',
+      prodVal: prodVal || ticket.contract_value || 0,
       serviceAddress: ticket.service_address || '',
-      postalCode: ticket.postal_code || '',
-      contactPerson: ticket.contact_person || '',
-      phone: ticket.contact_number || '',
-      contractCode: ticket.num_series || '',
-      appointmentRemarks: ticket.remarks || '',
-      serviceType: ticket.ticket_type || '',
-      scheduleStatus: ticket.ticket_status || '',
-      appointmentStatus: ticket.ticket_status || '',
-      status: ticket.ticket_status || ''
+      postalCode: ticket.postal_address || '',
+      contactPerson: ticket.contact_person_name || '',
+      phone: ticket.phone || ticket.mobile || '',
+      contractCode: ticket.num_series || ticket.contract_code || '',
+      appointmentRemarks: ticket.technician_remarks || '',
+      status: ticket.contract_status || ''
     }
   }
 
-  const CONTRACT_ID = 6010
-
-  const fetchTicketsFromApi = async () => {
+  const fetchTicketsFromApi = async (showToastMsg = false) => {
     try {
       setLoading(true)
 
-      const res = await getTicketList({ contract_id: CONTRACT_ID })
+      const params = {
+        page: pagination.pageIndex + 1,
+        page_size: pagination.pageSize
+      }
 
-      const list = res?.data?.results || []
+      // Priority 1 → Contract filter
+      if (contractFilter) {
+        params.contract_id = contractFilter
+      }
+
+      // Priority 2 → If contract missing but customer selected
+      else if (customerFilter) {
+        params.customer_id = customerFilter
+      }
+
+      // No customer, no contract → empty table
+      else {
+        setRows([])
+        setRowCount(0)
+        setLoading(false)
+        return
+      }
+
+      // Optional filters
+      if (enableDateFilter && startDate && endDate) {
+        params.from_date = format(startDate, 'yyyy-MM-dd')
+        params.to_date = format(endDate, 'yyyy-MM-dd')
+      }
+
+      if (technicianFilter) params.technician_id = technicianFilter
+      if (supervisorFilter) params.supervisor_id = supervisorFilter
+      if (appointmentStatusFilter) params.attendance_status_id = appointmentStatusFilter
+      if (appointmentTypeFilter) params.ticket_type = appointmentTypeFilter
+      if (searchText?.trim()) params.search = searchText.trim()
+
+      console.log('Ticket Params =>', params)
+
+      const res = await getTicketList(params)
+      console.log('Ticket API Response =>', res)
+
+      const list = res?.data?.results || res?.results || []
+      const total = res?.data?.count || res?.count || list.length
+
       const mapped = list.map(mapTicketToRow)
 
-      setAllTickets(mapped)
+      const startIndex = pagination.pageIndex * pagination.pageSize
+      const withSno = mapped.map((item, index) => ({
+        ...item,
+        sno: startIndex + index + 1
+      }))
+
+      setRows(withSno)
+      setRowCount(total)
+
+      if (showToastMsg) {
+        if (total > 0) showToast('success', `${total} service request(s) found`)
+        else showToast('info', 'No service requests found for selected filters')
+      }
     } catch (err) {
-      console.log(err)
-      showToast('error', 'Failed to fetch ticket list')
+      console.error('Ticket fetch failed:', err)
+      showToast('error', 'Failed to load service requests')
+      setRows([])
+      setRowCount(0)
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchTicketsFromApi()
-  }, [])
+    const fetchContractByCustomer = async () => {
+      if (!customerFilter) {
+        setContractOptions([])
+        setContractFilter('')
+        return
+      }
 
-  // filter + load data
-  const loadData = async (showToastMsg = false) => {
-    setLoading(true)
-    try {
-      // simulate fetch delay
-      await new Promise(r => setTimeout(r, 200))
+      try {
+        const res = await getContractList({
+          customer_id: customerFilter
+        })
 
-      // apply filters on dummyData
-      const filtered = (allTickets || []).filter(r => {
-        const matchSearch =
-          !searchText ||
-          Object.values({
-            ...r,
-            prodVal: r.prodVal?.toString() || ''
-          })
-            .join(' ')
-            .toLowerCase()
-            .includes(searchText.toLowerCase())
+        const list = Array.isArray(res) ? res : []
 
-        // date range check
-        const matchDate =
-          !enableDateFilter ||
-          (() => {
-            const rowDate = new Date(r.scheduleDate)
-            // include entire day by comparing date parts
-            const start = new Date(startDate)
-            start.setHours(0, 0, 0, 0)
-            const end = new Date(endDate)
-            end.setHours(23, 59, 59, 999)
-            return rowDate >= start && rowDate <= end
-          })()
-
-        const matchCustomer = !customerFilter || r.customer === customerFilter
-        const matchContract = !contractFilter || r.contractCode === contractFilter
-        const matchTech = !technicianFilter || r.technician === technicianFilter
-        const matchAppStatus = !appointmentStatusFilter || r.appointmentStatus === appointmentStatusFilter
-        const matchAppType = !appointmentTypeFilter || r.serviceType === appointmentTypeFilter
-
-        return matchSearch && matchDate && matchCustomer && matchContract && matchTech && matchAppStatus && matchAppType
-      })
-
-      // sort desc by id
-      const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
-
-      // pagination
-      const start = pagination.pageIndex * pagination.pageSize
-      const end = start + pagination.pageSize
-      const paginated = sorted.slice(start, end)
-
-      const normalized = paginated.map((item, idx) => ({ ...item, sno: start + idx + 1 }))
-      setRows(normalized)
-      setRowCount(filtered.length)
-
-      if (showToastMsg) showToast('info', 'Service Requests refreshed')
-    } catch (err) {
-      console.error(err)
-      showToast('error', 'Failed to load data')
-    } finally {
-      setLoading(false)
+        setContractOptions(
+          list.map(c => ({
+            id: c.id,
+            label: c.contract_code || c.name || 'Contract'
+          }))
+        )
+      } catch (err) {
+        console.error(err)
+        setContractOptions([])
+      }
     }
-  }
 
-  useEffect(() => {
-    loadData(false)
-  }, [
-    allTickets,
-    pagination.pageIndex,
-    pagination.pageSize,
-    searchText,
-    enableDateFilter,
-    startDate,
-    endDate,
-    customerFilter,
-    contractFilter,
-    technicianFilter,
-    appointmentStatusFilter,
-    appointmentTypeFilter
-  ])
+    fetchContractByCustomer()
+  }, [customerFilter])
 
   // react-table
   const table = useReactTable({
@@ -438,8 +500,14 @@ export default function ServiceRequestPage() {
                   variant='contained'
                   startIcon={<RefreshIcon />}
                   onClick={async () => {
-                    await fetchTicketsFromApi()
-                    showToast('success', 'Refreshed')
+                    if (!contractFilter) {
+                      showToast('warning', 'Select contract to refresh filtered list')
+                      return
+                    }
+
+                    setPagination({ pageIndex: 0, pageSize: pagination.pageSize })
+
+                    await fetchTicketsFromApi(true) // pass true to refresh with filters
                   }}
                   sx={{ textTransform: 'none' }}
                 >
@@ -490,47 +558,64 @@ export default function ServiceRequestPage() {
             />
           </Box>
 
-          {/* Customer */}
           <CustomAutocomplete
-            options={customers}
-            value={customerFilter || null}
-            onChange={(e, v) => setCustomerFilter(v || '')}
-            renderInput={params => <CustomTextField {...params} label='Customer' size='small' sx={{ width: 220 }} />}
+            options={customerOptions}
+            value={customerOptions.find(o => o.id === customerFilter) || null}
+            getOptionLabel={option => option?.label || ''} // ✔ only once
+            getOptionKey={option => option?.id}
+            isOptionEqualToValue={(o, v) => o.id === v?.id} // ⭐ IMPORTANT
+            onChange={(_, v) => {
+              const id = v?.id || ''
+              setCustomerFilter(id)
+              setContractFilter('')
+            }}
+            renderInput={params => (
+              <CustomTextField
+                {...params}
+                label='Customer'
+                size='small'
+                sx={{ width: 220 }}
+                placeholder='Search customer...'
+              />
+            )}
           />
 
-          {/* Contract */}
           <CustomAutocomplete
-            options={contracts}
-            value={contractFilter || null}
-            onChange={(e, v) => setContractFilter(v || '')}
-            renderInput={params => <CustomTextField {...params} label='Contract' size='small' sx={{ width: 180 }} />}
+            options={contractOptions}
+            value={contractOptions.find(o => o.id === contractFilter) || null}
+            getOptionLabel={option => option?.label || ''}
+            getOptionKey={option => option?.id}
+            isOptionEqualToValue={(o, v) => o.id === v?.id}
+            onChange={(_, v) => setContractFilter(v?.id || '')}
+            renderInput={params => <CustomTextField {...params} label='Contract' size='small' sx={{ width: 220 }} />}
           />
 
           {/* Technician */}
           <CustomAutocomplete
-            options={technicians}
-            value={technicianFilter || null}
-            onChange={(e, v) => setTechnicianFilter(v || '')}
+            options={technicianOptions}
+            value={technicianOptions.find(o => o.id === technicianFilter) || null}
+            onChange={(_, v) => setTechnicianFilter(v?.id || '')}
+            getOptionLabel={option => option?.label || ''}
             renderInput={params => <CustomTextField {...params} label='Technician' size='small' sx={{ width: 180 }} />}
           />
 
-          {/* Appointment Status */}
+          {/* Supervisor */}
           <CustomAutocomplete
-            options={appointmentStatuses}
-            value={appointmentStatusFilter || null}
-            onChange={(e, v) => setAppointmentStatusFilter(v || '')}
-            renderInput={params => (
-              <CustomTextField {...params} label='Appointment Status' size='small' sx={{ width: 180 }} />
-            )}
+            options={supervisorOptions}
+            value={supervisorOptions.find(o => o.id === supervisorFilter) || null}
+            onChange={(_, v) => setSupervisorFilter(v?.id || '')}
+            getOptionLabel={option => option?.label || ''}
+            renderInput={params => <CustomTextField {...params} label='Supervisor' size='small' sx={{ width: 180 }} />}
           />
 
-          {/* Appointment Type */}
+          {/* Attendance Status */}
           <CustomAutocomplete
-            options={appointmentTypes}
-            value={appointmentTypeFilter || null}
-            onChange={(e, v) => setAppointmentTypeFilter(v || '')}
+            options={attendanceOptions}
+            value={attendanceOptions.find(o => o.id === appointmentStatusFilter) || null}
+            onChange={(_, v) => setAppointmentStatusFilter(v?.id || '')}
+            getOptionLabel={option => option?.label || ''}
             renderInput={params => (
-              <CustomTextField {...params} label='Appointment Type' size='small' sx={{ width: 180 }} />
+              <CustomTextField {...params} label='Attendance Status' size='small' sx={{ width: 180 }} />
             )}
           />
         </Box>
@@ -701,9 +786,76 @@ export default function ServiceRequestPage() {
             showLastButton
           />
         </Box>
-      </Card>
 
-      <ToastContainer />
+        <Dialog
+          onClose={() => setDeleteDialog({ open: false, row: null })}
+          aria-labelledby='customized-dialog-title'
+          open={deleteDialog.open}
+          closeAfterTransition={false}
+          PaperProps={{
+            sx: {
+              overflow: 'visible',
+              width: 420,
+              borderRadius: 1,
+              textAlign: 'center'
+            }
+          }}
+        >
+          {/* 🔴 Title with Warning Icon */}
+          <DialogTitle
+            id='customized-dialog-title'
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 1,
+              color: 'error.main',
+              fontWeight: 700,
+              pb: 1,
+              position: 'relative'
+            }}
+          >
+            <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
+            Confirm Delete
+            <DialogCloseButton
+              onClick={() => setDeleteDialog({ open: false, row: null })}
+              disableRipple
+              sx={{ position: 'absolute', right: 1, top: 1 }}
+            >
+              <i className='tabler-x' />
+            </DialogCloseButton>
+          </DialogTitle>
+
+          {/* Centered Text */}
+          <DialogContent sx={{ px: 5, pt: 1 }}>
+            <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
+              Are you sure you want to delete{' '}
+              <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name || 'this incident'}</strong>?
+              <br />
+              This action cannot be undone.
+            </Typography>
+          </DialogContent>
+
+          {/* Centered Buttons */}
+          <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+            <GlobalButton
+              onClick={() => setDeleteDialog({ open: false, row: null })}
+              color='secondary'
+              sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+            >
+              Cancel
+            </GlobalButton>
+            <GlobalButton
+              onClick={confirmDelete}
+              variant='contained'
+              color='error'
+              sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+            >
+              Delete
+            </GlobalButton>
+          </DialogActions>
+        </Dialog>
+      </Card>
     </Box>
   )
 }

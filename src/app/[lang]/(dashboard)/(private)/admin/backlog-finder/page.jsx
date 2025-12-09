@@ -106,6 +106,7 @@ export default function BacklogFinderPage() {
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
 
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
+  const [enableDateFilter, setEnableDateFilter] = useState(false)
 
   const loadData = () => {
     setLoading(true)
@@ -157,18 +158,18 @@ export default function BacklogFinderPage() {
   const fetchBacklog = async () => {
     setLoading(true)
     try {
-      const res = await getReportBacklogList()
+      const payload = {}
+      if (fromDate) payload.from_date = fromDate
+      if (toDate) payload.to_date = toDate
+
+      const res = await getReportBacklogList(payload)
 
       if (res?.status === 'success') {
-        let list = Array.isArray(res.data) ? res.data : []
-
-        // backend returns empty object → remove those
-        list = list.filter(item => item.id)
+        let list = Array.isArray(res.results) ? res.results : []
 
         const normalized = list.map((item, index) => ({
           id: item.id,
           sno: index + 1,
-
           serviceDate: item.service_date,
           scheduleDate: item.schedule_date,
           backlogDays: item.backlog_days,
@@ -195,19 +196,21 @@ export default function BacklogFinderPage() {
         setRowCount(normalized.length)
         setPagination(prev => ({ ...prev, pageIndex: 0 }))
       } else {
-        showToast('error', res?.message || 'Failed to fetch report backlog')
+        showToast('error', res?.message || 'No data')
         setAllRows([])
         setRowCount(0)
       }
     } catch (err) {
       console.error('report-backlog fetch error:', err)
       showToast('error', 'Error fetching report backlog')
-      setAllRows([])
-      setRowCount(0)
     } finally {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    if (fromDate || toDate) fetchBacklog()
+  }, [fromDate, toDate])
 
   // fetch once on page load
   useEffect(() => {
@@ -462,15 +465,20 @@ export default function BacklogFinderPage() {
             {/* Checkbox + Label */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
               <Checkbox
-                checked={!!fromDate || !!toDate}
+                checked={enableDateFilter}
                 onChange={e => {
-                  if (!e.target.checked) {
+                  const checked = e.target.checked
+                  setEnableDateFilter(checked)
+
+                  if (!checked) {
                     setFromDate('')
                     setToDate('')
+                    fetchBacklog() // reload full data when unchecked
                   }
                 }}
                 size='small'
               />
+
               <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Date Range</Typography>
             </Box>
 
@@ -483,7 +491,7 @@ export default function BacklogFinderPage() {
                 setFromDate(start)
                 setToDate(end)
               }}
-              disabled={!fromDate && !toDate}
+              disabled={!enableDateFilter}
             />
           </Box>
           <Divider sx={{ mb: 4 }} />

@@ -71,9 +71,11 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
 
 const contractStatusOptions = [
   { label: 'Current', value: 'Current' },
-  { label: 'Expired', value: 'Expired' },
+  { label: 'Renewal Pending', value: 'Renewal Pending' },
+  { label: 'Renewed', value: 'Renewed' },
   { label: 'Hold', value: 'Hold' },
-  { label: 'Terminated', value: 'Terminated' }
+  { label: 'Terminated', value: 'Terminated' },
+  { label: 'Expired', value: 'Expired' }
 ]
 
 const renewalOptions = [
@@ -107,6 +109,8 @@ export default function ContractStatusPage() {
   const [contractTypeOptions, setContractTypeOptions] = useState([])
   const [invoiceOptions, setInvoiceOptions] = useState([])
 
+  const [companyMap, setCompanyMap] = useState(new Map()) // For mapping company ID to name
+
   const originRef = useRef()
   const customerRef = useRef()
   const contractTypeRef = useRef()
@@ -116,73 +120,115 @@ export default function ContractStatusPage() {
 
   const loadData = async () => {
     setLoading(true)
+    console.log('🟡 Invoice Filter Object →', invoiceFrequencyFilter)
 
     try {
       // 1️⃣ CALL API WITH FILTERS + PAGINATION
-      const params = {
-        contract_type: contractTypeFilter || undefined,
-        contract_status: contractStatusFilter || undefined,
-        invoice_frequency: invoiceFrequencyFilter || undefined,
-        customer_id: customerFilter?.value || undefined,
-        company_id: originFilter?.value || undefined,
-        is_renewed: renewalFilter || undefined,
+      const params = {}
 
-        // date filter
-        start_date: filterByDate && dateFilter.start ? dateFilter.start.toISOString().slice(0, 10) : undefined,
-        end_date: filterByDate && dateFilter.end ? dateFilter.end.toISOString().slice(0, 10) : undefined,
+      if (originFilter?.value) params.company_id = originFilter.value
+      if (customerFilter?.value) params.customer_id = customerFilter.value
+      if (contractTypeFilter?.value) params.contract_type = contractTypeFilter.value
+      if (invoiceFrequencyFilter?.value) params.billing_frequency_id = invoiceFrequencyFilter.value
+      if (contractStatusFilter?.value) params.contract_status = contractStatusFilter.value
+      if (renewalFilter?.value) params.is_renewed = renewalFilter.value === 'Renewed' ? true : false
 
-        // pagination
-        page: pagination.pageIndex + 1,
-        page_size: pagination.pageSize
+      if (filterByDate && dateFilter.start && dateFilter.end) {
+        params.from_date = dateFilter.start.toISOString().split('T')[0]
+        params.to_date = dateFilter.end.toISOString().split('T')[0]
+      } else {
+        delete params.from_date
+        delete params.to_date
       }
+
+      params.page = pagination.pageIndex + 1
+      params.page_size = pagination.pageSize
+
+      console.log('🔍 Params sending to API: ', params)
 
       const response = await getContractView(params)
 
-      const count = response.data.count
-      const results = response.data.results
+      // Safely handle both response formats
+      const apiData = response.data.data ?? response.data
+
+      const count = apiData.count ?? 0
+      const results = apiData.results ?? []
 
       setRowCount(count)
 
       // 2️⃣ MAP API FIELDS → UI FIELDS
-      const normalized = results.map((item, index) => ({
-        sno: index + 1 + pagination.pageIndex * pagination.pageSize,
-        id: item.id,
+      // 2️⃣ MAP API FIELDS → UI FIELDS
+      const normalized = results.map((item, index) => {
+        // 🔹 Proper Status Text Convert
+        const statusMap = {
+          1: 'Current',
+          2: 'Expired',
+          3: 'Hold',
+          4: 'Terminated'
+        }
+        // Remove number mapping — API gives correct status string
+        const statusText = item.contract_status || 'Current'
 
-        customer: item.customer_name,
-        services: item.service_label, // correct
+        // Date Formatter
+        const formatDate = d => {
+          if (!d) return ''
+          // Convert "DD-MM-YYYY" & "2025-12-06" (BE)
+          const clean = d.replace(/[/\s].*/, '')
+          const parts = clean.split(/[-/]/)
 
-        contractCode: item.contract_code,
-        type: item.contract_type,
+          if (parts.length === 3) {
+            if (parts[0].length === 2) {
+              // dd-mm-yyyy
+              return `${parts[0]}-${parts[1]}-${parts[2]}`
+            } else if (parts[0].length === 4) {
+              // yyyy-mm-dd
+              return `${parts[2]}-${parts[1]}-${parts[0]}`
+            }
+          }
 
-        serviceAddress: item.service_address, // ← correct key
-        postalCode: item.postal_address, // ← correct key
+          return new Date(d).toLocaleDateString('en-GB')
+        }
 
-        startDate: item.start_date, // already correct
-        endDate: item.end_date,
+        return {
+          sno: index + 1 + pagination.pageIndex * pagination.pageSize,
+          id: item.id,
 
-        // PEST — API gives only array, no label present directly
-        pest: item.pest_items?.map(p => p.pest).join(', ') || '',
+          customer: item.customer_name || '—',
+          services: item.call_type_id || item.category || item.sales_mode || '—',
+          contractCode: item.contract_code || '—',
+          type: item.contract_type || '—',
+          serviceAddress: item.service_address || item.agreement_add_1 || item.agreement_add_2 || '—',
+          postalCode: item.postal_address || '—',
 
-        contractValue: item.contract_value,
-        prodValue: item.product_value,
+          // 👇 Final Display Date Conversion
+          startDate: formatDate(item.start_date),
+          endDate: formatDate(item.end_date),
+          renewalOn: formatDate(item.renewed_on),
+          holdedOn: formatDate(item.holded_on),
+          terminatedOn: formatDate(item.terminated_on),
+          expiredOn: formatDate(item.expired_on),
 
-        contactPerson: item.contact_person_name, // ← correct key
-        contactPhone: item.mobile || item.phone, // API has phone + mobile
+          pest:
+            item.ref_contract_pests?.map(p => p.pest).join(', ') ||
+            item.ref_job_pests?.map(p => p.pest).join(', ') ||
+            '—',
 
-        renewalPending: item.is_renewed ? 'No' : 'Yes',
-        renewalOn: item.renewed_on,
-        holdedOn: item.holded_on,
-        terminatedOn: item.terminated_on,
-        expiredOn: item.expired_on,
+          contractValue: item.contract_value || 0,
+          prodValue: item.product_value || 0,
 
-        status: item.contract_status,
+          contactPerson: item.contact_person_name || '—',
+          contactPhone: item.mobile || item.phone || '—',
 
-        origin: item.company_id, // API gives only ID, no name
+          renewalPending: item.is_renewed === 1 ? 'No' : 'Yes',
 
-        reportEmail: item.report_email,
-        picEmail: item.appointment_remarks, // API does not have pic_email
-        billingEmail: item.billing_remarks
-      }))
+          status: statusText, // 👈 Correct Status Value
+
+          origin: companyMap.get(item.company_id) || item.company_id || '—',
+          reportEmail: item.report_email || '—',
+          picEmail: item.appointment_remarks || '—',
+          billingEmail: item.billing_remarks || '—'
+        }
+      })
 
       // 3️⃣ SET DATA TO TABLE
       setRows(normalized)
@@ -195,8 +241,10 @@ export default function ContractStatusPage() {
   }
 
   // STEP 2: Filter change aana page 1 ku po
+  // When filters change -> Reset to first page + load
   useEffect(() => {
     setPagination(prev => ({ ...prev, pageIndex: 0 }))
+    loadData()
   }, [
     searchText,
     filterByDate,
@@ -210,58 +258,42 @@ export default function ContractStatusPage() {
     renewalFilter
   ])
 
+  // When pagination changes -> load
+  useEffect(() => {
+    loadData()
+  }, [pagination.pageIndex, pagination.pageSize])
+
   useEffect(() => {
     const fetchDropdowns = async () => {
       try {
-        const response = await getAllDropdowns()
+        const result = await getAllDropdowns()
 
-        console.log('Dropdown Full Response >>> ', response.data)
+        console.log('Dropdowns from API:', result)
 
-        const dropdownData = response?.data?.data // 👈 FIX HERE
+        // Origin (Company)
+        setOriginOptions(result.companies || [])
+        setCompanyMap(new Map(result.companies?.map(c => [c.value, c.label]) || []))
 
-        if (!dropdownData) return
+        // Customer
+        setCustomerOptions(result.customers || [])
 
-        setOriginOptions(
-          dropdownData.company?.name?.map(item => ({
-            label: item.name,
-            value: item.id
-          })) || []
-        )
-
-        setCustomerOptions(
-          dropdownData.customer?.name?.map(item => ({
-            label: item.name,
-            value: item.id
-          })) || []
-        )
-
+        // Contract Type
         setContractTypeOptions(
-          dropdownData.contract_type?.name?.map(item => ({
-            label: item.name,
-            value: item.id
-          })) || []
+          (result.callTypes || []).map(type => ({
+            label: type,
+            value: type
+          }))
         )
 
-        setInvoiceOptions(
-          dropdownData.billing_frequency?.name?.map(item => ({
-            label: item.name,
-            value: item.id
-          })) || []
-        )
+        setInvoiceOptions(result.billingFreq || [])
       } catch (err) {
-        console.error('Dropdown fetch failed:', err)
+        console.error('Failed to load dropdowns:', err)
         showToast('error', 'Failed to load filters')
       }
     }
 
     fetchDropdowns()
   }, [])
-
-  // STEP 3: Page number or page size maatrina data load pannu
-  useEffect(() => {
-    loadData()
-  }, [pagination.pageIndex, pagination.pageSize])
-
   // Table Columns
   const columnHelper = createColumnHelper()
   const columns = useMemo(
@@ -363,19 +395,28 @@ export default function ContractStatusPage() {
           const s = info.getValue() || 'Current'
           const bg =
             s === 'Current'
-              ? 'success.main'
-              : s === 'Expired'
-                ? 'error.main'
+              ? '#28a745'
+              : s === 'Terminated'
+                ? '#dc3545'
                 : s === 'Hold'
-                  ? 'warning.main'
-                  : s === 'Terminated'
-                    ? 'error.main'
-                    : 'info.main'
+                  ? '#ffc107'
+                  : s === 'Expired'
+                    ? '#fd7e14'
+                    : '#6c757d'
+
           return (
             <Chip
               label={s}
               size='small'
-              sx={{ color: '#fff', bgcolor: bg, fontWeight: 600, borderRadius: '6px', px: 1.5 }}
+              sx={{
+                color: '#fff',
+                bgcolor: bg,
+                fontWeight: 700,
+                fontSize: '0.75rem',
+                borderRadius: '6px',
+                px: 1.5,
+                textTransform: 'capitalize'
+              }}
             />
           )
         },
@@ -386,7 +427,7 @@ export default function ContractStatusPage() {
       columnHelper.accessor('picEmail', { header: 'PIC Email', meta: { width: '150px' } }),
       columnHelper.accessor('billingEmail', { header: 'Billing Email', meta: { width: '150px' } })
     ],
-    []
+    [companyMap]
   )
 
   const fuzzyFilter = (row, columnId, value, addMeta) => {
@@ -569,14 +610,43 @@ export default function ContractStatusPage() {
             {' '}
             {/* 👈 FIX is here */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-              <Checkbox checked={filterByDate} onChange={e => setFilterByDate(e.target.checked)} size='small' />
+              <Checkbox
+                checked={filterByDate}
+                onChange={e => {
+                  const checked = e.target.checked
+                  setFilterByDate(checked)
+
+                  if (checked) {
+                    const today = new Date()
+                    const onlyDate = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+
+                    const updatedRange = {
+                      start: onlyDate,
+                      end: onlyDate
+                    }
+
+                    setDateFilter(updatedRange)
+
+                    // 👇 THIS IS MISSING EARLIER → Force API call
+                    setTimeout(() => {
+                      loadData()
+                    }, 0)
+                  } else {
+                    setDateFilter({ start: null, end: null })
+                    setTimeout(() => {
+                      loadData()
+                    }, 0)
+                  }
+                }}
+                size='small'
+              />
+
               <Typography sx={{ fontSize: '0.85rem', fontWeight: 500 }}>Date Range</Typography>
             </Box>
             <AppReactDatepicker
               selectsRange
               startDate={dateFilter?.start || null}
               endDate={dateFilter?.end || null}
-              selected={dateFilter?.start || null}
               onChange={dates => {
                 const [start, end] = dates
                 setDateFilter({ start, end })

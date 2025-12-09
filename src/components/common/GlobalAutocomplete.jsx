@@ -13,49 +13,79 @@ const GlobalAutocomplete = ({
   isOptionEqualToValue,
   ...props
 }) => {
-  // ⭐ Normalize options
+  // ⭐ Normalize all options to { label, value }
   const normalizedOptions = options.map((opt, i) => {
     if (typeof opt === 'string') {
       return {
-        id: opt,
         label: opt,
         value: opt,
-        _key: opt
+        _key: `${opt}-${i}`
       }
     }
+
     return {
+      label: opt.label ?? opt.name ?? '',
+      value: opt.value ?? opt.id ?? '',
       ...opt,
       _key: `${opt.id ?? opt.value ?? i}-${i}`
     }
   })
 
-  // ⭐ Normalize current value
+  // ⭐ Sync string-value selection
   const normalizedValue =
-    typeof value === 'string' ? normalizedOptions.find(o => o.value === value || o.label === value) || null : value
+    typeof value === 'string'
+      ? normalizedOptions.find(o => o.value === value || o.label === value) || null
+      : value
 
-  // ⭐ Default label renderer
-  const finalGetLabel = getOptionLabel ?? (option => option?.label || option?.value || option?.name || '')
+  // ⭐ Display text
+  const finalGetLabel =
+    getOptionLabel ??
+    (option => {
+      if (!option) return ''
+      return typeof option === 'object' ? option.label || '' : String(option)
+    })
 
-  // ⭐ Default equality check
-  const finalIsEqual = isOptionEqualToValue ?? ((opt, val) => opt?.id === val?.id || opt?.value === val?.value)
+  // ⭐ Equality check (for highlighting selected option)
+  const finalIsEqual =
+    isOptionEqualToValue ??
+    ((a, b) => {
+      if (!a || !b) return false
+      if (typeof a === 'object' && typeof b === 'object') return String(a.value) === String(b.value)
+      return a === b
+    })
 
   return (
     <CustomAutocomplete
       fullWidth
+      size="small"
       options={normalizedOptions}
       value={normalizedValue}
       getOptionLabel={finalGetLabel}
       isOptionEqualToValue={finalIsEqual}
-      renderOption={(params, option) => (
-        <li {...params} key={option._key}>
+      renderOption={(props, option, { selected }) => (
+        <li
+          {...props}
+          key={option._key}
+          style={{
+            backgroundColor: selected ? '#f0d9d9' : '#fff',
+            fontWeight: selected ? 600 : 400,
+            padding: '6px 10px',
+            cursor: 'pointer'
+          }}
+          onMouseEnter={e => {
+            if (!selected) e.currentTarget.style.backgroundColor = '#f5f5f5'
+          }}
+          onMouseLeave={e => {
+            if (!selected) e.currentTarget.style.backgroundColor = '#fff'
+          }}
+        >
           {finalGetLabel(option)}
         </li>
       )}
-      // ⭐ FIX: Return FULL OBJECT (never return string)
-      onChange={(event, newValue) => {
-        onChange(newValue || null)
-      }}
-      renderInput={params => <CustomTextField {...params} label={label} placeholder={placeholder} />}
+      onChange={(event, newValue) => onChange(newValue || null)}
+      renderInput={params => (
+        <CustomTextField {...params} label={label} placeholder={placeholder || label} />
+      )}
       {...props}
     />
   )

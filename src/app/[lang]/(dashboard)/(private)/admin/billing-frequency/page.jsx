@@ -567,7 +567,7 @@ export default function BillingFrequencyPage() {
               value={pagination.pageSize}
               onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
             >
-              {[5, 10, 25, 50].map(s => (
+              {[25, 50, 75, 100].map(s => (
                 <MenuItem key={s} value={s}>
                   {s} entries
                 </MenuItem>

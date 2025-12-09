@@ -96,26 +96,22 @@ export default function KivFinderPage() {
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
 
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
+  const [enableDateFilter, setEnableDateFilter] = useState(false)
 
   // -----------------------------
   // FETCH DATA FROM API
   // -----------------------------
-  const fetchKVI = async () => {
+  const fetchKVI = async (payload = {}) => {
     setLoading(true)
-
     try {
-      const res = await getKviFinderList()
+      const res = await getKviFinderList(payload)
 
       if (res?.status === 'success') {
-        let list = Array.isArray(res.data) ? res.data : []
-
-        // remove empty placeholder object
-        list = list.filter(item => item.customer || item.service_address)
+        let list = Array.isArray(res.results) ? res.results : []
 
         const normalized = list.map((item, index) => ({
-          id: index + 1,
+          id: item.id,
           sno: index + 1,
-
           customer: item.customer,
           address: item.service_address,
           serviceDate: item.service_date,
@@ -126,7 +122,6 @@ export default function KivFinderPage() {
           technician: item.technician,
           degree: item.degree,
           purpose: item.purpose,
-
           serviceDateFormatted: formatDate(item.service_date),
           nextRoutineDateFormatted: formatDate(item.next_routine_date)
         }))
@@ -135,15 +130,13 @@ export default function KivFinderPage() {
         setRowCount(normalized.length)
         setPagination(prev => ({ ...prev, pageIndex: 0 }))
       } else {
-        showToast('error', res?.message || 'Failed to fetch KVI list')
+        showToast('error', res?.message || 'No data found')
         setAllRows([])
         setRowCount(0)
       }
     } catch (err) {
-      console.error('kvi-finder fetch error:', err)
-      showToast('error', 'Error fetching KVI Finder list')
-      setAllRows([])
-      setRowCount(0)
+      console.error(err)
+      showToast('error', 'Error loading KVI data')
     } finally {
       setLoading(false)
     }
@@ -401,15 +394,20 @@ export default function KivFinderPage() {
             {/* Checkbox + Label */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
               <Checkbox
-                checked={!!fromDate || !!toDate}
+                checked={enableDateFilter}
                 onChange={e => {
-                  if (!e.target.checked) {
+                  const checked = e.target.checked
+                  setEnableDateFilter(checked)
+
+                  if (!checked) {
                     setFromDate('')
                     setToDate('')
+                    fetchKVI() // reload full list
                   }
                 }}
                 size='small'
               />
+
               <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Date Range</Typography>
             </Box>
 
@@ -421,10 +419,12 @@ export default function KivFinderPage() {
               onSelectRange={({ start, end }) => {
                 setFromDate(start)
                 setToDate(end)
+                fetchKVI({ from_date: start, to_date: end }) // 🔥 call API on date change
               }}
-              disabled={!fromDate && !toDate}
+              disabled={!enableDateFilter}
             />
           </Box>
+
           <Divider sx={{ mb: 4 }} />
 
           {/* ENTRIES + SEARCH ROW */}

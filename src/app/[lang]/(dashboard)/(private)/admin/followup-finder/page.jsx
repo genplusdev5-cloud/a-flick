@@ -98,6 +98,7 @@ export default function FollowupFinderPage() {
   const [loading, setLoading] = useState(false)
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
+  const [enableDateFilter, setEnableDateFilter] = useState(false)
 
   const [pagination, setPagination] = useState({
     pageIndex: 0,
@@ -151,27 +152,22 @@ export default function FollowupFinderPage() {
   // ----------------------------
   // Fetch from API
   // ----------------------------
-  const fetchFollowup = async () => {
+  const fetchFollowup = async (payload = {}) => {
     setLoading(true)
     try {
-      const res = await getReportFollowupList()
+      const res = await getReportFollowupList(payload)
 
       if (res?.status === 'success') {
-        let list = Array.isArray(res.data) ? res.data : []
-
-        // Remove empty rows from backend
-        list = list.filter(item => item.customer)
+        let list = Array.isArray(res.results) ? res.results : []
 
         const normalized = list.map((item, index) => ({
-          id: index + 1,
+          id: item.id,
           sno: index + 1,
-
           customer: item.customer,
           address: item.service_address,
           serviceDate: item.service_date,
           nextServiceDate: item.next_service_date,
           daysDiff: item.days_diff,
-
           appointmentStatus: item.appointment_status,
           pest: item.pest,
           purpose: item.purpose,
@@ -183,15 +179,13 @@ export default function FollowupFinderPage() {
         setRowCount(normalized.length)
         setPagination(prev => ({ ...prev, pageIndex: 0 }))
       } else {
-        showToast('error', res?.message || 'Failed to fetch follow-up report')
+        showToast('error', res?.message || 'No data')
         setAllRows([])
         setRowCount(0)
       }
     } catch (err) {
-      console.error('followup fetch error:', err)
-      showToast('error', 'Error fetching follow-up report')
-      setAllRows([])
-      setRowCount(0)
+      console.error('fetch error:', err)
+      showToast('error', 'Error fetching follow-up data')
     } finally {
       setLoading(false)
     }
@@ -386,11 +380,15 @@ export default function FollowupFinderPage() {
             {/* Checkbox + Label */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
               <Checkbox
-                checked={!!fromDate || !!toDate}
+                checked={enableDateFilter}
                 onChange={e => {
-                  if (!e.target.checked) {
+                  const checked = e.target.checked
+                  setEnableDateFilter(checked)
+
+                  if (!checked) {
                     setFromDate('')
                     setToDate('')
+                    fetchFollowup() // reload full list
                   }
                 }}
                 size='small'
@@ -406,8 +404,9 @@ export default function FollowupFinderPage() {
               onSelectRange={({ start, end }) => {
                 setFromDate(start)
                 setToDate(end)
+                fetchFollowup({ from_date: start, to_date: end }) // 🔥 auto filter
               }}
-              disabled={!fromDate && !toDate}
+              disabled={!enableDateFilter}
             />
           </Box>
           <Divider sx={{ mb: 4 }} />

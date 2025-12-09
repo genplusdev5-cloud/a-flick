@@ -27,6 +27,7 @@ import {
 } from '@mui/material'
 
 import { getNonPrescheduleList } from '@/api/nonPreschedule/list'
+import { getCustomerList } from '@/api/customer/list'
 
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
@@ -89,117 +90,131 @@ export default function NonPreScheduleReportPage() {
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
   const [dateRange, setDateRange] = useState({ start: null, end: null })
   const [checked, setChecked] = useState(false)
+  const [customerLoading, setCustomerLoading] = useState(false)
 
   // only customer filter per your request
   const [customerFilter, setCustomerFilter] = useState(null)
-
-  // derive unique customer options from dummy
-  const customerOptions = useMemo(() => {
-    const map = new Map()
-    allRows.forEach(r => {
-      if (!map.has(r.customer)) map.set(r.customer, { id: r.customer, name: r.customer })
-    })
-    return Array.from(map.values())
-  }, [allRows])
+  const [customerOptions, setCustomerOptions] = useState([])
 
   // load & apply local filters, search, pagination — no API calls
   const loadData = () => {
-    setLoading(true)
+    let filtered = [...allRows]
+
+    // Date Range Filter (only if checkbox checked)
+    if (checked && dateRange.start && dateRange.end) {
+      const start = new Date(dateRange.start)
+      const end = new Date(dateRange.end)
+      filtered = filtered.filter(r => {
+        if (!r.startDate) return false
+        const d = new Date(r.startDate.split('-').reverse().join('-')) // DD-MM-YYYY → YYYY-MM-DD
+        return d >= start && d <= end
+      })
+    }
+
+    // Search Filter
+    if (searchText.trim()) {
+      const q = searchText.toLowerCase()
+      filtered = filtered.filter(r =>
+        [r.customer, r.contractCode, r.serviceAddress, r.pests]
+          .join(' ')
+          .toLowerCase()
+          .includes(q)
+      )
+    }
+
+    // Sort newest first
+    filtered.sort((a, b) => b.id - a.id)
+
+    // Pagination
+    const startIdx = pagination.pageIndex * pagination.pageSize
+    const paginated = filtered.slice(startIdx, startIdx + pagination.pageSize)
+
+    setRows(paginated.map((r, i) => ({
+      ...r,
+      sno: startIdx + i + 1,
+      startDateFormatted: formatDate(r.startDate),
+      endDateFormatted: formatDate(r.endDate)
+    })))
+    setRowCount(filtered.length)
+  }
+
+  const fetchCustomerList = async () => {
+    setCustomerLoading(true)
     try {
-      let filtered = [...allRows]
+      const res = await getCustomerList({
+        page: 1,
+        page_size: 500, // Load max customers for dropdown
+        search: ''
+      })
 
-      // customer filter
-      if (customerFilter) {
-        filtered = filtered.filter(r => r.customer === customerFilter)
+      if (res?.status === 'success') {
+        const list = res.data?.results || res.data || []
+
+        const customers = list.map(c => ({
+          id: c.id,
+          name: c.customer_name || c.name || ''
+        }))
+
+        setCustomerOptions(customers)
+      } else {
+        showToast('error', 'Failed to load customers')
       }
-
-      // DATE RANGE FILTER
-      if (dateRange.start && dateRange.end) {
-        const start = new Date(dateRange.start)
-        const end = new Date(dateRange.end)
-
-        filtered = filtered.filter(r => {
-          if (!r.startDate) return false
-          const d = new Date(r.startDate)
-          return d >= start && d <= end
-        })
-      }
-
-      // search
-      if (searchText && searchText.trim()) {
-        const q = searchText.trim().toLowerCase()
-        filtered = filtered.filter(r => {
-          return (
-            String(r.customer).toLowerCase().includes(q) ||
-            String(r.contractCode).toLowerCase().includes(q) ||
-            String(r.serviceAddress).toLowerCase().includes(q) ||
-            String(r.pests).toLowerCase().includes(q)
-          )
-        })
-      }
-
-      // sort by id desc
-      filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
-
-      // pagination
-      const start = pagination.pageIndex * pagination.pageSize
-      const end = start + pagination.pageSize
-      const paginated = filtered.slice(start, end)
-
-      const normalized = paginated.map((item, idx) => ({
-        ...item,
-        sno: start + idx + 1,
-        startDateFormatted: item.startDate ? formatDate(item.startDate) : '',
-        endDateFormatted: item.endDate ? formatDate(item.endDate) : ''
-      }))
-
-      setRows(normalized)
-      setRowCount(filtered.length)
+    } catch (err) {
+      console.error('Customer fetch error:', err)
+      showToast('error', 'Error fetching customer list')
     } finally {
-      setTimeout(() => setLoading(false), 220)
+      setCustomerLoading(false)
     }
   }
 
   // 🔹 Fetch from API and normalize data
   const fetchNonPreschedule = async () => {
+    if (!customerFilter) {
+      // No customer selected → show empty
+      setAllRows([])
+      setRows([])
+      setRowCount(0)
+      return
+    }
+
     setLoading(true)
     try {
-      const res = await getNonPrescheduleList()
+      const res = await getNonPrescheduleList({
+        customer_id: customerFilter // only this ID sent
+        // date & search NOT sent to backend
+      })
 
       if (res?.status === 'success') {
-        let list = Array.isArray(res.data) ? res.data : []
-
-        // Some APIs return one empty object – filter that out
-        list = list.filter(item => item.id)
+        let list = Array.isArray(res.data?.data) ? res.data.data : res.data || []
 
         const normalized = list.map((item, index) => ({
-          id: item.id,
-          sno: index + 1, // will be recalculated after pagination
-          customer: item.customer,
-          contractCode: item.contract_code,
-          type: item.type,
-          serviceAddress: item.service_address,
-          postalCode: item.postal_code,
-          startDate: item.start_date, // still string (YYYY-MM-DD)
-          endDate: item.end_date,
-          pests: item.pests,
-          frequency: item.frequency,
-          pestServiceCount: item.pest_service_count,
-          balance: item.balance,
+          id: item.row_number || index + 1,
+          sno: index + 1,
+          customer: item.customer || '',
+          contractCode: item.contract_code || '',
+          type: item.contract_type || '',
+          serviceAddress: item.service_address || '',
+          postalCode: item.postal_address || '',
+          startDate: item.start_date || '',
+          endDate: item.end_date || '',
+          pests: item.pest_name || '',
+          frequency: item.frequency || '',
+          pestServiceCount: item.pest_service_count || 0,
+          balance: item.balance || 0,
           contractStatus: item.contract_status || 'Current'
         }))
 
         setAllRows(normalized)
         setRowCount(normalized.length)
-        setPagination(prev => ({ ...prev, pageIndex: 0 })) // reset to first page
+        setPagination(prev => ({ ...prev, pageIndex: 0 }))
       } else {
-        showToast('error', res?.message || 'Failed to fetch non-preschedule list')
+        showToast('error', res?.message || 'No data found')
         setAllRows([])
         setRowCount(0)
       }
     } catch (err) {
-      console.error('Non-preschedule fetch error:', err)
-      showToast('error', 'Error fetching non-preschedule list')
+      console.error(err)
+      showToast('error', 'Failed to fetch data')
       setAllRows([])
       setRowCount(0)
     } finally {
@@ -220,21 +235,20 @@ export default function NonPreScheduleReportPage() {
     }
   }
 
-  // 1) First time, fetch from API
+  // 1) First time, fetch customers
   useEffect(() => {
-    fetchNonPreschedule()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetchCustomerList()
   }, [])
 
-  // 2) Whenever allRows / filters / pagination change, recompute visible rows
+  // 2) When customer changes, fetch data
   useEffect(() => {
-    if (!allRows.length) {
-      setRows([])
-      setRowCount(0)
-      return
-    }
+    fetchNonPreschedule()
+  }, [customerFilter])
+
+  // 3) When data or local filters change, apply local filtering
+  useEffect(() => {
     loadData()
-  }, [allRows, pagination.pageIndex, pagination.pageSize, searchText, customerFilter, dateRange])
+  }, [allRows, searchText, dateRange, pagination, checked])
 
   // --- simple delete (local only) ---
   const handleEdit = id => {
@@ -536,12 +550,20 @@ export default function NonPreScheduleReportPage() {
           <GlobalAutocomplete
             id='customer-filter'
             options={customerOptions}
-            fullWidth
+            loading={customerLoading}
             getOptionLabel={option => option?.name || ''}
+            onInputChange={(e, value) => {
+              // When user types → call API → fetch options
+              fetchCustomerList(value)
+            }}
             value={customerOptions.find(c => c.id === customerFilter) || null}
-            onChange={(e, val) => setCustomerFilter(val?.id || null)}
+            onChange={(e, val) => {
+              const newId = val?.id || null
+              setCustomerFilter(newId)
+              // API will auto trigger via useEffect above
+            }}
             renderInput={params => (
-              <GlobalTextField {...params} label='Customer' placeholder='Select Customer' size='small' />
+              <GlobalTextField {...params} label='Customer' placeholder='Search...' size='small' />
             )}
             sx={{ width: 350 }}
           />

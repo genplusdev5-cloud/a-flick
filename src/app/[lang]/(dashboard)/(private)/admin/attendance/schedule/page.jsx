@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import React from 'react'
 import Link from 'next/link'
 import {
@@ -24,6 +24,7 @@ import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalDateRange from '@/components/common/GlobalDateRange'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
+import { getAttendanceDropdowns } from '@/api/attendance/dropdowns'
 
 import PrintIcon from '@mui/icons-material/Print'
 import TableChartIcon from '@mui/icons-material/TableChart'
@@ -42,6 +43,14 @@ import styles from '@core/styles/table.module.css'
 import { format, addDays } from 'date-fns'
 import CustomTextField from '@core/components/mui/TextField'
 
+import {
+  getScheduleList,
+  getScheduleDetails,
+  updateSchedule,
+  deleteSchedule,
+  addSchedule
+} from '@/api/attendanceSchedule'
+
 // -----------------------------------------------------
 
 export default function AttendanceSchedulePage() {
@@ -53,6 +62,16 @@ export default function AttendanceSchedulePage() {
   const [startDate, setStartDate] = useState(new Date())
   const [endDate, setEndDate] = useState(addDays(new Date(), 7))
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
+
+  const [attendanceList, setAttendanceList] = useState([])
+  const [technicianList, setTechnicianList] = useState([])
+  const [supervisorList, setSupervisorList] = useState([])
+  const [customerList, setCustomerList] = useState([])
+
+  const [selectedAttendance, setSelectedAttendance] = useState(null)
+  const [selectedTechnician, setSelectedTechnician] = useState(null)
+  const [selectedSupervisor, setSelectedSupervisor] = useState(null)
+  const [selectedCustomer, setSelectedCustomer] = useState(null)
 
   const CustomDateInput = ({ label, start, end, ...rest }, ref) => {
     const startDateFormatted = format(start, 'dd/MM/yyyy')
@@ -68,6 +87,48 @@ export default function AttendanceSchedulePage() {
       />
     )
   }
+
+  // FETCH FUNCTION
+  const loadScheduleList = async () => {
+    try {
+      const params = {
+        page: pagination.pageIndex + 1,
+        page_size: pagination.pageSize,
+        search: searchText || '',
+        start_date: dateFilter ? format(dateRange[0], 'yyyy-MM-dd') : undefined,
+        end_date: dateFilter ? format(dateRange[1], 'yyyy-MM-dd') : undefined
+      }
+
+      const res = await getScheduleList(params)
+
+      setRows(res.results || [])
+    } catch (err) {
+      console.error('Attendance Schedule List Failed', err)
+    }
+  }
+
+  useEffect(() => {
+    loadScheduleList()
+    loadDropdownData()
+  }, [pagination.pageIndex, pagination.pageSize])
+
+  const loadDropdownData = async () => {
+    try {
+      const res = await getAttendanceDropdowns()
+
+      setAttendanceList(res.attendance || [])
+      setTechnicianList(res.technician || [])
+      setSupervisorList(res.supervisor || [])
+      setCustomerList(res.customer || [])
+    } catch (err) {
+      console.error('Dropdown Load Failed', err)
+    }
+  }
+
+  // AUTO LOAD DATA
+  useEffect(() => {
+    loadScheduleList()
+  }, [pagination.pageIndex, pagination.pageSize])
 
   const ForwardDateInput = React.forwardRef(CustomDateInput)
 
@@ -169,6 +230,11 @@ export default function AttendanceSchedulePage() {
               <GlobalAutocomplete label='Supervisor' placeholder='Select' options={[]} />
             </Box>
 
+            {/* Customer (Right-most item) */}
+            <Box sx={{ width: 200 }}>
+              <GlobalAutocomplete label='Customer' placeholder='Select' options={[]} />
+            </Box>
+
             {/* Approval Status */}
             <Box sx={{ width: 200 }}>
               <GlobalAutocomplete label='Approval Status' placeholder='Select' options={[]} />
@@ -179,13 +245,8 @@ export default function AttendanceSchedulePage() {
               <GlobalAutocomplete label='Appointment Status' placeholder='Select' options={[]} />
             </Box>
 
-            {/* Customer (Right-most item) */}
-            <Box sx={{ width: 200 }}>
-              <GlobalAutocomplete label='Customer' placeholder='Select' options={[]} />
-            </Box>
-
             {/* Refresh Button */}
-            <GlobalButton variant='contained' color='primary' sx={{ height: 40 }}>
+            <GlobalButton variant='contained' color='primary' sx={{ height: 40 }} onClick={loadScheduleList}>
               Refresh
             </GlobalButton>
 

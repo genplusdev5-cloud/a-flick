@@ -1,12 +1,23 @@
 import api from '@/utils/axiosInstance'
 
-// 📌 KVI Finder Report API
-export const getKviFinderList = async () => {
+export const getKviFinderList = async (payload = {}) => {
   try {
-    const res = await api.get('kvi-finder/')
-    return res.data
+    const formData = new FormData()
+    Object.entries(payload).forEach(([key, value]) => {
+      if (value) formData.append(key, value)
+    })
+
+    const res = await api.post('kvi-finder/', formData) // 🔥 POST + form-data
+
+    const response = res.data || {}
+    return {
+      status: response.status,
+      message: response.message,
+      results: response.data?.results || [],
+      count: response.data?.count || 0
+    }
   } catch (error) {
-    console.error('Error fetching KVI Finder list:', error)
+    console.error('KVI find error:', error)
     return {
       status: 'failed',
       message: error.response?.data?.message || 'API error'
