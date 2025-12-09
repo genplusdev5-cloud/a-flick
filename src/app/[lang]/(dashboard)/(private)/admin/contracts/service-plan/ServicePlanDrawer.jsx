@@ -1,14 +1,15 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Drawer, Box, Typography, IconButton, Divider, Grid, CircularProgress } from '@mui/material'
+import { Drawer, Box, Typography, IconButton, Divider, Grid, CircularProgress, Chip } from '@mui/material'
 import CloseIcon from '@mui/icons-material/Close'
 import CustomTextField from '@core/components/mui/TextField'
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import { showToast } from '@/components/common/Toasts'
-import { generateScheduleApi } from '@/api/schedule'
+import { generateScheduleApi, adjustScheduleDayApi, saveTicketsApi } from '@/api/schedule'
+import styles from '@core/styles/table.module.css'
 
 const toApiDate = d => (d ? new Date(d).toISOString().split('T')[0] : null)
 
@@ -35,13 +36,21 @@ export default function ServicePlanDrawer({ open, onClose, contract, pestOptions
       }
 
       const res = await generateScheduleApi(payload)
-      const ticketsList = res?.data?.data?.tickets || []
+      console.log('API Response:', res) // ← இத check பண்ணு ஒரு தடவ
+
+      // உன் backend response structure-படி மாத்திக்கோ
+      const ticketsList = res?.data?.tickets || res?.data?.data?.tickets || []
+
       setTickets(ticketsList)
 
-      showToast('success', 'Assignment dates generated successfully!')
+      if (ticketsList.length > 0) {
+        showToast('success', `${ticketsList.length} service dates generated successfully!`)
+      } else {
+        showToast('info', 'No dates generated for selected criteria')
+      }
     } catch (err) {
       console.error(err)
-      showToast('error', 'Failed to generate service plan')
+      showToast('error', err?.response?.data?.message || 'Failed to generate service plan')
     } finally {
       setLoading(false)
     }
@@ -58,9 +67,36 @@ export default function ServicePlanDrawer({ open, onClose, contract, pestOptions
     setTickets([])
   }, [contract])
 
-  const handleSave = () => {
-    showToast('success', 'Tickets generated successfully!')
-    onClose()
+  const handleSave = async () => {
+    if (!tickets.length) return showToast('error', 'No tickets to save')
+
+    setLoading(true)
+
+    try {
+      const payload = {
+        contract_id: contract.id, // 🔥 required by backend
+        tickets: tickets.map(t => ({
+          ticket_id: t.ticket_id || t.id,
+          ticket_date: t.ticket_date,
+          ticket_day: t.ticket_day,
+          pest_id: t.pest_id
+        }))
+      }
+
+      console.log('Save payload:', payload)
+
+      const res = await saveTicketsApi(payload)
+
+      console.log('Save response:', res)
+
+      showToast('success', 'Tickets saved successfully!')
+      onClose()
+    } catch (err) {
+      console.error(err)
+      showToast('error', err?.response?.data?.message || 'Failed to save tickets')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleCancel = () => {
@@ -167,63 +203,85 @@ export default function ServicePlanDrawer({ open, onClose, contract, pestOptions
             </Grid>
 
             {tickets.length > 0 && (
-              <Grid item xs={12}>
-                <Typography variant='subtitle2' gutterBottom>
-                  Generated Service Dates ({tickets.length})
+              <Grid item xs={12} mt={3}>
+                <Typography variant='h6' fontWeight={600} mb={1.5}>
+                  Service Schedule ({tickets.length})
                 </Typography>
 
-                <Box
-                  sx={{
-                    maxHeight: 350,
-                    overflowY: 'auto',
-                    border: '1px solid #ddd',
-                    borderRadius: 1
-                  }}
-                >
-                  <Grid container sx={{ bgcolor: '#f6f6f6', p: 1, borderBottom: '1px solid #ddd' }}>
-                    <Grid item xs={4}>
-                      <Typography fontWeight={600} fontSize='0.8rem'>
-                        Date
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={3}>
-                      <Typography fontWeight={600} fontSize='0.8rem'>
-                        Day
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={5}>
-                      <Typography fontWeight={600} fontSize='0.8rem'>
-                        Service
-                      </Typography>
-                    </Grid>
-                  </Grid>
+                <Box sx={{ maxHeight: '60vh', overflowY: 'auto' }}>
+                  <table className={styles.table}>
+                    <thead>
+                      <tr>
+                        <th style={{ width: 60, textAlign: 'center' }}>S.No</th>
+                        <th>Service Date</th>
+                        <th>Day</th>
+                        <th>Pest Type</th>
+                      </tr>
+                    </thead>
 
-                  {tickets.map((t, index) => (
-                    <Grid
-                      container
-                      key={index}
-                      sx={{
-                        p: 1.2,
-                        alignItems: 'center',
-                        borderBottom: index !== tickets.length - 1 ? '1px solid #eee' : 'none',
-                        '&:hover': { bgcolor: '#fafafa' }
-                      }}
-                    >
-                      <Grid item xs={4}>
-                        <Typography fontSize='0.8rem'>{t.ticket_date}</Typography>
-                      </Grid>
-                      <Grid item xs={3}>
-                        <Typography fontSize='0.8rem' sx={{ textTransform: 'capitalize' }}>
-                          {t.ticket_day}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={5}>
-                        <Typography fontSize='0.8rem'>
-                          {t.pest_name} — {t.frequency}
-                        </Typography>
-                      </Grid>
-                    </Grid>
-                  ))}
+                    <tbody>
+                      {tickets.map((t, i) => (
+                        <tr key={i}>
+                          <td style={{ textAlign: 'center', fontWeight: 600 }}>{i + 1}</td>
+
+                          <td style={{ fontWeight: 600 }}>
+                            <Box
+                              sx={{ cursor: 'pointer' }}
+                              onClick={() => document.getElementById(`date-input-${i}`).showPicker()}
+                            >
+                              {t.ticket_date}
+                            </Box>
+
+                            <input
+                              id={`date-input-${i}`}
+                              type='date'
+                              value={t.ticket_date || ''}
+                              onChange={async e => {
+                                const newDate = e.target.value
+
+                                try {
+                                  const res = await adjustScheduleDayApi({
+                                    ticket_id: t.ticket_id || t.id, // ID field
+                                    ticket_date: newDate // 🔥 correct key required by backend
+                                  })
+
+                                  console.log('Schedule-day response:', res)
+
+                                  const updatedDay =
+                                    res?.data?.ticket_day || res?.data?.day || res?.ticket_day || res?.day || ''
+
+                                  const finalDate = new Date(newDate).toISOString().split('T')[0]
+
+                                  setTickets(prev => {
+                                    const updated = [...prev]
+                                    updated[i].ticket_date = finalDate
+                                    updated[i].ticket_day = updatedDay
+                                    return updated
+                                  })
+
+                                  showToast('success', 'Day updated automatically')
+                                } catch (err) {
+                                  console.error(err)
+                                  showToast('error', err?.response?.data?.message || 'Failed to update schedule day')
+                                }
+                              }}
+                              style={{
+                                position: 'absolute',
+                                opacity: 0,
+                                pointerEvents: 'none',
+                                width: 0,
+                                height: 0
+                              }}
+                            />
+                          </td>
+
+                          <td style={{ textTransform: 'capitalize', fontWeight: 500 }}>{t.ticket_day}</td>
+
+                          <td style={{ color: '#1976d2', fontWeight: 600 }}>{t.pest_name}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </Box>
               </Grid>
             )}
@@ -240,7 +298,7 @@ export default function ServicePlanDrawer({ open, onClose, contract, pestOptions
             <Grid item xs={6}>
               <GlobalButton
                 variant='contained'
-                color='success'
+                color='primary'
                 fullWidth
                 onClick={handleSave}
                 disabled={tickets.length === 0}

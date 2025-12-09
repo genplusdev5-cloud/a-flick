@@ -15,3 +15,8 @@ export const getTicketBackendDataApi = params => {
 export const adjustScheduleDayApi = payload => {
   return api.post('schedule-day/', payload).then(res => res.data)
 }
+
+// Save final tickets
+export const saveTicketsApi = payload => {
+  return api.post('ticket-add/', payload).then(res => res.data)
+}
