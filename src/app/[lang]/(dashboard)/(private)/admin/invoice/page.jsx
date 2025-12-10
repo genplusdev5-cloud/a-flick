@@ -97,36 +97,33 @@ export default function InvoiceListPageFull() {
   const buildListParams = () => {
     const params = {
       page: pagination.pageIndex + 1,
-      page_size: pagination.pageSize,
-      invoice_type: 'new'
+      page_size: pagination.pageSize
     }
 
-    // DATE RANGE FILTER — THIS IS THE MAGIC
+    // Date range
     if (dateFilter && dateRange[0]) {
       params.from_date = format(dateRange[0], 'yyyy-MM-dd')
       if (dateRange[1]) {
         params.to_date = format(dateRange[1], 'yyyy-MM-dd')
-      } else {
-        params.to_date = format(dateRange[0], 'yyyy-MM-dd') // same day if only start selected
       }
     }
 
+    // Only add if value exists
     if (originFilter?.id) params.company_id = originFilter.id
     if (contractTypeFilter?.id) params.contract_type = contractTypeFilter.id
-    if (invoiceStatusFilter?.label) {
-      params.invoice_status = invoiceStatusFilter.label === 'Yes' ? 1 : 0
-    }
-    if (serviceFreqFilter?.id) params.service_frequency_id = serviceFreqFilter.id
+    if (invoiceStatusFilter?.label) params.is_issued = invoiceStatusFilter.label === 'Yes' ? 1 : 0
+    if (serviceFreqFilter?.id) params.service_frequency = serviceFreqFilter.id
     if (billingFreqFilter?.id) params.billing_frequency_id = billingFreqFilter.id
     if (contractLevelFilter?.id) params.contract_level = contractLevelFilter.id
     if (invoiceTypeFilter?.id) params.invoice_type = invoiceTypeFilter.id
     if (salesPersonFilter?.id) params.sales_person_id = salesPersonFilter.id
     if (customerFilter?.id) params.customer_id = customerFilter.id
     if (contractFilter?.id) params.contract_id = contractFilter.id
-    if (searchText) params.search = searchText
+    if (searchText.trim()) params.search = searchText.trim()
 
     return params
   }
+
   const buildFilters = () => {
     const params = {
       page: pagination.pageIndex + 1,
@@ -191,8 +188,7 @@ export default function InvoiceListPageFull() {
         getInvoiceDropdowns()
       ])
 
-      // Response structure is SAME as before
-      const apiData = listRes?.data || listRes
+      const apiData = listRes?.data?.data || {}
       const results = apiData?.results || []
       const count = apiData?.count || 0
 
@@ -227,15 +223,18 @@ export default function InvoiceListPageFull() {
       setLoading(false)
     }
   }
-
   useEffect(() => {
-    loadEverything()
+    const timer = setTimeout(() => {
+      loadEverything()
+    }, 300) // wait 300ms so state finishes update
+
+    return () => clearTimeout(timer)
   }, [
     pagination.pageIndex,
     pagination.pageSize,
-    dateFilter, // ← new
-    dateRange[0], // ← new
-    dateRange[1], // ← new
+    dateFilter,
+    dateRange[0],
+    dateRange[1],
     originFilter?.id,
     contractTypeFilter?.id,
     invoiceStatusFilter?.label,
@@ -253,6 +252,58 @@ export default function InvoiceListPageFull() {
   const handleRefresh = () => {
     setLoading(true)
     setTimeout(() => loadEverything(), 300)
+  }
+
+  // APPROVE (Issue Invoice)
+  const handleApprove = async invoice => {
+    if (invoice.issued) {
+      showToast('info', 'Already approved')
+      return
+    }
+
+    try {
+      // same issue API for this user
+      const { updateInvoice } = await import('@/api/invoice')
+
+      await updateInvoice(invoice.id, { is_issued: 1 })
+      showToast('success', 'Invoice Approved')
+      loadEverything()
+    } catch (err) {
+      showToast('error', 'Approval Failed')
+    }
+  }
+
+  // EDIT
+  const handleEdit = invoice => {
+    showToast('info', `Edit Invoice ${invoice.invNo} coming soon...`)
+  }
+
+  // DELETE
+  const handleDelete = async invoice => {
+    if (!confirm(`Are you sure you want to delete invoice ${invoice.invNo}?`)) return
+
+    try {
+      const { deleteInvoice } = await import('@/api/invoice')
+      await deleteInvoice(invoice.id)
+
+      showToast('success', 'Invoice deleted')
+      loadEverything()
+    } catch (err) {
+      showToast('error', 'Delete failed')
+    }
+  }
+
+  // PRINT
+  const handlePrint = async invoice => {
+    try {
+      const { getInvoicePDF } = await import('@/api/invoice')
+      const pdfFile = await getInvoicePDF(invoice.id)
+
+      const url = window.URL.createObjectURL(pdfFile)
+      window.open(url, '_blank')
+    } catch (err) {
+      showToast('error', 'PDF Failed')
+    }
   }
 
   const mapInvoice = (inv, dd) => ({
@@ -322,25 +373,33 @@ export default function InvoiceListPageFull() {
         id: 'actions',
         header: 'Actions',
         enableSorting: false,
-        cell: () => (
-          <div className='flex items-center gap-2'>
-            <IconButton size='small'>
-              <i className='tabler-circle-check text-green-600 text-lg' />
-            </IconButton>
-            <IconButton size='small'>
-              <i className='tabler-edit text-blue-600 text-lg' />
-            </IconButton>
-            <IconButton size='small'>
-              <i className='tabler-trash text-red-600 text-lg' />
-            </IconButton>
-            {/* <IconButton size='small'>
-              <i className='tabler-eye text-gray-600 text-lg' />
-            </IconButton> */}
-            <IconButton size='small'>
-              <i className='tabler-printer text-purple-600 text-lg' />
-            </IconButton>
-          </div>
-        )
+        cell: ({ row }) => {
+          const invoice = row.original
+
+          return (
+            <div className='flex items-center gap-1'>
+              {/* APPROVE / ISSUE */}
+              <IconButton size='small' onClick={() => handleApprove(invoice)}>
+                <i className='tabler-circle-check text-green-600 text-base' />
+              </IconButton>
+
+              {/* EDIT */}
+              <IconButton size='small' onClick={() => handleEdit(invoice)}>
+                <i className='tabler-edit text-blue-600 text-base' />
+              </IconButton>
+
+              {/* DELETE */}
+              <IconButton size='small' onClick={() => handleDelete(invoice)}>
+                <i className='tabler-trash text-red-600 text-base' />
+              </IconButton>
+
+              {/* PRINT */}
+              <IconButton size='small' onClick={() => handlePrint(invoice)}>
+                <i className='tabler-printer text-purple-600 text-base' />
+              </IconButton>
+            </div>
+          )
+        }
       }),
 
       columnHelper.accessor('invDate', {

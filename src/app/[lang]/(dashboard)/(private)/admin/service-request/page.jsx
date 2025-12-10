@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useRef } from 'react'
 import Link from 'next/link'
-import { format } from 'date-fns'
+import { format, isValid } from 'date-fns'
 import {
   Box,
   Button,
@@ -19,18 +19,20 @@ import {
   Dialog,
   DialogTitle,
   MenuItem,
+  FormControlLabel,
   Pagination,
   FormControl,
   Select,
   Checkbox
 } from '@mui/material'
-import { getTicketList } from '@/api/ticket'
-import { getContractList } from '@/api/contract' // ⬅️ add import
+
+import { getTicketReportList } from '@/api/service_request/report'
+import { getReportDropdowns } from '@/api/service_request/report'
 
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
 import AddIcon from '@mui/icons-material/Add'
-import { getAttendanceDropdowns } from '@/api/attendance/dropdowns'
+import GlobalDateRange from '@/components/common/GlobalDateRange'
 
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
@@ -59,6 +61,19 @@ import {
 import classnames from 'classnames'
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
+
+const appointmentStatusList = [
+  { id: 'NOT STARTED', label: 'NOT STARTED' },
+  { id: 'IN-PROGRESS', label: 'IN-PROGRESS' },
+  { id: 'PAUSED', label: 'PAUSED' },
+  { id: 'NOT UPLOADED', label: 'NOT UPLOADED' },
+  { id: 'COMPLETED', label: 'COMPLETED' }
+]
+
+const appointmentList = [
+  { id: 'SCHEDULED', label: 'SCHEDULED' },
+  { id: 'NOT SCHEDULED', label: 'NOT SCHEDULED' }
+]
 
 // -------------------------
 // Service Request Page (full)
@@ -96,15 +111,15 @@ export default function ServiceRequestPage() {
   const [supervisorOptions, setSupervisorOptions] = useState([])
   const [attendanceOptions, setAttendanceOptions] = useState([])
 
-  const loadDropdowns = async () => {
+  const loadReportDropdownData = async () => {
     try {
-      const attendanceRes = await getAttendanceDropdowns()
-
-      const dd = attendanceRes?.data?.data || {}
+      const res = await getReportDropdowns()
+      const dd = res?.data?.data || {}
 
       const customerList = dd?.customer?.name || []
       const technicianList = dd?.technician?.name || []
       const supervisorList = dd?.supervisor?.name || []
+
       const attendanceList = dd?.attendance?.label || []
 
       setCustomerOptions(customerList.map(c => ({ id: c.id, label: c.name || '' })))
@@ -112,15 +127,17 @@ export default function ServiceRequestPage() {
       setSupervisorOptions(supervisorList.map(s => ({ id: s.id, label: s.name || '' })))
       setAttendanceOptions(attendanceList.map(a => ({ id: a.id, label: a.label || '' })))
     } catch (err) {
-      console.error('Dropdown fetch failed => ', err)
+      console.error('Report dropdown fetch failed:', err)
       showToast('error', 'Failed to load dropdowns')
     }
   }
 
   useEffect(() => {
-    loadDropdowns() // only dropdown fetch
-    setRows([]) // table empty on load
-    setRowCount(0)
+    fetchTicketsFromApi()
+  }, [pagination.pageIndex, pagination.pageSize])
+
+  useEffect(() => {
+    loadReportDropdownData()
   }, [])
 
   const confirmDelete = async () => {
@@ -279,31 +296,37 @@ export default function ServiceRequestPage() {
   )
 
   const mapTicketToRow = ticket => {
-    const scheduleDate = ticket.start_date // format: "01-03-2025"
+    let scheduleDate = ticket.schedule_date || ticket.ticket_date || ''
 
-    const prodVal = (ticket.pest_items || []).reduce((sum, p) => sum + Number(p.pest_value || 0), 0)
+    // Convert DD-MM-YYYY → YYYY-MM-DD
+    if (scheduleDate && scheduleDate.includes('-') && scheduleDate.split('-')[2].length === 4) {
+      const [dd, mm, yyyy] = scheduleDate.split('-')
+      scheduleDate = `${yyyy}-${mm}-${dd}`
+    }
+
+    const dateObj = new Date(scheduleDate)
 
     return {
       id: ticket.id,
 
-      // ✔ Schedule info
-      scheduleDate: scheduleDate,
-      day: scheduleDate ? format(new Date(scheduleDate.split('-').reverse().join('-')), 'EEE') : '',
-      timeIn: ticket.preferred_time || '',
-      timeOut: '', // No field available in API
-
-      // ✔ Columns visible in UI
-      pestCode: ticket.pest_items?.[0]?.pest || '',
-      technician: ticket.technician_id || '',
-      customer: ticket.customer || '',
-      prodVal: prodVal || ticket.contract_value || 0,
+      scheduleDate,
+      day: isValid(dateObj) ? format(dateObj, 'EEE') : '',
+      timeIn: ticket.schedule_start_time || ticket.start_time || '',
+      timeOut: ticket.schedule_end_time || ticket.end_time || '',
+      pestCode: ticket.pest_code || '',
+      prodVal: Number(ticket.productivity || 0),
+      customer: ticket.customer_name || ticket.business_name || '',
       serviceAddress: ticket.service_address || '',
       postalCode: ticket.postal_address || '',
       contactPerson: ticket.contact_person_name || '',
-      phone: ticket.phone || ticket.mobile || '',
-      contractCode: ticket.num_series || ticket.contract_code || '',
-      appointmentRemarks: ticket.technician_remarks || '',
-      status: ticket.contract_status || ''
+      phone: ticket.contract_phone || ticket.phone || '',
+      appointmentRemarks: ticket.appointment_remarks || ticket.remarks || '',
+      contractCode: ticket.contract_code || ticket.ticket_no || ticket.num_series || '',
+      serviceType: ticket.ticket_type_name || ticket.ticket_type || '',
+      scheduleStatus: ticket.is_alloted ? 'Allocated' : 'Unallocated',
+      appointmentStatus: ticket.ticket_status || 'Pending',
+      status: ticket.status == 2 ? 'Completed' : ticket.status == 3 ? 'Cancelled' : 'Pending',
+      technician: ticket.employee_name || ''
     }
   }
 
@@ -316,23 +339,18 @@ export default function ServiceRequestPage() {
         page_size: pagination.pageSize
       }
 
-      // Priority 1 → Contract filter
-      if (contractFilter) {
-        params.contract_id = contractFilter
+      // Filters will apply only if selected
+      if (customerFilter) params.customer_id = customerFilter
+      if (contractFilter) params.contract_id = contractFilter
+      if (technicianFilter) params.technician_id = technicianFilter
+      if (supervisorFilter) params.supervisor_id = supervisorFilter
+      if (appointmentStatusFilter) params.ticket_status = appointmentStatusFilter
+      if (appointmentTypeFilter) params.ticket_type = appointmentTypeFilter
+      if (enableDateFilter && startDate && endDate) {
+        params.from_date = format(startDate, 'yyyy-MM-dd')
+        params.to_date = format(endDate, 'yyyy-MM-dd')
       }
-
-      // Priority 2 → If contract missing but customer selected
-      else if (customerFilter) {
-        params.customer_id = customerFilter
-      }
-
-      // No customer, no contract → empty table
-      else {
-        setRows([])
-        setRowCount(0)
-        setLoading(false)
-        return
-      }
+      if (searchText?.trim()) params.search = searchText.trim()
 
       // Optional filters
       if (enableDateFilter && startDate && endDate) {
@@ -342,17 +360,18 @@ export default function ServiceRequestPage() {
 
       if (technicianFilter) params.technician_id = technicianFilter
       if (supervisorFilter) params.supervisor_id = supervisorFilter
-      if (appointmentStatusFilter) params.attendance_status_id = appointmentStatusFilter
+      if (appointmentStatusFilter) params.ticket_status = appointmentStatusFilter
+      if (appointmentTypeFilter) params.schedule_status = appointmentTypeFilter
       if (appointmentTypeFilter) params.ticket_type = appointmentTypeFilter
       if (searchText?.trim()) params.search = searchText.trim()
 
       console.log('Ticket Params =>', params)
 
-      const res = await getTicketList(params)
-      console.log('Ticket API Response =>', res)
+      const res = await getTicketReportList(params)
+      const list = res?.results || res?.data?.results || res?.data?.data?.results || []
+      const total = res?.count || res?.data?.count || list.length
 
-      const list = res?.data?.results || res?.results || []
-      const total = res?.data?.count || res?.count || list.length
+      console.log('API Updated:', list.length, total) // ← Paste here 👌
 
       const mapped = list.map(mapTicketToRow)
 
@@ -388,20 +407,19 @@ export default function ServiceRequestPage() {
       }
 
       try {
-        const res = await getContractList({
-          customer_id: customerFilter
-        })
+        const res = await getReportDropdowns({ customer_id: customerFilter })
 
-        const list = Array.isArray(res) ? res : []
+        const dd = res?.data?.data || {}
+        const list = dd?.contract_list?.label || [] // ⭐ FIXED KEY
 
         setContractOptions(
           list.map(c => ({
             id: c.id,
-            label: c.contract_code || c.name || 'Contract'
+            label: c.label || ''
           }))
         )
       } catch (err) {
-        console.error(err)
+        console.error('Contract fetch failed:', err)
         setContractOptions([])
       }
     }
@@ -500,14 +518,9 @@ export default function ServiceRequestPage() {
                   variant='contained'
                   startIcon={<RefreshIcon />}
                   onClick={async () => {
-                    if (!contractFilter) {
-                      showToast('warning', 'Select contract to refresh filtered list')
-                      return
-                    }
-
+                    // Always fetch full list or filtered list
                     setPagination({ pageIndex: 0, pageSize: pagination.pageSize })
-
-                    await fetchTicketsFromApi(true) // pass true to refresh with filters
+                    await fetchTicketsFromApi(true)
                   }}
                   sx={{ textTransform: 'none' }}
                 >
@@ -526,36 +539,31 @@ export default function ServiceRequestPage() {
 
         <Divider sx={{ mb: 2 }} />
 
-        {/* Filters (single horizontal row) */}
-        <Box sx={{ display: 'flex', gap: 3, alignItems: 'center', mb: 3, flexWrap: 'wrap' }}>
-          {/* Date range */}
-          <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-              <Checkbox checked={enableDateFilter} onChange={e => setEnableDateFilter(e.target.checked)} size='small' />
-              <Typography variant='body2' sx={{ fontWeight: 500 }}>
-                Date
-              </Typography>
-            </Box>
-            <AppReactDatepicker
-              selectsRange
-              startDate={startDate}
-              endDate={endDate}
-              onChange={dates => {
-                if (dates && dates.length === 2) {
-                  setStartDate(dates[0])
-                  setEndDate(dates[1])
-                }
-              }}
-              shouldCloseOnSelect={false}
-              disabled={!enableDateFilter}
-              customInput={
-                <CustomTextField
-                  size='small'
-                  sx={{ width: 220 }}
-                  value={`${format(startDate, 'dd/MM/yyyy')} - ${format(endDate, 'dd/MM/yyyy')}`}
-                />
-              }
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'flex-end', // ⭐ FIX: Align bottom of all fields
+            gap: 2,
+            mb: 3,
+            flexWrap: 'nowrap'
+          }}
+        >
+          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+            <FormControlLabel
+              control={<Checkbox checked={enableDateFilter} onChange={e => setEnableDateFilter(e.target.checked)} />}
+              label='Date Filter'
             />
+            <Box sx={{ width: 220 }}>
+              <GlobalDateRange
+                start={startDate}
+                end={endDate}
+                onSelectRange={({ start, end }) => {
+                  setStartDate(start)
+                  setEndDate(end)
+                }}
+                disabled={!enableDateFilter}
+              />
+            </Box>
           </Box>
 
           <CustomAutocomplete
@@ -608,15 +616,24 @@ export default function ServiceRequestPage() {
             renderInput={params => <CustomTextField {...params} label='Supervisor' size='small' sx={{ width: 180 }} />}
           />
 
-          {/* Attendance Status */}
+          {/* Appointment Status */}
           <CustomAutocomplete
-            options={attendanceOptions}
-            value={attendanceOptions.find(o => o.id === appointmentStatusFilter) || null}
+            options={appointmentStatusList}
+            value={appointmentStatusList.find(o => o.id === appointmentStatusFilter) || null}
             onChange={(_, v) => setAppointmentStatusFilter(v?.id || '')}
             getOptionLabel={option => option?.label || ''}
             renderInput={params => (
-              <CustomTextField {...params} label='Attendance Status' size='small' sx={{ width: 180 }} />
+              <CustomTextField {...params} label='Appointment Status' size='small' sx={{ width: 180 }} />
             )}
+          />
+
+          {/* Appointment */}
+          <CustomAutocomplete
+            options={appointmentList}
+            value={appointmentList.find(o => o.id === appointmentTypeFilter) || null}
+            onChange={(_, v) => setAppointmentTypeFilter(v?.id || '')}
+            getOptionLabel={option => option?.label || ''}
+            renderInput={params => <CustomTextField {...params} label='Appointment' size='small' sx={{ width: 180 }} />}
           />
         </Box>
 

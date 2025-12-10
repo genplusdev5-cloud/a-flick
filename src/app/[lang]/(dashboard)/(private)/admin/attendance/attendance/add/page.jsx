@@ -193,58 +193,53 @@ export default function AddAttendancePage() {
       if (!formData.customer_id) return showToast('warning', 'Customer is required')
       if (!formData.startDate) return showToast('warning', 'Start date is required')
 
-      const payload = new FormData()
-
-      // CORRECT FIELD NAMES AS PER YOUR DATABASE
-      payload.append('customer_id', formData.customer_id)
-      payload.append('covered_location', formData.coveredLocation || '')
-      payload.append('service_address', formData.serviceAddress || '')
-      payload.append('postal_code', formData.postalCode || '')
-
-      // THESE ARE THE EXACT COLUMN NAMES IN DB
-      payload.append('contact_person_name', formData.siteContactPerson || '')
-      payload.append('report_email', formData.serviceReportEmail || '')
-      payload.append('phone', formData.siteInchargePhone || '') // ← this is "Incharge Phone"
-      payload.append('mobile', formData.mobile || '')
-
-      // Supervisor → must send ID, not name!
-      const selectedSupervisor = dropdowns.supervisors.find(s => s.name === formData.supervisor)
-      payload.append('supervisor_id', selectedSupervisor?.id || '')
-
-      // Dates
-      payload.append('start_date', formData.startDate ? format(formData.startDate, 'yyyy-MM-dd') : '')
-      payload.append('end_date', formData.endDate ? format(formData.endDate, 'yyyy-MM-dd') : '')
-      payload.append('reminder_date', formData.reminderDate ? format(formData.reminderDate, 'yyyy-MM-dd') : '')
-
-      // Technician → if you have technician ID dropdown, use ID. Else send name if API accepts
-      const selectedTechnician = dropdowns.technicians.find(t => t.name === formData.technicians)
-      payload.append('technician_id', selectedTechnician?.id || formData.technicians || '') // adjust as needed
-
-      // Geo
-      payload.append('latitude', formData.latitude || '')
-      payload.append('longitude', formData.longitude || '')
-      payload.append('radius', formData.radius || '')
-
-      // Remarks → correct column names
-      payload.append('technician_remarks', formData.remarksTechnician || '')
-      payload.append('attendance_remarks', formData.remarksOffice || '')
-
-      // File
-      if (formData.floorPlanFile) {
-        payload.append('floor_plan', formData.floorPlanFile)
+      const payload = {
+        customer_id: formData.customer_id,
+        covered_location: formData.coveredLocation || '',
+        service_address: formData.serviceAddress || '',
+        postal_code: formData.postalCode || '',
+        contact_person_name: formData.siteContactPerson || '',
+        report_email: formData.serviceReportEmail || '',
+        phone: formData.siteInchargePhone || '',
+        mobile: formData.mobile || '',
+        supervisor_id: formData.supervisor_id || '',
+        start_date: format(formData.startDate, 'yyyy-MM-dd'),
+        end_date: formData.endDate ? format(formData.endDate, 'yyyy-MM-dd') : '',
+        reminder_date: formData.reminderDate ? format(formData.reminderDate, 'yyyy-MM-dd') : '',
+        technician_id: formData.technician_id || '',
+        latitude: formData.latitude || '',
+        longitude: formData.longitude || '',
+        radius: formData.radius || '',
+        technician_remarks: formData.remarksTechnician || '',
+        attendance_remarks: formData.remarksOffice || '',
+        slot: slots.map(s => ({
+          slot_id: dropdowns.slots.find(x => x.name === s.slot)?.id,
+          frequency_id: 1,
+          start_time: s.startTime + ':00',
+          end_time: s.endTime + ':00',
+          lunch: Number(s.lunchMinutes) || 0,
+          work_time: String(s.slotValue || '1'),
+          slot_value: Number(s.slotValue) || 0
+        }))
       }
 
-      // Slots → make sure backend accepts JSON string
+      console.log('FINAL JSON Payload:', payload)
+      await addAttendance(payload)
+      showToast('success', 'Attendance added successfully')
+      router.push('/admin/attendance/attendance')
+
       if (slots.length > 0) {
         payload.append(
-          'slots',
+          'slot',
           JSON.stringify(
             slots.map(s => ({
-              slot: s.slot,
-              slot_value: s.slotValue,
-              start_time: s.startTime,
-              end_time: s.endTime,
-              lunch_minutes: s.lunchMinutes || 0
+              slot_id: dropdowns.slots.find(x => x.name === s.slot)?.id || null,
+              frequency_id: 1, // 🔥 Ask backend if dynamic later
+              start_time: s.startTime || '00:00:00',
+              end_time: s.endTime || '00:00:00',
+              lunch: Number(s.lunchMinutes) || 0,
+              work_time: s.slotValue || '1',
+              slot_value: Number(s.slotValue) || 0
             }))
           )
         )

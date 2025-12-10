@@ -366,7 +366,7 @@ export default function ChemicalsPage() {
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
             <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
-              <i className='tabler-edit text-blue-600 text-lg' />
+              <i className='tabler-edit ' />
             </IconButton>
             <IconButton
               size='small'
@@ -730,7 +730,7 @@ export default function ChemicalsPage() {
                 <GlobalTextField
                   fullWidth
                   required
-                  label='Chemical Name'
+                  label='Name'
                   placeholder='Enter chemical name'
                   value={formData.name}
                   inputRef={nameRef}

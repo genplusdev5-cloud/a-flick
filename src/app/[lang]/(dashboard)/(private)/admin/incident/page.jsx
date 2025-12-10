@@ -324,7 +324,7 @@ export default function IncidentPage() {
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
             <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
-              <i className='tabler-edit text-blue-600 text-lg' />
+              <i className='tabler-edit ' />
             </IconButton>
             <IconButton
               size='small'
@@ -792,7 +792,7 @@ export default function IncidentPage() {
         {/* Centered Buttons */}
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
           <GlobalButton
-            onClick={() => setDeleteDialog({ open: false, row: null })} 
+            onClick={() => setDeleteDialog({ open: false, row: null })}
             color='secondary'
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
           >

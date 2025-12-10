@@ -363,13 +363,13 @@ export default function ContractsPage() {
               }}
             >
               {/* 👁 VIEW */}
-              <IconButton size='small' onClick={() => router.push(`/admin/contracts/${item.id}/view`)}>
-                <i className='tabler-eye text-gray-600 text-[18px]' />
+              <IconButton size='small' color='info' onClick={() => router.push(`/admin/contracts/${item.id}/view`)}>
+                <i className='tabler-eye ' />
               </IconButton>
 
               {/* ✏ EDIT */}
-              <IconButton size='small' onClick={() => handleEdit(item)}>
-                <i className='tabler-edit text-blue-600 text-[18px]' />
+              <IconButton size='small' color='primary' onClick={() => handleEdit(item)}>
+                <i className='tabler-edit' />
               </IconButton>
 
               {/* 📅 SCHEDULE */}

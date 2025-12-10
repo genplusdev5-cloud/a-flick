@@ -6,7 +6,7 @@ if (baseURL && !baseURL.endsWith('/')) baseURL += '/'
 
 const api = axios.create({
   baseURL,
-  timeout: 20000,
+  timeout: 40000,
   headers: { 'Content-Type': 'application/json' }
 })
 

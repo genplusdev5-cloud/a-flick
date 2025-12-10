@@ -183,7 +183,7 @@ export default function CompanyOriginListPage() {
               color='primary'
               onClick={() => router.push(`/admin/company-origin/edit/${info.row.original.id}`)}
             >
-              <i className='tabler-edit text-blue-600 text-lg' />
+              <i className='tabler-edit' />
             </IconButton>
 
             <IconButton

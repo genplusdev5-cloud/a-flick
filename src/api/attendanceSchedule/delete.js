@@ -1,6 +1,6 @@
 import api from '@/utils/axiosInstance'
 
 export const deleteSchedule = async id => {
-  const response = await api.patch(`/attendance_request-delete/?id=${id}`)
-  return response.data
+  const res = await api.patch(`/attendance-schedule-delete/?id=${id}`)
+  return res.data
 }

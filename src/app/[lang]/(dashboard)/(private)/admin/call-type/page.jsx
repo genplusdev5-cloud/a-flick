@@ -322,7 +322,7 @@ export default function CallTypePage() {
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
             <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
-              <i className='tabler-edit text-blue-600 text-lg' />
+              <i className='tabler-edit ' />
             </IconButton>
             <IconButton
               size='small'
@@ -689,7 +689,7 @@ export default function CallTypePage() {
                 <GlobalTextField
                   fullWidth
                   required
-                  label='Call Type Name'
+                  label=' Name'
                   placeholder='Enter call type name'
                   value={formData.name}
                   inputRef={nameRef}

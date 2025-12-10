@@ -1,22 +1,13 @@
-import api from "@/utils/axiosInstance";
+import api from '@/utils/axiosInstance'
 
 export const getInvoiceSummary = async (filters = {}) => {
-  try {
-    const query = new URLSearchParams();
+  const formData = new FormData()
 
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== null && value !== undefined && value !== "") {
-        query.append(key, value);
-      }
-    });
+  Object.keys(filters).forEach(key => {
+    if (filters[key] !== null && filters[key] !== '' && filters[key] !== undefined) {
+      formData.append(key, filters[key])
+    }
+  })
 
-    console.log("FINAL QUERY 👉", query.toString());
-
-    const response = await api.get(`invoice-summary/?${query.toString()}`);
-    return response.data;
-
-  } catch (err) {
-    console.error("Invoice Summary Error:", err);
-    throw err;
-  }
-};
+  return api.post('invoice-summary/', formData) // 👈 MUST BE POST
+}

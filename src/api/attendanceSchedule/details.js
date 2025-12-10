@@ -1,6 +1,6 @@
 import api from '@/utils/axiosInstance'
 
 export const getScheduleDetails = async id => {
-  const response = await api.get(`/attendance_request-details/?id=${id}`)
-  return response.data
+  const res = await api.get(`/attendance-schedule-details/?id=${id}`)
+  return res.data
 }

@@ -53,11 +53,23 @@ import {
 
 // -----------------------------------------------------
 
+const approvalStatusOptions = [
+  { label: 'Pending', value: 'pending' },
+  { label: 'Confirmed', value: 'confirmed' }
+]
+
+const appointmentStatusOptions = [
+  { label: 'Pending', value: 'pending' },
+  { label: 'Open', value: 'open' },
+  { label: 'Paused', value: 'paused' },
+  { label: 'Completed', value: 'completed' }
+]
+
 export default function AttendanceSchedulePage() {
   const [rows, setRows] = useState([])
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 })
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
   const [searchText, setSearchText] = useState('')
-  const [dateFilter, setDateFilter] = useState(true)
+  const [dateFilter, setDateFilter] = useState(false)
   const [dateRange, setDateRange] = useState([new Date(), new Date()])
   const [startDate, setStartDate] = useState(new Date())
   const [endDate, setEndDate] = useState(addDays(new Date(), 7))
@@ -72,6 +84,8 @@ export default function AttendanceSchedulePage() {
   const [selectedTechnician, setSelectedTechnician] = useState(null)
   const [selectedSupervisor, setSelectedSupervisor] = useState(null)
   const [selectedCustomer, setSelectedCustomer] = useState(null)
+  const [selectedApproval, setSelectedApproval] = useState(null)
+  const [selectedAppointment, setSelectedAppointment] = useState(null)
 
   const CustomDateInput = ({ label, start, end, ...rest }, ref) => {
     const startDateFormatted = format(start, 'dd/MM/yyyy')
@@ -88,24 +102,85 @@ export default function AttendanceSchedulePage() {
     )
   }
 
+  const handleEdit = async id => {
+    const res = await getScheduleDetails(id)
+    console.log('Edit Data:', res.data)
+  }
+
+  const handleDelete = async id => {
+    if (!confirm('Are you sure?')) return
+    await deleteSchedule(id)
+    loadScheduleList()
+  }
+
+  useEffect(() => {
+    setPagination(prev => ({ ...prev, pageIndex: 0 }))
+  }, [
+    selectedAttendance,
+    selectedTechnician,
+    selectedSupervisor,
+    selectedCustomer,
+    selectedApproval,
+    selectedAppointment,
+    dateFilter,
+    dateRange,
+    searchText
+  ])
+
   // FETCH FUNCTION
   const loadScheduleList = async () => {
     try {
       const params = {
         page: pagination.pageIndex + 1,
         page_size: pagination.pageSize,
-        search: searchText || '',
-        start_date: dateFilter ? format(dateRange[0], 'yyyy-MM-dd') : undefined,
-        end_date: dateFilter ? format(dateRange[1], 'yyyy-MM-dd') : undefined
+        search_text: searchText,
+
+        // Date Filter
+        ...(dateFilter && {
+          start_date: format(dateRange[0], 'yyyy-MM-dd'),
+          end_date: format(dateRange[1], 'yyyy-MM-dd')
+        }),
+
+        // Main Filters
+        ...(selectedAttendance && { attendance_id: selectedAttendance.value }),
+        ...(selectedTechnician && { technician_id: selectedTechnician.value }),
+        ...(selectedSupervisor && { supervisor_id: selectedSupervisor.value }),
+        ...(selectedCustomer && { customer_id: selectedCustomer.value }),
+
+        // Approval & Appointment Filters
+        ...(selectedApproval && { approval_status: selectedApproval.value }),
+        ...(selectedAppointment && { appointment_status: selectedAppointment.value })
       }
 
       const res = await getScheduleList(params)
 
-      setRows(res.results || [])
+      setRows(res.count ? res.results : res)
+      setPagination(prev => ({ ...prev, total: res.count || rows.length }))
     } catch (err) {
-      console.error('Attendance Schedule List Failed', err)
+      console.error('Schedule Load Failed', err)
     }
   }
+
+  useEffect(() => {
+    const delayDebounce = setTimeout(() => {
+      loadScheduleList()
+    }, 500) // wait 0.5 sec after typing stops
+
+    return () => clearTimeout(delayDebounce)
+  }, [searchText])
+
+  useEffect(() => {
+    loadScheduleList()
+  }, [
+    selectedAttendance,
+    selectedTechnician,
+    selectedSupervisor,
+    selectedCustomer,
+    selectedApproval,
+    selectedAppointment,
+    dateFilter,
+    dateRange
+  ])
 
   useEffect(() => {
     loadScheduleList()
@@ -115,25 +190,23 @@ export default function AttendanceSchedulePage() {
   const loadDropdownData = async () => {
     try {
       const res = await getAttendanceDropdowns()
+      const data = res?.data?.data || {}
 
-      setAttendanceList(res.attendance || [])
-      setTechnicianList(res.technician || [])
-      setSupervisorList(res.supervisor || [])
-      setCustomerList(res.customer || [])
+      // Attendance - label array
+      setAttendanceList(data.attendance?.label || [])
+
+      setTechnicianList(data.technician?.name || [])
+      setSupervisorList(data.supervisor?.name || [])
+      setCustomerList(data.customer?.name || [])
     } catch (err) {
       console.error('Dropdown Load Failed', err)
     }
   }
 
-  // AUTO LOAD DATA
-  useEffect(() => {
-    loadScheduleList()
-  }, [pagination.pageIndex, pagination.pageSize])
-
   const ForwardDateInput = React.forwardRef(CustomDateInput)
 
   const columns = [
-    { key: 'id', label: 'ID' },
+    { key: 's.no', label: 's.no' },
     { key: 'action', label: 'Action' },
     { key: 'attendance_date', label: 'Attendance Date' },
     { key: 'day', label: 'Day' },
@@ -198,51 +271,113 @@ export default function AttendanceSchedulePage() {
               mb: 2
             }}
           >
-            {/* Date Filter + Range */}
-            <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-              <FormControlLabel
-                control={<Checkbox checked={dateFilter} onChange={e => setDateFilter(e.target.checked)} />}
-                label='Date Filter'
-              />
+            {/* ROW: Attendance + Technician + Supervisor + Customer */}
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-end', // ⭐ FIX: Align by bottom (input line)
+                mb: 4,
+                gap: 2,
+                flexWrap: 'nowrap'
+              }}
+            >
+              {/* Date Filter + Range */}
+              <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                <FormControlLabel
+                  control={<Checkbox checked={dateFilter} onChange={e => setDateFilter(e.target.checked)} />}
+                  label='Date Filter'
+                />
 
+                <Box sx={{ width: 220 }}>
+                  <GlobalDateRange
+                    label=''
+                    start={dateRange[0]}
+                    end={dateRange[1]}
+                    onSelectRange={({ start, end }) => setDateRange([start, end])}
+                    disabled={!dateFilter}
+                  />
+                </Box>
+              </Box>
+
+              {/* Attendance */}
               <Box sx={{ width: 220 }}>
-                <GlobalDateRange
-                  label=''
-                  start={dateRange[0]}
-                  end={dateRange[1]}
-                  onSelectRange={({ start, end }) => setDateRange([start, end])}
-                  disabled={!dateFilter}
+                <GlobalAutocomplete
+                  label='Attendance'
+                  placeholder='Select'
+                  options={attendanceList.map(a => ({
+                    label: a.label, // ✔ correct field
+                    value: a.id
+                  }))}
+                  value={selectedAttendance}
+                  onChange={setSelectedAttendance}
                 />
               </Box>
-            </Box>
-            {/* Attendance */}
-            <Box sx={{ width: 200 }}>
-              <GlobalAutocomplete label='Attendance' placeholder='Select' options={[]} />
-            </Box>
 
-            {/* Technician */}
-            <Box sx={{ width: 200 }}>
-              <GlobalAutocomplete label='Technician' placeholder='Select' options={[]} />
-            </Box>
+              {/* Technician */}
+              <Box sx={{ width: 220 }}>
+                <GlobalAutocomplete
+                  label='Technician'
+                  placeholder='Select'
+                  options={technicianList.map(t => ({
+                    label: t.name,
+                    value: t.id
+                  }))}
+                  value={selectedTechnician}
+                  onChange={setSelectedTechnician}
+                />
+              </Box>
 
-            {/* Supervisor */}
-            <Box sx={{ width: 200 }}>
-              <GlobalAutocomplete label='Supervisor' placeholder='Select' options={[]} />
-            </Box>
+              {/* Supervisor */}
+              <Box sx={{ width: 220 }}>
+                <GlobalAutocomplete
+                  label='Supervisor'
+                  placeholder='Select'
+                  options={supervisorList.map(s => ({
+                    label: s.name,
+                    value: s.id
+                  }))}
+                  value={selectedSupervisor}
+                  onChange={setSelectedSupervisor}
+                />
+              </Box>
 
-            {/* Customer (Right-most item) */}
-            <Box sx={{ width: 200 }}>
-              <GlobalAutocomplete label='Customer' placeholder='Select' options={[]} />
-            </Box>
+              {/* Customer */}
+              <Box sx={{ width: 220 }}>
+                <GlobalAutocomplete
+                  label='Customer'
+                  placeholder='Select'
+                  options={customerList.map(c => ({
+                    label: c.name,
+                    value: c.id
+                  }))}
+                  value={selectedCustomer}
+                  onChange={setSelectedCustomer}
+                />
+              </Box>
 
-            {/* Approval Status */}
-            <Box sx={{ width: 200 }}>
-              <GlobalAutocomplete label='Approval Status' placeholder='Select' options={[]} />
-            </Box>
+              {/* Approval Status */}
+              {/* Approval Status */}
+              <Box sx={{ width: 200 }}>
+                <GlobalAutocomplete
+                  label='Approval Status'
+                  placeholder='Select'
+                  options={approvalStatusOptions}
+                  value={selectedApproval}
+                  onChange={setSelectedApproval}
+                />
+              </Box>
 
-            {/* Appointment Status */}
-            <Box sx={{ width: 200 }}>
-              <GlobalAutocomplete label='Appointment Status' placeholder='Select' options={[]} />
+              {/* Appointment Status */}
+              <Box sx={{ width: 200 }}>
+                <GlobalAutocomplete
+                  label='Appointment Status'
+                  placeholder='Select'
+                  options={appointmentStatusOptions}
+                  value={selectedAppointment}
+                  onChange={setSelectedAppointment}
+                />
+              </Box>
             </Box>
 
             {/* Refresh Button */}
@@ -349,7 +484,7 @@ export default function AttendanceSchedulePage() {
                   }))
                 }
               >
-                {[10, 25, 50, 75, 100].map(num => (
+                {[25, 50, 75, 100].map(num => (
                   <MenuItem key={num} value={num}>
                     {num} entries
                   </MenuItem>
@@ -396,15 +531,16 @@ export default function AttendanceSchedulePage() {
               {rows.length ? (
                 rows.map((row, index) => (
                   <tr key={index}>
-                    <td>{row.id}</td>
+                    {/* S.No */}
+                    <td>{pagination.pageIndex * pagination.pageSize + index + 1}</td>
 
                     {/* ACTION */}
                     <td>
                       <Box sx={{ display: 'flex', gap: 1 }}>
-                        <IconButton size='small' color='primary'>
+                        <IconButton size='small' color='primary' onClick={() => handleEdit(row.id)}>
                           <i className='tabler-edit' />
                         </IconButton>
-                        <IconButton size='small' color='error'>
+                        <IconButton size='small' color='error' onClick={() => handleDelete(row.id)}>
                           <i className='tabler-trash text-red-600 text-lg' />
                         </IconButton>
                       </Box>

@@ -322,8 +322,13 @@ export default function ContractStatusPage() {
               }}
             >
               {/* 👁 VIEW */}
-              <IconButton size='small' sx={{ p: 0.8 }} onClick={() => router.push(`/admin/contracts/${item.id}/view`)}>
-                <i className='tabler-eye text-gray-600 text-[18px]' />
+              <IconButton
+                size='small'
+                color='info'
+                sx={{ p: 0.8 }}
+                onClick={() => router.push(`/admin/contracts/${item.id}/view`)}
+              >
+                <i className='tabler-eye' />
               </IconButton>
 
               {/* ✏ EDIT */}

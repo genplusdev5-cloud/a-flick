@@ -54,6 +54,7 @@ import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
 import SearchIcon from '@mui/icons-material/Search'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
+import AttendanceScheduleDrawer from './service-plan/AttendanceScheduleDrawer'
 
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 import styles from '@core/styles/table.module.css'
@@ -83,6 +84,8 @@ export default function AttendancePage() {
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const customerOptions = ['Customer 1', 'Customer 2']
   const serviceAddressOptions = ['Address 1', 'Address 2']
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [selectedAttendance, setSelectedAttendance] = useState(null)
 
   const router = useRouter()
 
@@ -472,13 +475,15 @@ export default function AttendancePage() {
 
             <tbody>
               {rows.length ? (
-                rows.map(row => (
+                rows.map((row, i) => (
                   <tr key={row.id}>
-                    <td>{row.id}</td>
+                    <td>{i + 1}</td>
 
+                    {/* Action */}
                     {/* Action */}
                     <td>
                       <Box sx={{ display: 'flex', gap: 1 }}>
+                        {/* Edit */}
                         <IconButton
                           size='small'
                           color='primary'
@@ -486,6 +491,20 @@ export default function AttendancePage() {
                         >
                           <i className='tabler-edit' />
                         </IconButton>
+
+                        {/* 🔥 NEW → Schedule */}
+                        <IconButton
+                          size='small'
+                          color='secondary'
+                          onClick={() => {
+                            setSelectedAttendance(row) // 👈 store selected row
+                            setDrawerOpen(true) // 👈 open Drawer
+                          }}
+                        >
+                          <i className='tabler-calendar-event' />
+                        </IconButton>
+
+                        {/* Delete */}
                         <IconButton size='small' color='error' onClick={() => setDeleteDialog({ open: true, row })}>
                           <i className='tabler-trash text-red-600 text-lg' />
                         </IconButton>
@@ -599,6 +618,14 @@ export default function AttendancePage() {
           </GlobalButton>
         </DialogActions>
       </Dialog>
+
+      <AttendanceScheduleDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        attendance={selectedAttendance}
+        technicians={dropdowns.technicians}
+        slots={dropdowns.slots}
+      />
     </Box>
   )
 }

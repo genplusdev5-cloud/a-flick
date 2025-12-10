@@ -1,0 +1,9 @@
+// src/api/invoice/pdf.js
+import api from '@/utils/axiosInstance'
+
+export const getInvoicePDF = async id => {
+  const res = await api.get(`/invoice-pdf/?id=${id}`, {
+    responseType: 'blob'
+  })
+  return res.data
+}
