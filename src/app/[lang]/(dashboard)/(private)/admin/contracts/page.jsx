@@ -363,7 +363,7 @@ export default function ContractsPage() {
               }}
             >
               {/* 👁 VIEW */}
-              <IconButton size='small' color='info' onClick={() => router.push(`/admin/contracts/${item.id}/view`)}>
+              <IconButton size='small' color='info' onClick={() => router.push(`/admin/contracts/${item.uuid}/view`)}>
                 <i className='tabler-eye ' />
               </IconButton>
 

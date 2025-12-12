@@ -26,6 +26,7 @@ import {
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
 import GlobalDateRange from '@/components/common/GlobalDateRange'
+import { printInvoice } from '@/helpers/printInvoice'
 
 // Table
 import {
@@ -41,6 +42,7 @@ import CustomTextField from '@core/components/mui/TextField'
 import CustomAutocomplete from '@core/components/mui/Autocomplete'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import tableStyles from '@core/styles/table.module.css'
+import InvoicePDF from '@/components/invoice/InvoicePDF'
 
 // API
 import { getInvoiceSummary, getInvoiceDropdowns } from '@/api/invoice' // adjust path if needed
@@ -75,6 +77,8 @@ export default function InvoiceListPageFull() {
   const [dateFilter, setDateFilter] = useState(false) // renamed from dateFilterEnabled
   const today = new Date()
   const [dateRange, setDateRange] = useState([null, null])
+  // PDF Preview Invoice Data
+  const [selectedInvoiceData, setSelectedInvoiceData] = useState(null)
 
   // ── Pagination ───────────────────────────────
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
@@ -293,17 +297,71 @@ export default function InvoiceListPageFull() {
     }
   }
 
-  // PRINT
+  // PRINT (Frontend PDF Generation)
   const handlePrint = async invoice => {
     try {
       const { getInvoicePDF } = await import('@/api/invoice')
-      const pdfFile = await getInvoicePDF(invoice.id)
 
-      const url = window.URL.createObjectURL(pdfFile)
-      window.open(url, '_blank')
+      const invoiceData = await getInvoicePDF(invoice.id)
+
+      setSelectedInvoiceData(invoiceData)
+
+      // wait for component render
+      setTimeout(async () => {
+        const element = document.getElementById('invoice-preview')
+        if (!element) return
+
+        const html2canvas = (await import('html2canvas')).default
+        const jsPDF = (await import('jspdf')).default
+
+        const canvas = await html2canvas(element, {
+          scale: 3,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#ffffff'
+        })
+
+        const imgData = canvas.toDataURL('image/png')
+        const pdf = new jsPDF('p', 'mm', 'a4')
+        const width = pdf.internal.pageSize.getWidth()
+        const height = (canvas.height * width) / canvas.width
+
+        pdf.addImage(imgData, 'PNG', 0, 0, width, height)
+
+        const pdfBlob = pdf.output('blob')
+        const blobUrl = URL.createObjectURL(pdfBlob)
+
+        // OPEN PDF PREVIEW ONLY
+        window.open(blobUrl, '_blank') // ← Preview Tab Only
+      }, 1000)
     } catch (err) {
+      console.error(err)
       showToast('error', 'PDF Failed')
     }
+  }
+
+  const generatePDF = async () => {
+    const element = document.getElementById('invoice-preview')
+    if (!element) return
+
+    const html2canvas = (await import('html2canvas')).default
+    const jsPDF = (await import('jspdf')).default
+
+    const canvas = await html2canvas(element, {
+      scale: 3,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff'
+    })
+
+    const imgData = canvas.toDataURL('image/png')
+    const pdf = new jsPDF('p', 'mm', 'a4')
+
+    const width = pdf.internal.pageSize.getWidth()
+    const height = (canvas.height * width) / canvas.width
+
+    pdf.addImage(imgData, 'PNG', 0, 0, width, height)
+    pdf.save(`invoice_${Date.now()}.pdf`)
   }
 
   const mapInvoice = (inv, dd) => ({
@@ -511,6 +569,21 @@ export default function InvoiceListPageFull() {
 
   return (
     <Box>
+      {/* Hidden Invoice Preview for PDF Generation */}
+      <div
+        id='invoice-preview'
+        style={{
+          position: 'absolute',
+          left: '-9999px',
+          top: 0,
+          width: '210mm',
+          visibility: 'visible',
+          background: '#ffffff'
+        }}
+      >
+        {selectedInvoiceData && <InvoicePDF invoiceData={selectedInvoiceData} />}
+      </div>
+
       {/* BREADCRUMB */}
       <Box role='presentation' sx={{ mb: 2 }}>
         <Breadcrumbs aria-label='breadcrumb'>

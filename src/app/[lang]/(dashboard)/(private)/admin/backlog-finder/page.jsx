@@ -90,8 +90,6 @@ const formatDate = iso => {
 export default function BacklogFinderPage() {
   const router = useRouter()
 
-  const [allRows, setAllRows] = useState([])
-
   const [rows, setRows] = useState([])
 
   const [rowCount, setRowCount] = useState(0)
@@ -108,53 +106,6 @@ export default function BacklogFinderPage() {
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
   const [enableDateFilter, setEnableDateFilter] = useState(false)
 
-  const loadData = () => {
-    setLoading(true)
-
-    try {
-      let data = [...allRows]
-
-      // Apply date filter
-      if (fromDate) {
-        data = data.filter(r => new Date(r.serviceDate) >= new Date(fromDate))
-      }
-      if (toDate) {
-        data = data.filter(r => new Date(r.serviceDate) <= new Date(toDate))
-      }
-
-      // Search
-      if (searchText) {
-        const q = searchText.toLowerCase()
-        data = data.filter(
-          r =>
-            String(r.customer).toLowerCase().includes(q) ||
-            String(r.address).toLowerCase().includes(q) ||
-            String(r.pestCode).toLowerCase().includes(q)
-        )
-      }
-
-      // Sort by id desc
-      data.sort((a, b) => b.id - a.id)
-
-      // Pagination
-      const start = pagination.pageIndex * pagination.pageSize
-      const end = start + pagination.pageSize
-      let pageData = data.slice(start, end)
-
-      pageData = pageData.map((r, i) => ({
-        ...r,
-        sno: start + i + 1,
-        serviceDateFormatted: formatDate(r.serviceDate),
-        scheduleDateFormatted: formatDate(r.scheduleDate)
-      }))
-
-      setRows(pageData)
-      setRowCount(data.length)
-    } finally {
-      setTimeout(() => setLoading(false), 200)
-    }
-  }
-
   const fetchBacklog = async () => {
     setLoading(true)
     try {
@@ -162,47 +113,42 @@ export default function BacklogFinderPage() {
       if (fromDate) payload.from_date = fromDate
       if (toDate) payload.to_date = toDate
 
-      const res = await getReportBacklogList(payload)
+      const res = await getReportBacklogList({
+        ...payload,
+        page: pagination.pageIndex + 1,
+        page_size: pagination.pageSize
+      })
 
       if (res?.status === 'success') {
-        let list = Array.isArray(res.results) ? res.results : []
+        const list = res.results || []
 
-        const normalized = list.map((item, index) => ({
-          id: item.id,
-          sno: index + 1,
-          serviceDate: item.service_date,
-          scheduleDate: item.schedule_date,
-          backlogDays: item.backlog_days,
+        const formatted = list.map((item, index) => ({
+          id: item.row_number,
+          sno: pagination.pageIndex * pagination.pageSize + index + 1,
+          serviceDateFormatted: formatDate(item.ticket_date),
+          scheduleDateFormatted: formatDate(item.schedule_date),
+          backlogDays: item.aging,
           productivity: item.productivity_value,
           frequency: item.frequency,
           customer: item.customer,
           contactPerson: item.contact_person,
           phone: item.phone,
-          timeIn: item.appointment_time_in,
-          timeOut: item.appointment_time_out,
+          timeIn: item.schedule_start_time,
+          timeOut: item.schedule_end_time,
           serviceType: item.service_type,
           contractType: item.contract_type,
-          technician: item.technician,
-          pestCode: item.pest_code,
+          technician: item.technicians,
           address: item.service_address,
-          postalCode: item.postal_code,
+          postalCode: item.postal_address,
           scheduleStatus: item.schedule_status,
           serviceStatus: item.service_status,
           remarks: item.remarks,
-          status: item.status || 'Active'
+          status: item.ticket_status
         }))
 
-        setAllRows(normalized)
-        setRowCount(normalized.length)
-        setPagination(prev => ({ ...prev, pageIndex: 0 }))
-      } else {
-        showToast('error', res?.message || 'No data')
-        setAllRows([])
-        setRowCount(0)
+        setRows(formatted)
+        setRowCount(res.count) // backend total count
       }
-    } catch (err) {
-      console.error('report-backlog fetch error:', err)
-      showToast('error', 'Error fetching report backlog')
     } finally {
       setLoading(false)
     }
@@ -217,15 +163,9 @@ export default function BacklogFinderPage() {
     fetchBacklog()
   }, [])
 
-  // reload table when filters/pagination change
   useEffect(() => {
-    if (!allRows.length) {
-      setRows([])
-      setRowCount(0)
-      return
-    }
-    loadData()
-  }, [allRows, pagination.pageIndex, pagination.pageSize, searchText, fromDate, toDate])
+    fetchBacklog()
+  }, [pagination.pageIndex, pagination.pageSize, fromDate, toDate])
 
   const handleEdit = id => router.push(`/admin/backlog/${id}/edit`)
   const confirmDelete = () => {
@@ -236,7 +176,7 @@ export default function BacklogFinderPage() {
   const columnHelper = createColumnHelper()
   const columns = useMemo(
     () => [
-      columnHelper.accessor('sno', { header: 'ID' }),
+      columnHelper.accessor('sno', { header: 'S.No' }),
       columnHelper.display({
         id: 'action',
         header: 'Action',
@@ -517,7 +457,7 @@ export default function BacklogFinderPage() {
                   }))
                 }
               >
-                {[10, 25, 50, 100].map(s => (
+                {[ 25, 50, 75, 100].map(s => (
                   <MenuItem key={s} value={s}>
                     {s} entries
                   </MenuItem>

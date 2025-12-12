@@ -7,14 +7,15 @@ export const getKviFinderList = async (payload = {}) => {
       if (value) formData.append(key, value)
     })
 
-    const res = await api.post('kvi-finder/', formData) // 🔥 POST + form-data
+    const res = await api.post('kvi-finder/', formData)
 
     const response = res.data || {}
+
     return {
       status: response.status,
       message: response.message,
-      results: response.data?.results || [],
-      count: response.data?.count || 0
+      results: response.data?.data || [], // 🔥 FIX
+      count: (response.data?.data || []).length
     }
   } catch (error) {
     console.error('KVI find error:', error)

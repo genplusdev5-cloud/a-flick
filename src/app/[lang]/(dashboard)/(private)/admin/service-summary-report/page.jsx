@@ -1,40 +1,30 @@
 'use client'
 
-// React Imports
-import { useState, forwardRef } from 'react'
-
-// MUI Imports
+import { useState, useEffect, forwardRef } from 'react'
 import { Box, Card, Grid, Typography } from '@mui/material'
 import Breadcrumbs from '@mui/material/Breadcrumbs'
 import Link from 'next/link'
-
-// Third-party
 import { format } from 'date-fns'
 
-// Components
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import CustomTextField from '@core/components/mui/TextField'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
 import GlobalButton from '@/components/common/GlobalButton'
 
-/* ----------------------------------------------
-   📅 Date Range Picker
----------------------------------------------- */
-const DateRangePickerField = () => {
-  const [startDate, setStartDate] = useState(new Date())
-  const [endDate, setEndDate] = useState(new Date())
+import { getReportDropdown, generateServiceSummary } from '@/api/serviceSummary'
+import { showToast } from '@/components/common/Toasts'
 
+/* -----------------------------------
+   📅 DATE RANGE PICKER
+----------------------------------- */
+const DateRangePickerField = ({ startDate, endDate, setDates }) => {
   const handleChange = dates => {
     const [start, end] = dates
-    setStartDate(start)
-    setEndDate(end)
+    setDates({ startDate: start, endDate: end })
   }
 
   const CustomInput = forwardRef((props, ref) => {
     const { label, start, end, ...rest } = props
-
-    const s = start ? format(start, 'MM/dd/yyyy') : ''
-    const e = end ? ` - ${format(end, 'MM/dd/yyyy')}` : ''
 
     return (
       <CustomTextField
@@ -42,8 +32,7 @@ const DateRangePickerField = () => {
         inputRef={ref}
         label={label}
         {...rest}
-        value={`${s}${e}`}
-        sx={{ '& .MuiInputBase-root': { height: 40 } }}
+        value={`${start ? format(start, 'MM/dd/yyyy') : ''}${end ? ' - ' + format(end, 'MM/dd/yyyy') : ''}`}
       />
     )
   })
@@ -61,13 +50,65 @@ const DateRangePickerField = () => {
   )
 }
 
-/* ----------------------------------------------
-   SERVICE REQUEST SUMMARY PAGE (RIC STYLE)
----------------------------------------------- */
+/* -----------------------------------
+   📌 MAIN PAGE
+----------------------------------- */
 export default function ServiceSummaryReportPage() {
+  const [dropdown, setDropdown] = useState({})
+
+  const [filters, setFilters] = useState({
+    customer_id: '',
+    contract_id: '',
+    group_code: '',
+    pest_level: ''
+  })
+
+  const [dates, setDates] = useState({
+    startDate: new Date(),
+    endDate: new Date()
+  })
+
+  /* LOAD INITIAL DROPDOWNS */
+  const loadDropdowns = async () => {
+    const res = await getReportDropdown()
+    if (res.status === 'success') {
+      setDropdown(res.data)
+    } else {
+      showToast('error', res.message)
+    }
+  }
+
+  useEffect(() => {
+    loadDropdowns()
+  }, [])
+
+  /* GENERATE REPORT */
+const handleGenerate = async () => {
+  const payload = {
+    from_date: format(dates.startDate, 'yyyy-MM-dd'),
+    to_date: format(dates.endDate, 'yyyy-MM-dd'),
+    ...filters
+  };
+
+  // ⭐ DEBUG: Print payload in browser console
+  console.log("🚀 FINAL PAYLOAD SENT TO API:", payload);
+
+  const res = await generateServiceSummary(payload);
+
+  if (res.status === 'success') {
+    const url = window.URL.createObjectURL(new Blob([res.file]))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'service_summary.xlsx'
+    link.click()
+  } else {
+    showToast('error', res.message)
+  }
+};
+
+
   return (
     <Box>
-      {/* Breadcrumbs */}
       <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
         <Link href='/' style={{ textDecoration: 'none' }}>
           Dashboard
@@ -75,84 +116,137 @@ export default function ServiceSummaryReportPage() {
         <Typography color='text.primary'>Service Request Summary</Typography>
       </Breadcrumbs>
 
-      {/* Filter Card */}
       <Card
         sx={{
-          p: 2.5,
+          p: 4,
           borderRadius: 2,
-          boxShadow: '0px 1px 4px rgba(0,0,0,0.1)'
+          boxShadow: '0px 4px 20px rgba(0,0,0,0.08)',
+          minHeight: 170,
+          display: 'flex',
+          alignItems: 'center'
         }}
       >
-        <Grid
-          container
-          spacing={2}
-          alignItems='center'
-          sx={{
-            '& .MuiInputBase-root': { height: 40 }
-          }}
-        >
-          {/* Date Range */}
-          <Grid item xs={12} md={3}>
-            <DateRangePickerField />
+        <Grid container spacing={3} alignItems='center'>
+          {/* DATE RANGE */}
+          <Grid item xs={12} md={3.2}>
+            <DateRangePickerField startDate={dates.startDate} endDate={dates.endDate} setDates={setDates} />
           </Grid>
 
-          {/* Customer */}
+          {/* CUSTOMER */}
           <Grid item xs={12} md={2.2}>
             <GlobalAutocomplete
               label='Customer'
-              placeholder='Select Customer'
-              fullWidth
-              options={[
-                { label: 'All Customers', value: 'all' },
-                { label: 'GP Industries Pvt Ltd', value: 'gp' }
-              ]}
+              value={
+                filters.customer_id
+                  ? {
+                      label: (dropdown?.customer?.name || []).find(c => c.id === filters.customer_id)?.name || '',
+                      value: filters.customer_id
+                    }
+                  : null
+              }
+              options={(dropdown?.customer?.name || []).map(c => ({
+                label: c.name,
+                value: c.id
+              }))}
+              onChange={async selected => {
+                const value = selected?.value || ''
+
+                setFilters(prev => ({
+                  ...prev,
+                  customer_id: value
+                }))
+
+                // Load dependent dropdowns
+                const dependent = await getReportDropdown({ customer_id: value })
+
+                setDropdown(prev => ({
+                  ...prev,
+                  contract_list: dependent.data.contract_list || {},
+                  group_code: dependent.data.group_code || {}
+                }))
+              }}
             />
           </Grid>
 
-          {/* Contracts */}
+          {/* CONTRACT */}
           <Grid item xs={12} md={2.2}>
             <GlobalAutocomplete
-              label='Contracts'
-              placeholder='Select Contract'
-              fullWidth
-              options={[{ label: 'Select', value: 'all' }]}
+              label='Contract'
+              value={
+                filters.contract_id
+                  ? {
+                      label:
+                        (dropdown?.contract_list?.label || []).find(c => c.id === filters.contract_id)?.label || '',
+                      value: filters.contract_id
+                    }
+                  : null
+              }
+              options={(dropdown?.contract_list?.label || []).map(c => ({
+                label: c.label,
+                value: c.id
+              }))}
+              onChange={selected =>
+                setFilters(prev => ({
+                  ...prev,
+                  contract_id: selected?.value || ''
+                }))
+              }
             />
           </Grid>
 
-          {/* Group Code */}
+          {/* GROUP CODE */}
           <Grid item xs={12} md={2.2}>
             <GlobalAutocomplete
               label='Group Code'
-              placeholder='Select Group Code'
-              fullWidth
-              options={[{ label: 'Select', value: 'all' }]}
+              value={
+                filters.group_code
+                  ? {
+                      label:
+                        (dropdown?.group_code?.category || []).find(g => g.id === filters.group_code)?.category ||
+                        'No Category',
+                      value: filters.group_code
+                    }
+                  : null
+              }
+              options={(dropdown?.group_code?.category || []).map(g => ({
+                label: g.category || 'No Category',
+                value: g.id
+              }))}
+              onChange={selected =>
+                setFilters(prev => ({
+                  ...prev,
+                  group_code: selected?.value || ''
+                }))
+              }
             />
           </Grid>
 
-          {/* Pest Level */}
-          <Grid item xs={12} md={2.2}>
+          {/* PEST LEVEL */}
+          <Grid item xs={12} md={1.8}>
             <GlobalAutocomplete
               label='Pest Level'
-              placeholder='All'
-              fullWidth
-              options={[
-                { label: 'All', value: 'all' },
-                { label: 'Low', value: 'low' },
-                { label: 'High', value: 'high' }
-              ]}
+              options={(dropdown?.pest_level?.name || []).map(p => ({
+                label: p.name,
+                value: p.id
+              }))}
+              onChange={v => setFilters(prev => ({ ...prev, pest_level: v }))}
             />
           </Grid>
 
-          {/* Generate Button */}
-          <Grid item xs={12} md={1.2} display='flex' justifyContent='center'>
-            <GlobalButton variant='contained' color='primary' fullWidth sx={{ height: 40, fontWeight: 600 }}>
+          {/* GENERATE */}
+          <Grid item xs={12} md={1.4}>
+            <GlobalButton
+              variant='contained'
+              color='primary'
+              fullWidth
+              onClick={handleGenerate}
+              sx={{ height: 45, fontWeight: 700 }}
+            >
               GENERATE
             </GlobalButton>
           </Grid>
         </Grid>
       </Card>
-
-      <Box sx={{ mt: 5 }}></Box>
     </Box>
   )
 }

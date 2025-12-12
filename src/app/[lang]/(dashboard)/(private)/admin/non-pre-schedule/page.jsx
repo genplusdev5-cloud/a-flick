@@ -115,10 +115,7 @@ export default function NonPreScheduleReportPage() {
     if (searchText.trim()) {
       const q = searchText.toLowerCase()
       filtered = filtered.filter(r =>
-        [r.customer, r.contractCode, r.serviceAddress, r.pests]
-          .join(' ')
-          .toLowerCase()
-          .includes(q)
+        [r.customer, r.contractCode, r.serviceAddress, r.pests].join(' ').toLowerCase().includes(q)
       )
     }
 
@@ -129,22 +126,24 @@ export default function NonPreScheduleReportPage() {
     const startIdx = pagination.pageIndex * pagination.pageSize
     const paginated = filtered.slice(startIdx, startIdx + pagination.pageSize)
 
-    setRows(paginated.map((r, i) => ({
-      ...r,
-      sno: startIdx + i + 1,
-      startDateFormatted: formatDate(r.startDate),
-      endDateFormatted: formatDate(r.endDate)
-    })))
+    setRows(
+      paginated.map((r, i) => ({
+        ...r,
+        sno: startIdx + i + 1,
+        startDateFormatted: formatDate(r.startDate),
+        endDateFormatted: formatDate(r.endDate)
+      }))
+    )
     setRowCount(filtered.length)
   }
 
-  const fetchCustomerList = async () => {
+  const fetchCustomerList = async (search = '') => {
     setCustomerLoading(true)
     try {
       const res = await getCustomerList({
         page: 1,
-        page_size: 500, // Load max customers for dropdown
-        search: ''
+        page_size: 500,
+        search: search // HERE IS THE FIX
       })
 
       if (res?.status === 'success') {
@@ -167,56 +166,44 @@ export default function NonPreScheduleReportPage() {
     }
   }
 
-  // 🔹 Fetch from API and normalize data
   const fetchNonPreschedule = async () => {
-    if (!customerFilter) {
-      // No customer selected → show empty
-      setAllRows([])
-      setRows([])
-      setRowCount(0)
-      return
-    }
-
     setLoading(true)
+
     try {
       const res = await getNonPrescheduleList({
-        customer_id: customerFilter // only this ID sent
-        // date & search NOT sent to backend
+        customer_id: customerFilter || '' // allow empty value also
       })
 
-      if (res?.status === 'success') {
-        let list = Array.isArray(res.data?.data) ? res.data.data : res.data || []
+      // correct data path (backend structure)
+      const list =
+        res?.data?.data?.data || // main array
+        res?.data?.data || // fallback
+        []
 
-        const normalized = list.map((item, index) => ({
-          id: item.row_number || index + 1,
-          sno: index + 1,
-          customer: item.customer || '',
-          contractCode: item.contract_code || '',
-          type: item.contract_type || '',
-          serviceAddress: item.service_address || '',
-          postalCode: item.postal_address || '',
-          startDate: item.start_date || '',
-          endDate: item.end_date || '',
-          pests: item.pest_name || '',
-          frequency: item.frequency || '',
-          pestServiceCount: item.pest_service_count || 0,
-          balance: item.balance || 0,
-          contractStatus: item.contract_status || 'Current'
-        }))
+      const normalized = list.map((item, index) => ({
+        id: index + 1,
+        sno: index + 1,
+        customerId: item.customer_id, // ⭐ ADD THIS
+        customer: item.customer || '',
+        contractCode: item.contract_code || '',
+        type: item.contract_type || '',
+        serviceAddress: item.service_address || '',
+        postalCode: item.postal_address || '',
+        startDate: item.start_date || '',
+        endDate: item.end_date || '',
+        pests: item.pest_name || '',
+        frequency: item.frequency || '',
+        pestServiceCount: item.pest_service_count || 0,
+        balance: item.balance || 0,
+        contractStatus: item.contract_status || 'Current'
+      }))
 
-        setAllRows(normalized)
-        setRowCount(normalized.length)
-        setPagination(prev => ({ ...prev, pageIndex: 0 }))
-      } else {
-        showToast('error', res?.message || 'No data found')
-        setAllRows([])
-        setRowCount(0)
-      }
+      setAllRows(normalized)
+      setRowCount(normalized.length)
+      setPagination(prev => ({ ...prev, pageIndex: 0 }))
     } catch (err) {
       console.error(err)
-      showToast('error', 'Failed to fetch data')
-      setAllRows([])
-      setRowCount(0)
+      showToast('error', 'Error fetching non-preschedule report')
     } finally {
       setLoading(false)
     }

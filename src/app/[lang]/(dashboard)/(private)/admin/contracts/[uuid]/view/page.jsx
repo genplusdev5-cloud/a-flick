@@ -1,7 +1,10 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import { getContractDetails } from '@/api/contract' // <-- Create this API if not exists
+import AgreementPDF from '@/components/pdf/AgreementPDF'
+import SchedulePDF from '@/components/pdf/SchedulePDF'
+import { printSchedule } from '@/helpers/printSchedule'
 
 import Grid from '@mui/material/Grid2'
 import { Tooltip, Drawer } from '@mui/material'
@@ -39,12 +42,20 @@ import ProductInventory from '@/views/apps/ecommerce/products/add/ProductInvento
 import UserActivityTimeLine from '@/views/apps/user/view/user-right/overview/UserActivityTimeline'
 import TabContentSwiper from '@/components/TabContentSwiper'
 import SalesOverview from '@/views/dashboards/analytics/SalesOverview'
+import html2canvas from 'html2canvas'
+import jsPDF from 'jspdf'
 
 export default function Project() {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [openTerminate, setOpenTerminate] = useState(false)
   const [openHold, setOpenHold] = useState(false)
   const [openRenew, setOpenRenew] = useState(false)
+
+  const [openAgreement, setOpenAgreement] = useState(false)
+  const [agreementData, setAgreementData] = useState(null)
+  const [scheduleData, setScheduleData] = useState(null)
+
+  const agreementRef = useRef()
 
   const { uuid } = useParams()
   const [contract, setContract] = useState(null)
@@ -75,9 +86,8 @@ export default function Project() {
   }
 
   useEffect(() => {
-  if (uuid) loadContractData()
-}, [uuid])
-
+    if (uuid) loadContractData()
+  }, [uuid])
 
   // or 'pest'
 
@@ -118,8 +128,116 @@ export default function Project() {
     }
   }
 
+  // ================= AGREEMENT PRINT FUNCTION =================
+  // ================= AGREEMENT PRINT FUNCTION =================
+  const handleAgreementPrint = async () => {
+    if (!contract?.id) return
+
+    // 1. Load Agreement API
+    const { getAgreementPDF } = await import('@/api/contract/agreement')
+    const data = await getAgreementPDF(contract.id)
+
+    // 2. Set the data so AgreementPDF will render
+    setAgreementData(data)
+
+    // 3. Wait for AgreementPDF DOM to appear
+    setTimeout(async () => {
+      const element = document.getElementById('agreement-preview')
+      if (!element) return
+
+      // 4. Convert HTML → Canvas
+      const canvas = await html2canvas(element, {
+        scale: 3,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff'
+      })
+
+      const imgData = canvas.toDataURL('image/png')
+
+      // 5. Create PDF
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      const width = pdf.internal.pageSize.getWidth()
+      const height = (canvas.height * width) / canvas.width
+
+      pdf.addImage(imgData, 'PNG', 0, 0, width, height)
+
+      // 6. Generate Blob → Preview Tab
+      const blob = pdf.output('blob')
+      const blobUrl = URL.createObjectURL(blob)
+
+      window.open(blobUrl, '_blank')
+    }, 800)
+  }
+
+  const handleSchedulePrint = async () => {
+    if (!contract?.id) return
+
+    const { getSchedulePDF } = await import('@/api/contract/schedulepdf')
+    const data = await getSchedulePDF(contract.id)
+
+    setScheduleData(data)
+
+    setTimeout(async () => {
+      const element = document.getElementById('schedule-preview-container')
+      if (!element) return
+
+      const canvas = await html2canvas(element, {
+        scale: 3,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#fff'
+      })
+
+      const img = canvas.toDataURL('image/png')
+
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      const width = pdf.internal.pageSize.getWidth()
+      const height = (canvas.height * width) / canvas.width
+
+      pdf.addImage(img, 'PNG', 0, 0, width, height)
+
+      const blob = pdf.output('blob')
+      const blobURL = URL.createObjectURL(blob)
+
+      window.open(blobURL, '_blank')
+    }, 800)
+  }
+
   return (
     <>
+      {/* Hidden Agreement Preview for PDF Generation */}
+      <div
+        id='agreement-preview'
+        style={{
+          position: 'absolute',
+          left: '-9999px',
+          top: 0,
+          width: '210mm',
+          background: '#ffffff',
+          visibility: 'visible',
+          zIndex: -1
+        }}
+      >
+        {agreementData && <AgreementPDF agreementData={agreementData} />}
+      </div>
+
+      {/* Hidden Schedule Preview for PDF Generation */}
+      <div
+        id='schedule-preview-container'
+        style={{
+          position: 'absolute',
+          left: '-9999px',
+          top: 0,
+          width: '210mm',
+          background: '#ffffff',
+          visibility: 'visible',
+          zIndex: -1
+        }}
+      >
+        {scheduleData && <SchedulePDF data={scheduleData} />}
+      </div>
+
       {/* Top product Details Start */}
       <Card className='bg-white shadow-md rounded-2xl'>
         <CardContent>
@@ -214,13 +332,21 @@ export default function Project() {
                     </Tooltip>
 
                     <Tooltip title='Service Schedule Print'>
-                      <IconButton size='small' className='bg-primary text-white hover:bg-primary/90'>
+                      <IconButton
+                        size='small'
+                        className='bg-primary text-white hover:bg-primary/90'
+                        onClick={handleSchedulePrint}
+                      >
                         <i className='tabler-printer text-[18px]' />
                       </IconButton>
                     </Tooltip>
 
-                    <Tooltip title='Agreement'>
-                      <IconButton size='small' className='bg-primary text-white hover:bg-primary/90'>
+                    <Tooltip title='Agreement (Preview + Print)'>
+                      <IconButton
+                        size='small'
+                        className='bg-primary text-white hover:bg-primary/90'
+                        onClick={handleAgreementPrint}
+                      >
                         <i className='tabler-file-description text-[18px]' />
                       </IconButton>
                     </Tooltip>

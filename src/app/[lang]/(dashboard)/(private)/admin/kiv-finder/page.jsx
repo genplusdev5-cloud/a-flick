@@ -110,20 +110,27 @@ export default function KivFinderPage() {
         let list = Array.isArray(res.results) ? res.results : []
 
         const normalized = list.map((item, index) => ({
-          id: item.id,
+          id: index + 1,
           sno: index + 1,
-          customer: item.customer,
-          address: item.service_address,
-          serviceDate: item.service_date,
-          nextRoutineDate: item.next_routine_date,
-          daysDiff: item.days_diff,
-          appointment: item.appointment_status,
-          pest: item.pest,
-          technician: item.technician,
-          degree: item.degree,
-          purpose: item.purpose,
+
+          customer: item.name, // ✅ correct
+          address: item.address, // ✅ correct
+
+          serviceDate: item.service_date, // original date
+          nextRoutineDate: item.next_date, // correct key from API
+
+          daysDiff: item.days_diff, // correct
+
+          appointment: item.scheduled, // scheduled → appointment
+
+          pest: item.pest_code, // correct
+          technician: item.technician_name, // correct
+
+          degree: item.degree, // correct
+          purpose: item.purpose, // correct
+
           serviceDateFormatted: formatDate(item.service_date),
-          nextRoutineDateFormatted: formatDate(item.next_routine_date)
+          nextRoutineDateFormatted: formatDate(item.next_date)
         }))
 
         setAllRows(normalized)

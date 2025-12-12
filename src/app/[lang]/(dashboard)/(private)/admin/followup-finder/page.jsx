@@ -161,18 +161,22 @@ export default function FollowupFinderPage() {
         let list = Array.isArray(res.results) ? res.results : []
 
         const normalized = list.map((item, index) => ({
-          id: item.id,
+          id: index + 1,
           sno: index + 1,
-          customer: item.customer,
-          address: item.service_address,
-          serviceDate: item.service_date,
-          nextServiceDate: item.next_service_date,
-          daysDiff: item.days_diff,
-          appointmentStatus: item.appointment_status,
-          pest: item.pest,
-          purpose: item.purpose,
-          degree: item.degree,
-          technician: item.technician
+
+          customer: item.name, // ✅ correct
+          address: item.address, // ✅ correct
+
+          serviceDate: item.service_date, // date
+          nextServiceDate: item.next_date || '', // correct key
+          daysDiff: item.days_diff, // correct
+
+          appointmentStatus: item.scheduled, // appointment status = scheduled
+
+          pest: item.pest_code, // correct
+          purpose: item.purpose, // correct
+          degree: item.degree, // correct
+          technician: item.technician_name // correct
         }))
 
         setAllRows(normalized)
