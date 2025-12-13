@@ -35,6 +35,7 @@ import {
 
 import { getAttendanceList, deleteAttendance } from '@/api/attendance'
 import { getAttendanceDropdowns } from '@/api/attendance/dropdowns'
+import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
@@ -244,6 +245,23 @@ export default function AttendancePage() {
 
   return (
     <Box>
+      {loading && (
+        <Box
+          sx={{
+            position: 'fixed',
+            inset: 0,
+            bgcolor: 'rgba(255,255,255,0.8)',
+            backdropFilter: 'blur(2px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999
+          }}
+        >
+          <ProgressCircularCustomization size={60} thickness={5} />
+        </Box>
+      )}
+
       {/* Breadcrumb */}
       <Box sx={{ mb: 2 }}>
         <Link href='/admin/dashboards' className='text-primary'>

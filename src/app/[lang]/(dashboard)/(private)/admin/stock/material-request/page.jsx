@@ -88,6 +88,8 @@ export default function MaterialRequestPage() {
   // ✅ Confirm delete (properly scoped)
   const confirmDelete = async () => {
     try {
+      setLoading(true)
+
       const row = deleteDialog.row
       if (!row) return
 
@@ -99,6 +101,7 @@ export default function MaterialRequestPage() {
       console.error(err)
       showToast('error', 'Failed to delete request')
     } finally {
+      setLoading(false)
       setDeleteDialog({ open: false, row: null })
     }
   }
@@ -481,32 +484,15 @@ export default function MaterialRequestPage() {
             sx={{
               position: 'fixed',
               inset: 0,
-              bgcolor: 'rgba(255,255,255,0.65)',
-              backdropFilter: 'blur(3px)',
+              bgcolor: 'rgba(255,255,255,0.8)',
+              backdropFilter: 'blur(2px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              flexDirection: 'column',
-              zIndex: 2000,
-              animation: 'fadeIn 0.3s ease-in-out',
-              '@keyframes fadeIn': {
-                from: { opacity: 0 },
-                to: { opacity: 1 }
-              }
+              zIndex: 9999
             }}
           >
-            <ProgressCircularCustomization size={70} thickness={5} />
-            <Typography
-              mt={2}
-              sx={{
-                color: 'primary.main',
-                fontWeight: 600,
-                fontSize: '1.05rem',
-                letterSpacing: 0.3
-              }}
-            >
-              Loading Material Requests...
-            </Typography>
+            <ProgressCircularCustomization size={60} thickness={5} />
           </Box>
         )}
 

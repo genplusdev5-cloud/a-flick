@@ -486,20 +486,32 @@ export default function NonPreScheduleReportPage() {
             sx={{
               position: 'fixed',
               inset: 0,
-              bgcolor: 'rgba(255,255,255,0.7)',
-              backdropFilter: 'blur(2px)',
+              bgcolor: 'rgba(255,255,255,0.65)',
+              backdropFilter: 'blur(3px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              zIndex: 2000
+              flexDirection: 'column',
+              zIndex: 2000,
+              animation: 'fadeIn 0.3s ease-in-out',
+              '@keyframes fadeIn': {
+                from: { opacity: 0 },
+                to: { opacity: 1 }
+              }
             }}
           >
-            <Box textAlign='center'>
-              <ProgressCircularCustomization size={60} thickness={5} />
-              <Typography mt={2} fontWeight={600} color='primary'>
-                Loading...
-              </Typography>
-            </Box>
+            <ProgressCircularCustomization size={70} thickness={5} />
+            <Typography
+              mt={2}
+              sx={{
+                color: 'primary.main',
+                fontWeight: 600,
+                fontSize: '1.05rem',
+                letterSpacing: 0.3
+              }}
+            >
+              Loading Report...
+            </Typography>
           </Box>
         )}
 

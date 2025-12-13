@@ -334,12 +334,7 @@ export default function CompanyOriginListPage() {
               zIndex: 9999
             }}
           >
-            <Box textAlign='center'>
-              <ProgressCircularCustomization size={60} thickness={5} />
-              <Typography mt={2} fontWeight={600} color='primary'>
-                Loading...
-              </Typography>
-            </Box>
+            <ProgressCircularCustomization size={60} thickness={5} />
           </Box>
         )}
 

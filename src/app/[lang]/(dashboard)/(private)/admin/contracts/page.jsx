@@ -677,20 +677,15 @@ export default function ContractsPage() {
             sx={{
               position: 'fixed',
               inset: 0,
-              bgcolor: 'rgba(255,255,255,0.7)',
+              bgcolor: 'rgba(255,255,255,0.8)',
               backdropFilter: 'blur(2px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              zIndex: 2000
+              zIndex: 9999
             }}
           >
-            <Box textAlign='center'>
-              <ProgressCircularCustomization size={60} thickness={5} />
-              <Typography mt={2} fontWeight={600} color='primary'>
-                Loading...
-              </Typography>
-            </Box>
+            <ProgressCircularCustomization size={60} thickness={5} />
           </Box>
         )}
 

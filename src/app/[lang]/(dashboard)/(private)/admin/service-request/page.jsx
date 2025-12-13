@@ -708,23 +708,17 @@ export default function ServiceRequestPage() {
             sx={{
               position: 'fixed',
               inset: 0,
-              zIndex: 2000,
+              bgcolor: 'rgba(255,255,255,0.7)',
+              backdropFilter: 'blur(2px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              backdropFilter: 'blur(2px)',
-              backgroundColor: 'rgba(255,255,255,0.7)'
+              zIndex: 2000
             }}
           >
-            <Box textAlign='center'>
-              <ProgressCircularCustomization size={60} thickness={5} />
-              <Typography mt={2} fontWeight={600}>
-                Loading...
-              </Typography>
-            </Box>
+            <ProgressCircularCustomization size={60} thickness={5} />
           </Box>
         )}
-
         {/* Table */}
         <div className='overflow-x-auto'>
           <table className={styles.table}>

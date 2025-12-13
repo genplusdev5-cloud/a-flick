@@ -522,6 +522,23 @@ export default function ContractStatusPage() {
   // ───────────────────────────────────────────
   return (
     <Box>
+      {loading && (
+        <Box
+          sx={{
+            position: 'fixed',
+            inset: 0,
+            bgcolor: 'rgba(255,255,255,0.8)',
+            backdropFilter: 'blur(2px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999
+          }}
+        >
+          <ProgressCircularCustomization size={60} thickness={5} />
+        </Box>
+      )}
+
       <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
         <Link underline='hover' color='inherit' href='/admin/dashboard'>
           Dashboard

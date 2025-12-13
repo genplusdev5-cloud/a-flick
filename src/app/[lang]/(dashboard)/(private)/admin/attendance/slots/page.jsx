@@ -27,6 +27,7 @@ import GlobalTextField from '@/components/common/GlobalTextField'
 import { showToast } from '@/components/common/Toasts'
 import GlobalSelect from '@/components/common/GlobalSelect'
 import CustomTextField from '@core/components/mui/TextField'
+import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 
 import TableChartIcon from '@mui/icons-material/TableChart'
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
@@ -60,6 +61,7 @@ export default function SlotsPage() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [isEdit, setIsEdit] = useState(false)
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
+  const [loading, setLoading] = useState(false)
 
   const [formData, setFormData] = useState({
     id: null,
@@ -74,12 +76,10 @@ export default function SlotsPage() {
   })
 
   const fetchSlots = async () => {
+    setLoading(true)
     try {
       const res = await getSlotList(pagination.pageIndex + 1, pagination.pageSize, searchText)
 
-      console.log('Full API Response:', res.data) // Remove after fix
-
-      // Correct path based on your actual response
       const slots = res?.data?.data?.results || []
       const total = res?.data?.data?.count || 0
 
@@ -90,6 +90,8 @@ export default function SlotsPage() {
       }))
     } catch (error) {
       showToast('error', 'Failed to load slots')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -132,19 +134,17 @@ export default function SlotsPage() {
   }
 
   const handleDelete = async id => {
-    if (!window.confirm('Are you sure you want to delete this slot? This action cannot be undone.')) {
-      return
-    }
+    if (!window.confirm('Are you sure you want to delete this slot?')) return
 
+    setLoading(true)
     try {
       await deleteSlot(id)
       showToast('success', 'Slot deleted successfully')
-
-      // Refresh list after delete
       fetchSlots()
     } catch (error) {
-      const msg = error?.response?.data?.message || error?.message || 'Failed to delete'
-      showToast('error', msg)
+      showToast('error', 'Failed to delete')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -235,6 +235,23 @@ export default function SlotsPage() {
 
   return (
     <Box>
+      {loading && (
+        <Box
+          sx={{
+            position: 'fixed',
+            inset: 0,
+            bgcolor: 'rgba(255,255,255,0.8)',
+            backdropFilter: 'blur(2px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999
+          }}
+        >
+          <ProgressCircularCustomization size={60} thickness={5} />
+        </Box>
+      )}
+
       {/* Breadcrumb */}
       <Box sx={{ mb: 2 }}>
         <Link href='/admin/dashboards' className='text-primary'>

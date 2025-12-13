@@ -41,6 +41,7 @@ import { useRouter } from 'next/navigation'
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalTextField from '@/components/common/GlobalTextField'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
+import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import { showToast } from '@/components/common/Toasts'
 
@@ -326,6 +327,39 @@ export default function KivFinderPage() {
   // -----------------------------
   return (
     <Box>
+      {loading && (
+        <Box
+          sx={{
+            position: 'fixed',
+            inset: 0,
+            bgcolor: 'rgba(255,255,255,0.65)',
+            backdropFilter: 'blur(3px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column',
+            zIndex: 2000,
+            animation: 'fadeIn 0.3s ease-in-out',
+            '@keyframes fadeIn': {
+              from: { opacity: 0 },
+              to: { opacity: 1 }
+            }
+          }}
+        >
+          <ProgressCircularCustomization size={70} thickness={5} />
+          <Typography
+            mt={2}
+            sx={{
+              color: 'primary.main',
+              fontWeight: 600,
+              fontSize: '1.05rem',
+              letterSpacing: 0.3
+            }}
+          >
+            Loading KIV Reports...
+          </Typography>
+        </Box>
+      )}
       <Breadcrumbs sx={{ mb: 2 }}>
         <Link href='/'>Dashboard</Link>
         <Typography>KVI Finder</Typography>

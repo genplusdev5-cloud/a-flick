@@ -32,6 +32,7 @@ import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
 import FileCopyIcon from '@mui/icons-material/FileCopy'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import FileDownloadIcon from '@mui/icons-material/FileDownload'
+import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 
 import SearchIcon from '@mui/icons-material/Search'
 import EditIcon from '@mui/icons-material/Edit'
@@ -74,6 +75,7 @@ export default function AttendanceSchedulePage() {
   const [startDate, setStartDate] = useState(new Date())
   const [endDate, setEndDate] = useState(addDays(new Date(), 7))
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
+  const [loading, setLoading] = useState(false)
 
   const [attendanceList, setAttendanceList] = useState([])
   const [technicianList, setTechnicianList] = useState([])
@@ -130,24 +132,22 @@ export default function AttendanceSchedulePage() {
   // FETCH FUNCTION
   const loadScheduleList = async () => {
     try {
+      setLoading(true)
+
       const params = {
         page: pagination.pageIndex + 1,
         page_size: pagination.pageSize,
         search_text: searchText,
 
-        // Date Filter
         ...(dateFilter && {
           start_date: format(dateRange[0], 'yyyy-MM-dd'),
           end_date: format(dateRange[1], 'yyyy-MM-dd')
         }),
 
-        // Main Filters
         ...(selectedAttendance && { attendance_id: selectedAttendance.value }),
         ...(selectedTechnician && { technician_id: selectedTechnician.value }),
         ...(selectedSupervisor && { supervisor_id: selectedSupervisor.value }),
         ...(selectedCustomer && { customer_id: selectedCustomer.value }),
-
-        // Approval & Appointment Filters
         ...(selectedApproval && { approval_status: selectedApproval.value }),
         ...(selectedAppointment && { appointment_status: selectedAppointment.value })
       }
@@ -155,9 +155,11 @@ export default function AttendanceSchedulePage() {
       const res = await getScheduleList(params)
 
       setRows(res.count ? res.results : res)
-      setPagination(prev => ({ ...prev, total: res.count || rows.length }))
+      setPagination(prev => ({ ...prev, total: res.count || 0 }))
     } catch (err) {
       console.error('Schedule Load Failed', err)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -227,6 +229,22 @@ export default function AttendanceSchedulePage() {
 
   return (
     <Box>
+      {loading && (
+        <Box
+          sx={{
+            position: 'fixed',
+            inset: 0,
+            bgcolor: 'rgba(255,255,255,0.8)',
+            backdropFilter: 'blur(2px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999
+          }}
+        >
+          <ProgressCircularCustomization size={60} thickness={5} />
+        </Box>
+      )}
       {/* Breadcrumb */}
       <Box sx={{ mb: 2 }}>
         <Link href='/en/admin/dashboards' className='text-primary'>

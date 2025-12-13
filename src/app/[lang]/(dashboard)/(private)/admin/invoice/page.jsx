@@ -27,6 +27,7 @@ import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
 import GlobalDateRange from '@/components/common/GlobalDateRange'
 import { printInvoice } from '@/helpers/printInvoice'
+import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 
 // Table
 import {
@@ -569,6 +570,40 @@ export default function InvoiceListPageFull() {
 
   return (
     <Box>
+      {loading && (
+        <Box
+          sx={{
+            position: 'fixed',
+            inset: 0,
+            bgcolor: 'rgba(255,255,255,0.65)',
+            backdropFilter: 'blur(3px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column',
+            zIndex: 2000,
+            animation: 'fadeIn 0.3s ease-in-out',
+            '@keyframes fadeIn': {
+              from: { opacity: 0 },
+              to: { opacity: 1 }
+            }
+          }}
+        >
+          <ProgressCircularCustomization size={70} thickness={5} />
+          <Typography
+            mt={2}
+            sx={{
+              color: 'primary.main',
+              fontWeight: 600,
+              fontSize: '1.05rem',
+              letterSpacing: 0.3
+            }}
+          >
+            Loading Invoices...
+          </Typography>
+        </Box>
+      )}
+
       {/* Hidden Invoice Preview for PDF Generation */}
       <div
         id='invoice-preview'
