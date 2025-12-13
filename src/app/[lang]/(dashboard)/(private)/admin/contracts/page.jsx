@@ -779,19 +779,31 @@ export default function ContractsPage() {
             onChange={v => {
               const value = String(v)
 
-              // 🔹 type: uuid:5478f8d4-c6ce-11f0-9171-fe7e4a53ce8c
               if (value.startsWith('uuid:')) {
                 const uid = value.replace('uuid:', '').trim()
-                setUuidFilter(uid) // ✅ store in state
-                setSearchText('') // clear normal search
-                setPagination(p => ({ ...p, pageIndex: 0 }))
+                setUuidFilter(uid)
                 return
               }
 
+              setUuidFilter(null)
               setSearchText(value)
               setPagination(p => ({ ...p, pageIndex: 0 }))
             }}
-            placeholder="Search customer, code, address, pests... (or type 'uuid:XXXX')"
+            placeholder='Search customer, code, address, pests...'
+            size='small'
+            sx={{
+              width: 320, // 🔥 same width
+              '& .MuiInputBase-root': {
+                height: 36 // 🔥 same height
+              }
+            }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position='start'>
+                  <SearchIcon fontSize='small' />
+                </InputAdornment>
+              )
+            }}
           />
         </Box>
 
