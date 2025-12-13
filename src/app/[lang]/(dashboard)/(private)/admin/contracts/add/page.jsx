@@ -667,8 +667,13 @@ export default function AddContractPage() {
   }
 
   // Logic to Save to IndexedDB and Redirect
+  // =======================================
+  // 🚀 FINAL WORKING HANDLE SUBMIT FUNCTION
+  // =======================================
   const handleSubmit = async () => {
-    // Basic validations
+    // ------------------------------
+    // 1️⃣ BASIC VALIDATIONS
+    // ------------------------------
     if (!formData.contractName) {
       showToast('error', 'Contract Name is required!')
       return
@@ -687,6 +692,9 @@ export default function AddContractPage() {
     }
 
     try {
+      // ------------------------------
+      // 2️⃣ BUILD PAYLOAD
+      // ------------------------------
       const payload = {
         parent_id: 0,
         level: 1,
@@ -752,24 +760,31 @@ export default function AddContractPage() {
 
       console.log('📌 FINAL PAYLOAD:', payload)
 
-      // ===================================
-      // 🔥 Actual Backend Call
-      // ===================================
-      const response = await createContract(payload)
+      // ------------------------------
+      // 3️⃣ SEND TO BACKEND
+      // ------------------------------
+      const response = await createContract(payload) // ⭐ MUST BE HERE
 
+      // ------------------------------
+      // 4️⃣ SUCCESS → REDIRECT WITH PARAM
+      // ------------------------------
       if (response?.data?.status === 'success') {
-        const newUuid = response.data.data.uuid // ✔ correct ID
-
         showToast('success', 'Contract Added Successfully!')
 
-        // ⭐ Redirect to list page with drawer auto-open
+        const lang = window.location.pathname.split('/')[1]
+
         setTimeout(() => {
-          router.push(`/admin/contracts?openDrawer=${newUuid}`)
+          router.push(`/${lang}/admin/contracts?newContract=${btoa(JSON.stringify(response.data.data))}`)
         }, 500)
-      } else {
-        console.error('❌ Backend Error:', response)
-        showToast('error', response?.data?.message || 'Error while saving contract!')
+
+        return
       }
+
+      // ------------------------------
+      // 5️⃣ FAILED BACKEND RESPONSE
+      // ------------------------------
+      console.error('❌ Backend Error:', response)
+      showToast('error', response?.data?.message || 'Error while saving contract!')
     } catch (error) {
       console.error('❌ Submit Error:', error)
       showToast('error', 'Error while saving contract!')
@@ -1607,7 +1622,11 @@ export default function AddContractPage() {
             sx={{ display: 'flex', justifyContent: 'flex-end', gap: 4, pt: 8 }}
             key='form-action-buttons'
           >
-            <GlobalButton color='secondary' onClick={() => router.push('/admin/contracts')} ref={closeButtonRef}>
+            <GlobalButton
+              color='secondary'
+              onClick={() => router.push(`/${lang}/admin/contracts`)}
+              ref={closeButtonRef}
+            >
               Close
             </GlobalButton>
             <GlobalButton variant='contained' onClick={handleSubmit} ref={saveButtonRef}>

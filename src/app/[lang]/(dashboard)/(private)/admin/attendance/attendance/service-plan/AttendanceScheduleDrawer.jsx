@@ -18,11 +18,12 @@ import GlobalButton from '@/components/common/GlobalButton'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 
-export default function AttendancePlanDrawer({ open, onClose, attendance, slots = [], technicians = [] }) {
-  const [startDate, setStartDate] = useState(null)
+export default function AttendanceScheduleDrawer({ open, onClose, attendance, slots = [], technicians = [] }) {
   const [endDate, setEndDate] = useState(null)
   const [selectedSlot, setSelectedSlot] = useState([])
   const [selectedTechnicians, setSelectedTechnicians] = useState([])
+  const [startDate, setStartDate] = useState(null)
+
   const [weekDays, setWeekDays] = useState({
     Monday: true,
     Tuesday: true,
@@ -73,11 +74,16 @@ export default function AttendancePlanDrawer({ open, onClose, attendance, slots 
     }
   }, [attendance])
 
-  // Autofill when opening
   useEffect(() => {
-    if (!attendance) return
-    setScheduleRows([]) // reset
-  }, [attendance])
+    if (!open || !attendance) return
+
+    // Auto-fill dates
+    setStartDate(attendance.start_date ? new Date(attendance.start_date) : null)
+    setEndDate(attendance.end_date ? new Date(attendance.end_date) : null)
+
+    // Reset old generated schedule
+    setScheduleRows([])
+  }, [open, attendance])
 
   const toggleDay = day =>
     setWeekDays(prev => ({
@@ -130,9 +136,9 @@ export default function AttendancePlanDrawer({ open, onClose, attendance, slots 
               label='Slots'
               multiple
               value={selectedSlot}
-              options={(attendance?.slot || []).map(s => ({
-                label: s.slot_name,
-                value: s.slot_id ?? s.id // backend internal slot id
+              options={slots.map(s => ({
+                label: s.name,
+                value: s.id
               }))}
               onChange={setSelectedSlot}
             />
@@ -152,16 +158,10 @@ export default function AttendancePlanDrawer({ open, onClose, attendance, slots 
               label='Technicians'
               multiple
               value={selectedTechnicians}
-              options={
-                attendance?.technician && attendance?.technician !== '-'
-                  ? [
-                      {
-                        label: attendance?.technician,
-                        value: attendance?.technician_id
-                      }
-                    ]
-                  : []
-              }
+              options={technicians.map(t => ({
+                label: t.name,
+                value: t.id
+              }))}
               onChange={setSelectedTechnicians}
             />
           </Grid>

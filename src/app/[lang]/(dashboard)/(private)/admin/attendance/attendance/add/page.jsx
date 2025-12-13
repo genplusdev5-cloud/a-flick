@@ -223,40 +223,30 @@ export default function AddAttendancePage() {
         }))
       }
 
-      console.log('FINAL JSON Payload:', payload)
-      await addAttendance(payload)
-      showToast('success', 'Attendance added successfully')
-      router.push('/admin/attendance/attendance')
+      const response = await addAttendance(payload)
 
-      if (slots.length > 0) {
-        payload.append(
-          'slot',
-          JSON.stringify(
-            slots.map(s => ({
-              slot_id: dropdowns.slots.find(x => x.name === s.slot)?.id || null,
-              frequency_id: 1, // 🔥 Ask backend if dynamic later
-              start_time: s.startTime || '00:00:00',
-              end_time: s.endTime || '00:00:00',
-              lunch: Number(s.lunchMinutes) || 0,
-              work_time: s.slotValue || '1',
-              slot_value: Number(s.slotValue) || 0
-            }))
-          )
-        )
+      console.log('ADD ATTENDANCE RESPONSE 👉', response)
+
+      // 🔥 TRY ALL POSSIBLE ID PATHS
+      const newId = response?.data?.id || response?.data?.data?.id || response?.data?.data?.data?.id
+
+      if (!newId) {
+        showToast('error', 'Attendance ID not returned from API')
+        return
       }
 
-      console.log('Sending payload:', Object.fromEntries(payload))
+      showToast('success', 'Attendance added successfully')
 
-      await addAttendance(payload)
-      showToast('success', 'Attendance created successfully')
-      router.push('/admin/attendance/attendance')
+      router.push(
+        `/admin/attendance/attendance?page=1&page_size=1000&newAttendance=${btoa(JSON.stringify({ id: newId }))}`
+      )
     } catch (error) {
       console.error('Save error:', error)
       showToast('error', error?.response?.data?.message || 'Failed to save attendance')
     }
   }
 
-  const handleClose = () => router.push('/admin/attendance')
+  const handleClose = () => router.push('/admin/attendance/attendance')
 
   return (
     <ContentLayout
@@ -264,6 +254,7 @@ export default function AddAttendancePage() {
       breadcrumbs={[
         { label: 'Dashboard', href: '/admin/dashboards' },
         { label: 'Attendance', href: '/admin/attendance/attendance' },
+
         { label: 'Add Attendance' }
       ]}
     >

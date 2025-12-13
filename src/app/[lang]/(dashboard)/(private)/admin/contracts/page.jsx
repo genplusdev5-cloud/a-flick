@@ -263,45 +263,27 @@ export default function ContractsPage() {
     }
   }
 
+  // AUTO-OPEN DRAWER AFTER ADD CONTRACT
   useEffect(() => {
-    const uuidParam = searchParams.get('openDrawer')
-    console.log('📌 URL UUID:', uuidParam)
+    const encoded = searchParams.get('newContract')
+    if (!encoded) return
 
-    if (!uuidParam) return
+    try {
+      const item = JSON.parse(atob(encoded))
 
-    const loadContract = async () => {
-      try {
-        console.log('🚀 Fetching by UUID...')
+      // 🔥 DELAY IS IMPORTANT — PAGE RENDER AANA PIRAGU DRAWER OPEN AGUM
+      setTimeout(() => {
+        openPlanDrawer(item)
+      }, 300)
 
-        const res = await api.get('contract/', {
-          params: { uuid: uuidParam }
-        })
-        const json = res.data
-
-        console.log('🔍 API Response:', json)
-
-        if (json?.data?.length > 0) {
-          const contract = json.data[0]
-          console.log('🎯 Contract Found:', contract)
-
-          setSelectedContract(contract)
-          setOpenDrawer(true)
-          console.log('🟢 Drawer State ->', true, contract)
-
-          // URL la param remove panna
-          const url = new URL(window.location.href)
-          url.searchParams.delete('openDrawer')
-          window.history.replaceState({}, '', url)
-        } else {
-          console.warn('⚠ No contract found for UUID!')
-        }
-      } catch (error) {
-        console.error('❌ Contract fetch error:', error)
-      }
+      // remove param
+      const url = new URL(window.location.href)
+      url.searchParams.delete('newContract')
+      window.history.replaceState({}, '', url)
+    } catch (e) {
+      console.error('Auto-open decode error:', e)
     }
-
-    loadContract()
-  }, [searchParams])
+  }, [])
 
   useEffect(() => {
     if (decodedCustomerId && customerOptions.length > 0) {

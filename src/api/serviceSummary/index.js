@@ -24,22 +24,41 @@ export const getReportDropdown = async (params = {}) => {
 export const generateServiceSummary = async payload => {
   try {
     const res = await api.post('service-summary/', payload, {
-      responseType: 'blob',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      transformRequest: [data => JSON.stringify(data)]
+      responseType: 'blob'
     })
 
+    // இந்த check இல்லைன்னா corrupted file தான் வரும்!
+    const contentType = res.headers['content-type']
+
+    if (contentType && contentType.includes('application/json')) {
+      // Error JSON வந்திருக்கு – அதை text ஆ convert பண்ணி படிக்கணும்
+      const text = await res.data.text()
+      const json = JSON.parse(text)
+      return {
+        status: 'failed',
+        message: json.message || 'Invalid response from server'
+      }
+    }
+
+    // இப்போதான் real Excel file
     return {
       status: 'success',
       file: res.data
     }
   } catch (error) {
-    console.error('Service Summary Error:', error)
+    let message = 'Service summary generation failed'
+
+    if (error.response?.data) {
+      try {
+        const text = await error.response.data.text()
+        const json = JSON.parse(text)
+        message = json.message || message
+      } catch {}
+    }
+
     return {
       status: 'failed',
-      message: error.response?.data?.message || 'Service summary generation failed'
+      message
     }
   }
 }

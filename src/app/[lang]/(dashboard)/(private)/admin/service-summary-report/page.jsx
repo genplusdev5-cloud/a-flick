@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, forwardRef } from 'react'
-import { Box, Card, Grid, Typography } from '@mui/material'
+import { Box, Card, Grid, Typography, Checkbox } from '@mui/material'
 import Breadcrumbs from '@mui/material/Breadcrumbs'
 import Link from 'next/link'
 import { format } from 'date-fns'
@@ -10,6 +10,7 @@ import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import CustomTextField from '@core/components/mui/TextField'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
 import GlobalButton from '@/components/common/GlobalButton'
+import GlobalDateRange from '@/components/common/GlobalDateRange'
 
 import { getReportDropdown, generateServiceSummary } from '@/api/serviceSummary'
 import { showToast } from '@/components/common/Toasts'
@@ -55,6 +56,9 @@ const DateRangePickerField = ({ startDate, endDate, setDates }) => {
 ----------------------------------- */
 export default function ServiceSummaryReportPage() {
   const [dropdown, setDropdown] = useState({})
+  const [enableDateFilter, setEnableDateFilter] = useState(true)
+  const [fromDate, setFromDate] = useState(format(new Date(), 'yyyy-MM-dd'))
+  const [toDate, setToDate] = useState(format(new Date(), 'yyyy-MM-dd'))
 
   const [filters, setFilters] = useState({
     customer_id: '',
@@ -82,30 +86,32 @@ export default function ServiceSummaryReportPage() {
     loadDropdowns()
   }, [])
 
-  /* GENERATE REPORT */
-const handleGenerate = async () => {
-  const payload = {
-    from_date: format(dates.startDate, 'yyyy-MM-dd'),
-    to_date: format(dates.endDate, 'yyyy-MM-dd'),
-    ...filters
-  };
+  const handleGenerate = async () => {
+    const payload = {}
 
-  // ⭐ DEBUG: Print payload in browser console
-  console.log("🚀 FINAL PAYLOAD SENT TO API:", payload);
+    if (enableDateFilter && fromDate) payload.from_date = fromDate
+    if (enableDateFilter && toDate) payload.to_date = toDate
+    if (filters.customer_id) payload.customer_id ? (payload.customer_id = Number(filters.customer_id)) : null
+    if (filters.contract_id) payload.contract_id = Number(filters.contract_id)
+    if (filters.group_code) payload.group_code = Number(filters.group_code)
+    if (filters.pest_level) payload.pest_level = Number(filters.pest_level)
 
-  const res = await generateServiceSummary(payload);
+    console.log('Final JSON payload →', payload) // இத பாரு console-ல
 
-  if (res.status === 'success') {
-    const url = window.URL.createObjectURL(new Blob([res.file]))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = 'service_summary.xlsx'
-    link.click()
-  } else {
-    showToast('error', res.message)
+    const res = await generateServiceSummary(payload) // இப்போ JSON ஆ போகும்
+
+    if (res.status === 'success') {
+      const url = window.URL.createObjectURL(new Blob([res.file]))
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'service_summary.xlsx'
+      link.click()
+      window.URL.revokeObjectURL(url)
+      showToast('success', 'Report generated!')
+    } else {
+      showToast('error', res.message)
+    }
   }
-};
-
 
   return (
     <Box>
@@ -128,8 +134,40 @@ const handleGenerate = async () => {
       >
         <Grid container spacing={3} alignItems='center'>
           {/* DATE RANGE */}
+          {/* DATE RANGE */}
           <Grid item xs={12} md={3.2}>
-            <DateRangePickerField startDate={dates.startDate} endDate={dates.endDate} setDates={setDates} />
+            <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+              {/* Checkbox + Label */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Checkbox
+                  checked={enableDateFilter}
+                  onChange={e => {
+                    const checked = e.target.checked
+                    setEnableDateFilter(checked)
+
+                    if (!checked) {
+                      setFromDate('')
+                      setToDate('')
+                    }
+                  }}
+                  size='small'
+                />
+
+                <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Date Range</Typography>
+              </Box>
+
+              {/* Global Date Range Picker */}
+              <GlobalDateRange
+                label=''
+                start={fromDate}
+                end={toDate}
+                onSelectRange={({ start, end }) => {
+                  setFromDate(start ? format(new Date(start), 'yyyy-MM-dd') : '')
+                  setToDate(end ? format(new Date(end), 'yyyy-MM-dd') : '')
+                }}
+                disabled={!enableDateFilter}
+              />
+            </Box>
           </Grid>
 
           {/* CUSTOMER */}
@@ -229,7 +267,7 @@ const handleGenerate = async () => {
                 label: p.name,
                 value: p.id
               }))}
-              onChange={v => setFilters(prev => ({ ...prev, pest_level: v }))}
+              onChange={v => setFilters(prev => ({ ...prev, pest_level: v?.value || '' }))}
             />
           </Grid>
 

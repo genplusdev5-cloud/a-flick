@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 
 import {
   Box,
@@ -86,6 +87,9 @@ export default function AttendancePage() {
   const serviceAddressOptions = ['Address 1', 'Address 2']
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [selectedAttendance, setSelectedAttendance] = useState(null)
+  const autoOpenedRef = useRef(false)
+
+  const searchParams = useSearchParams()
 
   const router = useRouter()
 
@@ -176,6 +180,32 @@ export default function AttendancePage() {
 
     fetchDropdowns()
   }, [])
+
+  useEffect(() => {
+    const encoded = searchParams.get('newAttendance')
+    if (!encoded || autoOpenedRef.current) return
+
+    try {
+      const { id } = JSON.parse(atob(encoded))
+
+      // 🔥 wait until rows loaded
+      if (!rows.length) return
+
+      const found = rows.find(r => String(r.id) === String(id))
+      if (!found) return
+
+      setSelectedAttendance(found)
+      setDrawerOpen(true)
+      autoOpenedRef.current = true
+
+      // clean URL
+      const url = new URL(window.location.href)
+      url.searchParams.delete('newAttendance')
+      window.history.replaceState({}, '', url)
+    } catch (e) {
+      console.error('Auto open failed', e)
+    }
+  }, [searchParams, rows])
 
   useEffect(() => {
     console.log('Dropdown Data:', dropdowns) // ← IDHU MUST!
