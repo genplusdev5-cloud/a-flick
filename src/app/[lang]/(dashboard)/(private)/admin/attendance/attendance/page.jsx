@@ -33,7 +33,7 @@ import {
   InputAdornment // 👈 Added now
 } from '@mui/material'
 
-import { getAttendanceList, deleteAttendance } from '@/api/attendance'
+import { getAttendanceList, deleteAttendance, getAttendanceById } from '@/api/attendance'
 import { getAttendanceDropdowns } from '@/api/attendance/dropdowns'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 
@@ -108,7 +108,7 @@ export default function AttendancePage() {
   }
 
   // Inside your component — replace fetchAttendances
-  const fetchAttendances = async () => {
+  const fetchAttendances = async (overrideParams = {}) => {
     try {
       setLoading(true)
 
@@ -121,15 +121,16 @@ export default function AttendancePage() {
         supervisor_id: selectedSupervisor?.value || undefined,
         slot_id: selectedSlot?.value || undefined,
         start_date: dateFilter && dateRange[0] ? format(dateRange[0], 'yyyy-MM-dd') : undefined,
-        end_date: dateFilter && dateRange[1] ? format(dateRange[1], 'yyyy-MM-dd') : undefined
+        end_date: dateFilter && dateRange[1] ? format(dateRange[1], 'yyyy-MM-dd') : undefined,
+        ...overrideParams // 🔥 ADD THIS
       }
 
-      Object.keys(params).forEach(key => params[key] === undefined && delete params[key])
+      Object.keys(params).forEach(k => params[k] === undefined && delete params[k])
 
       const res = await getAttendanceList(params)
       setRows(res?.data?.results || [])
-    } catch (error) {
-      console.error('Failed to fetch attendance:', error)
+    } catch (err) {
+      console.error(err)
     } finally {
       setLoading(false)
     }
@@ -183,30 +184,36 @@ export default function AttendancePage() {
   }, [])
 
   useEffect(() => {
-    const encoded = searchParams.get('newAttendance')
-    if (!encoded || autoOpenedRef.current) return
+    if (autoOpenedRef.current) return
+    if (!dropdowns.technicians.length || !dropdowns.slots.length) return
+    if (!rows.length) return
 
+    const params = new URLSearchParams(window.location.search)
+    const encoded = params.get('newAttendance')
+    if (!encoded) return
+
+    let parsed
     try {
-      const { id } = JSON.parse(atob(encoded))
-
-      // 🔥 wait until rows loaded
-      if (!rows.length) return
-
-      const found = rows.find(r => String(r.id) === String(id))
-      if (!found) return
-
-      setSelectedAttendance(found)
-      setDrawerOpen(true)
-      autoOpenedRef.current = true
-
-      // clean URL
-      const url = new URL(window.location.href)
-      url.searchParams.delete('newAttendance')
-      window.history.replaceState({}, '', url)
-    } catch (e) {
-      console.error('Auto open failed', e)
+      parsed = JSON.parse(atob(encoded))
+    } catch {
+      return
     }
-  }, [searchParams, rows])
+
+    const attendanceId = parsed?.id
+    if (!attendanceId) return
+
+    const row = rows.find(r => String(r.id) === String(attendanceId))
+    if (!row) return
+
+    autoOpenedRef.current = true
+    setSelectedAttendance(row)
+    setDrawerOpen(true)
+
+    // clean URL
+    const url = new URL(window.location.href)
+    url.searchParams.delete('newAttendance')
+    window.history.replaceState({}, '', url)
+  }, [rows, dropdowns])
 
   useEffect(() => {
     console.log('Dropdown Data:', dropdowns) // ← IDHU MUST!
@@ -668,8 +675,11 @@ export default function AttendancePage() {
       </Dialog>
 
       <AttendanceScheduleDrawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
+        open={drawerOpen && !!selectedAttendance && dropdowns.technicians.length > 0 && dropdowns.slots.length > 0}
+        onClose={() => {
+          setDrawerOpen(false)
+          setSelectedAttendance(null)
+        }}
         attendance={selectedAttendance}
         technicians={dropdowns.technicians}
         slots={dropdowns.slots}

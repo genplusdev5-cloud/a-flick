@@ -22,6 +22,7 @@ import SearchIcon from '@mui/icons-material/Search'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
+import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
 import GlobalTextField from '@/components/common/GlobalTextField'
@@ -58,11 +59,16 @@ export default function DashboardList() {
       header: 'Action',
       cell: () => (
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <IconButton size='small' color='primary'>
-            <EditIcon />
+          <IconButton
+            size='small'
+            color='primary'
+            onClick={() => router.push(`/admin/attendance/attendance/edit/${row.id}`)}
+          >
+            <i className='tabler-edit' />
           </IconButton>
-          <IconButton size='small' color='error'>
-            <DeleteIcon />
+          {/* Delete */}
+          <IconButton size='small' color='error' onClick={() => setDeleteDialog({ open: true, row })}>
+            <i className='tabler-trash text-red-600 text-lg' />
           </IconButton>
         </Box>
       )
@@ -90,11 +96,16 @@ export default function DashboardList() {
       header: 'Action',
       cell: () => (
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <IconButton size='small' color='primary'>
-            <EditIcon />
+          <IconButton
+            size='small'
+            color='primary'
+            onClick={() => router.push(`/admin/attendance/attendance/edit/${row.id}`)}
+          >
+            <i className='tabler-edit' />
           </IconButton>
-          <IconButton size='small' color='error'>
-            <DeleteIcon />
+          {/* Delete */}
+          <IconButton size='small' color='error' onClick={() => setDeleteDialog({ open: true, row })}>
+            <i className='tabler-trash text-red-600 text-lg' />
           </IconButton>
         </Box>
       )
@@ -220,6 +231,23 @@ export default function DashboardList() {
 
   return (
     <Box>
+      {loading && (
+        <Box
+          sx={{
+            position: 'fixed',
+            inset: 0,
+            bgcolor: 'rgba(255,255,255,0.8)',
+            backdropFilter: 'blur(2px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999
+          }}
+        >
+          <ProgressCircularCustomization size={60} thickness={5} />
+        </Box>
+      )}
+
       <Card sx={{ p: 3 }}>
         <CardHeader title='Dashboard Summary' />
 
@@ -257,7 +285,7 @@ export default function DashboardList() {
                   setFilterType(value.label)
                 }
               }}
-              label='Filter Type'
+              label=''
             />
 
             {/* SEARCH */}

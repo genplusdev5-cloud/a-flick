@@ -225,24 +225,21 @@ export default function AddAttendancePage() {
 
       const response = await addAttendance(payload)
 
-      console.log('ADD ATTENDANCE RESPONSE 👉', response)
-
-      // 🔥 TRY ALL POSSIBLE ID PATHS
+      // ✅ GET NEW ID (SUPER SAFE)
       const newId = response?.data?.id || response?.data?.data?.id || response?.data?.data?.data?.id
 
       if (!newId) {
-        showToast('error', 'Attendance ID not returned from API')
+        showToast('error', 'Attendance ID not returned')
         return
       }
 
       showToast('success', 'Attendance added successfully')
 
-      router.push(
-        `/admin/attendance/attendance?page=1&page_size=1000&newAttendance=${btoa(JSON.stringify({ id: newId }))}`
-      )
+      // 🔥🔥🔥 THIS IS THE KEY 🔥🔥🔥
+      router.push(`/admin/attendance/attendance?newAttendance=${btoa(JSON.stringify({ id: newId }))}`)
     } catch (error) {
-      console.error('Save error:', error)
-      showToast('error', error?.response?.data?.message || 'Failed to save attendance')
+      console.error(error)
+      showToast('error', 'Failed to save attendance')
     }
   }
 
