@@ -33,7 +33,7 @@ import {
   InputAdornment // 👈 Added now
 } from '@mui/material'
 
-import { getAttendanceList, deleteAttendance, getAttendanceById } from '@/api/attendance'
+import { getAttendanceList, deleteAttendance } from '@/api/attendance'
 import { getAttendanceDropdowns } from '@/api/attendance/dropdowns'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 
@@ -183,37 +183,51 @@ export default function AttendancePage() {
     fetchDropdowns()
   }, [])
 
+  // AUTO-OPEN DRAWER LOGIC
   useEffect(() => {
+    // 1. Check if already opened to prevent re-loops
     if (autoOpenedRef.current) return
-    if (!dropdowns.technicians.length || !dropdowns.slots.length) return
-    if (!rows.length) return
 
+    // 2. DEPENDENCIES CHECK:
+    //    - Rows must be loaded (length > 0)
+    //    - Dropdowns (technicians/slots) must be available for the drawer to render correctly
+    if (!rows || rows.length === 0) return
+    if (!dropdowns.technicians?.length || !dropdowns.slots?.length) return
+
+    // 3. READ PARAMS
     const params = new URLSearchParams(window.location.search)
-    const encoded = params.get('newAttendance')
-    if (!encoded) return
+    const targetId = params.get('openScheduleId')
 
-    let parsed
-    try {
-      parsed = JSON.parse(atob(encoded))
-    } catch {
-      return
+    if (!targetId) return
+
+    // 4. FIND ROW
+    //    Convert both key and target to strings to match safely
+    const matchedRow = rows.find(r => String(r.id) === String(targetId))
+
+    if (matchedRow) {
+      // 5. OPEN DRAWER
+      //    Use a small timeout to ensure the render cycle is settled (matching "Contract" stability)
+      setTimeout(() => {
+        // Prevent double opening
+        if (autoOpenedRef.current) return
+        
+        autoOpenedRef.current = true
+        setSelectedAttendance(matchedRow)
+        setDrawerOpen(true)
+
+        // 6. CLEANUP URL
+        //    Remove the param so refresh doesn't trigger again
+        const newUrl = new URL(window.location.href)
+        newUrl.searchParams.delete('openScheduleId')
+        window.history.replaceState({}, '', newUrl)
+      }, 500)
+    } else {
+      // Optional: If row not found (e.g. pagination), we simply do nothing.
+      // The user requirement is to "Find matching row -> Open". 
+      // If strict finding fails, we can't open.
+      console.warn(`[AutoOpen] Row with ID ${targetId} not found in loaded list.`)
     }
-
-    const attendanceId = parsed?.id
-    if (!attendanceId) return
-
-    const row = rows.find(r => String(r.id) === String(attendanceId))
-    if (!row) return
-
-    autoOpenedRef.current = true
-    setSelectedAttendance(row)
-    setDrawerOpen(true)
-
-    // clean URL
-    const url = new URL(window.location.href)
-    url.searchParams.delete('newAttendance')
-    window.history.replaceState({}, '', url)
-  }, [rows, dropdowns])
+  }, [rows, dropdowns]) // Runs whenever list or dropdowns update
 
   useEffect(() => {
     console.log('Dropdown Data:', dropdowns) // ← IDHU MUST!

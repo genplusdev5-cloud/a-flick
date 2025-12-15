@@ -23,10 +23,18 @@ import '@/app/globals.css'
 // Generated Icon CSS Imports
 import '@assets/iconify-icons/generated-icons.css'
 
+// ✅ Import ClientWrapper
+import ClientWrapper from '@/app/ClientWrapper'
+
 export const metadata = {
   title: 'Vuexy - MUI Next.js Admin Dashboard Template',
   description:
     'Vuexy - MUI Next.js Admin Dashboard Template - is the most developer friendly & highly customizable Admin Dashboard Template based on MUI v5.'
+}
+
+export const viewport = {
+  initialScale: 1,
+  width: 'device-width'
 }
 
 const Layout = async ({ children }) => {
@@ -37,23 +45,26 @@ const Layout = async ({ children }) => {
     <html id='__next' suppressHydrationWarning>
       <body className='flex is-full min-bs-full flex-auto flex-col'>
         <InitColorSchemeScript attribute='data' defaultMode={systemMode} />
-        <Providers direction='ltr'>
-          <BlankLayout systemMode={systemMode}>
-            <IntersectionProvider>
-              <FrontLayout>
-                {children}
-                <ScrollToTop className='mui-fixed'>
-                  <Button
-                    variant='contained'
-                    className='is-10 bs-10 rounded-full p-0 min-is-0 flex items-center justify-center'
-                  >
-                    <i className='tabler-arrow-up' />
-                  </Button>
-                </ScrollToTop>
-              </FrontLayout>
-            </IntersectionProvider>
-          </BlankLayout>
-        </Providers>
+        {/* ✅ Wrapped in ClientWrapper */}
+        <ClientWrapper>
+          <Providers direction='ltr'>
+            <BlankLayout systemMode={systemMode}>
+              <IntersectionProvider>
+                <FrontLayout>
+                  {children}
+                  <ScrollToTop className='mui-fixed'>
+                    <Button
+                      variant='contained'
+                      className='is-10 bs-10 rounded-full p-0 min-is-0 flex items-center justify-center'
+                    >
+                      <i className='tabler-arrow-up' />
+                    </Button>
+                  </ScrollToTop>
+                </FrontLayout>
+              </IntersectionProvider>
+            </BlankLayout>
+          </Providers>
+        </ClientWrapper>
       </body>
     </html>
   )

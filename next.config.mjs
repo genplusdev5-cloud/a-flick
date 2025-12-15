@@ -7,19 +7,19 @@ const nextConfig = {
     return [
       {
         source: '/',
-        destination: '/admin/dashboards',
+        destination: '/en/admin/dashboards', // 🔥 Explicitly include lang
         permanent: true,
         locale: false
       },
       {
         source: '/:lang(en|fr|ar)',
-        destination: '/admin/dashboards',
+        destination: '/en/admin/dashboards', // 🔥 Explicitly include lang
         permanent: true,
         locale: false
       },
       {
         source: '/:prefix*/dashboards/crm/:suffix*',
-        destination: '/admin/dashboards',
+        destination: '/en/admin/dashboards', // 🔥 Explicitly include lang
         permanent: true,
         locale: false
       },

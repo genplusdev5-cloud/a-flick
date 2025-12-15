@@ -14,8 +14,16 @@ import TranslationWrapper from '@/hocs/TranslationWrapper'
 import { i18n } from '@configs/i18n'
 import { getSystemMode } from '@core/utils/serverHelpers'
 
+// ✅ Import ClientWrapper
+import ClientWrapper from '@/app/ClientWrapper'
+
 export const metadata = {
   title: 'A-flick Pest Control Management'
+}
+
+export const viewport = {
+  initialScale: 1,
+  width: 'device-width'
 }
 
 const RootLayout = async props => {
@@ -30,11 +38,13 @@ const RootLayout = async props => {
     <html id='__next' lang={params.lang} dir={direction} suppressHydrationWarning>
       <body className='flex is-full min-bs-full flex-auto flex-col'>
         <InitColorSchemeScript attribute='data' defaultMode={systemMode} />
-
-        {/* ✅ Wrap app in TranslationWrapper */}
-        <TranslationWrapper headersList={headersList} lang={params.lang}>
-          {children}
-        </TranslationWrapper>
+        
+        {/* ✅ Wrapped in ClientWrapper */}
+        <ClientWrapper>
+          <TranslationWrapper headersList={headersList} lang={params.lang}>
+            {children}
+          </TranslationWrapper>
+        </ClientWrapper>
       </body>
     </html>
   )

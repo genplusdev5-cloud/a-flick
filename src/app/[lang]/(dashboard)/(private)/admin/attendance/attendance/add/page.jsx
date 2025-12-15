@@ -235,8 +235,8 @@ export default function AddAttendancePage() {
 
       showToast('success', 'Attendance added successfully')
 
-      // 🔥🔥🔥 THIS IS THE KEY 🔥🔥🔥
-      router.push(`/admin/attendance/attendance?newAttendance=${btoa(JSON.stringify({ id: newId }))}`)
+      // 🔥 Redirect with simple ID parameter as requested
+      router.push(`/admin/attendance/attendance?openScheduleId=${newId}`)
     } catch (error) {
       console.error(error)
       showToast('error', 'Failed to save attendance')
