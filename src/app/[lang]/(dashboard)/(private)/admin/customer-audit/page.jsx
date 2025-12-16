@@ -1,6 +1,6 @@
 'use client'
 
-import PermissionGuard from '@/components/PermissionGuard'
+import PermissionGuard from '@components/auth/PermissionGuard'
 
 const CustomerAuditPageContent = () => (
   <div className='p-6'>
