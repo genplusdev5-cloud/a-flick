@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import { usePermission } from '@/hooks/usePermission'
 
 import {
   Box,
@@ -138,6 +139,7 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
 export default function AccountItemCodePage() {
   const [rows, setRows] = useState([])
   const [rowCount, setRowCount] = useState(0)
+  const { canAccess } = usePermission()
   const [searchText, setSearchText] = useState('')
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -337,16 +339,20 @@ export default function AccountItemCodePage() {
         header: 'Actions',
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
-              <EditIcon />
-            </IconButton>
-            <IconButton
-              size='small'
-              color='error'
-              onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
-            >
-              <DeleteIcon />
-            </IconButton>
+            {canAccess('Account Item Code', 'update') && (
+              <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
+                <EditIcon />
+              </IconButton>
+            )}
+            {canAccess('Account Item Code', 'delete') && (
+              <IconButton
+                size='small'
+                color='error'
+                onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
+              >
+                <DeleteIcon />
+              </IconButton>
+            )}
           </Box>
         )
       }),
@@ -611,14 +617,16 @@ export default function AccountItemCodePage() {
                 </MenuItem>
               </Menu>
 
-              <Button
-                variant='contained'
-                startIcon={<AddIcon />}
-                onClick={handleAdd}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-              >
-                Add Item
-              </Button>
+              {canAccess('Account Item Code', 'create') && (
+                <Button
+                  variant='contained'
+                  startIcon={<AddIcon />}
+                  onClick={handleAdd}
+                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                >
+                  Add Item
+                </Button>
+              )}
             </Box>
           }
           sx={{

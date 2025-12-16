@@ -16,6 +16,7 @@ import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import CustomTextField from '@core/components/mui/TextField'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
 import GlobalButton from '@/components/common/GlobalButton'
+import PermissionGuard from '@/components/auth/PermissionGuard'
 
 /* ----------------------------------------------
    📅 Date Range Picker
@@ -64,7 +65,7 @@ const DateRangePickerField = () => {
 /* ----------------------------------------------
    MAIN PAGE – PRODUCTIVITY SUMMARY
 ---------------------------------------------- */
-export default function ProductivitySummaryPage() {
+const ProductivitySummaryPageContent = () => {
   return (
     <Box>
       {/* Breadcrumbs */}
@@ -128,5 +129,14 @@ export default function ProductivitySummaryPage() {
 
       <Box sx={{ mt: 5 }}></Box>
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function ProductivitySummaryPage() {
+  return (
+    <PermissionGuard permission="Productivity Summary">
+      <ProductivitySummaryPageContent />
+    </PermissionGuard>
   )
 }

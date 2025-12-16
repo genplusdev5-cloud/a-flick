@@ -16,6 +16,8 @@ import {
   FormControlLabel 
 } from '@mui/material'
 
+import PermissionGuard from '@/components/auth/PermissionGuard'
+
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
@@ -23,7 +25,8 @@ import GlobalDateRange from '@/components/common/GlobalDateRange'
 
 // -----------------------------------------------------
 
-export default function AttendanceSummaryPage() {
+// ───────────────────────────────────────────
+const AttendanceSummaryPageContent = () => {
   const [supervisor, setSupervisor] = useState('')
   const [technician, setTechnician] = useState('')
   const [otFilter, setOtFilter] = useState('all')
@@ -115,5 +118,14 @@ export default function AttendanceSummaryPage() {
         </Box>
       </Card>
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function AttendanceSummaryPage() {
+  return (
+    <PermissionGuard permission="Timesheet">
+      <AttendanceSummaryPageContent />
+    </PermissionGuard>
   )
 }

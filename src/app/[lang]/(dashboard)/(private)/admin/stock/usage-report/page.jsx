@@ -20,6 +20,8 @@ import {
   Button // ✅ Added here
 } from '@mui/material'
 
+import PermissionGuard from '@/components/auth/PermissionGuard'
+
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
@@ -147,7 +149,8 @@ const showToast = (type, message = '') => {
 // ─────────────────────────────────────────────
 // Component
 // ─────────────────────────────────────────────
-export default function UsageReportPage() {
+// ─────────────────────────────────────────────
+const UsageReportPageContent = () => {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(false)
 
@@ -611,5 +614,14 @@ export default function UsageReportPage() {
       </Card>
       <ToastContainer />
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function UsageReportPage() {
+  return (
+    <PermissionGuard permission="Usage Report">
+      <UsageReportPageContent />
+    </PermissionGuard>
   )
 }

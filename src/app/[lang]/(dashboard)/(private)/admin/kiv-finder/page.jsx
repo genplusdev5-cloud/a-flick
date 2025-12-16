@@ -24,6 +24,8 @@ import {
   InputAdornment
 } from '@mui/material'
 
+import PermissionGuard from '@/components/auth/PermissionGuard'
+
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import GlobalDateRange from '@/components/common/GlobalDateRange'
 import EditIcon from '@mui/icons-material/Edit'
@@ -81,7 +83,7 @@ const formatDate = iso => {
   }
 }
 
-export default function KivFinderPage() {
+const KivFinderPageContent = () => {
   const router = useRouter()
 
   const [allRows, setAllRows] = useState([])
@@ -591,5 +593,14 @@ export default function KivFinderPage() {
         </DialogActions>
       </Dialog>
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function KivFinderPage() {
+  return (
+    <PermissionGuard permission="KIV Finder">
+      <KivFinderPageContent />
+    </PermissionGuard>
   )
 }

@@ -24,6 +24,9 @@ import {
   InputAdornment
 } from '@mui/material'
 
+import PermissionGuard from '@/components/auth/PermissionGuard'
+import { usePermission } from '@/hooks/usePermission'
+
 import { getContractList, deleteContractApi } from '@/api/contract'
 import api from '@/utils/axiosInstance'
 
@@ -108,7 +111,9 @@ const CONTRACT_STATUS = [
 // ───────────────────────────────────────────
 // Component
 // ───────────────────────────────────────────
-export default function ContractsPage() {
+// ───────────────────────────────────────────
+const ContractsPageContent = () => {
+  const { canAccess } = usePermission()
   const [planDrawer, setPlanDrawer] = useState({
     open: false,
     contract: null,
@@ -350,9 +355,11 @@ export default function ContractsPage() {
               </IconButton>
 
               {/* ✏ EDIT */}
-              <IconButton size='small' color='primary' onClick={() => handleEdit(item)}>
-                <i className='tabler-edit' />
-              </IconButton>
+              {canAccess('Contracts', 'update') && (
+                <IconButton size='small' color='primary' onClick={() => handleEdit(item)}>
+                  <i className='tabler-edit' />
+                </IconButton>
+              )}
 
               {/* 📅 SCHEDULE */}
               <IconButton size='small' onClick={() => openPlanDrawer(item)}>
@@ -360,9 +367,11 @@ export default function ContractsPage() {
               </IconButton>
 
               {/* 🗑 DELETE */}
-              <IconButton size='small' onClick={() => setDeleteDialog({ open: true, row: item })}>
-                <i className='tabler-trash text-red-600 text-[18px]' />
-              </IconButton>
+              {canAccess('Contracts', 'delete') && (
+                <IconButton size='small' onClick={() => setDeleteDialog({ open: true, row: item })}>
+                  <i className='tabler-trash text-red-600 text-[18px]' />
+                </IconButton>
+              )}
             </Box>
           )
         }
@@ -661,14 +670,16 @@ export default function ContractsPage() {
                 </MenuItem>
               </Menu>
 
-              <GlobalButton
-                variant='contained'
-                startIcon={<AddIcon />}
-                onClick={() => router.push('/admin/contracts/add')}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-              >
-                Add Contract
-              </GlobalButton>
+              {canAccess('Contracts', 'create') && (
+                <GlobalButton
+                  variant='contained'
+                  startIcon={<AddIcon />}
+                  onClick={() => router.push('/admin/contracts/add')}
+                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                >
+                  Add Contract
+                </GlobalButton>
+              )}
             </Box>
           }
         />
@@ -925,5 +936,14 @@ export default function ContractsPage() {
         pestOptions={planDrawer.pestOptions}
       />
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function ContractsPage() {
+  return (
+    <PermissionGuard permission="Contracts">
+      <ContractsPageContent />
+    </PermissionGuard>
   )
 }

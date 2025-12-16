@@ -28,6 +28,9 @@ import {
   Autocomplete
 } from '@mui/material'
 
+import PermissionGuard from '@/components/auth/PermissionGuard'
+import { usePermission } from '@/hooks/usePermission'
+
 import {
   getSupplierList,
   addSupplier,
@@ -82,7 +85,9 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
 // ───────────────────────────────────────────
 // Component
 // ───────────────────────────────────────────
-export default function SupplierPage() {
+// ───────────────────────────────────────────
+const SupplierPageContent = () => {
+  const { canAccess } = usePermission()
   const [rows, setRows] = useState([])
   const [rowCount, setRowCount] = useState(0)
   const [searchText, setSearchText] = useState('')
@@ -335,16 +340,20 @@ export default function SupplierPage() {
         header: 'Actions',
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
-              <i className='tabler-edit ' />
-            </IconButton>
-            <IconButton
-              size='small'
-              color='error'
-              onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
-            >
-              <i className='tabler-trash text-red-600 text-lg' />
-            </IconButton>
+            {canAccess('Suppliers', 'update') && (
+              <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
+                <i className='tabler-edit ' />
+              </IconButton>
+            )}
+            {canAccess('Suppliers', 'delete') && (
+              <IconButton
+                size='small'
+                color='error'
+                onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
+              >
+                <i className='tabler-trash text-red-600 text-lg' />
+              </IconButton>
+            )}
           </Box>
         )
       }),
@@ -560,14 +569,16 @@ export default function SupplierPage() {
                 </MenuItem>
               </Menu>
 
-              <Button
-                variant='contained'
-                startIcon={<AddIcon />}
-                onClick={handleAdd}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-              >
-                Add Supplier
-              </Button>
+              {canAccess('Suppliers', 'create') && (
+                <Button
+                  variant='contained'
+                  startIcon={<AddIcon />}
+                  onClick={handleAdd}
+                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                >
+                  Add Supplier
+                </Button>
+              )}
             </Box>
           }
         />
@@ -857,5 +868,14 @@ export default function SupplierPage() {
         </DialogActions>
       </Dialog>
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function SupplierPage() {
+  return (
+    <PermissionGuard permission="Suppliers">
+      <SupplierPageContent />
+    </PermissionGuard>
   )
 }

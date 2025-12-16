@@ -55,6 +55,8 @@ import CustomTextFieldWrapper from '@/components/common/CustomTextField'
 import CustomTextarea from '@/components/common/CustomTextarea'
 import CustomSelectField from '@/components/common/CustomSelectField'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
+import PermissionGuard from '@/components/auth/PermissionGuard'
+import { usePermission } from '@/hooks/usePermission'
 
 import { rankItem } from '@tanstack/match-sorter-utils'
 import {
@@ -82,8 +84,9 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
 // ───────────────────────────────────────────
 // Component
 // ───────────────────────────────────────────
-export default function UnitOfMeasurementPage() {
+const UnitOfMeasurementPageContent = () => {
   const [rows, setRows] = useState([])
+  const { canAccess } = usePermission()
   const [rowCount, setRowCount] = useState(0)
   const [searchText, setSearchText] = useState('')
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
@@ -306,16 +309,20 @@ export default function UnitOfMeasurementPage() {
         header: 'Actions',
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
-              <i className='tabler-edit ' />
-            </IconButton>
-            <IconButton
-              size='small'
-              color='error'
-              onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
-            >
-              <i className='tabler-trash text-red-600 text-lg' />
-            </IconButton>
+            {canAccess('Unit Of Measurement', 'update') && (
+              <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
+                <i className='tabler-edit ' />
+              </IconButton>
+            )}
+            {canAccess('Unit Of Measurement', 'delete') && (
+              <IconButton
+                size='small'
+                color='error'
+                onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
+              >
+                <i className='tabler-trash text-red-600 text-lg' />
+              </IconButton>
+            )}
           </Box>
         )
       }),
@@ -531,14 +538,16 @@ export default function UnitOfMeasurementPage() {
                 </MenuItem>
               </Menu>
 
-              <GlobalButton
-                variant='contained'
-                startIcon={<AddIcon />}
-                onClick={handleAdd}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-              >
-                Add UOM
-              </GlobalButton>
+              {canAccess('Unit Of Measurement', 'create') && (
+                <GlobalButton
+                  variant='contained'
+                  startIcon={<AddIcon />}
+                  onClick={handleAdd}
+                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                >
+                  Add UOM
+                </GlobalButton>
+              )}
             </Box>
           }
         />
@@ -770,5 +779,14 @@ export default function UnitOfMeasurementPage() {
         </DialogActions>
       </Dialog>
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function UnitOfMeasurementPage() {
+  return (
+    <PermissionGuard permission="Unit Of Measurement">
+      <UnitOfMeasurementPageContent />
+    </PermissionGuard>
   )
 }

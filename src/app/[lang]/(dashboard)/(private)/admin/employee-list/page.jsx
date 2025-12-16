@@ -82,10 +82,17 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
   return <TextField {...props} value={value} onChange={e => setValue(e.target.value)} />
 }
 
+import PermissionGuard from '@/components/auth/PermissionGuard'
+import { usePermission } from '@/hooks/usePermission'
+
 // ───────────────────────────────────────────
 // Component
 // ───────────────────────────────────────────
-export default function EmployeePage() {
+// ───────────────────────────────────────────
+// Component
+// ───────────────────────────────────────────
+const EmployeePageContent = () => {
+  const { canAccess } = usePermission()
   const router = useRouter()
   const [rows, setRows] = useState([])
   const [rowCount, setRowCount] = useState(0)
@@ -215,16 +222,20 @@ export default function EmployeePage() {
         header: 'Actions',
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original.id)}>
-              <i className='tabler-edit' />
-            </IconButton>
-            <IconButton
-              size='small'
-              color='error'
-              onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
-            >
-              <i className='tabler-trash text-red-600 text-lg' />
-            </IconButton>
+            {canAccess('Employee List', 'update') && (
+              <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original.id)}>
+                <i className='tabler-edit' />
+              </IconButton>
+            )}
+            {canAccess('Employee List', 'delete') && (
+              <IconButton
+                size='small'
+                color='error'
+                onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
+              >
+                <i className='tabler-trash text-red-600 text-lg' />
+              </IconButton>
+            )}
           </Box>
         )
       }),
@@ -589,14 +600,16 @@ export default function EmployeePage() {
                 </MenuItem>
               </Menu>
 
-              <GlobalButton
-                variant='contained'
-                startIcon={<AddIcon />}
-                onClick={() => router.push('/admin/employee-list/add')}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-              >
-                Add Employee
-              </GlobalButton>
+              {canAccess('Employee List', 'create') && (
+                <GlobalButton
+                  variant='contained'
+                  startIcon={<AddIcon />}
+                  onClick={() => router.push('/admin/employee-list/add')}
+                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                >
+                  Add Employee
+                </GlobalButton>
+              )}
             </Box>
           }
         />
@@ -759,5 +772,14 @@ export default function EmployeePage() {
         </DialogActions>
       </Dialog>
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function EmployeePage() {
+  return (
+    <PermissionGuard permission="Employee List">
+      <EmployeePageContent />
+    </PermissionGuard>
   )
 }

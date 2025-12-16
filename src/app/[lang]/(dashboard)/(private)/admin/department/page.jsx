@@ -57,6 +57,8 @@ import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import CustomTextFieldWrapper from '@/components/common/CustomTextField'
 import CustomTextarea from '@/components/common/CustomTextarea'
 import CustomSelectField from '@/components/common/CustomSelectField'
+import PermissionGuard from '@/components/auth/PermissionGuard'
+import { usePermission } from '@/hooks/usePermission'
 
 import TableChartIcon from '@mui/icons-material/TableChart'
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
@@ -95,7 +97,9 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
 // ───────────────────────────────────────────
 // Component
 // ───────────────────────────────────────────
-export default function DepartmentPage() {
+// ───────────────────────────────────────────
+const DepartmentPageContent = () => {
+  const { canAccess } = usePermission()
   const [rows, setRows] = useState([])
   const [rowCount, setRowCount] = useState(0)
   const [searchText, setSearchText] = useState('')
@@ -347,16 +351,20 @@ export default function DepartmentPage() {
         header: 'Actions',
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
-              <i className='tabler-edit' />
-            </IconButton>
-            <IconButton
-              size='small'
-              color='error'
-              onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
-            >
-              <i className='tabler-trash text-red-600 text-lg' />
-            </IconButton>
+            {canAccess('Department', 'update') && (
+              <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
+                <i className='tabler-edit ' />
+              </IconButton>
+            )}
+            {canAccess('Department', 'delete') && (
+              <IconButton
+                size='small'
+                color='error'
+                onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
+              >
+                <i className='tabler-trash text-red-600 text-lg' />
+              </IconButton>
+            )}
           </Box>
         )
       }),
@@ -548,14 +556,16 @@ export default function DepartmentPage() {
                 </MenuItem>
               </Menu>
 
-              <GlobalButton
-                variant='contained'
-                startIcon={<AddIcon />}
-                onClick={handleAdd}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-              >
-                Add Department
-              </GlobalButton>
+              {canAccess('Department', 'create') && (
+                <GlobalButton
+                  variant='contained'
+                  startIcon={<AddIcon />}
+                  onClick={handleAdd}
+                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                >
+                  Add Department
+                </GlobalButton>
+              )}
             </Box>
           }
         />
@@ -811,5 +821,14 @@ export default function DepartmentPage() {
         </DialogActions>
       </Dialog>
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function DepartmentPage() {
+  return (
+    <PermissionGuard permission="Department">
+      <DepartmentPageContent />
+    </PermissionGuard>
   )
 }

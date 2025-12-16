@@ -78,6 +78,9 @@ import {
 } from '@tanstack/react-table'
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
+import PermissionGuard from '@/components/auth/PermissionGuard'
+import DebugPermissions from '@/components/DebugPermissions'
+import { usePermission } from '@/hooks/usePermission'
 
 // Toast helper
 // ──────────────────────────────────────────────────────────────
@@ -147,7 +150,8 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
 // ───────────────────────────────────────────
 // Component
 // ───────────────────────────────────────────
-export default function UserPrivilegePage() {
+// ───────────────────────────────────────────
+const UserPrivilegePageContent = () => {
   const [rows, setRows] = useState([])
   const [rowCount, setRowCount] = useState(0)
   const [searchText, setSearchText] = useState('')
@@ -186,6 +190,8 @@ export default function UserPrivilegePage() {
 
   const moduleRef = useRef(null)
 
+  const { triggerPrivilegeUpdate, canAccess } = usePermission() // Destructure new helper
+
   const handleUpdatePrivileges = async () => {
     if (!selectedRole) {
       showToast('warning', 'Select a role first')
@@ -209,6 +215,21 @@ export default function UserPrivilegePage() {
 
       await updateUserPrivilege(selectedRole, payload)
       showToast('success', 'Privileges updated successfully')
+
+      // Creating a check to see if the updated role is the CURRENT user's role
+      const storedUser = localStorage.getItem('user_info')
+      if (storedUser) {
+        const userInfo = JSON.parse(storedUser)
+        const currentRoleId = userInfo.role_id || userInfo.role?.id
+
+        // If the updated role is ANY role (or specifically the current one), we can trigger refresh.
+        // Even if we updated another role, it doesn't hurt to refresh, but it's critical if it's OUR role.
+        if (String(currentRoleId) === String(selectedRole)) {
+          console.log('🔄 Triggering immediate role refresh for current user')
+          triggerPrivilegeUpdate()
+        }
+      }
+
     } catch (err) {
       console.error('❌ Update error:', err)
       showToast('error', 'Failed to update privileges')
@@ -631,354 +652,361 @@ export default function UserPrivilegePage() {
   // Render
   // ───────────────────────────────────────────
   return (
-    <Box>
-      {loading && (
-        <Box
-          sx={{
-            position: 'fixed',
-            inset: 0,
-            bgcolor: 'rgba(255,255,255,0.8)',
-            backdropFilter: 'blur(2px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999
-          }}
-        >
-          <ProgressCircularCustomization size={60} thickness={5} />
-        </Box>
-      )}
+    <PermissionGuard permission="User Privilege">
+      <Box>
+        {loading && (
+          <Box
+            sx={{
+              position: 'fixed',
+              inset: 0,
+              bgcolor: 'rgba(255,255,255,0.8)',
+              backdropFilter: 'blur(2px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 9999
+            }}
+          >
+            <ProgressCircularCustomization size={60} thickness={5} />
+          </Box>
+        )}
 
-      <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
-        <Link underline='hover' color='inherit' href='/'>
-          Home
-        </Link>
-        <Typography color='text.primary'>User Privilege</Typography>
-      </Breadcrumbs>
-      <Card sx={{ p: 3 }}>
-        {/* 🔹 Page Header Title */}
+        <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
+          <Link underline='hover' color='inherit' href='/'>
+            Home
+          </Link>
+          <Typography color='text.primary'>User Privilege</Typography>
+        </Breadcrumbs>
+        <Card sx={{ p: 3 }}>
+          {/* 🔹 Page Header Title */}
 
-        <Box display='flex' alignItems='center' gap={2} mb={7}>
-          <Typography variant='h5' sx={{ fontWeight: 600 }}>
-            User Privilege Management
-          </Typography>
-        </Box>
+          <Box display='flex' alignItems='center' gap={2} mb={7}>
+            <Typography variant='h5' sx={{ fontWeight: 600 }}>
+              User Privilege Management
+            </Typography>
+          </Box>
 
-        <Divider sx={{ mb: 5 }} />
+          <Divider sx={{ mb: 5 }} />
 
-        {/* 🔹 Role Dropdown + Action Buttons */}
-        <Box
-          sx={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-end', // ⭐ FIX: Align by bottom (input line)
-            mb: 4,
-            gap: 2,
-            flexWrap: 'nowrap'
-          }}
-        >
+          {/* 🔹 Role Dropdown + Action Buttons */}
           <Box
             sx={{
               display: 'flex',
-              alignItems: 'flex-end', // ⭐ FIX: Align bottom of all fields
+              justifyContent: 'space-between',
+              alignItems: 'flex-end', // ⭐ FIX: Align by bottom (input line)
+              mb: 4,
               gap: 2,
               flexWrap: 'nowrap'
             }}
           >
-            {/* User Role Dropdown */}
-            <Box sx={{ minWidth: 250 }}>
-              <CustomAutocomplete
-                fullWidth
-                options={roles}
-                value={roles.find(r => r.id === selectedRole) || null}
-                getOptionLabel={option => option.name || ''}
-                onChange={(e, newValue) => {
-                  if (newValue) {
-                    setSelectedRole(newValue.id)
-                    fetchPrivileges(newValue.id)
-                  } else {
-                    setSelectedRole('')
-                    setPrivileges([])
-                  }
-                }}
-                renderInput={params => <CustomTextField {...params} label='User Role' placeholder='Choose a role...' />}
-              />
-            </Box>
-
-            {/* Buttons inline with dropdown */}
-            <Button variant='contained' startIcon={<AddIcon />} onClick={handleAdd}>
-              Add
-            </Button>
-
-            <Button
-              variant='outlined'
-              startIcon={<EditIcon />}
-              disabled={!selectedRole}
-              onClick={async () => {
-                const res = await getUserRoleDetails(selectedRole)
-                setIsEdit(true)
-                setFormData({
-                  id: res?.data?.id,
-                  module: res?.data?.name,
-                  description: res?.data?.description || ''
-                })
-                setDrawerOpen(true)
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'flex-end', // ⭐ FIX: Align bottom of all fields
+                gap: 2,
+                flexWrap: 'nowrap'
               }}
             >
-              Edit
-            </Button>
+              {/* User Role Dropdown */}
+              <Box sx={{ minWidth: 250 }}>
+                <CustomAutocomplete
+                  fullWidth
+                  options={roles}
+                  value={roles.find(r => r.id === selectedRole) || null}
+                  getOptionLabel={option => option.name || ''}
+                  onChange={(e, newValue) => {
+                    if (newValue) {
+                      setSelectedRole(newValue.id)
+                      fetchPrivileges(newValue.id)
+                    } else {
+                      setSelectedRole('')
+                      setPrivileges([])
+                    }
+                  }}
+                  renderInput={params => <CustomTextField {...params} label='User Role' placeholder='Choose a role...' />}
+                />
+              </Box>
 
+              {/* Buttons inline with dropdown */}
+              {canAccess('User Privilege', 'create') && (
+                <Button variant='contained' startIcon={<AddIcon />} onClick={handleAdd}>
+                  Add
+                </Button>
+              )}
+
+              <Button
+                variant='outlined'
+                startIcon={<EditIcon />}
+                disabled={!selectedRole}
+                onClick={async () => {
+                  const res = await getUserRoleDetails(selectedRole)
+                  setIsEdit(true)
+                  setFormData({
+                    id: res?.data?.id,
+                    module: res?.data?.name,
+                    description: res?.data?.description || ''
+                  })
+                  setDrawerOpen(true)
+                }}
+              >
+                Edit
+              </Button>
+
+              <Button
+                variant='outlined'
+                color='error'
+                startIcon={<DeleteIcon />}
+                disabled={!selectedRole}
+                onClick={() => handleDeleteRole(selectedRole)}
+              >
+                Delete
+              </Button>
+
+              <Button
+                variant='outlined'
+                color='secondary'
+                startIcon={<FileCopyIcon />}
+                disabled={!selectedRole}
+                onClick={() => handleDuplicateRole(selectedRole)}
+              >
+                Duplicate
+              </Button>
+
+              <Button
+                variant='outlined'
+                color='info'
+                startIcon={<RefreshIcon />}
+                disabled={!selectedRole}
+                onClick={() => loadPrivileges(selectedRole)}
+              >
+                Refresh
+              </Button>
+            </Box>
+
+            {/* 🔹 Right Section - Update Privileges */}
             <Button
+              variant='contained'
+              color='success'
+              startIcon={<DoneIcon />}
+              onClick={handleUpdatePrivileges}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 600,
+                px: 3,
+                whiteSpace: 'nowrap'
+              }}
+            >
+              Update Privileges
+            </Button>
+          </Box>
+
+          <Divider sx={{ mb: 2 }} />
+          <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+            <FormControl size='small' sx={{ width: 140 }}>
+              <Select
+                value={pagination.pageSize}
+                onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
+              >
+                {[5, 10, 25, 50].map(s => (
+                  <MenuItem key={s} value={s}>
+                    {s} entries
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <DebouncedInput
+              value={searchText}
+              onChange={v => {
+                setSearchText(String(v))
+                setPagination(p => ({ ...p, pageIndex: 0 }))
+              }}
+              placeholder='Search module...'
+              sx={{ width: 360 }}
               variant='outlined'
+              size='small'
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position='start'>
+                      <SearchIcon />
+                    </InputAdornment>
+                  )
+                }
+              }}
+            />
+          </Box>
+          <div className='overflow-x-auto'>
+            <table className={styles.table}>
+              <thead>
+                {table.getHeaderGroups().map(hg => (
+                  <tr key={hg.id}>
+                    {hg.headers.map(h => (
+                      <th key={h.id}>
+                        <div
+                          className={classnames({
+                            'flex items-center': h.column.getIsSorted(),
+                            'cursor-pointer select-none': h.column.getCanSort()
+                          })}
+                          onClick={h.column.getToggleSortingHandler()}
+                        >
+                          {flexRender(h.column.columnDef.header, h.getContext())}
+                          {{
+                            asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
+                            desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
+                          }[h.column.getIsSorted()] ?? null}
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
+                ))}
+              </thead>
+              <tbody>
+                {rows.length ? (
+                  table.getRowModel().rows.map(row => (
+                    <tr key={row.id}>
+                      {row.getVisibleCells().map(cell => (
+                        <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                      ))}
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={columns.length} className='text-center py-4'>
+                      No results found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+        </Card>
+
+        {/* Drawer */}
+        {/* Drawer */}
+        <Drawer anchor='right' open={drawerOpen} onClose={toggleDrawer}>
+          <Box sx={{ p: 5, width: 420 }}>
+            <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
+              <Typography variant='h5' fontWeight={600}>
+                {isEdit ? 'Edit Module' : 'Add New Module'}
+              </Typography>
+              <IconButton onClick={toggleDrawer}>
+                <CloseIcon />
+              </IconButton>
+            </Box>
+
+            <form onSubmit={handleSubmit}>
+              <Grid container spacing={2}>
+                <Grid item xs={12}>
+                  <CustomTextFieldWrapper
+                    ref={moduleRef}
+                    fullWidth
+                    label='Module Name'
+                    placeholder='Enter module name'
+                    value={formData.module}
+                    onChange={e => setFormData(prev => ({ ...prev, module: e.target.value }))}
+                  />
+                </Grid>
+
+                {/* 🔹 Description field replaces checkboxes */}
+                <Grid item xs={12}>
+                  <CustomTextFieldWrapper
+                    fullWidth
+                    multiline
+                    rows={3}
+                    label='Description'
+                    placeholder='Enter description'
+                    value={formData.description}
+                    onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  />
+                </Grid>
+              </Grid>
+
+              <Box mt={4} display='flex' gap={2}>
+                <Button type='submit' variant='contained' fullWidth disabled={loading}>
+                  {loading ? 'Saving...' : isEdit ? 'Update' : 'Save'}
+                </Button>
+                <Button variant='outlined' fullWidth onClick={toggleDrawer}>
+                  Cancel
+                </Button>
+              </Box>
+            </form>
+          </Box>
+        </Drawer>
+
+        <Dialog
+          onClose={() => setDeleteDialog({ open: false, row: null })}
+          aria-labelledby='customized-dialog-title'
+          open={deleteDialog.open}
+          closeAfterTransition={false}
+          PaperProps={{
+            sx: {
+              overflow: 'visible',
+              width: 420,
+              borderRadius: 1,
+              textAlign: 'center'
+            }
+          }}
+        >
+          {/* 🔴 Title with Warning Icon */}
+          <DialogTitle
+            id='customized-dialog-title'
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 1,
+              color: 'error.main',
+              fontWeight: 700,
+              pb: 1,
+              position: 'relative'
+            }}
+          >
+            <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
+            Confirm Delete
+            <DialogCloseButton
+              onClick={() => setDeleteDialog({ open: false, row: null })}
+              disableRipple
+              sx={{ position: 'absolute', right: 1, top: 1 }}
+            >
+              <i className='tabler-x' />
+            </DialogCloseButton>
+          </DialogTitle>
+
+          {/* Centered Text */}
+          <DialogContent sx={{ px: 5, pt: 1 }}>
+            <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
+              Are you sure you want to delete the module{' '}
+              <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.module || 'this module'}</strong>?
+              <br />
+              This action cannot be undone.
+            </Typography>
+          </DialogContent>
+
+          {/* Centered Buttons */}
+          <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+            <Button
+              onClick={() => setDeleteDialog({ open: false, row: null })}
+              variant='tonal'
+              color='secondary'
+              sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmDelete}
+              variant='contained'
               color='error'
-              startIcon={<DeleteIcon />}
-              disabled={!selectedRole}
-              onClick={() => handleDeleteRole(selectedRole)}
+              sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
             >
               Delete
             </Button>
-
-            <Button
-              variant='outlined'
-              color='secondary'
-              startIcon={<FileCopyIcon />}
-              disabled={!selectedRole}
-              onClick={() => handleDuplicateRole(selectedRole)}
-            >
-              Duplicate
-            </Button>
-
-            <Button
-              variant='outlined'
-              color='info'
-              startIcon={<RefreshIcon />}
-              disabled={!selectedRole}
-              onClick={() => loadPrivileges(selectedRole)}
-            >
-              Refresh
-            </Button>
-          </Box>
-
-          {/* 🔹 Right Section - Update Privileges */}
-          <Button
-            variant='contained'
-            color='success'
-            startIcon={<DoneIcon />}
-            onClick={handleUpdatePrivileges}
-            sx={{
-              textTransform: 'none',
-              fontWeight: 600,
-              px: 3,
-              whiteSpace: 'nowrap'
-            }}
-          >
-            Update Privileges
-          </Button>
-        </Box>
-
-        <Divider sx={{ mb: 2 }} />
-        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-          <FormControl size='small' sx={{ width: 140 }}>
-            <Select
-              value={pagination.pageSize}
-              onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
-            >
-              {[5, 10, 25, 50].map(s => (
-                <MenuItem key={s} value={s}>
-                  {s} entries
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <DebouncedInput
-            value={searchText}
-            onChange={v => {
-              setSearchText(String(v))
-              setPagination(p => ({ ...p, pageIndex: 0 }))
-            }}
-            placeholder='Search module...'
-            sx={{ width: 360 }}
-            variant='outlined'
-            size='small'
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position='start'>
-                    <SearchIcon />
-                  </InputAdornment>
-                )
-              }
-            }}
-          />
-        </Box>
-        <div className='overflow-x-auto'>
-          <table className={styles.table}>
-            <thead>
-              {table.getHeaderGroups().map(hg => (
-                <tr key={hg.id}>
-                  {hg.headers.map(h => (
-                    <th key={h.id}>
-                      <div
-                        className={classnames({
-                          'flex items-center': h.column.getIsSorted(),
-                          'cursor-pointer select-none': h.column.getCanSort()
-                        })}
-                        onClick={h.column.getToggleSortingHandler()}
-                      >
-                        {flexRender(h.column.columnDef.header, h.getContext())}
-                        {{
-                          asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
-                          desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
-                        }[h.column.getIsSorted()] ?? null}
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody>
-              {rows.length ? (
-                table.getRowModel().rows.map(row => (
-                  <tr key={row.id}>
-                    {row.getVisibleCells().map(cell => (
-                      <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
-                    ))}
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={columns.length} className='text-center py-4'>
-                    No results found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
-      </Card>
-
-      {/* Drawer */}
-      {/* Drawer */}
-      <Drawer anchor='right' open={drawerOpen} onClose={toggleDrawer}>
-        <Box sx={{ p: 5, width: 420 }}>
-          <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
-            <Typography variant='h5' fontWeight={600}>
-              {isEdit ? 'Edit Module' : 'Add New Module'}
-            </Typography>
-            <IconButton onClick={toggleDrawer}>
-              <CloseIcon />
-            </IconButton>
-          </Box>
-
-          <form onSubmit={handleSubmit}>
-            <Grid container spacing={2}>
-              <Grid item xs={12}>
-                <CustomTextFieldWrapper
-                  ref={moduleRef}
-                  fullWidth
-                  label='Module Name'
-                  placeholder='Enter module name'
-                  value={formData.module}
-                  onChange={e => setFormData(prev => ({ ...prev, module: e.target.value }))}
-                />
-              </Grid>
-
-              {/* 🔹 Description field replaces checkboxes */}
-              <Grid item xs={12}>
-                <CustomTextFieldWrapper
-                  fullWidth
-                  multiline
-                  rows={3}
-                  label='Description'
-                  placeholder='Enter description'
-                  value={formData.description}
-                  onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                />
-              </Grid>
-            </Grid>
-
-            <Box mt={4} display='flex' gap={2}>
-              <Button type='submit' variant='contained' fullWidth disabled={loading}>
-                {loading ? 'Saving...' : isEdit ? 'Update' : 'Save'}
-              </Button>
-              <Button variant='outlined' fullWidth onClick={toggleDrawer}>
-                Cancel
-              </Button>
-            </Box>
-          </form>
-        </Box>
-      </Drawer>
-
-      <Dialog
-        onClose={() => setDeleteDialog({ open: false, row: null })}
-        aria-labelledby='customized-dialog-title'
-        open={deleteDialog.open}
-        closeAfterTransition={false}
-        PaperProps={{
-          sx: {
-            overflow: 'visible',
-            width: 420,
-            borderRadius: 1,
-            textAlign: 'center'
-          }
-        }}
-      >
-        {/* 🔴 Title with Warning Icon */}
-        <DialogTitle
-          id='customized-dialog-title'
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 1,
-            color: 'error.main',
-            fontWeight: 700,
-            pb: 1,
-            position: 'relative'
-          }}
-        >
-          <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
-          Confirm Delete
-          <DialogCloseButton
-            onClick={() => setDeleteDialog({ open: false, row: null })}
-            disableRipple
-            sx={{ position: 'absolute', right: 1, top: 1 }}
-          >
-            <i className='tabler-x' />
-          </DialogCloseButton>
-        </DialogTitle>
-
-        {/* Centered Text */}
-        <DialogContent sx={{ px: 5, pt: 1 }}>
-          <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
-            Are you sure you want to delete the module{' '}
-            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.module || 'this module'}</strong>?
-            <br />
-            This action cannot be undone.
-          </Typography>
-        </DialogContent>
-
-        {/* Centered Buttons */}
-        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-          <Button
-            onClick={() => setDeleteDialog({ open: false, row: null })}
-            variant='tonal'
-            color='secondary'
-            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={confirmDelete}
-            variant='contained'
-            color='error'
-            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
-          >
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+          </DialogActions>
+        </Dialog>
+      </Box>
+      <DebugPermissions />
+    </PermissionGuard>
   )
 }
+
+export default UserPrivilegePageContent

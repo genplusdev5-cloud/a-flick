@@ -90,7 +90,7 @@ const Navigation = props => {
     // Sidebar Vertical Menu
     <VerticalNav
       customStyles={navigationCustomStyles(verticalNavOptions, theme)}
-      collapsedWidth={71}
+      collapsedWidth={68}
       backgroundColor='var(--mui-palette-background-paper)'
       // eslint-disable-next-line lines-around-comment
       // The following condition adds the data-dark attribute to the VerticalNav component

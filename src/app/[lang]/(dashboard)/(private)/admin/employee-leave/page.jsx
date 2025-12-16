@@ -29,6 +29,9 @@ import {
   InputAdornment
 } from '@mui/material'
 
+import PermissionGuard from '@/components/auth/PermissionGuard'
+import { usePermission } from '@/hooks/usePermission'
+
 import {
   addEmployeeLeave,
   getEmployeeLeaveList,
@@ -111,8 +114,10 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
 // ───────────────────────────────────────────
 // Component
 // ───────────────────────────────────────────
-export default function EmployeeLeavePage() {
+// ───────────────────────────────────────────
+const EmployeeLeavePageContent = () => {
   const [rows, setRows] = useState([])
+  const { canAccess } = usePermission()
   const [rowCount, setRowCount] = useState(0)
   const [searchText, setSearchText] = useState('')
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
@@ -468,16 +473,20 @@ export default function EmployeeLeavePage() {
         header: 'Actions',
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
-              <i className='tabler-edit ' />
-            </IconButton>
-            <IconButton
-              size='small'
-              color='error'
-              onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
-            >
-              <i className='tabler-trash text-red-600 text-lg' />
-            </IconButton>
+            {canAccess('Employee Leaves', 'update') && (
+              <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
+                <i className='tabler-edit ' />
+              </IconButton>
+            )}
+            {canAccess('Employee Leaves', 'delete') && (
+              <IconButton
+                size='small'
+                color='error'
+                onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
+              >
+                <i className='tabler-trash text-red-600 text-lg' />
+              </IconButton>
+            )}
           </Box>
         )
       }),
@@ -700,14 +709,16 @@ export default function EmployeeLeavePage() {
                 </MenuItem>
               </Menu>
 
-              <GlobalButton
-                variant='contained'
-                startIcon={<AddIcon />}
-                onClick={handleAdd}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-              >
-                Add Leave
-              </GlobalButton>
+              {canAccess('Employee Leaves', 'create') && (
+                <GlobalButton
+                  variant='contained'
+                  startIcon={<AddIcon />}
+                  onClick={handleAdd}
+                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                >
+                  Add Leave
+                </GlobalButton>
+              )}
             </Box>
           }
         />
@@ -1073,5 +1084,14 @@ export default function EmployeeLeavePage() {
         </DialogActions>
       </Dialog>
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function EmployeeLeavePage() {
+  return (
+    <PermissionGuard permission="Employee Leaves">
+      <EmployeeLeavePageContent />
+    </PermissionGuard>
   )
 }

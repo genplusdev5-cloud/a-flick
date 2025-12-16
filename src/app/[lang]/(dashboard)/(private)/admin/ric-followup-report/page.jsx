@@ -12,11 +12,12 @@ import GlobalDateRange from '@/components/common/GlobalDateRange'
 
 import { getRICDropdowns } from '@/api/ricFollowup/dropdowns'
 import { generateRICReport } from '@/api/ricFollowup/generate'
+import PermissionGuard from '@/components/auth/PermissionGuard'
 
 /* ------------------------------------------------
    📌 MAIN PAGE — Updated to EXACT Service Summary UI
 -------------------------------------------------- */
-export default function RicFollowUpReportPage() {
+const RicFollowUpReportPageContent = () => {
   const [enableDateFilter, setEnableDateFilter] = useState(true)
   const [filters, setFilters] = useState({
     customer_id: '',
@@ -292,5 +293,14 @@ export default function RicFollowUpReportPage() {
 
       <Box sx={{ mt: 6 }}></Box>
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function RicFollowUpReportPage() {
+  return (
+    <PermissionGuard permission="RIC Followup Report">
+      <RicFollowUpReportPageContent />
+    </PermissionGuard>
   )
 }

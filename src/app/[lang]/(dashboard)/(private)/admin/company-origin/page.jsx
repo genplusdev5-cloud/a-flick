@@ -38,6 +38,8 @@ import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import { showToast } from '@/components/common/Toasts'
+import PermissionGuard from '@/components/auth/PermissionGuard'
+import { usePermission } from '@/hooks/usePermission'
 
 import classnames from 'classnames'
 import {
@@ -74,7 +76,8 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
 // ──────────────────────────────────────────────────────────────
 // Main Page Component
 // ──────────────────────────────────────────────────────────────
-export default function CompanyOriginListPage() {
+const CompanyOriginListContent = () => {
+  const { canAccess } = usePermission()
   const router = useRouter()
 
   const [rows, setRows] = useState([])
@@ -178,21 +181,25 @@ export default function CompanyOriginListPage() {
         header: 'Actions',
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <IconButton
-              size='small'
-              color='primary'
-              onClick={() => router.push(`/admin/company-origin/edit/${info.row.original.id}`)}
-            >
-              <i className='tabler-edit' />
-            </IconButton>
+            {canAccess('Company Origin', 'update') && (
+              <IconButton
+                size='small'
+                color='primary'
+                onClick={() => router.push(`/admin/company-origin/edit/${info.row.original.id}`)}
+              >
+                <i className='tabler-edit' />
+              </IconButton>
+            )}
 
-            <IconButton
-              size='small'
-              color='error'
-              onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
-            >
-              <i className='tabler-trash text-red-600 text-lg' />
-            </IconButton>
+            {canAccess('Company Origin', 'delete') && (
+              <IconButton
+                size='small'
+                color='error'
+                onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
+              >
+                <i className='tabler-trash text-red-600 text-lg' />
+              </IconButton>
+            )}
           </Box>
         )
       }),
@@ -312,9 +319,11 @@ export default function CompanyOriginListPage() {
                 </MenuItem>
               </Menu>
 
-              <GlobalButton startIcon={<AddIcon />} onClick={() => router.push('/admin/company-origin/add')}>
-                Add Company
-              </GlobalButton>
+              {canAccess('Company Origin', 'create') && (
+                <GlobalButton startIcon={<AddIcon />} onClick={() => router.push('/admin/company-origin/add')}>
+                  Add Company
+                </GlobalButton>
+              )}
             </Box>
           }
           sx={{ pb: 1.5, pt: 1.5, '& .MuiCardHeader-action': { m: 0 } }}
@@ -460,5 +469,14 @@ export default function CompanyOriginListPage() {
         </DialogActions>
       </Dialog>
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function CompanyOriginListPage() {
+  return (
+    <PermissionGuard permission="Company Origin">
+      <CompanyOriginListContent />
+    </PermissionGuard>
   )
 }

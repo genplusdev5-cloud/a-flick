@@ -56,6 +56,8 @@ import TablePaginationComponent from '@/components/TablePaginationComponent'
 import classnames from 'classnames'
 import { rankItem } from '@tanstack/match-sorter-utils'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
+import PermissionGuard from '@/components/auth/PermissionGuard'
+import { usePermission } from '@/hooks/usePermission'
 
 // ✅ Custom reusable form components
 import CustomTextFieldWrapper from '@/components/common/CustomTextField'
@@ -95,7 +97,9 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
 // ───────────────────────────────────────────
 // Component
 // ───────────────────────────────────────────
-export default function DesignationPage() {
+// ───────────────────────────────────────────
+const DesignationPageContent = () => {
+  const { canAccess } = usePermission()
   const [rows, setRows] = useState([])
   const [rowCount, setRowCount] = useState(0)
   const [searchText, setSearchText] = useState('')
@@ -330,16 +334,20 @@ export default function DesignationPage() {
         header: 'Actions',
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
-              <i className='tabler-edit' />
-            </IconButton>
-            <IconButton
-              size='small'
-              color='error'
-              onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
-            >
-              <i className='tabler-trash text-red-600 text-lg' />
-            </IconButton>
+            {canAccess('Designation', 'update') && (
+              <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
+                <i className='tabler-edit ' />
+              </IconButton>
+            )}
+            {canAccess('Designation', 'delete') && (
+              <IconButton
+                size='small'
+                color='error'
+                onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
+              >
+                <i className='tabler-trash text-red-600 text-lg' />
+              </IconButton>
+            )}
           </Box>
         )
       }),
@@ -531,14 +539,16 @@ export default function DesignationPage() {
                 </MenuItem>
               </Menu>
 
-              <GlobalButton
-                variant='contained'
-                startIcon={<AddIcon />}
-                onClick={handleAdd}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-              >
-                Add Designation
-              </GlobalButton>
+              {canAccess('Designation', 'create') && (
+                <GlobalButton
+                  variant='contained'
+                  startIcon={<AddIcon />}
+                  onClick={handleAdd}
+                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                >
+                  Add Designation
+                </GlobalButton>
+              )}
             </Box>
           }
         />
@@ -794,5 +804,14 @@ export default function DesignationPage() {
         </DialogActions>
       </Dialog>
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function DesignationPage() {
+  return (
+    <PermissionGuard permission="Designation">
+      <DesignationPageContent />
+    </PermissionGuard>
   )
 }

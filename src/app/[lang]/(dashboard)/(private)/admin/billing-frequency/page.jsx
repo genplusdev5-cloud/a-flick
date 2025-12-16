@@ -64,6 +64,8 @@ import { showToast } from '@/components/common/Toasts'
 
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import CustomTextFieldWrapper from '@/components/common/CustomTextField'
+import PermissionGuard from '@/components/auth/PermissionGuard'
+import { usePermission } from '@/hooks/usePermission'
 
 import {
   useReactTable,
@@ -90,8 +92,9 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
 // ───────────────────────────────────────────
 // Component
 // ───────────────────────────────────────────
-export default function BillingFrequencyPage() {
+const BillingFrequencyPageContent = () => {
   const [rows, setRows] = useState([])
+  const { canAccess } = usePermission()
   const [rowCount, setRowCount] = useState(0)
   const [searchText, setSearchText] = useState('')
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
@@ -312,16 +315,20 @@ export default function BillingFrequencyPage() {
         header: 'Actions',
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
-              <i className='tabler-edit' />
-            </IconButton>
-            <IconButton
-              size='small'
-              color='error'
-              onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
-            >
-              <i className='tabler-trash text-red-600 text-lg' />
-            </IconButton>
+            {canAccess('Billing Frequency', 'update') && (
+              <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
+                <i className='tabler-edit' />
+              </IconButton>
+            )}
+            {canAccess('Billing Frequency', 'delete') && (
+              <IconButton
+                size='small'
+                color='error'
+                onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
+              >
+                <i className='tabler-trash text-red-600 text-lg' />
+              </IconButton>
+            )}
           </Box>
         )
       }),
@@ -532,9 +539,11 @@ export default function BillingFrequencyPage() {
                 </MenuItem>
               </Menu>
 
-              <GlobalButton startIcon={<AddIcon />} onClick={handleAdd}>
-                Add Frequency
-              </GlobalButton>
+              {canAccess('Billing Frequency', 'create') && (
+                <GlobalButton startIcon={<AddIcon />} onClick={handleAdd}>
+                  Add Frequency
+                </GlobalButton>
+              )}
             </Box>
           }
         />
@@ -879,5 +888,14 @@ export default function BillingFrequencyPage() {
         </DialogActions>
       </Dialog>
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function BillingFrequencyPage() {
+  return (
+    <PermissionGuard permission="Billing Frequency">
+      <BillingFrequencyPageContent />
+    </PermissionGuard>
   )
 }

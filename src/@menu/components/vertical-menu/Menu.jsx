@@ -67,24 +67,21 @@ const Menu = (props, ref) => {
         const submenuIndex = openSubmenuCopy.findIndex(submenu => submenu.id === id)
         const submenuExists = submenuIndex >= 0
         const isAccordion = subMenuOpenBehavior === 'accordion'
-        const inactiveSubmenuIndex = openSubmenuCopy.findIndex(submenu => !submenu.active && submenu.level === 0)
 
-        // Delete submenu if it exists
         if (submenuExists) {
           openSubmenuCopy.splice(submenuIndex, 1)
         }
 
         if (isAccordion) {
-          // Add submenu if it doesn't exist
           if (!submenuExists) {
-            if (inactiveSubmenuIndex >= 0 && !active && level === 0) {
-              openSubmenuCopy.splice(inactiveSubmenuIndex, 1, { level, label, active, id })
-            } else {
-              openSubmenuCopy.push({ level, label, active, id })
+            const siblingIndex = openSubmenuCopy.findIndex(submenu => submenu.level === level)
+
+            if (siblingIndex >= 0) {
+              openSubmenuCopy.splice(siblingIndex, 1)
             }
+            openSubmenuCopy.push({ level, label, active, id })
           }
         } else {
-          // Add submenu if it doesn't exist
           if (!submenuExists) {
             openSubmenuCopy.push({ level, label, active, id })
           }

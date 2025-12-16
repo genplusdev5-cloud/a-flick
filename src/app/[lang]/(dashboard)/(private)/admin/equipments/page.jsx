@@ -72,6 +72,8 @@ import {
   flexRender,
   createColumnHelper
 } from '@tanstack/react-table'
+import PermissionGuard from '@/components/auth/PermissionGuard'
+import { usePermission } from '@/hooks/usePermission'
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
 
@@ -89,8 +91,10 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
 // ───────────────────────────────────────────
 // Component
 // ───────────────────────────────────────────
-export default function EquipmentsPage() {
+// ───────────────────────────────────────────
+const EquipmentsPageContent = () => {
   const [rows, setRows] = useState([])
+  const { canAccess } = usePermission()
   const [rowCount, setRowCount] = useState(0)
   const [searchText, setSearchText] = useState('')
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
@@ -320,16 +324,20 @@ export default function EquipmentsPage() {
         header: 'Actions',
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
-              <i className='tabler-edit' />
-            </IconButton>
-            <IconButton
-              size='small'
-              color='error'
-              onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
-            >
-              <i className='tabler-trash text-red-600 text-lg' />
-            </IconButton>
+            {canAccess('Equipments', 'update') && (
+              <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
+                <i className='tabler-edit' />
+              </IconButton>
+            )}
+            {canAccess('Equipments', 'delete') && (
+              <IconButton
+                size='small'
+                color='error'
+                onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
+              >
+                <i className='tabler-trash text-red-600 text-lg' />
+              </IconButton>
+            )}
           </Box>
         )
       }),
@@ -539,14 +547,16 @@ export default function EquipmentsPage() {
                 </MenuItem>
               </Menu>
 
-              <GlobalButton
-                variant='contained'
-                startIcon={<AddIcon />}
-                onClick={handleAdd}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-              >
-                Add Equipment
-              </GlobalButton>
+              {canAccess('Equipments', 'create') && (
+                <GlobalButton
+                  variant='contained'
+                  startIcon={<AddIcon />}
+                  onClick={handleAdd}
+                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                >
+                  Add Equipment
+                </GlobalButton>
+              )}
             </Box>
           }
         />
@@ -802,5 +812,14 @@ export default function EquipmentsPage() {
         </DialogActions>
       </Dialog>
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function EquipmentsPage() {
+  return (
+    <PermissionGuard permission="Equipments">
+      <EquipmentsPageContent />
+    </PermissionGuard>
   )
 }

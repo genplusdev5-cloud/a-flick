@@ -23,6 +23,8 @@ import {
   Divider
 } from '@mui/material'
 
+import PermissionGuard from '@/components/auth/PermissionGuard'
+
 import GlobalTextField from '@/components/common/GlobalTextField'
 import { showToast } from '@/components/common/Toasts'
 import GlobalSelect from '@/components/common/GlobalSelect'
@@ -53,7 +55,8 @@ import ChevronRight from '@menu/svg/ChevronRight'
 
 // ------------------------------------------------------------------------------------------------
 
-export default function SlotsPage() {
+// ───────────────────────────────────────────
+const SlotsPageContent = () => {
   const [rows, setRows] = useState([])
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
   const [searchText, setSearchText] = useState('')
@@ -687,5 +690,14 @@ export default function SlotsPage() {
         </Box>
       </Drawer>
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function SlotsPage() {
+  return (
+    <PermissionGuard permission="Slots">
+      <SlotsPageContent />
+    </PermissionGuard>
   )
 }

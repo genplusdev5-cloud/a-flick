@@ -58,6 +58,8 @@ import CustomTextFieldWrapper from '@/components/common/CustomTextField'
 import CustomTextarea from '@/components/common/CustomTextarea'
 import CustomSelectField from '@/components/common/CustomSelectField'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
+import PermissionGuard from '@/components/auth/PermissionGuard'
+import { usePermission } from '@/hooks/usePermission'
 
 import {
   useReactTable,
@@ -84,8 +86,9 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
 // ───────────────────────────────────────────
 // Component
 // ───────────────────────────────────────────
-export default function CallTypePage() {
+const CallTypePageContent = () => {
   const [rows, setRows] = useState([])
+  const { canAccess } = usePermission()
   const [rowCount, setRowCount] = useState(0)
   const [searchText, setSearchText] = useState('')
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
@@ -321,16 +324,20 @@ export default function CallTypePage() {
         header: 'Actions',
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
-              <i className='tabler-edit ' />
-            </IconButton>
-            <IconButton
-              size='small'
-              color='error'
-              onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
-            >
-              <i className='tabler-trash text-red-600 text-lg' />
-            </IconButton>
+            {canAccess('Call Type', 'update') && (
+              <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
+                <i className='tabler-edit ' />
+              </IconButton>
+            )}
+            {canAccess('Call Type', 'delete') && (
+              <IconButton
+                size='small'
+                color='error'
+                onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
+              >
+                <i className='tabler-trash text-red-600 text-lg' />
+              </IconButton>
+            )}
           </Box>
         )
       }),
@@ -558,14 +565,16 @@ export default function CallTypePage() {
                 </MenuItem>
               </Menu>
 
-              <GlobalButton
-                variant='contained'
-                startIcon={<AddIcon />}
-                onClick={handleAdd}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-              >
-                Add Call Type
-              </GlobalButton>
+              {canAccess('Call Type', 'create') && (
+                <GlobalButton
+                  variant='contained'
+                  startIcon={<AddIcon />}
+                  onClick={handleAdd}
+                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                >
+                  Add Call Type
+                </GlobalButton>
+              )}
             </Box>
           }
         />
@@ -828,5 +837,14 @@ export default function CallTypePage() {
         </DialogActions>
       </Dialog>
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function CallTypePage() {
+  return (
+    <PermissionGuard permission="Call Type">
+      <CallTypePageContent />
+    </PermissionGuard>
   )
 }

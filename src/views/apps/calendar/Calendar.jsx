@@ -238,13 +238,24 @@ const Calendar = ({
             return
           }
 
+          // 3. GET FROM / TO EMPLOYEE
+          const oldResourceId = oldEvent.getResources()[0]?.id
+          const newResourceId = event.getResources()[0]?.id
+
+          if (!oldResourceId || !newResourceId) {
+            console.error('❌ MISSING RESOURCE ID', { oldResourceId, newResourceId })
+            info.revert()
+            return
+          }
+
+          // 4. API CALL
           await updateSchedule({
             id: ticketId,
             schedule_date: toApiDate(event.start),
             schedule_start_time: toApiTime(event.startStr),
             schedule_end_time: toApiTime(event.endStr),
-            from_employee_id: data.technician_id,
-            to_employee_id: data.technician_id
+            from_employee_id: Number(oldResourceId),
+            to_employee_id: Number(newResourceId)
           })
 
           event.setExtendedProp('ticket_id', ticketId)

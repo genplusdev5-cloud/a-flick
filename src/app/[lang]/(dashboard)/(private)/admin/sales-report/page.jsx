@@ -16,6 +16,7 @@ import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import CustomTextField from '@core/components/mui/TextField'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
 import GlobalButton from '@/components/common/GlobalButton'
+import PermissionGuard from '@/components/auth/PermissionGuard'
 
 /* ----------------------------------------------
    📅 Date Range Picker
@@ -64,7 +65,7 @@ const DateRangePickerField = () => {
 /* ----------------------------------------------
    MAIN PAGE – SALES REPORT
 ---------------------------------------------- */
-export default function SalesReportPage() {
+const SalesReportPageContent = () => {
   return (
     <Box>
       {/* Breadcrumbs */}
@@ -127,5 +128,14 @@ export default function SalesReportPage() {
 
       <Box sx={{ mt: 5 }}></Box>
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function SalesReportPage() {
+  return (
+    <PermissionGuard permission="Sales Report">
+      <SalesReportPageContent />
+    </PermissionGuard>
   )
 }

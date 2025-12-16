@@ -26,6 +26,9 @@ import {
   Checkbox
 } from '@mui/material'
 
+import PermissionGuard from '@/components/auth/PermissionGuard'
+import { usePermission } from '@/hooks/usePermission'
+
 import { getTicketReportList } from '@/api/service_request/report'
 import { getReportDropdowns } from '@/api/service_request/report'
 
@@ -78,7 +81,9 @@ const appointmentList = [
 // -------------------------
 // Service Request Page (full)
 // -------------------------
-export default function ServiceRequestPage() {
+// -------------------------
+const ServiceRequestPageContent = () => {
+  const { canAccess } = usePermission()
   // state
   const [rows, setRows] = useState([])
   const [rowCount, setRowCount] = useState(0)
@@ -196,14 +201,18 @@ export default function ServiceRequestPage() {
               </IconButton>
 
               {/* ✏ EDIT */}
-              <IconButton size='small' onClick={() => handleEdit(item)}>
-                <i className='tabler-edit text-blue-600 text-[18px]' />
-              </IconButton>
+              {canAccess('Service Request', 'update') && (
+                <IconButton size='small' onClick={() => handleEdit(item)}>
+                  <i className='tabler-edit text-blue-600 text-[18px]' />
+                </IconButton>
+              )}
 
               {/* 🗑 DELETE */}
-              <IconButton size='small' onClick={() => setDeleteDialog({ open: true, row: item })}>
-                <i className='tabler-trash text-red-600 text-[18px]' />
-              </IconButton>
+              {canAccess('Service Request', 'delete') && (
+                <IconButton size='small' onClick={() => setDeleteDialog({ open: true, row: item })}>
+                  <i className='tabler-trash text-red-600 text-[18px]' />
+                </IconButton>
+              )}
             </Box>
           )
         }
@@ -528,9 +537,11 @@ export default function ServiceRequestPage() {
                 </Button>
               </Box>
 
-              <Button variant='contained' startIcon={<AddIcon />} sx={{ textTransform: 'none' }}>
-                Global Change
-              </Button>
+              {canAccess('Service Request', 'create') && (
+                <Button variant='contained' startIcon={<AddIcon />} sx={{ textTransform: 'none' }}>
+                  Global Change
+                </Button>
+              )}
             </Box>
           }
           sx={{ pb: 1.5, pt: 1.5 }}
@@ -583,7 +594,7 @@ export default function ServiceRequestPage() {
                 label='Customer'
                 size='small'
                 sx={{ width: 220 }}
-                placeholder='Search customer...'
+                placeholder='Select customer...'
               />
             )}
           />
@@ -595,7 +606,15 @@ export default function ServiceRequestPage() {
             getOptionKey={option => option?.id}
             isOptionEqualToValue={(o, v) => o.id === v?.id}
             onChange={(_, v) => setContractFilter(v?.id || '')}
-            renderInput={params => <CustomTextField {...params} label='Contract' size='small' sx={{ width: 220 }} />}
+            renderInput={params => (
+              <CustomTextField
+                {...params}
+                label='Contract'
+                size='small'
+                sx={{ width: 220 }}
+                placeholder='Select contract...'
+              />
+            )}
           />
 
           {/* Technician */}
@@ -604,7 +623,15 @@ export default function ServiceRequestPage() {
             value={technicianOptions.find(o => o.id === technicianFilter) || null}
             onChange={(_, v) => setTechnicianFilter(v?.id || '')}
             getOptionLabel={option => option?.label || ''}
-            renderInput={params => <CustomTextField {...params} label='Technician' size='small' sx={{ width: 180 }} />}
+            renderInput={params => (
+              <CustomTextField
+                {...params}
+                label='Technician'
+                size='small'
+                sx={{ width: 220 }}
+                placeholder='Select Technician...'
+              />
+            )}
           />
 
           {/* Supervisor */}
@@ -613,7 +640,15 @@ export default function ServiceRequestPage() {
             value={supervisorOptions.find(o => o.id === supervisorFilter) || null}
             onChange={(_, v) => setSupervisorFilter(v?.id || '')}
             getOptionLabel={option => option?.label || ''}
-            renderInput={params => <CustomTextField {...params} label='Supervisor' size='small' sx={{ width: 180 }} />}
+            renderInput={params => (
+              <CustomTextField
+                {...params}
+                label='Supervisor'
+                size='small'
+                sx={{ width: 220 }}
+                placeholder='Select Supervisor...'
+              />
+            )}
           />
 
           {/* Appointment Status */}
@@ -623,7 +658,13 @@ export default function ServiceRequestPage() {
             onChange={(_, v) => setAppointmentStatusFilter(v?.id || '')}
             getOptionLabel={option => option?.label || ''}
             renderInput={params => (
-              <CustomTextField {...params} label='Appointment Status' size='small' sx={{ width: 180 }} />
+              <CustomTextField
+                {...params}
+                label='Appointment Status'
+                size='small'
+                sx={{ width: 200 }}
+                placeholder='Select Status...'
+              />
             )}
           />
 
@@ -633,7 +674,15 @@ export default function ServiceRequestPage() {
             value={appointmentList.find(o => o.id === appointmentTypeFilter) || null}
             onChange={(_, v) => setAppointmentTypeFilter(v?.id || '')}
             getOptionLabel={option => option?.label || ''}
-            renderInput={params => <CustomTextField {...params} label='Appointment' size='small' sx={{ width: 180 }} />}
+            renderInput={params => (
+              <CustomTextField
+                {...params}
+                label='Appointment'
+                size='small'
+                sx={{ width: 200 }}
+                placeholder='Select Appointment...'
+              />
+            )}
           />
         </Box>
 
@@ -868,5 +917,14 @@ export default function ServiceRequestPage() {
         </Dialog>
       </Card>
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function ServiceRequestPage() {
+  return (
+    <PermissionGuard permission='Service Request'>
+      <ServiceRequestPageContent />
+    </PermissionGuard>
   )
 }

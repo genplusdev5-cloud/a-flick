@@ -25,6 +25,8 @@ import {
   InputAdornment
 } from '@mui/material'
 
+import PermissionGuard from '@/components/auth/PermissionGuard'
+
 import { getReportFollowupList } from '@/api/reportFollowup/list'
 import GlobalDateRange from '@/components/common/GlobalDateRange'
 
@@ -84,7 +86,7 @@ const formatDate = iso => {
   }
 }
 
-export default function FollowupFinderPage() {
+const FollowupFinderPageContent = () => {
   const router = useRouter()
 
   const [allRows, setAllRows] = useState([])
@@ -572,5 +574,14 @@ export default function FollowupFinderPage() {
         </DialogActions>
       </Dialog>
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function FollowupFinderPage() {
+  return (
+    <PermissionGuard permission="Followup Finder">
+      <FollowupFinderPageContent />
+    </PermissionGuard>
   )
 }

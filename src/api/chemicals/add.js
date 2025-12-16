@@ -2,11 +2,7 @@ import api from '@/utils/axiosInstance'
 
 export const addChemical = async formData => {
   try {
-    const response = await api.post('chemicals-add/', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    })
+    const response = await api.post('chemicals-add/', formData)
 
     if (response?.data?.status === 'success') {
       return {

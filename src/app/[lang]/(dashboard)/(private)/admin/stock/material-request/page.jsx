@@ -25,6 +25,8 @@ import {
   FormControlLabel
 } from '@mui/material'
 
+import PermissionGuard from '@/components/auth/PermissionGuard'
+
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
@@ -67,7 +69,8 @@ import { showToast } from '@/components/common/Toasts'
 // ───────────────────────────────────────
 // Main Component
 // ───────────────────────────────────────
-export default function MaterialRequestPage() {
+// ───────────────────────────────────────
+const MaterialRequestPageContent = () => {
   const router = useRouter()
 
   const [rows, setRows] = useState([])
@@ -839,5 +842,14 @@ export default function MaterialRequestPage() {
 
       <ToastContainer />
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function MaterialRequestPage() {
+  return (
+    <PermissionGuard permission="Material Request">
+      <MaterialRequestPageContent />
+    </PermissionGuard>
   )
 }

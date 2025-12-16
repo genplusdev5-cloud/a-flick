@@ -61,6 +61,8 @@ import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 
 import CustomTextField from '@core/components/mui/TextField'
 import CustomAutocomplete from '@core/components/mui/Autocomplete'
+import PermissionGuard from '@/components/auth/PermissionGuard'
+import { usePermission } from '@/hooks/usePermission'
 import { toast } from 'react-toastify'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 import classnames from 'classnames'
@@ -144,8 +146,9 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
 // ───────────────────────────────────────────
 // Component
 // ───────────────────────────────────────────
-export default function ServiceFrequencyPage() {
+const ServiceFrequencyPageContent = () => {
   const [rows, setRows] = useState([])
+  const { canAccess } = usePermission()
   const [rowCount, setRowCount] = useState(0)
   const [searchText, setSearchText] = useState('')
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
@@ -361,16 +364,20 @@ export default function ServiceFrequencyPage() {
         header: 'Actions',
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
-              <i className='tabler-edit' />
-            </IconButton>
-            <IconButton
-              size='small'
-              color='error'
-              onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
-            >
-              <i className='tabler-trash text-red-600 text-lg' />
-            </IconButton>
+            {canAccess('Service Frequency', 'update') && (
+              <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
+                <i className='tabler-edit' />
+              </IconButton>
+            )}
+            {canAccess('Service Frequency', 'delete') && (
+              <IconButton
+                size='small'
+                color='error'
+                onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
+              >
+                <i className='tabler-trash text-red-600 text-lg' />
+              </IconButton>
+            )}
           </Box>
         )
       }),
@@ -602,9 +609,11 @@ export default function ServiceFrequencyPage() {
                 </MenuItem>
               </Menu>
 
-              <GlobalButton startIcon={<AddIcon />} onClick={handleAdd}>
-                Add Frequency
-              </GlobalButton>
+              {canAccess('Service Frequency', 'create') && (
+                <GlobalButton startIcon={<AddIcon />} onClick={handleAdd}>
+                  Add Frequency
+                </GlobalButton>
+              )}
             </Box>
           }
         />
@@ -970,5 +979,14 @@ export default function ServiceFrequencyPage() {
         </DialogActions>
       </Dialog>
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function ServiceFrequencyPage() {
+  return (
+    <PermissionGuard permission="Service Frequency">
+      <ServiceFrequencyPageContent />
+    </PermissionGuard>
   )
 }

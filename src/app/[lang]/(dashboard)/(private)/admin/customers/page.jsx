@@ -27,6 +27,9 @@ import {
   InputAdornment
 } from '@mui/material'
 
+import PermissionGuard from '@/components/auth/PermissionGuard'
+import { usePermission } from '@/hooks/usePermission'
+
 import { getCustomerList, deleteCustomer, getCustomerSummary } from '@/api/customer'
 import { getCustomerOrigin } from '@/api/customer/origin'
 import GlobalButton from '@/components/common/GlobalButton'
@@ -84,7 +87,9 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
 // ───────────────────────────────────────────
 // Component
 // ───────────────────────────────────────────
-export default function CustomersPage() {
+// ───────────────────────────────────────────
+const CustomersPageContent = () => {
+  const { canAccess } = usePermission()
   const router = useRouter()
   const [rows, setRows] = useState([])
   const [rowCount, setRowCount] = useState(0)
@@ -238,17 +243,21 @@ export default function CustomersPage() {
         header: 'Action',
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original.id)}>
-              <i className='tabler-edit ' />
-            </IconButton>
+            {canAccess('Customers', 'update') && (
+              <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original.id)}>
+                <i className='tabler-edit ' />
+              </IconButton>
+            )}
 
-            <IconButton
-              size='small'
-              color='error'
-              onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
-            >
-              <i className='tabler-trash text-red-600 text-lg' />
-            </IconButton>
+            {canAccess('Customers', 'delete') && (
+              <IconButton
+                size='small'
+                color='error'
+                onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
+              >
+                <i className='tabler-trash text-red-600 text-lg' />
+              </IconButton>
+            )}
           </Box>
         )
       }),
@@ -618,14 +627,16 @@ export default function CustomersPage() {
                 </MenuItem>
               </Menu>
 
-              <GlobalButton
-                variant='contained'
-                startIcon={<AddIcon />}
-                onClick={() => router.push('/admin/customers/add')}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-              >
-                Add Customer
-              </GlobalButton>
+              {canAccess('Customers', 'create') && (
+                <GlobalButton
+                  variant='contained'
+                  startIcon={<AddIcon />}
+                  onClick={() => router.push('/admin/customers/add')}
+                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                >
+                  Add Customer
+                </GlobalButton>
+              )}
             </Box>
           }
         />
@@ -854,5 +865,14 @@ export default function CustomersPage() {
         </DialogActions>
       </Dialog>
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function CustomersPage() {
+  return (
+    <PermissionGuard permission="Customers">
+      <CustomersPageContent />
+    </PermissionGuard>
   )
 }

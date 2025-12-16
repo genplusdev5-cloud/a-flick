@@ -25,6 +25,8 @@ import {
   InputAdornment
 } from '@mui/material'
 
+import PermissionGuard from '@/components/auth/PermissionGuard'
+
 import { getReportBacklogList } from '@/api/reportBacklog/list'
 import GlobalDateRange from '@/components/common/GlobalDateRange'
 
@@ -87,7 +89,8 @@ const formatDate = iso => {
 }
 
 // MAIN PAGE
-export default function BacklogFinderPage() {
+// MAIN PAGE
+const BacklogFinderPageContent = () => {
   const router = useRouter()
 
   const [rows, setRows] = useState([])
@@ -593,5 +596,14 @@ export default function BacklogFinderPage() {
         </DialogActions>
       </Dialog>
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function BacklogFinderPage() {
+  return (
+    <PermissionGuard permission="Backlog Finder">
+      <BacklogFinderPageContent />
+    </PermissionGuard>
   )
 }

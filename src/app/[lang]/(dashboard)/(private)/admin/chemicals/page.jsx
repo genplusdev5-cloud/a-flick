@@ -59,6 +59,7 @@ import {
 } from '@tanstack/react-table'
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
+import { objectToFormData } from '@/utils/formUtils'
 
 // ✅ Custom common form components
 import CustomTextFieldWrapper from '@/components/common/CustomTextField'
@@ -84,10 +85,17 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
   return <TextField {...props} value={value} onChange={e => setValue(e.target.value)} />
 }
 
+import PermissionGuard from '@/components/auth/PermissionGuard'
+import { usePermission } from '@/hooks/usePermission'
+
 // ───────────────────────────────────────────
 // Component
 // ───────────────────────────────────────────
-export default function ChemicalsPage() {
+// ───────────────────────────────────────────
+// Component
+// ───────────────────────────────────────────
+const ChemicalsPageContent = () => {
+  const { canAccess } = usePermission() // Hook usage
   const [rows, setRows] = useState([])
   const [rowCount, setRowCount] = useState(0)
   const [searchText, setSearchText] = useState('')
@@ -281,16 +289,23 @@ export default function ChemicalsPage() {
       return
     }
 
-    const form = new FormData()
-    form.append('name', formData.name)
-    form.append('description', formData.ingredients || '')
-    form.append('uom', formData.unit || '')
-    form.append('unit_value', formData.dosage || '')
-    form.append('is_active', formData.status === 'Active' ? 1 : 0)
+    const payload = {
+      name: formData.name,
+      description: formData.ingredients || '',
+      uom: formData.unit || '',
+      unit_value: formData.dosage || '',
+      is_active: formData.status === 'Active' ? 1 : 0
+    }
 
     if (formData.file instanceof File) {
-      form.append('file_name', formData.file)
+      payload.file_name = formData.file
+    } else if (isEdit && selectedFile && !formData.file) {
+      // Keep existing file if editing and no new file selected
+      // API might need this, or might ignore it. 
+      // Based on usual logic, if not sending file, backend keeps old.
     }
+
+    const form = objectToFormData(payload)
 
     setLoading(true)
 
@@ -365,16 +380,20 @@ export default function ChemicalsPage() {
         header: 'Actions',
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
-              <i className='tabler-edit ' />
-            </IconButton>
-            <IconButton
-              size='small'
-              color='error'
-              onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
-            >
-              <i className='tabler-trash text-red-600 text-lg' />
-            </IconButton>
+            {canAccess('Chemicals', 'update') && (
+              <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
+                <i className='tabler-edit ' />
+              </IconButton>
+            )}
+            {canAccess('Chemicals', 'delete') && (
+              <IconButton
+                size='small'
+                color='error'
+                onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
+              >
+                <i className='tabler-trash text-red-600 text-lg' />
+              </IconButton>
+            )}
           </Box>
         )
       }),
@@ -484,507 +503,513 @@ export default function ChemicalsPage() {
   // Render
   // ───────────────────────────────────────────
   return (
-    <Box>
-      <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
-        <Link underline='hover' color='inherit' href='/'>
-          Home
-        </Link>
-        <Typography color='text.primary'>Chemicals</Typography>
-      </Breadcrumbs>
-      <Card sx={{ p: 3 }}>
-        <CardHeader
-          sx={{
-            pb: 1.5,
-            pt: 1.5,
-            '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
-            '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
-          }}
-          title={
-            <Box display='flex' alignItems='center' gap={2}>
-              <Typography variant='h5' sx={{ fontWeight: 600 }}>
-                Chemicals
+    <PermissionGuard permission="Chemicals">
+      <Box>
+        <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
+          <Link underline='hover' color='inherit' href='/'>
+            Home
+          </Link>
+          <Typography color='text.primary'>Chemicals</Typography>
+        </Breadcrumbs>
+        <Card sx={{ p: 3 }}>
+          <CardHeader
+            sx={{
+              pb: 1.5,
+              pt: 1.5,
+              '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
+              '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
+            }}
+            title={
+              <Box display='flex' alignItems='center' gap={2}>
+                <Typography variant='h5' sx={{ fontWeight: 600 }}>
+                  Chemicals
+                </Typography>
+                <Button
+                  variant='contained'
+                  color='primary'
+                  startIcon={
+                    <RefreshIcon
+                      sx={{
+                        animation: loading ? 'spin 1s linear infinite' : 'none',
+                        '@keyframes spin': {
+                          '0%': { transform: 'rotate(0deg)' },
+                          '100%': { transform: 'rotate(360deg)' }
+                        }
+                      }}
+                    />
+                  }
+                  disabled={loading}
+                  onClick={async () => {
+                    setLoading(true)
+
+                    // Reset page size to 25 BEFORE refresh
+                    setPagination(prev => ({
+                      ...prev,
+                      pageSize: 25,
+                      pageIndex: 0
+                    }))
+
+                    // Load data after pagination updates
+                    setTimeout(async () => {
+                      await loadData()
+                      setLoading(false)
+                    }, 50)
+                  }}
+                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                >
+                  {loading ? 'Refreshing...' : 'Refresh'}
+                </Button>
+              </Box>
+            }
+            action={
+              <Box display='flex' alignItems='center' gap={2}>
+                <GlobalButton
+                  color='secondary'
+                  endIcon={<ArrowDropDownIcon />}
+                  onClick={e => setExportAnchorEl(e.currentTarget)}
+                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                >
+                  Export
+                </GlobalButton>
+                <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
+                  <MenuItem
+                    onClick={() => {
+                      setExportAnchorEl(null)
+                      exportPrint()
+                    }}
+                  >
+                    <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
+                  </MenuItem>
+
+                  <MenuItem
+                    onClick={() => {
+                      setExportAnchorEl(null)
+                      exportCSV()
+                    }}
+                  >
+                    <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
+                  </MenuItem>
+
+                  <MenuItem
+                    onClick={async () => {
+                      setExportAnchorEl(null)
+                      await exportExcel()
+                    }}
+                  >
+                    <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
+                  </MenuItem>
+
+                  <MenuItem
+                    onClick={async () => {
+                      setExportAnchorEl(null)
+                      await exportPDF()
+                    }}
+                  >
+                    <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
+                  </MenuItem>
+
+                  <MenuItem
+                    onClick={() => {
+                      setExportAnchorEl(null)
+                      exportCopy()
+                    }}
+                  >
+                    <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
+                  </MenuItem>
+                </Menu>
+
+                {canAccess('Chemicals', 'create') && (
+                  <Button
+                    variant='contained'
+                    startIcon={<AddIcon />}
+                    onClick={handleAdd}
+                    sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                  >
+                    Add Chemical
+                  </Button>
+                )}
+              </Box>
+            }
+          />
+          {loading && (
+            <Box
+              sx={{
+                position: 'fixed',
+                inset: 0,
+                bgcolor: 'rgba(255,255,255,0.8)',
+                backdropFilter: 'blur(2px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 9999
+              }}
+            >
+              <ProgressCircularCustomization size={60} thickness={5} />
+            </Box>
+          )}
+
+          <Divider sx={{ mb: 2 }} />
+          <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+            <FormControl size='small' sx={{ width: 140 }}>
+              <Select
+                value={pagination.pageSize}
+                onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
+              >
+                {[5, 10, 25, 50].map(s => (
+                  <MenuItem key={s} value={s}>
+                    {s} entries
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <DebouncedInput
+              value={searchText}
+              onChange={v => {
+                setSearchText(String(v))
+                setPagination(p => ({ ...p, pageIndex: 0 }))
+              }}
+              placeholder='Search name, unit, ingredients...'
+              sx={{ width: 360 }}
+              variant='outlined'
+              size='small'
+            />
+          </Box>
+          <div className='overflow-x-auto'>
+            <table className={styles.table}>
+              <thead>
+                {table.getHeaderGroups().map(hg => (
+                  <tr key={hg.id}>
+                    {hg.headers.map(h => (
+                      <th key={h.id}>
+                        <div
+                          className={classnames({
+                            'flex items-center': h.column.getIsSorted(),
+                            'cursor-pointer select-none': h.column.getCanSort()
+                          })}
+                          onClick={h.column.getToggleSortingHandler()}
+                        >
+                          {flexRender(h.column.columnDef.header, h.getContext())}
+                          {{
+                            asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
+                            desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
+                          }[h.column.getIsSorted()] ?? null}
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
+                ))}
+              </thead>
+              <tbody>
+                {rows.length ? (
+                  table.getRowModel().rows.map(row => (
+                    <tr key={row.id}>
+                      {row.getVisibleCells().map(cell => (
+                        <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                      ))}
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={columns.length} className='text-center py-4'>
+                      No data available
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+        </Card>
+
+        {/* Drawer */}
+        <Drawer
+          anchor='right'
+          open={drawerOpen}
+          onClose={toggleDrawer}
+          PaperProps={{ sx: { width: 420, boxShadow: '0px 0px 15px rgba(0,0,0,0.08)' } }}
+        >
+          <Box sx={{ p: 5, display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
+              <Typography variant='h5' fontWeight={600}>
+                {isEdit ? 'Edit Chemical' : 'Add Chemical'}
               </Typography>
-              <Button
-                variant='contained'
-                color='primary'
-                startIcon={
-                  <RefreshIcon
+              <IconButton onClick={toggleDrawer} size='small'>
+                <CloseIcon />
+              </IconButton>
+            </Box>
+
+            <Divider sx={{ mb: 3 }} />
+
+            <form onSubmit={handleSubmit} style={{ flexGrow: 1 }}>
+              <Grid container spacing={3}>
+                {/* Chemical Name */}
+                <Grid item xs={12}>
+                  <GlobalTextField
+                    fullWidth
+                    required
+                    label='Name'
+                    placeholder='Enter chemical name'
+                    value={formData.name}
+                    inputRef={nameRef}
+                    onChange={e => handleFieldChange('name', e.target.value)}
                     sx={{
-                      animation: loading ? 'spin 1s linear infinite' : 'none',
-                      '@keyframes spin': {
-                        '0%': { transform: 'rotate(0deg)' },
-                        '100%': { transform: 'rotate(360deg)' }
+                      '& .MuiFormLabel-asterisk': {
+                        color: '#e91e63 !important',
+                        fontWeight: 700
+                      },
+                      '& .MuiInputLabel-root.Mui-required': {
+                        color: 'inherit'
                       }
                     }}
                   />
-                }
-                disabled={loading}
-                onClick={async () => {
-                  setLoading(true)
-
-                  // Reset page size to 25 BEFORE refresh
-                  setPagination(prev => ({
-                    ...prev,
-                    pageSize: 25,
-                    pageIndex: 0
-                  }))
-
-                  // Load data after pagination updates
-                  setTimeout(async () => {
-                    await loadData()
-                    setLoading(false)
-                  }, 50)
-                }}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-              >
-                {loading ? 'Refreshing...' : 'Refresh'}
-              </Button>
-            </Box>
-          }
-          action={
-            <Box display='flex' alignItems='center' gap={2}>
-              <GlobalButton
-                color='secondary'
-                endIcon={<ArrowDropDownIcon />}
-                onClick={e => setExportAnchorEl(e.currentTarget)}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-              >
-                Export
-              </GlobalButton>
-              <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
-                <MenuItem
-                  onClick={() => {
-                    setExportAnchorEl(null)
-                    exportPrint()
-                  }}
-                >
-                  <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
-                </MenuItem>
-
-                <MenuItem
-                  onClick={() => {
-                    setExportAnchorEl(null)
-                    exportCSV()
-                  }}
-                >
-                  <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
-                </MenuItem>
-
-                <MenuItem
-                  onClick={async () => {
-                    setExportAnchorEl(null)
-                    await exportExcel()
-                  }}
-                >
-                  <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
-                </MenuItem>
-
-                <MenuItem
-                  onClick={async () => {
-                    setExportAnchorEl(null)
-                    await exportPDF()
-                  }}
-                >
-                  <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
-                </MenuItem>
-
-                <MenuItem
-                  onClick={() => {
-                    setExportAnchorEl(null)
-                    exportCopy()
-                  }}
-                >
-                  <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
-                </MenuItem>
-              </Menu>
-
-              <Button
-                variant='contained'
-                startIcon={<AddIcon />}
-                onClick={handleAdd}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-              >
-                Add Chemical
-              </Button>
-            </Box>
-          }
-        />
-        {loading && (
-          <Box
-            sx={{
-              position: 'fixed',
-              inset: 0,
-              bgcolor: 'rgba(255,255,255,0.8)',
-              backdropFilter: 'blur(2px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 9999
-            }}
-          >
-            <ProgressCircularCustomization size={60} thickness={5} />
-          </Box>
-        )}
-
-        <Divider sx={{ mb: 2 }} />
-        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-          <FormControl size='small' sx={{ width: 140 }}>
-            <Select
-              value={pagination.pageSize}
-              onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
-            >
-              {[5, 10, 25, 50].map(s => (
-                <MenuItem key={s} value={s}>
-                  {s} entries
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <DebouncedInput
-            value={searchText}
-            onChange={v => {
-              setSearchText(String(v))
-              setPagination(p => ({ ...p, pageIndex: 0 }))
-            }}
-            placeholder='Search name, unit, ingredients...'
-            sx={{ width: 360 }}
-            variant='outlined'
-            size='small'
-          />
-        </Box>
-        <div className='overflow-x-auto'>
-          <table className={styles.table}>
-            <thead>
-              {table.getHeaderGroups().map(hg => (
-                <tr key={hg.id}>
-                  {hg.headers.map(h => (
-                    <th key={h.id}>
-                      <div
-                        className={classnames({
-                          'flex items-center': h.column.getIsSorted(),
-                          'cursor-pointer select-none': h.column.getCanSort()
-                        })}
-                        onClick={h.column.getToggleSortingHandler()}
-                      >
-                        {flexRender(h.column.columnDef.header, h.getContext())}
-                        {{
-                          asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
-                          desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
-                        }[h.column.getIsSorted()] ?? null}
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody>
-              {rows.length ? (
-                table.getRowModel().rows.map(row => (
-                  <tr key={row.id}>
-                    {row.getVisibleCells().map(cell => (
-                      <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
-                    ))}
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={columns.length} className='text-center py-4'>
-                    No data available
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
-      </Card>
-
-      {/* Drawer */}
-      <Drawer
-        anchor='right'
-        open={drawerOpen}
-        onClose={toggleDrawer}
-        PaperProps={{ sx: { width: 420, boxShadow: '0px 0px 15px rgba(0,0,0,0.08)' } }}
-      >
-        <Box sx={{ p: 5, display: 'flex', flexDirection: 'column', height: '100%' }}>
-          <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
-            <Typography variant='h5' fontWeight={600}>
-              {isEdit ? 'Edit Chemical' : 'Add Chemical'}
-            </Typography>
-            <IconButton onClick={toggleDrawer} size='small'>
-              <CloseIcon />
-            </IconButton>
-          </Box>
-
-          <Divider sx={{ mb: 3 }} />
-
-          <form onSubmit={handleSubmit} style={{ flexGrow: 1 }}>
-            <Grid container spacing={3}>
-              {/* Chemical Name */}
-              <Grid item xs={12}>
-                <GlobalTextField
-                  fullWidth
-                  required
-                  label='Name'
-                  placeholder='Enter chemical name'
-                  value={formData.name}
-                  inputRef={nameRef}
-                  onChange={e => handleFieldChange('name', e.target.value)}
-                  sx={{
-                    '& .MuiFormLabel-asterisk': {
-                      color: '#e91e63 !important',
-                      fontWeight: 700
-                    },
-                    '& .MuiInputLabel-root.Mui-required': {
-                      color: 'inherit'
-                    }
-                  }}
-                />
-              </Grid>
-
-              {/* Unit */}
-              <Grid item xs={12}>
-                <GlobalAutocomplete
-                  label='Unit'
-                  value={formData.unit}
-                  onChange={(event, newValue) => {
-                    setFormData(prev => ({
-                      ...prev,
-                      unit: newValue?.value || prev.unit
-                    }))
-                  }}
-                  options={[
-                    { value: 'kg', label: 'Kg' },
-                    { value: 'litre', label: 'Litre' },
-                    { value: 'bottle', label: 'Bottle' },
-                    { value: 'pkt', label: 'Packet' },
-                    { value: 'box', label: 'Box' }
-                  ]}
-                />
-              </Grid>
-
-              {/* Dosage */}
-              <Grid item xs={12}>
-                <GlobalTextField
-                  fullWidth
-                  required
-                  label='Dosage'
-                  placeholder='Enter dosage value'
-                  value={formData.dosage}
-                  onChange={e => handleFieldChange('dosage', e.target.value.replace(/[^0-9.]/g, ''))}
-                  sx={{
-                    '& .MuiFormLabel-asterisk': {
-                      color: '#e91e63 !important',
-                      fontWeight: 700
-                    },
-                    '& .MuiInputLabel-root.Mui-required': {
-                      color: 'inherit'
-                    }
-                  }}
-                />
-              </Grid>
-
-              {/* Ingredients */}
-              <Grid item xs={12}>
-                <GlobalTextarea
-                  label='Ingredients'
-                  placeholder='Enter ingredients or remarks...'
-                  rows={3}
-                  value={formData.ingredients}
-                  required
-                  onChange={e => handleFieldChange('ingredients', e.target.value)}
-                  sx={{
-                    '& .MuiFormLabel-asterisk': {
-                      color: '#e91e63 !important',
-                      fontWeight: 700
-                    },
-                    '& .MuiInputLabel-root.Mui-required': {
-                      color: 'inherit'
-                    }
-                  }}
-                />
-              </Grid>
-
-              {/* File Upload */}
-              <Grid item xs={12}>
-                <Grid item xs={12}>
-                  <Box
-                    sx={{
-                      border: '1px dashed #ccc',
-                      borderRadius: '8px',
-                      p: 3,
-                      textAlign: 'center',
-                      bgcolor: '#fafafa',
-                      transition: '0.2s',
-                      '&:hover': { borderColor: 'primary.main' }
-                    }}
-                    onDragOver={e => e.preventDefault()}
-                    onDrop={e => {
-                      e.preventDefault()
-                      const file = e.dataTransfer.files[0]
-                      if (file) {
-                        setSelectedFile(file.name)
-                        setFormData(prev => ({ ...prev, file })) // REAL FILE
-                      }
-                    }}
-                  >
-                    <UploadFileIcon sx={{ fontSize: 45, color: 'primary.main', mb: 1 }} />
-
-                    <Typography sx={{ fontWeight: 600, color: '#5e5873', mb: 1 }}>
-                      Drag & Drop your file here
-                    </Typography>
-
-                    <Typography sx={{ fontSize: '0.85rem', color: '#6e6b7b', mb: 2 }}>or</Typography>
-
-                    {/* CLICKABLE BROWSE BUTTON — SAME LOGIC AS OLD WORKING CODE */}
-                    <GlobalButton
-                      variant='contained'
-                      sx={{
-                        textTransform: 'none',
-                        backgroundColor: 'primary.main',
-                        borderRadius: '6px',
-                        px: 3,
-                        py: 1,
-                        '&:hover': { backgroundColor: 'primary.dark' }
-                      }}
-                      onClick={() => {
-                        console.log('🔥 BROWSE CLICKED')
-                        fileInputRef.current?.click()
-                      }}
-                    >
-                      Browse
-                    </GlobalButton>
-
-                    {/* SHOW SELECTED FILE */}
-                    {selectedFile && (
-                      <Typography
-                        sx={{
-                          mt: 2,
-                          fontSize: '0.85rem',
-                          fontWeight: 500,
-                          color: 'primary.main'
-                        }}
-                      >
-                        {selectedFile}
-                      </Typography>
-                    )}
-
-                    {/* HIDDEN INPUT (DO NOT TOUCH) */}
-                  </Box>
                 </Grid>
 
-                <input
-                  type='file'
-                  ref={fileInputRef}
-                  style={{ display: 'none' }}
-                  onChange={e => {
-                    const file = e.target.files[0]
-                    if (file) {
-                      setSelectedFile(file.name)
-                      setFormData(prev => ({ ...prev, file })) // REAL FILE OBJECT
-                    }
-                  }}
-                />
-              </Grid>
-
-              {/* Status (only on edit) */}
-              {isEdit && (
+                {/* Unit */}
                 <Grid item xs={12}>
-                  <GlobalSelect
-                    label='Status'
-                    value={formData.status}
-                    onChange={e => handleFieldChange('status', e.target.value)}
+                  <GlobalAutocomplete
+                    label='Unit'
+                    value={formData.unit}
+                    onChange={(event, newValue) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        unit: newValue?.value || prev.unit
+                      }))
+                    }}
                     options={[
-                      { value: 'Active', label: 'Active' },
-                      { value: 'Inactive', label: 'Inactive' }
+                      { value: 'kg', label: 'Kg' },
+                      { value: 'litre', label: 'Litre' },
+                      { value: 'bottle', label: 'Bottle' },
+                      { value: 'pkt', label: 'Packet' },
+                      { value: 'box', label: 'Box' }
                     ]}
                   />
                 </Grid>
-              )}
-            </Grid>
 
-            {/* Footer Buttons */}
-            <Box mt={4} display='flex' gap={2}>
-              <GlobalButton color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
-                Cancel
-              </GlobalButton>
+                {/* Dosage */}
+                <Grid item xs={12}>
+                  <GlobalTextField
+                    fullWidth
+                    required
+                    label='Dosage'
+                    placeholder='Enter dosage value'
+                    value={formData.dosage}
+                    onChange={e => handleFieldChange('dosage', e.target.value.replace(/[^0-9.]/g, ''))}
+                    sx={{
+                      '& .MuiFormLabel-asterisk': {
+                        color: '#e91e63 !important',
+                        fontWeight: 700
+                      },
+                      '& .MuiInputLabel-root.Mui-required': {
+                        color: 'inherit'
+                      }
+                    }}
+                  />
+                </Grid>
 
-              <GlobalButton type='submit' variant='contained' fullWidth disabled={loading}>
-                {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
-              </GlobalButton>
-            </Box>
-          </form>
-        </Box>
-      </Drawer>
+                {/* Ingredients */}
+                <Grid item xs={12}>
+                  <GlobalTextarea
+                    label='Ingredients'
+                    placeholder='Enter ingredients or remarks...'
+                    rows={3}
+                    value={formData.ingredients}
+                    required
+                    onChange={e => handleFieldChange('ingredients', e.target.value)}
+                    sx={{
+                      '& .MuiFormLabel-asterisk': {
+                        color: '#e91e63 !important',
+                        fontWeight: 700
+                      },
+                      '& .MuiInputLabel-root.Mui-required': {
+                        color: 'inherit'
+                      }
+                    }}
+                  />
+                </Grid>
 
-      <Dialog
-        onClose={() => setDeleteDialog({ open: false, row: null })}
-        aria-labelledby='customized-dialog-title'
-        open={deleteDialog.open}
-        closeAfterTransition={false}
-        PaperProps={{
-          sx: {
-            overflow: 'visible',
-            width: 420,
-            borderRadius: 1,
-            textAlign: 'center'
-          }
-        }}
-      >
-        {/* 🔴 Title with Warning Icon */}
-        <DialogTitle
-          id='customized-dialog-title'
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 1,
-            color: 'error.main',
-            fontWeight: 700,
-            pb: 1,
-            position: 'relative'
+                {/* File Upload */}
+                <Grid item xs={12}>
+                  <Grid item xs={12}>
+                    <Box
+                      sx={{
+                        border: '1px dashed #ccc',
+                        borderRadius: '8px',
+                        p: 3,
+                        textAlign: 'center',
+                        bgcolor: '#fafafa',
+                        transition: '0.2s',
+                        '&:hover': { borderColor: 'primary.main' }
+                      }}
+                      onDragOver={e => e.preventDefault()}
+                      onDrop={e => {
+                        e.preventDefault()
+                        const file = e.dataTransfer.files[0]
+                        if (file) {
+                          setSelectedFile(file.name)
+                          setFormData(prev => ({ ...prev, file })) // REAL FILE
+                        }
+                      }}
+                    >
+                      <UploadFileIcon sx={{ fontSize: 45, color: 'primary.main', mb: 1 }} />
+
+                      <Typography sx={{ fontWeight: 600, color: '#5e5873', mb: 1 }}>
+                        Drag & Drop your file here
+                      </Typography>
+
+                      <Typography sx={{ fontSize: '0.85rem', color: '#6e6b7b', mb: 2 }}>or</Typography>
+
+                      {/* CLICKABLE BROWSE BUTTON — SAME LOGIC AS OLD WORKING CODE */}
+                      <GlobalButton
+                        variant='contained'
+                        sx={{
+                          textTransform: 'none',
+                          backgroundColor: 'primary.main',
+                          borderRadius: '6px',
+                          px: 3,
+                          py: 1,
+                          '&:hover': { backgroundColor: 'primary.dark' }
+                        }}
+                        onClick={() => {
+                          console.log('🔥 BROWSE CLICKED')
+                          fileInputRef.current?.click()
+                        }}
+                      >
+                        Browse
+                      </GlobalButton>
+
+                      {/* SHOW SELECTED FILE */}
+                      {selectedFile && (
+                        <Typography
+                          sx={{
+                            mt: 2,
+                            fontSize: '0.85rem',
+                            fontWeight: 500,
+                            color: 'primary.main'
+                          }}
+                        >
+                          {selectedFile}
+                        </Typography>
+                      )}
+
+                      {/* HIDDEN INPUT (DO NOT TOUCH) */}
+                    </Box>
+                  </Grid>
+
+                  <input
+                    type='file'
+                    ref={fileInputRef}
+                    style={{ display: 'none' }}
+                    onChange={e => {
+                      const file = e.target.files[0]
+                      if (file) {
+                        setSelectedFile(file.name)
+                        setFormData(prev => ({ ...prev, file })) // REAL FILE OBJECT
+                      }
+                    }}
+                  />
+                </Grid>
+
+                {/* Status (only on edit) */}
+                {isEdit && (
+                  <Grid item xs={12}>
+                    <GlobalSelect
+                      label='Status'
+                      value={formData.status}
+                      onChange={e => handleFieldChange('status', e.target.value)}
+                      options={[
+                        { value: 'Active', label: 'Active' },
+                        { value: 'Inactive', label: 'Inactive' }
+                      ]}
+                    />
+                  </Grid>
+                )}
+              </Grid>
+
+              {/* Footer Buttons */}
+              <Box mt={4} display='flex' gap={2}>
+                <GlobalButton color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
+                  Cancel
+                </GlobalButton>
+
+                <GlobalButton type='submit' variant='contained' fullWidth disabled={loading}>
+                  {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
+                </GlobalButton>
+              </Box>
+            </form>
+          </Box>
+        </Drawer>
+
+        <Dialog
+          onClose={() => setDeleteDialog({ open: false, row: null })}
+          aria-labelledby='customized-dialog-title'
+          open={deleteDialog.open}
+          closeAfterTransition={false}
+          PaperProps={{
+            sx: {
+              overflow: 'visible',
+              width: 420,
+              borderRadius: 1,
+              textAlign: 'center'
+            }
           }}
         >
-          <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
-          Confirm Delete
-          <DialogCloseButton
-            onClick={() => setDeleteDialog({ open: false, row: null })}
-            disableRipple
-            sx={{ position: 'absolute', right: 1, top: 1 }}
+          {/* 🔴 Title with Warning Icon */}
+          <DialogTitle
+            id='customized-dialog-title'
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 1,
+              color: 'error.main',
+              fontWeight: 700,
+              pb: 1,
+              position: 'relative'
+            }}
           >
-            <i className='tabler-x' />
-          </DialogCloseButton>
-        </DialogTitle>
+            <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
+            Confirm Delete
+            <DialogCloseButton
+              onClick={() => setDeleteDialog({ open: false, row: null })}
+              disableRipple
+              sx={{ position: 'absolute', right: 1, top: 1 }}
+            >
+              <i className='tabler-x' />
+            </DialogCloseButton>
+          </DialogTitle>
 
-        {/* Centered text */}
-        <DialogContent sx={{ px: 5, pt: 1 }}>
-          <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
-            Are you sure you want to delete{' '}
-            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name || 'this chemical'}</strong>?
-            <br />
-            This action cannot be undone.
-          </Typography>
-        </DialogContent>
+          {/* Centered text */}
+          <DialogContent sx={{ px: 5, pt: 1 }}>
+            <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
+              Are you sure you want to delete{' '}
+              <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name || 'this chemical'}</strong>?
+              <br />
+              This action cannot be undone.
+            </Typography>
+          </DialogContent>
 
-        {/* Centered buttons */}
-        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-          <GlobalButton
-            onClick={() => setDeleteDialog({ open: false, row: null })}
-            color='secondary'
-            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
-          >
-            Cancel
-          </GlobalButton>
-          <GlobalButton
-            onClick={confirmDelete}
-            variant='contained'
-            color='error'
-            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
-          >
-            Delete
-          </GlobalButton>
-        </DialogActions>
-      </Dialog>
-    </Box>
+          {/* Centered buttons */}
+          <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+            <GlobalButton
+              onClick={() => setDeleteDialog({ open: false, row: null })}
+              color='secondary'
+              sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+            >
+              Cancel
+            </GlobalButton>
+            <GlobalButton
+              onClick={confirmDelete}
+              variant='contained'
+              color='error'
+              sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+            >
+              Delete
+            </GlobalButton>
+          </DialogActions>
+        </Dialog>
+      </Box>
+    </PermissionGuard>
   )
 }
+
+export default ChemicalsPageContent

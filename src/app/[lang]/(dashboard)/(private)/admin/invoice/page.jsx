@@ -49,10 +49,13 @@ import InvoicePDF from '@/components/invoice/InvoicePDF'
 import { getInvoiceSummary, getInvoiceDropdowns } from '@/api/invoice' // adjust path if needed
 
 import { showToast } from '@/components/common/Toasts'
+import PermissionGuard from '@/components/auth/PermissionGuard'
+import { usePermission } from '@/hooks/usePermission'
 
 const columnHelper = createColumnHelper()
 
-export default function InvoiceListPageFull() {
+const InvoiceListPageFullContent = () => {
+  const { canAccess } = usePermission()
   // ── Data & Dropdowns ────────────────────────
   const [data, setData] = useState([])
   const [dropdownData, setDropdownData] = useState({})
@@ -438,19 +441,25 @@ export default function InvoiceListPageFull() {
           return (
             <div className='flex items-center gap-1'>
               {/* APPROVE / ISSUE */}
-              <IconButton size='small' onClick={() => handleApprove(invoice)}>
-                <i className='tabler-circle-check text-green-600 text-base' />
-              </IconButton>
+              {canAccess('Invoice', 'update') && (
+                <IconButton size='small' onClick={() => handleApprove(invoice)}>
+                  <i className='tabler-circle-check text-green-600 text-base' />
+                </IconButton>
+              )}
 
               {/* EDIT */}
-              <IconButton size='small' onClick={() => handleEdit(invoice)}>
-                <i className='tabler-edit text-blue-600 text-base' />
-              </IconButton>
+              {canAccess('Invoice', 'update') && (
+                <IconButton size='small' onClick={() => handleEdit(invoice)}>
+                  <i className='tabler-edit text-blue-600 text-base' />
+                </IconButton>
+              )}
 
               {/* DELETE */}
-              <IconButton size='small' onClick={() => handleDelete(invoice)}>
-                <i className='tabler-trash text-red-600 text-base' />
-              </IconButton>
+              {canAccess('Invoice', 'delete') && (
+                <IconButton size='small' onClick={() => handleDelete(invoice)}>
+                  <i className='tabler-trash text-red-600 text-base' />
+                </IconButton>
+              )}
 
               {/* PRINT */}
               <IconButton size='small' onClick={() => handlePrint(invoice)}>
@@ -938,5 +947,14 @@ export default function InvoiceListPageFull() {
         </Box>
       </Card>
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function InvoiceListPageFull() {
+  return (
+    <PermissionGuard permission="Invoice">
+      <InvoiceListPageFullContent />
+    </PermissionGuard>
   )
 }

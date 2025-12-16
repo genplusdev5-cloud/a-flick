@@ -1,8 +1,9 @@
 'use client'
 
 import React from 'react'
+import PermissionGuard from '@/components/auth/PermissionGuard'
 
-const MapPage = () => {
+const MapPageContent = () => {
   return (
     <div className='p-6'>
       {/* ✅ Page Title */}
@@ -24,4 +25,10 @@ const MapPage = () => {
   )
 }
 
-export default MapPage
+export default function MapPage() {
+  return (
+    <PermissionGuard permission="Map">
+      <MapPageContent />
+    </PermissionGuard>
+  )
+}

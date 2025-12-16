@@ -1,9 +1,8 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 
 import {
   Box,
@@ -30,8 +29,10 @@ import {
   CircularProgress,
   FormControlLabel,
   Checkbox,
-  InputAdornment // 👈 Added now
+  InputAdornment
 } from '@mui/material'
+
+import PermissionGuard from '@/components/auth/PermissionGuard'
 
 import { getAttendanceList, deleteAttendance } from '@/api/attendance'
 import { getAttendanceDropdowns } from '@/api/attendance/dropdowns'
@@ -73,7 +74,8 @@ const initialDropdowns = {
   slots: ['Morning Slot', 'Evening Slot']
 }
 
-export default function AttendancePage() {
+// ───────────────────────────────────────────
+const AttendancePageContent = () => {
   const [rows, setRows] = useState([])
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 })
   const [searchText, setSearchText] = useState('')
@@ -91,7 +93,7 @@ export default function AttendancePage() {
   const autoOpenedRef = useRef(false)
 
   const searchParams = useSearchParams()
-
+  const pathname = usePathname()
   const router = useRouter()
 
   const confirmDelete = async () => {
@@ -167,13 +169,22 @@ export default function AttendancePage() {
   useEffect(() => {
     const fetchDropdowns = async () => {
       try {
-        const res = await getAttendanceDropdowns()
+        const response = await getAttendanceDropdowns()
+
+        // SUPER SAFE WAY — works for any nesting level
+        let apiData = response
+        if (apiData?.data?.data?.data) apiData = apiData.data.data.data
+        else if (apiData?.data?.data) apiData = apiData.data.data
+        else if (apiData?.data) apiData = apiData.data
+
+        const getObjects = obj =>
+          (obj?.name || []).map(x => ({ id: x.id, name: x.name || 'Unnamed' })).filter(x => x.name && x.name !== 'null')
 
         setDropdowns({
-          customers: res?.data?.data?.customer?.name || [],
-          technicians: res?.data?.data?.technician?.name || [],
-          supervisors: res?.data?.data?.supervisor?.name || [],
-          slots: res?.data?.data?.slot?.name || []
+          customers: apiData.customer?.name || [],
+          technicians: getObjects(apiData.technician || {}),
+          supervisors: getObjects(apiData.supervisor || {}),
+          slots: getObjects(apiData.slot || {})
         })
       } catch (err) {
         console.error('Dropdown API Error:', err)
@@ -185,53 +196,31 @@ export default function AttendancePage() {
 
   // AUTO-OPEN DRAWER LOGIC
   useEffect(() => {
-    // 1. Check if already opened to prevent re-loops
-    if (autoOpenedRef.current) return
+    // 1. Get param
+    const openScheduleId = searchParams.get('openScheduleId')
 
     // 2. DEPENDENCIES CHECK:
-    //    - Rows must be loaded (length > 0)
-    //    - Dropdowns (technicians/slots) must be available for the drawer to render correctly
+    if (!openScheduleId) return
     if (!rows || rows.length === 0) return
     if (!dropdowns.technicians?.length || !dropdowns.slots?.length) return
 
-    // 3. READ PARAMS
-    const params = new URLSearchParams(window.location.search)
-    const targetId = params.get('openScheduleId')
-
-    if (!targetId) return
-
-    // 4. FIND ROW
-    //    Convert both key and target to strings to match safely
-    const matchedRow = rows.find(r => String(r.id) === String(targetId))
+    // 3. FIND ROW
+    const matchedRow = rows.find(r => String(r.id) === String(openScheduleId))
 
     if (matchedRow) {
-      // 5. OPEN DRAWER
-      //    Use a small timeout to ensure the render cycle is settled (matching "Contract" stability)
-      setTimeout(() => {
-        // Prevent double opening
-        if (autoOpenedRef.current) return
-        
-        autoOpenedRef.current = true
-        setSelectedAttendance(matchedRow)
-        setDrawerOpen(true)
+      // 4. OPEN DRAWER
+      setSelectedAttendance(matchedRow)
+      setDrawerOpen(true)
 
-        // 6. CLEANUP URL
-        //    Remove the param so refresh doesn't trigger again
-        const newUrl = new URL(window.location.href)
-        newUrl.searchParams.delete('openScheduleId')
-        window.history.replaceState({}, '', newUrl)
-      }, 500)
-    } else {
-      // Optional: If row not found (e.g. pagination), we simply do nothing.
-      // The user requirement is to "Find matching row -> Open". 
-      // If strict finding fails, we can't open.
-      console.warn(`[AutoOpen] Row with ID ${targetId} not found in loaded list.`)
+      // 5. CLEANUP URL
+      // Create new params object to preserve other params if they exist
+      const newParams = new URLSearchParams(searchParams.toString())
+      newParams.delete('openScheduleId')
+      
+      // Replace URL without refresh using router.replace
+      router.replace(`${pathname}?${newParams.toString()}`, { scroll: false })
     }
-  }, [rows, dropdowns]) // Runs whenever list or dropdowns update
-
-  useEffect(() => {
-    console.log('Dropdown Data:', dropdowns) // ← IDHU MUST!
-  }, [dropdowns])
+  }, [rows, dropdowns, searchParams, pathname, router])
 
   useEffect(() => {
     fetchAttendances()
@@ -699,5 +688,16 @@ export default function AttendancePage() {
         slots={dropdowns.slots}
       />
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function AttendancePage() {
+  return (
+    <PermissionGuard permission="Attendance">
+      <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>}>
+        <AttendancePageContent />
+      </Suspense>
+    </PermissionGuard>
   )
 }

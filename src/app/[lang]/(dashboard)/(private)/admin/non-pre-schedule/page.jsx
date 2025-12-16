@@ -26,6 +26,8 @@ import {
   InputAdornment
 } from '@mui/material'
 
+import PermissionGuard from '@/components/auth/PermissionGuard'
+
 import { getNonPrescheduleList } from '@/api/nonPreschedule/list'
 import { getCustomerList } from '@/api/customer/list'
 
@@ -74,7 +76,8 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
   return <TextField {...props} value={value} onChange={e => setValue(e.target.value)} />
 }
 
-export default function NonPreScheduleReportPage() {
+// Main Component
+const NonPreScheduleReportPageContent = () => {
   const router = useRouter()
 
   // states
@@ -742,5 +745,14 @@ export default function NonPreScheduleReportPage() {
         </DialogActions>
       </Dialog>
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function NonPreScheduleReportPage() {
+  return (
+    <PermissionGuard permission="Non Pre-Schedule">
+      <NonPreScheduleReportPageContent />
+    </PermissionGuard>
   )
 }

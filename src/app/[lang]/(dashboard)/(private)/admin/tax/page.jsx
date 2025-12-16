@@ -97,9 +97,14 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
 }
 
 // ──────────────────────────────────────────────────────────────
+import PermissionGuard from '@/components/auth/PermissionGuard'
+import { usePermission } from '@/hooks/usePermission'
+
+// ──────────────────────────────────────────────────────────────
 // Main Component
 // ──────────────────────────────────────────────────────────────
-export default function TaxPage() {
+const TaxPageContent = () => {
+  const { canAccess } = usePermission()
   const [rows, setRows] = useState([])
   const [rowCount, setRowCount] = useState(0)
   const [searchText, setSearchText] = useState('')
@@ -322,16 +327,20 @@ export default function TaxPage() {
         header: 'Actions',
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
-              <i className='tabler-edit ' />
-            </IconButton>
-            <IconButton
-              size='small'
-              color='error'
-              onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
-            >
-              <i className='tabler-trash text-red-600 text-lg' />
-            </IconButton>
+            {canAccess('Tax', 'update') && (
+              <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
+                <i className='tabler-edit ' />
+              </IconButton>
+            )}
+            {canAccess('Tax', 'delete') && (
+              <IconButton
+                size='small'
+                color='error'
+                onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
+              >
+                <i className='tabler-trash text-red-600 text-lg' />
+              </IconButton>
+            )}
           </Box>
         )
       }),
@@ -399,8 +408,7 @@ export default function TaxPage() {
       ${rows
         .map(
           r =>
-            `<tr><td>${r.sno}</td><td>${r.name}</td><td>${r.tax}</td><td>${
-              r.is_active === 1 ? 'Active' : 'Inactive'
+            `<tr><td>${r.sno}</td><td>${r.name}</td><td>${r.tax}</td><td>${r.is_active === 1 ? 'Active' : 'Inactive'
             }</td></tr>`
         )
         .join('')}
@@ -462,377 +470,387 @@ export default function TaxPage() {
   }
 
   return (
-    <Box>
-      <Box sx={{ mb: 2 }}>
-        <Breadcrumbs aria-label='breadcrumb'>
-          <Link underline='hover' color='inherit' href='/'>
-            Home
-          </Link>
-          <Typography color='text.primary'>Tax</Typography>
-        </Breadcrumbs>
-      </Box>
-
-      <Card sx={{ p: 3 }}>
-        <CardHeader
-          title={
-            <Box display='flex' alignItems='center' gap={2}>
-              <Typography variant='h5' sx={{ fontWeight: 600 }}>
-                Tax
-              </Typography>
-              <GlobalButton
-                startIcon={
-                  <RefreshIcon
-                    sx={{
-                      animation: loading ? 'spin 1s linear infinite' : 'none',
-                      '@keyframes spin': {
-                        '0%': { transform: 'rotate(0deg)' },
-                        '100%': { transform: 'rotate(360deg)' }
-                      }
-                    }}
-                  />
-                }
-                disabled={loading}
-                onClick={async () => {
-                  setLoading(true)
-                  setPagination({ pageIndex: 0, pageSize: 25 })
-                  await loadTaxes()
-                  setTimeout(() => setLoading(false), 800)
-                }}
-              >
-                {loading ? 'Refreshing...' : 'Refresh'}
-              </GlobalButton>
-            </Box>
-          }
-          action={
-            <Box display='flex' alignItems='center' gap={2}>
-              <GlobalButton
-                color='secondary'
-                endIcon={<ArrowDropDownIcon />}
-                onClick={e => setExportAnchorEl(e.currentTarget)}
-              >
-                Export
-              </GlobalButton>
-
-              <Menu anchorEl={exportAnchorEl} open={exportOpen} onClose={() => setExportAnchorEl(null)}>
-                <MenuItem
-                  onClick={() => {
-                    setExportAnchorEl(null)
-                    exportPrint()
-                  }}
-                >
-                  <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
-                </MenuItem>
-                <MenuItem
-                  onClick={() => {
-                    setExportAnchorEl(null)
-                    exportCSV()
-                  }}
-                >
-                  <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
-                </MenuItem>
-                <MenuItem
-                  onClick={async () => {
-                    setExportAnchorEl(null)
-                    await exportExcel()
-                  }}
-                >
-                  <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
-                </MenuItem>
-                <MenuItem
-                  onClick={async () => {
-                    setExportAnchorEl(null)
-                    await exportPDF()
-                  }}
-                >
-                  <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
-                </MenuItem>
-                <MenuItem
-                  onClick={() => {
-                    setExportAnchorEl(null)
-                    exportCopy()
-                  }}
-                >
-                  <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
-                </MenuItem>
-              </Menu>
-
-              <GlobalButton startIcon={<AddIcon />} onClick={handleAdd}>
-                Add Tax
-              </GlobalButton>
-            </Box>
-          }
-          sx={{
-            pb: 1.5,
-            pt: 1.5,
-            '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
-            '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
-          }}
-        />
-
-        {loading && (
-          <Box
-            sx={{
-              position: 'fixed',
-              inset: 0,
-              bgcolor: 'rgba(255,255,255,0.7)',
-              backdropFilter: 'blur(2px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 2000
-            }}
-          >
-            <ProgressCircularCustomization size={60} thickness={5} />
-          </Box>
-        )}
-
-        <Divider sx={{ mb: 2 }} />
-
-        <Box
-          sx={{
-            mb: 3,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: 2
-          }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant='body2' color='text.secondary'>
-              Show
-            </Typography>
-            <FormControl size='small' sx={{ width: 140 }}>
-              <Select
-                value={pagination.pageSize}
-                onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value) }))}
-              >
-                {[5, 10, 25, 50, 100].map(s => (
-                  <MenuItem key={s} value={s}>
-                    {s} entries
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Box>
-
-          <DebouncedInput
-            value={searchText}
-            onChange={v => setSearchText(String(v))}
-            placeholder='Search tax name or value...'
-            sx={{ width: 360 }}
-            variant='outlined'
-            size='small'
-          />
+    <PermissionGuard permission="Tax">
+      <Box>
+        <Box sx={{ mb: 2 }}>
+          <Breadcrumbs aria-label='breadcrumb'>
+            <Link underline='hover' color='inherit' href='/'>
+              Home
+            </Link>
+            <Typography color='text.primary'>Tax</Typography>
+          </Breadcrumbs>
         </Box>
 
-        <div className='overflow-x-auto'>
-          <table className={styles.table}>
-            <thead>
-              {table.getHeaderGroups().map(hg => (
-                <tr key={hg.id}>
-                  {hg.headers.map(h => (
-                    <th key={h.id}>
-                      <div
-                        className={classnames({
-                          'flex items-center': h.column.getIsSorted(),
-                          'cursor-pointer select-none': h.column.getCanSort()
-                        })}
-                        onClick={h.column.getToggleSortingHandler()}
-                      >
-                        {flexRender(h.column.columnDef.header, h.getContext())}
-                        {{
-                          asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
-                          desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
-                        }[h.column.getIsSorted()] ?? null}
-                      </div>
-                    </th>
+        <Card sx={{ p: 3 }}>
+          <CardHeader
+            title={
+              <Box display='flex' alignItems='center' gap={2}>
+                <Typography variant='h5' sx={{ fontWeight: 600 }}>
+                  Tax
+                </Typography>
+                <GlobalButton
+                  startIcon={
+                    <RefreshIcon
+                      sx={{
+                        animation: loading ? 'spin 1s linear infinite' : 'none',
+                        '@keyframes spin': {
+                          '0%': { transform: 'rotate(0deg)' },
+                          '100%': { transform: 'rotate(360deg)' }
+                        }
+                      }}
+                    />
+                  }
+                  disabled={loading}
+                  onClick={async () => {
+                    setLoading(true)
+                    setPagination({ pageIndex: 0, pageSize: 25 })
+                    await loadTaxes()
+                    setTimeout(() => setLoading(false), 800)
+                  }}
+                >
+                  {loading ? 'Refreshing...' : 'Refresh'}
+                </GlobalButton>
+              </Box>
+            }
+            action={
+              <Box display='flex' alignItems='center' gap={2}>
+                <GlobalButton
+                  color='secondary'
+                  endIcon={<ArrowDropDownIcon />}
+                  onClick={e => setExportAnchorEl(e.currentTarget)}
+                >
+                  Export
+                </GlobalButton>
+
+                <Menu anchorEl={exportAnchorEl} open={exportOpen} onClose={() => setExportAnchorEl(null)}>
+                  <MenuItem
+                    onClick={() => {
+                      setExportAnchorEl(null)
+                      exportPrint()
+                    }}
+                  >
+                    <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
+                  </MenuItem>
+                  <MenuItem
+                    onClick={() => {
+                      setExportAnchorEl(null)
+                      exportCSV()
+                    }}
+                  >
+                    <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
+                  </MenuItem>
+                  <MenuItem
+                    onClick={async () => {
+                      setExportAnchorEl(null)
+                      await exportExcel()
+                    }}
+                  >
+                    <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
+                  </MenuItem>
+                  <MenuItem
+                    onClick={async () => {
+                      setExportAnchorEl(null)
+                      await exportPDF()
+                    }}
+                  >
+                    <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
+                  </MenuItem>
+                  <MenuItem
+                    onClick={() => {
+                      setExportAnchorEl(null)
+                      exportCopy()
+                    }}
+                  >
+                    <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
+                  </MenuItem>
+                </Menu>
+
+                {canAccess('Tax', 'create') && (
+                  <GlobalButton startIcon={<AddIcon />} onClick={handleAdd}>
+                    Add Tax
+                  </GlobalButton>
+                )}
+              </Box>
+            }
+            sx={{
+              pb: 1.5,
+              pt: 1.5,
+              '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
+              '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
+            }}
+          />
+
+          {loading && (
+            <Box
+              sx={{
+                position: 'fixed',
+                inset: 0,
+                bgcolor: 'rgba(255,255,255,0.7)',
+                backdropFilter: 'blur(2px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 2000
+              }}
+            >
+              <ProgressCircularCustomization size={60} thickness={5} />
+            </Box>
+          )}
+
+          <Divider sx={{ mb: 2 }} />
+
+          <Box
+            sx={{
+              mb: 3,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 2
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant='body2' color='text.secondary'>
+                Show
+              </Typography>
+              <FormControl size='small' sx={{ width: 140 }}>
+                <Select
+                  value={pagination.pageSize}
+                  onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value) }))}
+                >
+                  {[5, 10, 25, 50, 100].map(s => (
+                    <MenuItem key={s} value={s}>
+                      {s} entries
+                    </MenuItem>
                   ))}
-                </tr>
-              ))}
-            </thead>
-            {paginatedRows.length === 0 ? (
-              <tbody>
-                <tr>
-                  <td colSpan={columns.length} className='text-center py-4'>
-                    No data available
-                  </td>
-                </tr>
-              </tbody>
-            ) : (
-              <tbody>
-                {table.getRowModel().rows.map(row => (
-                  <tr key={row.id}>
-                    {row.getVisibleCells().map(cell => (
-                      <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                </Select>
+              </FormControl>
+            </Box>
+
+            <DebouncedInput
+              value={searchText}
+              onChange={v => setSearchText(String(v))}
+              placeholder='Search tax name or value...'
+              sx={{ width: 360 }}
+              variant='outlined'
+              size='small'
+            />
+          </Box>
+
+          <div className='overflow-x-auto'>
+            <table className={styles.table}>
+              <thead>
+                {table.getHeaderGroups().map(hg => (
+                  <tr key={hg.id}>
+                    {hg.headers.map(h => (
+                      <th key={h.id}>
+                        <div
+                          className={classnames({
+                            'flex items-center': h.column.getIsSorted(),
+                            'cursor-pointer select-none': h.column.getCanSort()
+                          })}
+                          onClick={h.column.getToggleSortingHandler()}
+                        >
+                          {flexRender(h.column.columnDef.header, h.getContext())}
+                          {{
+                            asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
+                            desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
+                          }[h.column.getIsSorted()] ?? null}
+                        </div>
+                      </th>
                     ))}
                   </tr>
                 ))}
-              </tbody>
-            )}
-          </table>
-        </div>
+              </thead>
+              {paginatedRows.length === 0 ? (
+                <tbody>
+                  <tr>
+                    <td colSpan={columns.length} className='text-center py-4'>
+                      No data available
+                    </td>
+                  </tr>
+                </tbody>
+              ) : (
+                <tbody>
+                  {table.getRowModel().rows.map(row => (
+                    <tr key={row.id}>
+                      {row.getVisibleCells().map(cell => (
+                        <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              )}
+            </table>
+          </div>
 
-        <TablePaginationComponent
-          totalCount={filteredRows.length}
-          pagination={pagination}
-          setPagination={setPagination}
-        />
-      </Card>
+          <TablePaginationComponent
+            totalCount={filteredRows.length}
+            pagination={pagination}
+            setPagination={setPagination}
+          />
+        </Card>
 
-      <Drawer
-        anchor='right'
-        open={drawerOpen}
-        onClose={toggleDrawer}
-        PaperProps={{ sx: { width: 420, boxShadow: '0px 0px 15px rgba(0,0,0,0.08)' } }}
-      >
-        <Box sx={{ p: 5, display: 'flex', flexDirection: 'column', height: '100%' }}>
-          <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
-            <Typography variant='h5' fontWeight={600}>
-              {isEdit ? 'Edit Tax' : 'Add Tax'}
-            </Typography>
-            <IconButton onClick={toggleDrawer} size='small'>
-              <CloseIcon />
-            </IconButton>
-          </Box>
-          <Divider sx={{ mb: 3 }} />
+        <Drawer
+          anchor='right'
+          open={drawerOpen}
+          onClose={toggleDrawer}
+          PaperProps={{ sx: { width: 420, boxShadow: '0px 0px 15px rgba(0,0,0,0.08)' } }}
+        >
+          <Box sx={{ p: 5, display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
+              <Typography variant='h5' fontWeight={600}>
+                {isEdit ? 'Edit Tax' : 'Add Tax'}
+              </Typography>
+              <IconButton onClick={toggleDrawer} size='small'>
+                <CloseIcon />
+              </IconButton>
+            </Box>
+            <Divider sx={{ mb: 3 }} />
 
-          <form onSubmit={handleSubmit} style={{ flexGrow: 1 }}>
-            <Grid container spacing={4}>
-              <Grid item xs={12}>
-                <GlobalTextField
-                  label='Tax Name'
-                  placeholder='Enter tax name'
-                  value={formData.name}
-                  inputRef={nameRef}
-                  required
-                  onChange={e => handleFieldChange('name', e.target.value)}
-                  sx={{
-                    '& .MuiFormLabel-asterisk': {
-                      color: '#e91e63 !important',
-                      fontWeight: 700
-                    },
-                    '& .MuiInputLabel-root.Mui-required': {
-                      color: 'inherit'
-                    }
-                  }}
-                />
-              </Grid>
-
-              <Grid item xs={12}>
-                <GlobalTextField
-                  label='Tax Value (%)'
-                  placeholder='e.g. 5.00'
-                  value={formData.tax_value}
-                  required
-                  onChange={e => handleFieldChange('tax_value', e.target.value.replace(/[^0-9.]/g, ''))}
-                  sx={{
-                    '& .MuiFormLabel-asterisk': {
-                      color: '#e91e63 !important',
-                      fontWeight: 700
-                    },
-                    '& .MuiInputLabel-root.Mui-required': {
-                      color: 'inherit'
-                    }
-                  }}
-                />
-              </Grid>
-
-              <Grid item xs={12}>
-                <GlobalTextarea
-                  label='Description'
-                  placeholder='Enter additional details...'
-                  rows={3}
-                  value={formData.description}
-                  onChange={e => handleFieldChange('description', e.target.value)}
-                />
-              </Grid>
-
-              {isEdit && (
+            <form onSubmit={handleSubmit} style={{ flexGrow: 1 }}>
+              <Grid container spacing={4}>
                 <Grid item xs={12}>
-                  <GlobalSelect
-                    label='Status'
-                    value={formData.status === 1 ? 'Active' : 'Inactive'}
-                    onChange={e =>
-                      setFormData(p => ({
-                        ...p,
-                        status: e.target.value === 'Active' ? 1 : 0
-                      }))
-                    }
+                  <GlobalTextField
+                    label='Tax Name'
+                    placeholder='Enter tax name'
+                    value={formData.name}
+                    inputRef={nameRef}
+                    required
+                    onChange={e => handleFieldChange('name', e.target.value)}
+                    sx={{
+                      '& .MuiFormLabel-asterisk': {
+                        color: '#e91e63 !important',
+                        fontWeight: 700
+                      },
+                      '& .MuiInputLabel-root.Mui-required': {
+                        color: 'inherit'
+                      }
+                    }}
                   />
                 </Grid>
-              )}
-            </Grid>
 
-            <Box mt={4} display='flex' gap={2}>
-              <GlobalButton color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
-                Cancel
-              </GlobalButton>
+                <Grid item xs={12}>
+                  <GlobalTextField
+                    label='Tax Value (%)'
+                    placeholder='e.g. 5.00'
+                    value={formData.tax_value}
+                    required
+                    onChange={e => handleFieldChange('tax_value', e.target.value.replace(/[^0-9.]/g, ''))}
+                    sx={{
+                      '& .MuiFormLabel-asterisk': {
+                        color: '#e91e63 !important',
+                        fontWeight: 700
+                      },
+                      '& .MuiInputLabel-root.Mui-required': {
+                        color: 'inherit'
+                      }
+                    }}
+                  />
+                </Grid>
 
-              <GlobalButton type='submit' fullWidth disabled={loading}>
-                {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
-              </GlobalButton>
-            </Box>
-          </form>
-        </Box>
-      </Drawer>
+                <Grid item xs={12}>
+                  <GlobalTextarea
+                    label='Description'
+                    placeholder='Enter additional details...'
+                    rows={3}
+                    value={formData.description}
+                    onChange={e => handleFieldChange('description', e.target.value)}
+                  />
+                </Grid>
 
-      <Dialog
-        onClose={() => setDeleteDialog({ open: false, row: null })}
-        aria-labelledby='customized-dialog-title'
-        open={deleteDialog.open}
-        closeAfterTransition={false}
-        PaperProps={{
-          sx: {
-            overflow: 'visible',
-            width: 420,
-            borderRadius: 1,
-            textAlign: 'center'
-          }
-        }}
-      >
-        {/* 🔴 Title with Warning Icon */}
-        <DialogTitle
-          id='customized-dialog-title'
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 1,
-            color: 'error.main',
-            fontWeight: 700,
-            pb: 1,
-            position: 'relative'
+                {isEdit && (
+                  <Grid item xs={12}>
+                    <GlobalSelect
+                      label='Status'
+                      value={formData.status === 1 ? 'Active' : 'Inactive'}
+                      onChange={e =>
+                        setFormData(p => ({
+                          ...p,
+                          status: e.target.value === 'Active' ? 1 : 0
+                        }))
+                      }
+                    />
+                  </Grid>
+                )}
+              </Grid>
+
+              <Box mt={4} display='flex' gap={2}>
+                <GlobalButton color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
+                  Cancel
+                </GlobalButton>
+
+                <GlobalButton type='submit' fullWidth disabled={loading}>
+                  {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
+                </GlobalButton>
+              </Box>
+            </form>
+          </Box>
+        </Drawer>
+
+        <Dialog
+          onClose={() => setDeleteDialog({ open: false, row: null })}
+          aria-labelledby='customized-dialog-title'
+          open={deleteDialog.open}
+          closeAfterTransition={false}
+          PaperProps={{
+            sx: {
+              overflow: 'visible',
+              width: 420,
+              borderRadius: 1,
+              textAlign: 'center'
+            }
           }}
         >
-          <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
-          Confirm Delete
-          <DialogCloseButton onClick={() => setDeleteDialog({ open: false, row: null })} disableRipple>
-            <i className='tabler-x' />
-          </DialogCloseButton>
-        </DialogTitle>
+          {/* 🔴 Title with Warning Icon */}
+          <DialogTitle
+            id='customized-dialog-title'
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 1,
+              color: 'error.main',
+              fontWeight: 700,
+              pb: 1,
+              position: 'relative'
+            }}
+          >
+            <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
+            Confirm Delete
+            <DialogCloseButton onClick={() => setDeleteDialog({ open: false, row: null })} disableRipple>
+              <i className='tabler-x' />
+            </DialogCloseButton>
+          </DialogTitle>
 
-        {/* Centered text */}
-        <DialogContent sx={{ px: 5, pt: 1 }}>
-          <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
-            Are you sure you want to delete{' '}
-            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name || 'this tax'}</strong>?
-            <br />
-            This action cannot be undone.
-          </Typography>
-        </DialogContent>
+          {/* Centered text */}
+          <DialogContent sx={{ px: 5, pt: 1 }}>
+            <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
+              Are you sure you want to delete{' '}
+              <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name || 'this tax'}</strong>?
+              <br />
+              This action cannot be undone.
+            </Typography>
+          </DialogContent>
 
-        {/* Centered buttons */}
-        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-          <GlobalButton color='secondary' onClick={() => setDeleteDialog({ open: false, row: null })}>
-            Cancel
-          </GlobalButton>
-
-          <GlobalButton variant='contained' color='error' onClick={confirmDelete}>
-            Delete
-          </GlobalButton>
-        </DialogActions>
-      </Dialog>
-    </Box>
+          {/* Centered buttons */}
+          <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+            <GlobalButton color='secondary' onClick={() => setDeleteDialog({ open: false, row: null })}>
+              Cancel
+            </GlobalButton>
+            <GlobalButton
+              onClick={confirmDelete}
+              variant='contained'
+              color='error'
+              disabled={loading}
+            >
+              {loading ? 'Deleting...' : 'Delete'}
+            </GlobalButton>
+          </DialogActions>
+        </Dialog>
+      </Box>
+    </PermissionGuard>
   )
 }
+
+export default TaxPageContent

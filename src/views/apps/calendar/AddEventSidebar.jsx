@@ -25,6 +25,7 @@ import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 
 // Slice Imports
 import { addEvent, deleteEvent, updateEvent, selectedEvent, filterEvents } from '@/redux-store/slices/calendar'
+import { usePermission } from '@/hooks/usePermission'
 
 // Vars
 const capitalize = string => string && string[0].toUpperCase() + string.slice(1)
@@ -47,6 +48,7 @@ const AddEventSidebar = props => {
 
   // States
   const [values, setValues] = useState(defaultState)
+  const { canAccess } = usePermission()
 
   // Refs
   const PickersComponent = forwardRef(({ ...props }, ref) => {
@@ -154,9 +156,11 @@ const AddEventSidebar = props => {
     ) {
       return (
         <div className='flex gap-4'>
-          <Button type='submit' variant='contained'>
-            Add
-          </Button>
+          {canAccess('Calendar', 'create') && (
+            <Button type='submit' variant='contained'>
+              Add
+            </Button>
+          )}
           <Button variant='outlined' color='secondary' onClick={resetToEmptyValues}>
             Reset
           </Button>
@@ -165,9 +169,11 @@ const AddEventSidebar = props => {
     } else {
       return (
         <div className='flex gap-4'>
-          <Button type='submit' variant='contained'>
-            Update
-          </Button>
+          {canAccess('Calendar', 'update') && (
+            <Button type='submit' variant='contained'>
+              Update
+            </Button>
+          )}
           <Button variant='outlined' color='secondary' onClick={resetToStoredValues}>
             Reset
           </Button>
@@ -200,9 +206,11 @@ const AddEventSidebar = props => {
         </Typography>
         {calendarStore.selectedEvent && calendarStore.selectedEvent.title.length ? (
           <Box className='flex items-center' sx={{ gap: calendarStore.selectedEvent !== null ? 1 : 0 }}>
-            <IconButton size='small' onClick={handleDeleteButtonClick}>
-              <i className='tabler-trash text-2xl text-textPrimary' />
-            </IconButton>
+            {canAccess('Calendar', 'delete') && (
+              <IconButton size='small' onClick={handleDeleteButtonClick}>
+                <i className='tabler-trash text-2xl text-textPrimary' />
+              </IconButton>
+            )}
             <IconButton size='small' onClick={handleSidebarClose}>
               <i className='tabler-x text-2xl text-textPrimary' />
             </IconButton>

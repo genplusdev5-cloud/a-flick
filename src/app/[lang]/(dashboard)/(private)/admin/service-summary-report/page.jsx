@@ -14,6 +14,7 @@ import GlobalDateRange from '@/components/common/GlobalDateRange'
 
 import { getReportDropdown, generateServiceSummary } from '@/api/serviceSummary'
 import { showToast } from '@/components/common/Toasts'
+import PermissionGuard from '@/components/auth/PermissionGuard'
 
 /* -----------------------------------
    📅 DATE RANGE PICKER
@@ -54,7 +55,7 @@ const DateRangePickerField = ({ startDate, endDate, setDates }) => {
 /* -----------------------------------
    📌 MAIN PAGE
 ----------------------------------- */
-export default function ServiceSummaryReportPage() {
+const ServiceSummaryReportPageContent = () => {
   const [dropdown, setDropdown] = useState({})
   const [enableDateFilter, setEnableDateFilter] = useState(true)
   const [fromDate, setFromDate] = useState(format(new Date(), 'yyyy-MM-dd'))
@@ -286,5 +287,14 @@ export default function ServiceSummaryReportPage() {
         </Grid>
       </Card>
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function ServiceSummaryReportPage() {
+  return (
+    <PermissionGuard permission="Service Summary Report">
+      <ServiceSummaryReportPageContent />
+    </PermissionGuard>
   )
 }

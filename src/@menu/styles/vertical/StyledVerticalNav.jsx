@@ -19,6 +19,7 @@ const StyledVerticalNav = styled.aside`
   transition-duration: ${({ transitionDuration }) => `${transitionDuration}ms`};
   transition-timing-function: ease-in-out;
 
+
   /* Width & Min Width & Margin */
   inline-size: ${({ width }) => `${width}px`};
   min-inline-size: ${({ width }) => `${width}px`};

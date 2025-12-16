@@ -23,6 +23,7 @@ import CustomTextField from '@core/components/mui/TextField'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
 import GlobalButton from '@/components/common/GlobalButton'
 import CustomAutocomplete from '@core/components/mui/Autocomplete'
+import PermissionGuard from '@/components/auth/PermissionGuard'
 
 /* ------------------------------------------------------------------
    📅 DATE RANGE PICKER
@@ -128,7 +129,7 @@ const DummyTrendingChart = ({ data }) => {
 /* ------------------------------------------------------------------
    MAIN PAGE — COMPLETED + WORKING
 ------------------------------------------------------------------ */
-export default function PestTrendingPage() {
+const PestTrendingPageContent = () => {
   const [customer, setCustomer] = useState(null)
   const [contract, setContract] = useState(null)
   const [selectedPests, setSelectedPests] = useState([])
@@ -229,5 +230,14 @@ export default function PestTrendingPage() {
       {/* TRENDING CHART */}
       <DummyTrendingChart data={chartData} />
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function PestTrendingPage() {
+  return (
+    <PermissionGuard permission="Pest Trending">
+      <PestTrendingPageContent />
+    </PermissionGuard>
   )
 }

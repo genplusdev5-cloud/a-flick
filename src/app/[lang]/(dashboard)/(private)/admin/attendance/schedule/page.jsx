@@ -20,6 +20,8 @@ import {
   IconButton
 } from '@mui/material'
 
+import PermissionGuard from '@/components/auth/PermissionGuard'
+
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalDateRange from '@/components/common/GlobalDateRange'
@@ -66,7 +68,8 @@ const appointmentStatusOptions = [
   { label: 'Completed', value: 'completed' }
 ]
 
-export default function AttendanceSchedulePage() {
+// ───────────────────────────────────────────
+const AttendanceSchedulePageContent = () => {
   const [rows, setRows] = useState([])
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
   const [searchText, setSearchText] = useState('')
@@ -595,5 +598,14 @@ export default function AttendanceSchedulePage() {
         <TablePaginationComponent totalCount={rows.length} pagination={pagination} setPagination={setPagination} />
       </Card>
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function AttendanceSchedulePage() {
+  return (
+    <PermissionGuard permission="Schedule">
+      <AttendanceSchedulePageContent />
+    </PermissionGuard>
   )
 }

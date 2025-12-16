@@ -23,6 +23,8 @@ import {
   FormControlLabel
 } from '@mui/material'
 
+import PermissionGuard from '@/components/auth/PermissionGuard'
+
 // 🔥 Global UI Components (use everywhere)
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalTextField from '@/components/common/GlobalTextField'
@@ -39,6 +41,7 @@ import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
 import MoreVertIcon from '@mui/icons-material/MoreVert'
 import { useRouter } from 'next/navigation'
+import { usePermission } from '@/hooks/usePermission'
 import { toast } from 'react-toastify'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 import classnames from 'classnames'
@@ -86,8 +89,10 @@ const renewalOptions = [
 // ───────────────────────────────────────────
 // Main Component
 // ───────────────────────────────────────────
-export default function ContractStatusPage() {
+// ───────────────────────────────────────────
+const ContractStatusPageContent = () => {
   const router = useRouter()
+  const { canAccess } = usePermission()
   const [rows, setRows] = useState([])
   const [rowCount, setRowCount] = useState(0)
   const [searchText, setSearchText] = useState('')
@@ -592,20 +597,22 @@ export default function ContractStatusPage() {
               </Box>
 
               {/* RIGHT — ADD CONTRACT */}
-              <Button
-                variant='contained'
-                color='primary'
-                startIcon={<AddIcon />}
-                onClick={() => router.push('/admin/contracts/add')}
-                sx={{
-                  textTransform: 'none',
-                  fontWeight: 500,
-                  px: 3,
-                  height: 36
-                }}
-              >
-                Add Contract
-              </Button>
+              {canAccess('Contracts', 'create') && (
+                <Button
+                  variant='contained'
+                  color='primary'
+                  startIcon={<AddIcon />}
+                  onClick={() => router.push('/admin/contracts/add')}
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 500,
+                    px: 3,
+                    height: 36
+                  }}
+                >
+                  Add Contract
+                </Button>
+              )}
             </Box>
           }
           sx={{
@@ -899,5 +906,14 @@ export default function ContractStatusPage() {
         <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
       </Card>
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function ContractStatusPage() {
+  return (
+    <PermissionGuard permission="Contract Status">
+      <ContractStatusPageContent />
+    </PermissionGuard>
   )
 }

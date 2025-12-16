@@ -17,6 +17,8 @@ import {
   Breadcrumbs
 } from '@mui/material'
 
+import PermissionGuard from '@/components/auth/PermissionGuard'
+
 import RefreshIcon from '@mui/icons-material/Refresh'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import PrintIcon from '@mui/icons-material/Print'
@@ -50,7 +52,7 @@ const fmt = n =>
     maximumFractionDigits: 2
   })
 
-export default function ProductivityReportPage() {
+const ProductivityReportPageContent = () => {
   const [allRows, setAllRows] = useState([])
   const [rows, setRows] = useState([])
   const [rowCount, setRowCount] = useState(0)
@@ -444,5 +446,14 @@ export default function ProductivityReportPage() {
         </Box>
       </Card>
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function ProductivityReportPage() {
+  return (
+    <PermissionGuard permission="Productivity Finder">
+      <ProductivityReportPageContent />
+    </PermissionGuard>
   )
 }

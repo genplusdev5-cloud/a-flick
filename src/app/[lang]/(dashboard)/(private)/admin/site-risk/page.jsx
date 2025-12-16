@@ -62,6 +62,7 @@ import CustomTextFieldWrapper from '@/components/common/CustomTextField'
 import CustomTextarea from '@/components/common/CustomTextarea'
 import CustomSelectField from '@/components/common/CustomSelectField'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
+import { usePermission } from '@/hooks/usePermission'
 
 import {
   useReactTable,
@@ -88,8 +89,9 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
 // ───────────────────────────────────────────
 // Component
 // ───────────────────────────────────────────
-export default function SiteRiskPage() {
+const SiteRiskPageContent = () => {
   const [rows, setRows] = useState([])
+  const { canAccess } = usePermission()
   const [rowCount, setRowCount] = useState(0)
   const [searchText, setSearchText] = useState('')
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
@@ -342,16 +344,20 @@ export default function SiteRiskPage() {
         header: 'Actions',
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
-              <i className='tabler-edit' />
-            </IconButton>
-            <IconButton
-              size='small'
-              color='error'
-              onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
-            >
-              <i className='tabler-trash text-red-600 text-lg' />
-            </IconButton>
+            {canAccess('Site Risk', 'update') && (
+              <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
+                <i className='tabler-edit' />
+              </IconButton>
+            )}
+            {canAccess('Site Risk', 'delete') && (
+              <IconButton
+                size='small'
+                color='error'
+                onClick={() => setDeleteDialog({ open: true, row: info.row.original })}
+              >
+                <i className='tabler-trash text-red-600 text-lg' />
+              </IconButton>
+            )}
           </Box>
         )
       }),
@@ -561,14 +567,16 @@ export default function SiteRiskPage() {
                 </MenuItem>
               </Menu>
 
-              <GlobalButton
-                variant='contained'
-                startIcon={<AddIcon />}
-                onClick={handleAdd}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-              >
-                Add Site Risk
-              </GlobalButton>
+              {canAccess('Site Risk', 'create') && (
+                <GlobalButton
+                  variant='contained'
+                  startIcon={<AddIcon />}
+                  onClick={handleAdd}
+                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                >
+                  Add Site Risk
+                </GlobalButton>
+              )}
             </Box>
           }
         />
@@ -828,5 +836,14 @@ export default function SiteRiskPage() {
         </DialogActions>
       </Dialog>
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function SiteRiskPage() {
+  return (
+    <PermissionGuard permission="Site Risk">
+      <SiteRiskPageContent />
+    </PermissionGuard>
   )
 }

@@ -3,8 +3,9 @@ import Card from '@mui/material/Card'
 import AppCalendar from '@/views/apps/calendar/AppCalendar'
 import AppFullCalendar from '@/libs/styles/AppFullCalendar'
 import { useState } from 'react'
+import PermissionGuard from '@/components/auth/PermissionGuard'
 
-const CalendarApp = () => {
+const CalendarAppContent = () => {
   const [selectedEmployee, setSelectedEmployee] = useState(null)
 
   return (
@@ -16,4 +17,10 @@ const CalendarApp = () => {
   )
 }
 
-export default CalendarApp
+export default function CalendarApp() {
+  return (
+    <PermissionGuard permission="Calendar">
+      <CalendarAppContent />
+    </PermissionGuard>
+  )
+}

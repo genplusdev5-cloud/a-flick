@@ -20,6 +20,8 @@ import {
   Button
 } from '@mui/material'
 
+import PermissionGuard from '@/components/auth/PermissionGuard'
+
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
@@ -139,7 +141,8 @@ const showToast = (type, message = '') => {
   )
 }
 
-export default function StockReportPage() {
+// ──────────────────────────────────────────────────────────────
+const StockReportPageContent = () => {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(false)
   const [enableDateFilter, setEnableDateFilter] = useState(false)
@@ -587,5 +590,14 @@ export default function StockReportPage() {
 
       <ToastContainer />
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function StockReportPage() {
+  return (
+    <PermissionGuard permission="Stock Report">
+      <StockReportPageContent />
+    </PermissionGuard>
   )
 }

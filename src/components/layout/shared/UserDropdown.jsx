@@ -59,7 +59,7 @@ return { status: 'success' }
       return { status: 'skipped' }
     }
 
-    ;```
+    ; ```
 console.error('Logout API error:', err)
 return { status: 'error', message: 'Server logout failed; proceeding locally.' }
 ```
@@ -80,12 +80,29 @@ const UserDropdown = () => {
   const { lang: locale } = useParams()
 
   // ✅ Load user info from localStorage
-  useEffect(() => {
+  // ✅ Load user info from localStorage
+  const loadUserData = () => {
     try {
-      const user = JSON.parse(localStorage.getItem('user_info'))
-      if (user) setUserData(user)
+      const stored = localStorage.getItem('user_info')
+      if (stored) {
+        setUserData(JSON.parse(stored))
+      }
     } catch (err) {
       console.error('Error parsing user info:', err)
+    }
+  }
+
+  useEffect(() => {
+    loadUserData()
+
+    const handleUpdate = () => loadUserData()
+    window.addEventListener('user-info-update', handleUpdate)
+    // Also listen to storage in case of multi-tab login (optional but good)
+    window.addEventListener('storage', handleUpdate)
+
+    return () => {
+      window.removeEventListener('user-info-update', handleUpdate)
+      window.removeEventListener('storage', handleUpdate)
     }
   }, [])
 

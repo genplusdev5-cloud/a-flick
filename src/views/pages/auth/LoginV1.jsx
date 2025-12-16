@@ -105,6 +105,7 @@ const LoginV1 = () => {
               render={({ field }) => (
                 <CustomTextField
                   {...field}
+                  id='email'
                   autoFocus
                   fullWidth
                   type='email'
@@ -123,6 +124,7 @@ const LoginV1 = () => {
               render={({ field }) => (
                 <CustomTextField
                   {...field}
+                  id='password'
                   fullWidth
                   label='Password'
                   placeholder='••••••••'

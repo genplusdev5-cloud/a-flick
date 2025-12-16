@@ -17,6 +17,8 @@ import {
   InputAdornment
 } from '@mui/material'
 
+import PermissionGuard from '@/components/auth/PermissionGuard'
+
 import GlobalDateRange from '@/components/common/GlobalDateRange'
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
@@ -26,7 +28,8 @@ import styles from '@core/styles/table.module.css'
 
 // --------------------------------------------------------------------
 
-export default function TimesoftSummaryReport() {
+// ───────────────────────────────────────────
+const TimesoftSummaryReportContent = () => {
   const [month, setMonth] = useState('January')
   const [year, setYear] = useState('2025')
   const [supervisor, setSupervisor] = useState(null)
@@ -282,5 +285,14 @@ export default function TimesoftSummaryReport() {
         <TablePaginationComponent totalCount={rows.length} pagination={pagination} setPagination={setPagination} />
       </Card>
     </Box>
+  )
+}
+
+// Wrapper for RBAC
+export default function TimesoftSummaryReport() {
+  return (
+    <PermissionGuard permission="Payslip">
+      <TimesoftSummaryReportContent />
+    </PermissionGuard>
   )
 }

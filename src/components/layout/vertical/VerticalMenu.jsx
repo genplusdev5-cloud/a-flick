@@ -9,6 +9,62 @@ import useVerticalNav from '@menu/hooks/useVerticalNav'
 import StyledVerticalNavExpandIcon from '@menu/styles/vertical/StyledVerticalNavExpandIcon'
 import menuItemStyles from '@core/styles/vertical/menuItemStyles'
 import menuSectionStyles from '@core/styles/vertical/menuSectionStyles'
+import { usePermission } from '@/hooks/usePermission'
+
+const PermissionMenuItem = ({ module, action = 'view', children, ...props }) => {
+  const { canAccess, isLoading } = usePermission()
+
+  if (isLoading) return null // or skeleton? for menu null is better to avoid flickering
+  if (!canAccess(module, action)) return null
+
+  // If children is a function (render prop) or just pass through
+  return children
+}
+
+// Wrapper for checking permission before rendering MenuItem
+// We can't easily wrap MenuItem because it might need direct parent to be Menu/SubMenu?
+// Actually, MenuItem just renders li. So wrapping it in a logic block is fine.
+const PermissionItem = ({ module, action = 'view', children }) => {
+  const { canAccess, isLoading } = usePermission()
+  if (isLoading) return null
+  if (!canAccess(module, action)) return null
+  return children
+}
+
+const PermissionGroup = ({ modules = [], children }) => {
+  const { canAccess, isLoading } = usePermission()
+  if (isLoading) return null
+
+  // If user has access to AT LEAST ONE module in the list, show the group
+  const hasAccess = modules.some(m => canAccess(m, 'view'))
+
+  if (!hasAccess) return null
+  return children
+}
+
+// ───────────────────────────────────────────
+// Module Groups for Sidebar Visibility
+// ───────────────────────────────────────────
+const MASTER_MODULES = [
+  'Tax', 'Company Origin', 'Service Frequency', 'Billing Frequency',
+  'Unit Of Measurement', 'Call Type', 'Chemicals', 'Industry', 'Holidays',
+  'Incident', 'Todo Items', 'Site Risk', 'Equipments'
+]
+
+const EMPLOYEE_MODULES = [
+  'Department', 'Designation', 'Employee List',
+  'Employee Leave Type', 'User Privilege'
+]
+
+const ATTENDANCE_MODULES = [
+  'Attendance Slots', 'Attendance', 'Attendance Schedule',
+  'Attendance Timesheet', 'Payslip Summary'
+]
+
+const STOCK_MODULES = [
+  'Material Request', 'Stock Report', 'Usage Report'
+]
+
 
 const RenderExpandIcon = ({ open, transitionDuration }) => (
   <StyledVerticalNavExpandIcon open={open} transitionDuration={transitionDuration}>
@@ -62,13 +118,13 @@ const VerticalMenu = ({ scrollMenu }) => {
     <ScrollWrapper
       {...(isBreakpointReached
         ? {
-            className: 'bs-full overflow-y-auto overflow-x-hidden'
-            // onScroll: container => scrollMenu(container, false)
-          }
+          className: 'bs-full overflow-y-auto overflow-x-hidden'
+          // onScroll: container => scrollMenu(container, false)
+        }
         : {
-            options: { wheelPropagation: false, suppressScrollX: true }
-            // onScrollY: container => scrollMenu(container, true)
-          })}
+          options: { wheelPropagation: false, suppressScrollX: true }
+          // onScrollY: container => scrollMenu(container, true)
+        })}
     >
       <Menu
         popoutMenuOffset={{ mainAxis: 23 }}
@@ -83,11 +139,9 @@ const VerticalMenu = ({ scrollMenu }) => {
         </MenuItem>
 
         {/* ✅ Master */}
-
         <SubMenu label='Master' icon={<i className='tabler-database' />}>
           <MenuItem href={`/${locale}/admin/tax`}>Tax</MenuItem>
           <MenuItem href={`/${locale}/admin/company-origin`}>Company Origin</MenuItem>
-          {/* <MenuItem href={`/${locale}/admin/account-item-code`}>Account Item Code</MenuItem> */}
           <MenuItem href={`/${locale}/admin/service-frequency`}>Service Frequency</MenuItem>
           <MenuItem href={`/${locale}/admin/billing-frequency`}>Billing Frequency</MenuItem>
           <MenuItem href={`/${locale}/admin/uom`}>Unit Of Measurement</MenuItem>
@@ -109,6 +163,7 @@ const VerticalMenu = ({ scrollMenu }) => {
           <MenuItem href={`/${locale}/admin/employee-leave-type`}>Employee Leave Type</MenuItem>
           <MenuItem href={`/${locale}/admin/user-privilege`}>User Privilege</MenuItem>
         </SubMenu>
+
         <MenuItem href={`/${locale}/admin/employee-leave`} icon={<i className='tabler-calendar-time' />}>
           Employee Leaves
         </MenuItem>
@@ -118,18 +173,14 @@ const VerticalMenu = ({ scrollMenu }) => {
           Service Type (Pest)
         </MenuItem>
 
-        {/* ✅ Customers */}
-
         <MenuItem href={`/${locale}/admin/customers`} icon={<i className='tabler-users' />}>
           Customers
         </MenuItem>
 
-        {/* ✅ Contracts */}
         <MenuItem href={`/${locale}/admin/contracts`} icon={<i className='tabler-file-text' />}>
           Contracts
         </MenuItem>
 
-        {/* ✅ Contract Status */}
         <MenuItem href={`/${locale}/admin/view-contract-status`} icon={<i className='tabler-list-details' />}>
           View Contract Status
         </MenuItem>
