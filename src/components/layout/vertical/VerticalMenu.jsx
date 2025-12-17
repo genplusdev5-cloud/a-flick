@@ -133,166 +133,221 @@ const VerticalMenu = ({ scrollMenu }) => {
         renderExpandedMenuItemIcon={{ icon: <i className='tabler-circle text-xs' /> }}
         menuSectionStyles={menuSectionStyles(verticalNavOptions, theme)}
       >
-        {/* ✅ Dashboard */}
+        {/* ✅ Dashboard - Always Visible or specific permission? Assuming public for now or separate dash permission */}
         <MenuItem href={`/${locale}/admin/dashboards`} icon={<i className='tabler-home' />}>
           Dashboard
         </MenuItem>
 
         {/* ✅ Master */}
-        <SubMenu label='Master' icon={<i className='tabler-database' />}>
-          <MenuItem href={`/${locale}/admin/tax`}>Tax</MenuItem>
-          <MenuItem href={`/${locale}/admin/company-origin`}>Company Origin</MenuItem>
-          <MenuItem href={`/${locale}/admin/service-frequency`}>Service Frequency</MenuItem>
-          <MenuItem href={`/${locale}/admin/billing-frequency`}>Billing Frequency</MenuItem>
-          <MenuItem href={`/${locale}/admin/uom`}>Unit Of Measurement</MenuItem>
-          <MenuItem href={`/${locale}/admin/call-type`}>Call Type</MenuItem>
-          <MenuItem href={`/${locale}/admin/chemicals`}>Chemicals</MenuItem>
-          <MenuItem href={`/${locale}/admin/industry`}>Industry</MenuItem>
-          <MenuItem href={`/${locale}/admin/holidays`}>Holidays</MenuItem>
-          <MenuItem href={`/${locale}/admin/incident`}>Incident</MenuItem>
-          <MenuItem href={`/${locale}/admin/todo-items`}>Todo Items</MenuItem>
-          <MenuItem href={`/${locale}/admin/site-risk`}>Site Risk</MenuItem>
-          <MenuItem href={`/${locale}/admin/equipments`}>Equipments</MenuItem>
-        </SubMenu>
+        <PermissionGroup modules={['Tax', 'Company Origin', 'Service Frequency', 'Billing Frequency', 'Unit Of Measurement', 'Call Type', 'Chemicals', 'Industry', 'Holidays', 'Incident', 'Todo Items', 'Site Risk', 'Equipments']}>
+          <SubMenu label='Master' icon={<i className='tabler-database' />}>
+            <PermissionItem module='Tax'><MenuItem href={`/${locale}/admin/tax`}>Tax</MenuItem></PermissionItem>
+            <PermissionItem module='Company Origin'><MenuItem href={`/${locale}/admin/company-origin`}>Company Origin</MenuItem></PermissionItem>
+            <PermissionItem module='Service Frequency'><MenuItem href={`/${locale}/admin/service-frequency`}>Service Frequency</MenuItem></PermissionItem>
+            <PermissionItem module='Billing Frequency'><MenuItem href={`/${locale}/admin/billing-frequency`}>Billing Frequency</MenuItem></PermissionItem>
+            <PermissionItem module='Unit Of Measurement'><MenuItem href={`/${locale}/admin/uom`}>Unit Of Measurement</MenuItem></PermissionItem>
+            <PermissionItem module='Call Type'><MenuItem href={`/${locale}/admin/call-type`}>Call Type</MenuItem></PermissionItem>
+            <PermissionItem module='Chemicals'><MenuItem href={`/${locale}/admin/chemicals`}>Chemicals</MenuItem></PermissionItem>
+            <PermissionItem module='Industry'><MenuItem href={`/${locale}/admin/industry`}>Industry</MenuItem></PermissionItem>
+            <PermissionItem module='Holidays'><MenuItem href={`/${locale}/admin/holidays`}>Holidays</MenuItem></PermissionItem>
+            <PermissionItem module='Incident'><MenuItem href={`/${locale}/admin/incident`}>Incident</MenuItem></PermissionItem>
+            <PermissionItem module='Todo Items'><MenuItem href={`/${locale}/admin/todo-items`}>Todo Items</MenuItem></PermissionItem>
+            <PermissionItem module='Site Risk'><MenuItem href={`/${locale}/admin/site-risk`}>Site Risk</MenuItem></PermissionItem>
+            <PermissionItem module='Equipments'><MenuItem href={`/${locale}/admin/equipments`}>Equipments</MenuItem></PermissionItem>
+          </SubMenu>
+        </PermissionGroup>
 
         {/* ✅ Employee */}
-        <SubMenu label='Employee' icon={<i className='tabler-user' />}>
-          <MenuItem href={`/${locale}/admin/department`}>Department</MenuItem>
-          <MenuItem href={`/${locale}/admin/designation`}>Designation</MenuItem>
-          <MenuItem href={`/${locale}/admin/employee-list`}>Employee List</MenuItem>
-          <MenuItem href={`/${locale}/admin/employee-leave-type`}>Employee Leave Type</MenuItem>
-          <MenuItem href={`/${locale}/admin/user-privilege`}>User Privilege</MenuItem>
-        </SubMenu>
+        <PermissionGroup modules={['Department', 'Designation', 'Employee List', 'Employee Leave Type', 'User Privilege']}>
+          <SubMenu label='Employee' icon={<i className='tabler-user' />}>
+            <PermissionItem module='Department'><MenuItem href={`/${locale}/admin/department`}>Department</MenuItem></PermissionItem>
+            <PermissionItem module='Designation'><MenuItem href={`/${locale}/admin/designation`}>Designation</MenuItem></PermissionItem>
+            <PermissionItem module='Employee List'><MenuItem href={`/${locale}/admin/employee-list`}>Employee List</MenuItem></PermissionItem>
+            <PermissionItem module='Employee Leave Type'><MenuItem href={`/${locale}/admin/employee-leave-type`}>Employee Leave Type</MenuItem></PermissionItem>
+            <PermissionItem module='User Privilege'><MenuItem href={`/${locale}/admin/user-privilege`}>User Privilege</MenuItem></PermissionItem>
+          </SubMenu>
+        </PermissionGroup>
 
-        <MenuItem href={`/${locale}/admin/employee-leave`} icon={<i className='tabler-calendar-time' />}>
-          Employee Leaves
-        </MenuItem>
+        {/* Single Items need direct PermissionItem wrapper */}
+        <PermissionItem module='Employee Leave'>
+          <MenuItem href={`/${locale}/admin/employee-leave`} icon={<i className='tabler-calendar-time' />}>
+            Employee Leaves
+          </MenuItem>
+        </PermissionItem>
 
         {/* ✅ Service Type (Pest) */}
-        <MenuItem href={`/${locale}/admin/pests`} icon={PestIcon}>
-          Service Type (Pest)
-        </MenuItem>
+        <PermissionItem module='Service Type (Pest)'>
+          <MenuItem href={`/${locale}/admin/pests`} icon={PestIcon}>
+            Service Type (Pest)
+          </MenuItem>
+        </PermissionItem>
 
-        <MenuItem href={`/${locale}/admin/customers`} icon={<i className='tabler-users' />}>
-          Customers
-        </MenuItem>
+        <PermissionItem module='Customers'>
+          <MenuItem href={`/${locale}/admin/customers`} icon={<i className='tabler-users' />}>
+            Customers
+          </MenuItem>
+        </PermissionItem>
 
-        <MenuItem href={`/${locale}/admin/contracts`} icon={<i className='tabler-file-text' />}>
-          Contracts
-        </MenuItem>
+        <PermissionItem module='Contracts'>
+          <MenuItem href={`/${locale}/admin/contracts`} icon={<i className='tabler-file-text' />}>
+            Contracts
+          </MenuItem>
+        </PermissionItem>
 
-        <MenuItem href={`/${locale}/admin/view-contract-status`} icon={<i className='tabler-list-details' />}>
-          View Contract Status
-        </MenuItem>
+        <PermissionItem module='View Contract Status'>
+          <MenuItem href={`/${locale}/admin/view-contract-status`} icon={<i className='tabler-list-details' />}>
+            View Contract Status
+          </MenuItem>
+        </PermissionItem>
 
         {/* ✅ Attendance */}
-        <SubMenu label='Attendance' icon={<i className='tabler-user-check' />}>
-          <MenuItem href={`/${locale}/admin/attendance/slots`}>Slots</MenuItem>
-          <MenuItem href={`/${locale}/admin/attendance/attendance`}>Attendance</MenuItem>
-          <MenuItem href={`/${locale}/admin/attendance/schedule`}>Schedule</MenuItem>
-          {/* <MenuItem href={`/${locale}/admin/attendance/hr-project-report`}>HR & Project Report</MenuItem>
-          <MenuItem href={`/${locale}/admin/attendance/hr-report`}>HR Report</MenuItem> */}
-          <MenuItem href={`/${locale}/admin/attendance/timesheet`}>Attendance Timesheet</MenuItem>
-          {/* <MenuItem href={`/${locale}/admin/attendance/timesheet-with-leave`}>Attendance Timesheet With Leave</MenuItem> */}
-          <MenuItem href={`/${locale}/admin/attendance/payslip-summary`}>Payslip Summary Report</MenuItem>
-          {/* <MenuItem href={`/${locale}/admin/attendance/salary-report`}>Salary Report</MenuItem> */}
-        </SubMenu>
+        <PermissionGroup modules={['Attendance Slots', 'Attendance', 'Attendance Schedule', 'Attendance Timesheet', 'Payslip Summary']}>
+          <SubMenu label='Attendance' icon={<i className='tabler-user-check' />}>
+            <PermissionItem module='Attendance Slots'><MenuItem href={`/${locale}/admin/attendance/slots`}>Slots</MenuItem></PermissionItem>
+            <PermissionItem module='Attendance'><MenuItem href={`/${locale}/admin/attendance/attendance`}>Attendance</MenuItem></PermissionItem>
+            <PermissionItem module='Attendance Schedule'><MenuItem href={`/${locale}/admin/attendance/schedule`}>Schedule</MenuItem></PermissionItem>
+            {/* <MenuItem href={`/${locale}/admin/attendance/hr-project-report`}>HR & Project Report</MenuItem>
+            <MenuItem href={`/${locale}/admin/attendance/hr-report`}>HR Report</MenuItem> */}
+            <PermissionItem module='Attendance Timesheet'><MenuItem href={`/${locale}/admin/attendance/timesheet`}>Attendance Timesheet</MenuItem></PermissionItem>
+            {/* <MenuItem href={`/${locale}/admin/attendance/timesheet-with-leave`}>Attendance Timesheet With Leave</MenuItem> */}
+            <PermissionItem module='Payslip Summary'><MenuItem href={`/${locale}/admin/attendance/payslip-summary`}>Payslip Summary Report</MenuItem></PermissionItem>
+            {/* <MenuItem href={`/${locale}/admin/attendance/salary-report`}>Salary Report</MenuItem> */}
+          </SubMenu>
+        </PermissionGroup>
 
         {/* ✅ Suppliers & Stock */}
         {/* {showHeadings && <SectionHeader label="Suppliers & Stock" />} */}
 
-        <MenuItem href={`/${locale}/admin/suppliers`} icon={<i className='tabler-building-store' />}>
-          Suppliers
-        </MenuItem>
+        <PermissionItem module='Suppliers'>
+          <MenuItem href={`/${locale}/admin/suppliers`} icon={<i className='tabler-building-store' />}>
+            Suppliers
+          </MenuItem>
+        </PermissionItem>
 
         {/* ✅ Stock Dropdown */}
-        <SubMenu label='Stock' icon={<i className='tabler-package' />}>
-          {/* <MenuItem href={`/${locale}/admin/stock/chemicals`}>Chemicals</MenuItem> */}
-          <MenuItem href={`/${locale}/admin/stock/material-request`}>Material Request</MenuItem>
-          <MenuItem href={`/${locale}/admin/stock/report`}>Stock Report</MenuItem>
-          <MenuItem href={`/${locale}/admin/stock/usage-report`}>Usage Report</MenuItem>
-        </SubMenu>
+        <PermissionGroup modules={['Material Request', 'Stock Report', 'Usage Report']}>
+          <SubMenu label='Stock' icon={<i className='tabler-package' />}>
+            {/* <MenuItem href={`/${locale}/admin/stock/chemicals`}>Chemicals</MenuItem> */}
+            <PermissionItem module='Material Request'><MenuItem href={`/${locale}/admin/stock/material-request`}>Material Request</MenuItem></PermissionItem>
+            <PermissionItem module='Stock Report'><MenuItem href={`/${locale}/admin/stock/report`}>Stock Report</MenuItem></PermissionItem>
+            <PermissionItem module='Usage Report'><MenuItem href={`/${locale}/admin/stock/usage-report`}>Usage Report</MenuItem></PermissionItem>
+          </SubMenu>
+        </PermissionGroup>
+
+        {/* ✅ Service Request */}
+        <PermissionItem module='Service Request'>
+          <MenuItem href={`/${locale}/admin/service-request`} icon={<i className='tabler-calendar' />}>
+            Service Request
+          </MenuItem>
+        </PermissionItem>
 
         {/* ✅ Calendar */}
-        <MenuItem href={`/${locale}/admin/service-request`} icon={<i className='tabler-calendar' />}>
-          Service Request
-        </MenuItem>
-
-        {/* ✅ Calendar */}
-        <MenuItem href={`/${locale}/admin/calendar`} icon={<i className='tabler-calendar' />}>
-          Calendar
-        </MenuItem>
+        <PermissionItem module='Calendar'>
+          <MenuItem href={`/${locale}/admin/calendar`} icon={<i className='tabler-calendar' />}>
+            Calendar
+          </MenuItem>
+        </PermissionItem>
 
         {/* ✅ Invoice */}
-        <MenuItem href={`/${locale}/admin/invoice`} icon={<i className='tabler-receipt-2' />}>
-          Invoice
-        </MenuItem>
+        <PermissionItem module='Invoice'>
+          <MenuItem href={`/${locale}/admin/invoice`} icon={<i className='tabler-receipt-2' />}>
+            Invoice
+          </MenuItem>
+        </PermissionItem>
 
         {/* ✅ Map */}
-        <MenuItem href={`/${locale}/admin/map`} icon={<i className='tabler-map' />}>
-          Map
-        </MenuItem>
+        <PermissionItem module='Map'>
+          <MenuItem href={`/${locale}/admin/map`} icon={<i className='tabler-map' />}>
+            Map
+          </MenuItem>
+        </PermissionItem>
 
         {/* ==================== FINDER ==================== */}
-        {showHeadings && <SectionHeader label='Finder' />}
+        {showHeadings && <PermissionGroup modules={['Non Pre-Schedule', 'Backlog Finder', 'Followup Finder', 'KIV Finder', 'Productivity Finder']}><SectionHeader label='Finder' /></PermissionGroup>}
 
-        <MenuItem href={`/${locale}/admin/non-pre-schedule`} icon={<i className='tabler-chart-line' />}>
-          Non Pre-Schedule
-        </MenuItem>
+        <PermissionItem module='Non Pre-Schedule'>
+          <MenuItem href={`/${locale}/admin/non-pre-schedule`} icon={<i className='tabler-chart-line' />}>
+            Non Pre-Schedule
+          </MenuItem>
+        </PermissionItem>
 
-        <MenuItem href={`/${locale}/admin/backlog-finder`} icon={<i className='tabler-trending-up' />}>
-          Backlog Finder
-        </MenuItem>
+        <PermissionItem module='Backlog Finder'>
+          <MenuItem href={`/${locale}/admin/backlog-finder`} icon={<i className='tabler-trending-up' />}>
+            Backlog Finder
+          </MenuItem>
+        </PermissionItem>
 
-        <MenuItem href={`/${locale}/admin/followup-finder`} icon={<i className='tabler-chart-line' />}>
-          Followup Finder
-        </MenuItem>
+        <PermissionItem module='Followup Finder'>
+          <MenuItem href={`/${locale}/admin/followup-finder`} icon={<i className='tabler-chart-line' />}>
+            Followup Finder
+          </MenuItem>
+        </PermissionItem>
 
-        <MenuItem href={`/${locale}/admin/kiv-finder`} icon={<i className='tabler-trending-up-2' />}>
-          KIV Finder
-        </MenuItem>
+        <PermissionItem module='KIV Finder'>
+          <MenuItem href={`/${locale}/admin/kiv-finder`} icon={<i className='tabler-trending-up-2' />}>
+            KIV Finder
+          </MenuItem>
+        </PermissionItem>
 
-        <MenuItem href={`/${locale}/admin/productivity-finder`} icon={<i className='tabler-activity' />}>
-          Productivity Finder
-        </MenuItem>
+        <PermissionItem module='Productivity Finder'>
+          <MenuItem href={`/${locale}/admin/productivity-finder`} icon={<i className='tabler-activity' />}>
+            Productivity Finder
+          </MenuItem>
+        </PermissionItem>
 
         {/* ==================== REPORTS ==================== */}
-        {showHeadings && <SectionHeader label='Reports' />}
+        {showHeadings && <PermissionGroup modules={['Service Summary Report', 'RIC / Follow-up Report', 'Productivity Summary', 'SCDF Report', 'Sales Report', 'Pest Trending']}><SectionHeader label='Reports' /></PermissionGroup>}
 
-        <MenuItem href={`/${locale}/admin/service-summary-report`} icon={<i className='tabler-report' />}>
-          Service Summary Report
-        </MenuItem>
+        <PermissionItem module='Service Summary Report'>
+          <MenuItem href={`/${locale}/admin/service-summary-report`} icon={<i className='tabler-report' />}>
+            Service Summary Report
+          </MenuItem>
+        </PermissionItem>
 
-        <MenuItem href={`/${locale}/admin/ric-followup-report`} icon={<i className='tabler-report-analytics' />}>
-          RIC / Follow-up Report
-        </MenuItem>
+        <PermissionItem module='RIC / Follow-up Report'>
+          <MenuItem href={`/${locale}/admin/ric-followup-report`} icon={<i className='tabler-report-analytics' />}>
+            RIC / Follow-up Report
+          </MenuItem>
+        </PermissionItem>
 
-        <MenuItem href={`/${locale}/admin/productivity-summary`} icon={<i className='tabler-chart-bar' />}>
-          Productivity Summary
-        </MenuItem>
+        <PermissionItem module='Productivity Summary'>
+          <MenuItem href={`/${locale}/admin/productivity-summary`} icon={<i className='tabler-chart-bar' />}>
+            Productivity Summary
+          </MenuItem>
+        </PermissionItem>
 
-        <MenuItem href={`/${locale}/admin/scdf-report`} icon={<i className='tabler-file-analytics' />}>
-          SCDF Report
-        </MenuItem>
+        <PermissionItem module='SCDF Report'>
+          <MenuItem href={`/${locale}/admin/scdf-report`} icon={<i className='tabler-file-analytics' />}>
+            SCDF Report
+          </MenuItem>
+        </PermissionItem>
 
-        <MenuItem href={`/${locale}/admin/sales-report`} icon={<i className='tabler-report-money' />}>
-          Sales Report
-        </MenuItem>
+        <PermissionItem module='Sales Report'>
+          <MenuItem href={`/${locale}/admin/sales-report`} icon={<i className='tabler-report-money' />}>
+            Sales Report
+          </MenuItem>
+        </PermissionItem>
 
-        <MenuItem href={`/${locale}/admin/pest-trending`} icon={<i className='tabler-trending-up' />}>
-          Pest Trending
-        </MenuItem>
+        <PermissionItem module='Pest Trending'>
+          <MenuItem href={`/${locale}/admin/pest-trending`} icon={<i className='tabler-trending-up' />}>
+            Pest Trending
+          </MenuItem>
+        </PermissionItem>
 
         {/* ==================== AUDIT TRIAL ==================== */}
-        {showHeadings && <SectionHeader label='Audit Trial' />}
+        {showHeadings && <PermissionGroup modules={['Customer Audit', 'Contracts Audit']}><SectionHeader label='Audit Trial' /></PermissionGroup>}
 
-        <MenuItem href={`/${locale}/admin/customer-audit`} icon={<i className='tabler-archive' />}>
-          Customer Audit
-        </MenuItem>
+        <PermissionItem module='Customer Audit'>
+          <MenuItem href={`/${locale}/admin/customer-audit`} icon={<i className='tabler-archive' />}>
+            Customer Audit
+          </MenuItem>
+        </PermissionItem>
 
-        <MenuItem href={`/${locale}/admin/contracts-audit`} icon={<i className='tabler-archive' />}>
-          Contracts Audit
-        </MenuItem>
+        <PermissionItem module='Contracts Audit'>
+          <MenuItem href={`/${locale}/admin/contracts-audit`} icon={<i className='tabler-archive' />}>
+            Contracts Audit
+          </MenuItem>
+        </PermissionItem>
       </Menu>
     </ScrollWrapper>
   )

@@ -28,20 +28,27 @@ export const PermissionProvider = ({ children }) => {
   const normalizePermissions = (list) => {
     const map = {}
     list.forEach(item => {
-      // API returns: { module_name: "Chemicals", is_read: 1, is_create: 0, ... }
-      const backendName = item.module_name?.trim()
+      // Robustly get the module name
+      const backendName = (item.module_name || item.module || item.name)?.trim()
 
       if (backendName) {
         // 1. Try to find an alias
         // 2. Fallback to the backend name itself
         const frontendKey = PERMISSION_ALIASES[backendName] || backendName
 
-        // Store standard object
+        // Handle various boolean/integer formats from API (0/1, true/false, "0"/"1")
+        const getBool = (val) => {
+          if (val === true || val === 'true') return true
+          if (val === 1 || val === '1') return true
+          return false
+        }
+
+        // Store standard object with fallbacks
         const permObj = {
-          view: Number(item.is_read) === 1,
-          create: Number(item.is_create) === 1,
-          update: Number(item.is_update) === 1,
-          delete: Number(item.is_delete) === 1,
+          view: getBool(item.is_read ?? item.view ?? item.can_view ?? item.read),
+          create: getBool(item.is_create ?? item.create ?? item.can_create),
+          update: getBool(item.is_update ?? item.update ?? item.can_update ?? item.edit ?? item.can_edit),
+          delete: getBool(item.is_delete ?? item.delete ?? item.can_delete),
           ...item
         }
 
@@ -61,6 +68,7 @@ export const PermissionProvider = ({ children }) => {
     try {
       const storedUser = localStorage.getItem('user_info')
       if (!storedUser) {
+        console.warn('⚠️ No user_info in localStorage')
         setPermissions([])
         setPermissionMap({})
         setIsLoading(false)
@@ -68,25 +76,44 @@ export const PermissionProvider = ({ children }) => {
       }
 
       const userInfo = JSON.parse(storedUser)
-      const roleId = userInfo.role_id || userInfo.role?.id
+      console.log('👤 User Info:', userInfo)
 
-      if (!roleId) {
-        console.warn('⚠️ No Role ID found for logged in user.')
-        setPermissions([])
-        setPermissionMap({})
-        setIsLoading(false)
-        return
+      let data = []
+
+      // 1. Prefer using privileges already present in user_info (from Login)
+      if (userInfo.user_privileges && Array.isArray(userInfo.user_privileges) && userInfo.user_privileges.length > 0) {
+        console.log('📦 Using locally stored user_privileges from user_info')
+        data = userInfo.user_privileges
+      } 
+      // 2. Fallback: Fetch from API if role_id exists
+      else {
+        const roleId = userInfo.role_id || userInfo.role?.id
+        console.log('🔑 Role ID:', roleId)
+
+        if (roleId) {
+          // Fetch from API
+          const res = await getUserPrivilegeList(roleId)
+          data = res?.results || res?.data?.results || []
+        } else {
+           console.warn('⚠️ No Role ID found and no local user_privileges.')
+        }
       }
 
-      // Fetch from API
-      const res = await getUserPrivilegeList(roleId)
-      const data = res?.results || res?.data?.results || []
+      console.log('🔐 Permissions Data to Process:', data)
 
-      console.log('🔐 Permissions fetched:', data.length, 'items')
+      console.log('🔐 Permissions fetched Raw:', data)
+      if (data.length > 0) {
+        console.log('🧐 First item structure:', Object.keys(data[0]))
+        console.log('🧐 First item sample:', data[0])
+      }
 
       setPermissions(data)
       const normalizedMap = normalizePermissions(data)
-      console.log('🗺️ Permission Map Keys:', Object.keys(normalizedMap))
+      console.log('🗺️ Permission Map Created with Keys:', Object.keys(normalizedMap))
+      
+      // DEBUG: Check specific keys
+      console.log('❓ Check Service Request:', normalizedMap['service request'])
+      
       setPermissionMap(normalizedMap)
 
     } catch (error) {
@@ -118,20 +145,19 @@ export const PermissionProvider = ({ children }) => {
 
   // Helper to check access
   const canAccess = useCallback((moduleName, action = 'view') => {
-    // 🔴 ROLLBACK: Always allow access
-    return true
-
-    /* ORIGINAL LOGIC DISABLED
     if (!moduleName) return true
 
     // Normalize lookup to lowercase to avoid casing issues
     const key = moduleName.toLowerCase()
     const perm = permissionMap[key]
 
-    // Debug helper (uncomment if stuck)
-    // if (!perm) console.log(`🚫 Access denied or missing module: ${moduleName}`)
+    // DEBUG: Trace every access check (noisy but necessary)
+    // console.log(`🔍 Checking access: Module="${moduleName}" (Key="${key}") Action="${action}" Found=${!!perm}`)
 
-    if (!perm) return false // Strict deny if not found
+    if (!perm) {
+       // console.warn(`🚫 Access Denied: Module "${moduleName}" not found in map. Keys avail:`, Object.keys(permissionMap))
+       return false // Strict deny if not found
+    }
 
     if (action === 'view') return perm.view
     if (action === 'create') return perm.create
@@ -139,7 +165,6 @@ export const PermissionProvider = ({ children }) => {
     if (action === 'delete') return perm.delete
 
     return false
-    */
   }, [permissionMap])
 
   const triggerPrivilegeUpdate = () => {

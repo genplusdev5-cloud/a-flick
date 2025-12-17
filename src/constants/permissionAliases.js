@@ -25,12 +25,12 @@ export const PERMISSION_ALIASES = {
   'Department': 'Department',
   'Designation': 'Designation',
   'Employee': 'Employee List', // Screenshot shows 'Employee'
-  'Employee_leave': 'Employee Leaves', // Screenshot shows 'Employee_leave'
+  'Employee_leave': 'Employee Leave', // Change to match VerticalMenu: 'Employee Leave'
   'Employee Leave Type': 'Employee Leave Type',
   'User Privilege': 'User Privilege',
 
   // Service / Pest
-  'Service_types': 'Pest Type', // Screenshot shows 'Service_types', Frontend uses 'Pest Type'
+  'Service_types': 'Service Type (Pest)', // Change to match VerticalMenu: 'Service Type (Pest)'
 
   // Contracts
   'Customers': 'Customers',

@@ -32,9 +32,7 @@ const PermissionGuard = props => {
       return
     }
 
-    // 🔴 ROLLBACK: Always allow access
-    const authorized = true
-    // const authorized = canAccess(permission, action) 
+    const authorized = canAccess(permission, action) 
 
     if (authorized) {
       setIsAuthorized(true)

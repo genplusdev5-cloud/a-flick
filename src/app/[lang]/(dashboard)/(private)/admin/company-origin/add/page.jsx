@@ -380,7 +380,7 @@ export default function CompanyOriginAddPage() {
           </Grid>
 
           {/* GL Accounts */}
-          {['glContractAccount', 'glJobAccount', 'glContJobAccount', 'glWarrantyAccount'].map(field => (
+          {['GlContractAccount', 'GlJobAccount', 'GlContJobAccount', 'GlWarrantyAccount'].map(field => (
             <Grid item xs={12} md={3} key={field}>
               <CustomTextField
                 fullWidth
@@ -432,7 +432,7 @@ export default function CompanyOriginAddPage() {
           ))}
 
           {/* Bank Details */}
-          {['bankName', 'bankAccountNumber', 'bankCode', 'swiftCode'].map(field => (
+          {['BankName', 'BankAccountNumber', 'BankCode', 'SwiftCode'].map(field => (
             <Grid item xs={12} md={3} key={field}>
               <CustomTextField
                 fullWidth

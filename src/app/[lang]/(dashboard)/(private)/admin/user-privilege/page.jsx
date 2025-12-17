@@ -40,7 +40,7 @@ import {
   refreshUserRole
 } from '@/api/userRole'
 
-import { getUserPrivilegeList, getUserPrivilegeDetails, updateUserPrivilege } from '@/api/userPrivilege'
+import { getUserPrivilegeList, getUserPrivilegeDetails, updateUserPrivilege, getUserModuleList } from '@/api/userPrivilege'
 
 import FileCopyIcon from '@mui/icons-material/FileCopy'
 import CustomTextFieldWrapper from '@/components/common/CustomTextField'
@@ -55,7 +55,6 @@ import DoneIcon from '@mui/icons-material/Done'
 // Component Imports
 
 import CustomAutocomplete from '@core/components/mui/Autocomplete'
-
 import CloseIcon from '@mui/icons-material/Close'
 import PrintIcon from '@mui/icons-material/Print'
 import FileDownloadIcon from '@mui/icons-material/FileDownload'
@@ -297,8 +296,38 @@ const UserPrivilegePageContent = () => {
     console.log('Privilege list:', privileges)
   }, [privileges])
 
+  // 🔹 New: Load base module list
+  const loadModules = async () => {
+    setLoading(true)
+    try {
+      const res = await getUserModuleList()
+      const list = res.data?.results || res.data || []
+
+      // Format for table
+      const formatted = list.map((item, idx) => ({
+        sno: idx + 1,
+        module: item.name,          // Assuming 'name' is the module name field from module list API
+        id: null,// No privilege ID yet if we just load pure modules
+        module_id: item.id,
+        create: false,
+        view: false,
+        update: false,
+        delete: false
+      }))
+
+      setRows(formatted)
+      setRowCount(formatted.length)
+    } catch (err) {
+      console.error('❌ Error loading modules:', err)
+      showToast('error', 'Failed to load module list')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
     loadRoles()
+    loadModules() // 🟢 Load modules initially so table isn't empty
   }, [])
 
   useEffect(() => {
@@ -717,10 +746,11 @@ const UserPrivilegePageContent = () => {
                   onChange={(e, newValue) => {
                     if (newValue) {
                       setSelectedRole(newValue.id)
-                      fetchPrivileges(newValue.id)
+                      fetchPrivileges(newValue.id) // This fetches actual privileges
                     } else {
                       setSelectedRole('')
-                      setPrivileges([])
+                      setPrivileges([]) // clear privileges
+                      loadModules()     // 🟢 Reset to base module list
                     }
                   }}
                   renderInput={params => <CustomTextField {...params} label='User Role' placeholder='Choose a role...' />}
