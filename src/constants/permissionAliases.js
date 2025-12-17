@@ -5,6 +5,7 @@
  */
 export const PERMISSION_ALIASES = {
   // Master
+  'Master': 'Master',
   'Tax': 'Tax',
   'Company Origin': 'Company Origin',
   'Frequency_master': 'Service Frequency', // Confirmed from context

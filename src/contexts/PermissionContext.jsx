@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { getUserPrivilegeList } from '@/api/userPrivilege'
+import { getEmployeeDetails } from '@/api/employee'
 import { useParams, usePathname } from 'next/navigation'
 import { PERMISSION_ALIASES } from '@/constants/permissionAliases'
 
@@ -65,6 +66,13 @@ export const PermissionProvider = ({ children }) => {
   }
 
   const fetchPermissions = useCallback(async () => {
+    // ⚠️ REVERT: Disabled for now to restore original behavior
+    setIsLoading(false)
+    setPermissions([])
+    setPermissionMap({})
+    return
+
+    /* 
     try {
       const storedUser = localStorage.getItem('user_info')
       if (!storedUser) {
@@ -80,24 +88,32 @@ export const PermissionProvider = ({ children }) => {
 
       let data = []
 
-      // 1. Prefer using privileges already present in user_info (from Login)
-      if (userInfo.user_privileges && Array.isArray(userInfo.user_privileges) && userInfo.user_privileges.length > 0) {
-        console.log('📦 Using locally stored user_privileges from user_info')
-        data = userInfo.user_privileges
-      } 
-      // 2. Fallback: Fetch from API if role_id exists
-      else {
-        const roleId = userInfo.role_id || userInfo.role?.id
-        console.log('🔑 Role ID:', roleId)
-
-        if (roleId) {
-          // Fetch from API
-          const res = await getUserPrivilegeList(roleId)
-          data = res?.results || res?.data?.results || []
-        } else {
-           console.warn('⚠️ No Role ID found and no local user_privileges.')
-        }
+      // 1. Get current User ID from local storage (this is the only static thing we trust)
+      const userId = userInfo.id || userInfo.user_id 
+      
+      if (!userId) {
+        console.warn('⚠️ No user ID found in local storage')
+        return
       }
+
+      // 2. Fetch FRESH user details to get the current Role ID
+      const userDetails = await getEmployeeDetails(userId)
+      // Check response structure: EditPage suggests res.data contains fields like user_role_id
+      const freshData = userDetails?.data || userDetails || {}
+      
+      // Try multiple possible keys for Role ID
+      const freshRoleId = freshData.user_role_id || freshData.role_id || freshData.role?.id
+
+      if (!freshRoleId) {
+        console.error('❌ Could not find Role ID for user', userId, 'Response:', userDetails)
+        return
+      }
+
+      console.log('✅ Fresh Role ID fetched:', freshRoleId)
+
+      // 3. Fetch privileges for this FRESH role
+      const res = await getUserPrivilegeList(freshRoleId)
+      data = res?.results || res?.data?.results || []
 
       console.log('🔐 Permissions Data to Process:', data)
 
@@ -111,9 +127,6 @@ export const PermissionProvider = ({ children }) => {
       const normalizedMap = normalizePermissions(data)
       console.log('🗺️ Permission Map Created with Keys:', Object.keys(normalizedMap))
       
-      // DEBUG: Check specific keys
-      console.log('❓ Check Service Request:', normalizedMap['service request'])
-      
       setPermissionMap(normalizedMap)
 
     } catch (error) {
@@ -121,6 +134,7 @@ export const PermissionProvider = ({ children }) => {
     } finally {
       setIsLoading(false)
     }
+    */
   }, [])
 
   // Initial Fetch & Listener
@@ -145,14 +159,15 @@ export const PermissionProvider = ({ children }) => {
 
   // Helper to check access
   const canAccess = useCallback((moduleName, action = 'view') => {
+    // ⚠️ REVERT: Always allow access
+    return true
+    
+    /* 
     if (!moduleName) return true
 
     // Normalize lookup to lowercase to avoid casing issues
     const key = moduleName.toLowerCase()
     const perm = permissionMap[key]
-
-    // DEBUG: Trace every access check (noisy but necessary)
-    // console.log(`🔍 Checking access: Module="${moduleName}" (Key="${key}") Action="${action}" Found=${!!perm}`)
 
     if (!perm) {
        // console.warn(`🚫 Access Denied: Module "${moduleName}" not found in map. Keys avail:`, Object.keys(permissionMap))
@@ -165,6 +180,7 @@ export const PermissionProvider = ({ children }) => {
     if (action === 'delete') return perm.delete
 
     return false
+    */
   }, [permissionMap])
 
   const triggerPrivilegeUpdate = () => {

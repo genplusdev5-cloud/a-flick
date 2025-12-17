@@ -54,10 +54,15 @@ const PermissionGuard = props => {
     )
   }
 
+  // ⚠️ REVERT: Always render children
+  return <>{children}</>
+  
+  /*
   // If we are done loading and authorized, render children.
   // If not authorized, we already triggered redirect in useEffect, 
   // but we return null here to avoid flashing content.
   return isAuthorized ? <>{children}</> : null
+  */
 }
 
 export default PermissionGuard
