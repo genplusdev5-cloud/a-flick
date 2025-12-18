@@ -19,6 +19,7 @@ import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import GlobalSelect from '@/components/common/GlobalSelect'
+import GlobalButton from '@/components/common/GlobalButton'
 
 import CustomTextFieldWrapper from '@/components/common/CustomTextField'
 import CustomSelectField from '@/components/common/CustomSelectField'
@@ -29,6 +30,7 @@ import { showToast } from '@/components/common/Toasts'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 
 import styles from '@core/styles/table.module.css'
+import { Global } from 'recharts'
 
 export default function FindingDrawerContent({ pestId }) {
   const [rows, setRows] = useState([])
@@ -181,13 +183,8 @@ export default function FindingDrawerContent({ pestId }) {
         )}
 
         <Grid item xs={12} display='flex' gap={2}>
-          <Button variant='contained' fullWidth onClick={handleSubmit}>
-            {editId ? 'Update Finding' : 'Add Finding'}
-          </Button>
-
           {editId && (
-            <Button
-              variant='outlined'
+            <GlobalButton
               fullWidth
               color='secondary'
               onClick={() => {
@@ -196,8 +193,11 @@ export default function FindingDrawerContent({ pestId }) {
               }}
             >
               Cancel
-            </Button>
+            </GlobalButton>
           )}
+          <GlobalButton variant='contained' fullWidth onClick={handleSubmit}>
+            {editId ? 'Update Finding' : 'Add Finding'}
+          </GlobalButton>
         </Grid>
       </Grid>
 
@@ -230,7 +230,7 @@ export default function FindingDrawerContent({ pestId }) {
 
                     <td>
                       <IconButton size='small' color='primary' onClick={() => handleEdit(row)}>
-                        <EditIcon />
+                        <i className='tabler-edit' />
                       </IconButton>
 
                       <IconButton
@@ -241,7 +241,7 @@ export default function FindingDrawerContent({ pestId }) {
                           setOpenDelete(true)
                         }}
                       >
-                        <DeleteIcon />
+                        <i className='tabler-trash text-red-600 text-lg' />
                       </IconButton>
                     </td>
 
@@ -325,23 +325,23 @@ export default function FindingDrawerContent({ pestId }) {
 
         {/* ⚙️ Buttons */}
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-          <Button
+          <GlobalButton
             onClick={() => setOpenDelete(false)}
             variant='tonal'
             color='secondary'
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
           >
             Cancel
-          </Button>
+          </GlobalButton>
 
-          <Button
+          <GlobalButton
             onClick={confirmDelete}
             variant='contained'
             color='error'
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
           >
             Delete
-          </Button>
+          </GlobalButton>
         </DialogActions>
       </Dialog>
     </Box>

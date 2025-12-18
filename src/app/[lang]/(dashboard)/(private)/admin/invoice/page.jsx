@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { format } from 'date-fns'
 
@@ -56,6 +57,7 @@ const columnHelper = createColumnHelper()
 
 const InvoiceListPageFullContent = () => {
   const { canAccess } = usePermission()
+  const searchParams = useSearchParams()
   // ── Data & Dropdowns ────────────────────────
   const [data, setData] = useState([])
   const [dropdownData, setDropdownData] = useState({})
@@ -73,29 +75,84 @@ const InvoiceListPageFullContent = () => {
   const [contractLevelFilter, setContractLevelFilter] = useState('')
   const [invoiceTypeFilter, setInvoiceTypeFilter] = useState('')
   const [salesPersonFilter, setSalesPersonFilter] = useState('')
-  const [customerFilter, setCustomerFilter] = useState('')
-  const [contractFilter, setContractFilter] = useState('')
+
+  const encodedCustomer = searchParams.get('customer')
+  const encodedContract = searchParams.get('contract')
+
+  const decodedCustomerId = encodedCustomer ? Number(atob(encodedCustomer)) : null
+  const decodedContractId = encodedContract ? Number(atob(encodedContract)) : null
+
+  // ✅ REQUIRED STATES (YOU MISSED THIS)
+  const [customerFilter, setCustomerFilter] = useState(null)
+  const [contractFilter, setContractFilter] = useState(null)
+
+  //CUSTOMER FILTERS
+  useEffect(() => {
+    if (!decodedCustomerId || !dropdownData.customers?.length) return
+
+    const matchedCustomer = dropdownData.customers.find(c => Number(c.id) === Number(decodedCustomerId))
+
+    if (matchedCustomer) {
+      setCustomerFilter(matchedCustomer)
+    }
+  }, [decodedCustomerId, dropdownData.customers])
+
+  //CONTRACT FILTER
+
+  useEffect(() => {
+    if (!decodedContractId || !dropdownData.contracts?.length) return
+
+    const matchedContract = dropdownData.contracts.find(c => Number(c.id) === Number(decodedContractId))
+
+    if (matchedContract) {
+      setContractFilter(matchedContract)
+    }
+  }, [decodedContractId, dropdownData.contracts])
+
   const [searchText, setSearchText] = useState('')
   const [totalCount, setTotalCount] = useState(0)
   const [customerSpecificContracts, setCustomerSpecificContracts] = useState(null)
   const [dateFilter, setDateFilter] = useState(false) // renamed from dateFilterEnabled
   const today = new Date()
   const [dateRange, setDateRange] = useState([null, null])
+
   // PDF Preview Invoice Data
   const [selectedInvoiceData, setSelectedInvoiceData] = useState(null)
-
   // ── Pagination ───────────────────────────────
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
+
+  // ───────────────────────────────────────────
+  // 🔥 URL Params for Redirection handled in Lazy State Init
+  // ───────────────────────────────────────────
 
   const loadContractsForCustomer = async customerId => {
     try {
       const res = await getInvoiceDropdowns({ customer_id: customerId })
       const dd = res?.data?.data || {}
 
-      setDropdownData(prev => ({
-        ...prev,
-        contracts: normalizeList(dd.contract_list?.label, 'label')
-      }))
+      setDropdownData(prev => {
+        let normalizedContracts = normalizeList(dd.contract_list?.label, 'label')
+
+        // 🔥 PERSIST URL OPTION (Contract)
+        // We use window.location because searchParams might be stale if inside closure?
+        // Actually searchParams is from top scope 'useSearchParams', it should be fine.
+        const urlContractId = searchParams.get('contract')
+        const urlContractCode = searchParams.get('contractCode')
+        const urlCustId = searchParams.get('customer')
+
+        // Ensure we only add if it belongs to this customer (roughly checked by URL presence)
+        if (urlContractId && urlContractCode) {
+          const exists = normalizedContracts.find(c => String(c.id) === String(urlContractId))
+          if (!exists) {
+            normalizedContracts.push({ id: Number(urlContractId), label: urlContractCode })
+          }
+        }
+
+        return {
+          ...prev,
+          contracts: normalizedContracts
+        }
+      })
     } catch (err) {
       console.log(err)
       showToast('error', 'Failed to load contracts')
@@ -125,8 +182,19 @@ const InvoiceListPageFullContent = () => {
     if (contractLevelFilter?.id) params.contract_level = contractLevelFilter.id
     if (invoiceTypeFilter?.id) params.invoice_type = invoiceTypeFilter.id
     if (salesPersonFilter?.id) params.sales_person_id = salesPersonFilter.id
-    if (customerFilter?.id) params.customer_id = customerFilter.id
-    if (contractFilter?.id) params.contract_id = contractFilter.id
+    // 🔥 ALWAYS SEND DECODED IDs TO API
+    if (decodedCustomerId) {
+      params.customer_id = decodedCustomerId
+    } else if (customerFilter?.id) {
+      params.customer_id = customerFilter.id
+    }
+
+    if (decodedContractId) {
+      params.contract_id = decodedContractId
+    } else if (contractFilter?.id) {
+      params.contract_id = contractFilter.id
+    }
+
     if (searchText.trim()) params.search = searchText.trim()
 
     return params
@@ -206,12 +274,40 @@ const InvoiceListPageFullContent = () => {
       const ddWrapper = dropdownRes?.data || dropdownRes || {}
       const dd = ddWrapper?.data || {}
 
+      let processedCustomers = dedupeById(dd.customer?.label || [])
+
+      // 🔥 PERSIST URL OPTION (Customer)
+      const urlCustId = searchParams.get('customer')
+      const urlCustName = searchParams.get('customerName')
+
+      if (urlCustId && urlCustName) {
+        const exists = processedCustomers.find(c => String(c.id) === String(urlCustId))
+        if (!exists) {
+          processedCustomers.push({ id: Number(urlCustId), label: urlCustName })
+        }
+      }
+
+      let processedContracts = customerSpecificContracts
+        ? customerSpecificContracts
+        : dedupeById(dd.contract_list?.label || [])
+
+      // 🔥 PERSIST URL OPTION (Contract)
+      const urlContractId = searchParams.get('contract')
+      const urlContractCode = searchParams.get('contractCode')
+
+      if (urlContractId && urlContractCode) {
+        const exists = processedContracts.find(c => String(c.id) === String(urlContractId))
+        if (!exists) {
+          processedContracts.push({ id: Number(urlContractId), label: urlContractCode })
+        }
+      }
+
       const processedDropdowns = {
         origins: dedupeById(dd.company?.name || []),
         billing_frequencies: dedupeById(dd.billing_frequency?.name || []),
         service_frequencies: dedupeById(dd.service_frequency?.name || []),
-        customers: dedupeById(dd.customer?.label || []),
-        contracts: customerSpecificContracts ? customerSpecificContracts : dedupeById(dd.contract_list?.label || []),
+        customers: processedCustomers,
+        contracts: processedContracts,
         sales_persons: dedupeById(dd.sales_person?.name || []),
         contract_levels: dedupeById(dd.contract_level?.name || []),
         invoice_statuses: [
@@ -222,6 +318,7 @@ const InvoiceListPageFullContent = () => {
         invoice_types: dedupeById(dd.invoice_type?.name || [])
       }
       setDropdownData(processedDropdowns)
+
       setData(results.map(inv => mapInvoice(inv, processedDropdowns)))
       setTotalCount(count)
     } catch (err) {
@@ -953,7 +1050,7 @@ const InvoiceListPageFullContent = () => {
 // Wrapper for RBAC
 export default function InvoiceListPageFull() {
   return (
-    <PermissionGuard permission="Invoice">
+    <PermissionGuard permission='Invoice'>
       <InvoiceListPageFullContent />
     </PermissionGuard>
   )

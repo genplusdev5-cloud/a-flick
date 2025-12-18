@@ -13,6 +13,7 @@ import GlobalSelect from '@/components/common/GlobalSelect'
 import styles from '@core/styles/table.module.css'
 import { showToast } from '@/components/common/Toasts'
 import { addAction, updateAction } from '@/api/actions'
+import GlobalButton from '../common/GlobalButton'
 
 export default function ActionDrawerContent({ pestId, rows, reload, onDelete }) {
   const [editId, setEditId] = useState(null)
@@ -111,13 +112,9 @@ export default function ActionDrawerContent({ pestId, rows, reload, onDelete }) 
         )}
 
         <Grid item xs={12} display='flex' gap={2}>
-          <Button variant='contained' fullWidth disabled={loading} onClick={handleSubmit}>
-            {editId ? 'Update Action' : 'Add Action'}
-          </Button>
-
           {editId && (
-            <Button
-              variant='outlined'
+            <GlobalButton
+              color='secondary'
               fullWidth
               onClick={() => {
                 setEditId(null)
@@ -125,8 +122,11 @@ export default function ActionDrawerContent({ pestId, rows, reload, onDelete }) 
               }}
             >
               Cancel
-            </Button>
+            </GlobalButton>
           )}
+          <GlobalButton variant='contained' fullWidth disabled={loading} onClick={handleSubmit}>
+            {editId ? 'Update Action' : 'Add Action'}
+          </GlobalButton>
         </Grid>
       </Grid>
 
@@ -154,12 +154,12 @@ export default function ActionDrawerContent({ pestId, rows, reload, onDelete }) 
 
                   <td>
                     <Box sx={{ display: 'flex', gap: 1 }}>
-                      <IconButton size='small' onClick={() => handleEditClick(row)}>
-                        <EditIcon fontSize='small' />
+                      <IconButton size='small' color='primary' onClick={() => handleEditClick(row)}>
+                        <i className='tabler-edit' />
                       </IconButton>
 
                       <IconButton size='small' color='error' onClick={() => onDelete(row.id)}>
-                        <DeleteIcon fontSize='small' />
+                        <i className='tabler-trash text-red-600 text-lg' />
                       </IconButton>
                     </Box>
                   </td>

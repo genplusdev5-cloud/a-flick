@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
   Box,
@@ -26,6 +26,17 @@ import TablePaginationComponent from '@/components/TablePaginationComponent'
 import SearchIcon from '@mui/icons-material/Search'
 import styles from '@core/styles/table.module.css'
 
+import classnames from 'classnames'
+import ChevronRight from '@menu/svg/ChevronRight'
+
+import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  flexRender,
+  createColumnHelper
+} from '@tanstack/react-table'
+
 // --------------------------------------------------------------------
 
 // ───────────────────────────────────────────
@@ -39,6 +50,18 @@ const TimesoftSummaryReportContent = () => {
   const [rows, setRows] = useState([])
   const [dateFilter, setDateFilter] = useState(true)
   const [dateRange, setDateRange] = useState([null, null])
+  const [sorting, setSorting] = useState([])
+
+  useEffect(() => {
+    if (!rows.length) return
+
+    setRows(prev =>
+      prev.map((item, index) => ({
+        ...item,
+        sno: index + 1 + pagination.pageIndex * pagination.pageSize
+      }))
+    )
+  }, [pagination.pageIndex, pagination.pageSize])
 
   const monthsList = [
     'January',
@@ -55,20 +78,35 @@ const TimesoftSummaryReportContent = () => {
     'December'
   ]
 
+  const columnHelper = createColumnHelper()
+
   const columns = [
-    { key: 'index', label: '#' },
-    { key: 'employee', label: 'Employee' },
-    { key: 'normal', label: 'Normal' },
-    { key: 'ot10l', label: 'OT1.0L' },
-    { key: 'ot15l', label: 'OT1.5L' },
-    { key: 'ot20l', label: 'OT2.0L' },
-    { key: 'ot10c', label: 'OT1.0C' },
-    { key: 'ot15c', label: 'OT1.5C' },
-    { key: 'ot20c', label: 'OT2.0C' },
-    { key: 'last_updated', label: 'Last Updated' },
-    { key: 'updated_on', label: 'Updated On' },
-    { key: 'updated_by', label: 'Updated By' }
+    columnHelper.accessor('sno', {
+      header: 'S.No',
+      enableSorting: true
+    }),
+
+    columnHelper.accessor('employee', { header: 'Employee' }),
+    columnHelper.accessor('normal', { header: 'Normal' }),
+    columnHelper.accessor('ot10l', { header: 'OT1.0L' }),
+    columnHelper.accessor('ot15l', { header: 'OT1.5L' }),
+    columnHelper.accessor('ot20l', { header: 'OT2.0L' }),
+    columnHelper.accessor('ot10c', { header: 'OT1.0C' }),
+    columnHelper.accessor('ot15c', { header: 'OT1.5C' }),
+    columnHelper.accessor('ot20c', { header: 'OT2.0C' }),
+    columnHelper.accessor('last_updated', { header: 'Last Updated' }),
+    columnHelper.accessor('updated_on', { header: 'Updated On' }),
+    columnHelper.accessor('updated_by', { header: 'Updated By' })
   ]
+
+  const table = useReactTable({
+    data: rows,
+    columns,
+    state: { sorting },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel()
+  })
 
   return (
     <Box>
@@ -252,28 +290,42 @@ const TimesoftSummaryReportContent = () => {
         <div className='overflow-x-auto'>
           <table className={styles.table}>
             <thead>
-              <tr>
-                {columns.map(col => (
-                  <th key={col.key}>
-                    <div className='flex items-center'>{col.label}</div>
-                  </th>
-                ))}
-              </tr>
+              {table.getHeaderGroups().map(hg => (
+                <tr key={hg.id}>
+                  {hg.headers.map(h => (
+                    <th key={h.id}>
+                      <div
+                        className={classnames({
+                          'flex items-center': h.column.getIsSorted(),
+                          'cursor-pointer select-none': h.column.getCanSort()
+                        })}
+                        onClick={h.column.getToggleSortingHandler()}
+                      >
+                        {flexRender(h.column.columnDef.header, h.getContext())}
+                        {{
+                          asc: <ChevronRight className='-rotate-90' />,
+                          desc: <ChevronRight className='rotate-90' />
+                        }[h.column.getIsSorted()] ?? null}
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              ))}
             </thead>
 
             <tbody>
-              {rows.length ? (
-                rows.map((row, index) => (
-                  <tr key={index}>
-                    {columns.map(col => (
-                      <td key={col.key}>{row[col.key] ?? '-'}</td>
+              {table.getRowModel().rows.length ? (
+                table.getRowModel().rows.map(row => (
+                  <tr key={row.id}>
+                    {row.getVisibleCells().map(cell => (
+                      <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
                     ))}
                   </tr>
                 ))
               ) : (
                 <tr>
                   <td colSpan={columns.length} className='text-center py-4'>
-                    Loading...
+                    No data found
                   </td>
                 </tr>
               )}
@@ -291,7 +343,7 @@ const TimesoftSummaryReportContent = () => {
 // Wrapper for RBAC
 export default function TimesoftSummaryReport() {
   return (
-    <PermissionGuard permission="Payslip">
+    <PermissionGuard permission='Payslip'>
       <TimesoftSummaryReportContent />
     </PermissionGuard>
   )

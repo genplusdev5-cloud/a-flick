@@ -34,6 +34,7 @@ import {
 
 import { showToast } from '@/components/common/Toasts'
 import styles from '@core/styles/table.module.css'
+import GlobalButton from '../common/GlobalButton'
 
 export default function RecommendationDrawerContent({ pestId }) {
   const [rows, setRows] = useState([])
@@ -173,13 +174,10 @@ export default function RecommendationDrawerContent({ pestId }) {
         )}
 
         <Grid item xs={12} display='flex' gap={2}>
-          <Button variant='contained' fullWidth onClick={handleSubmit} startIcon={<AddIcon />}>
-            {editId ? 'Update Recommendation' : 'Add Recommendation'}
-          </Button>
+
 
           {editId && (
-            <Button
-              variant='outlined'
+            <GlobalButton
               color='secondary'
               fullWidth
               onClick={() => {
@@ -188,8 +186,11 @@ export default function RecommendationDrawerContent({ pestId }) {
               }}
             >
               Cancel
-            </Button>
+            </GlobalButton>
           )}
+            <GlobalButton variant='contained' fullWidth onClick={handleSubmit} startIcon={<AddIcon />}>
+            {editId ? 'Update Recommendation' : 'Add Recommendation'}
+          </GlobalButton>
         </Grid>
       </Grid>
 
@@ -223,7 +224,7 @@ export default function RecommendationDrawerContent({ pestId }) {
                     <td>
                       <Box sx={{ display: 'flex', gap: 1 }}>
                         <IconButton size='small' color='primary' onClick={() => handleEdit(row)}>
-                          <EditIcon fontSize='small' />
+                          <i className='tabler-edit' />
                         </IconButton>
 
                         <IconButton
@@ -234,7 +235,7 @@ export default function RecommendationDrawerContent({ pestId }) {
                             setOpenDelete(true)
                           }}
                         >
-                          <DeleteIcon fontSize='small' />
+                          <i className='tabler-trash text-red-600 text-lg' />
                         </IconButton>
                       </Box>
                     </td>

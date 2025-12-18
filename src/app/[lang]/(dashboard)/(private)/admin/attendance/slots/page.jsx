@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import {
   Box,
@@ -52,6 +52,13 @@ import TablePaginationComponent from '@/components/TablePaginationComponent'
 import styles from '@core/styles/table.module.css'
 import classnames from 'classnames'
 import ChevronRight from '@menu/svg/ChevronRight'
+import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  flexRender,
+  createColumnHelper
+} from '@tanstack/react-table'
 
 // ------------------------------------------------------------------------------------------------
 
@@ -86,7 +93,13 @@ const SlotsPageContent = () => {
       const slots = res?.data?.data?.results || []
       const total = res?.data?.data?.count || 0
 
-      setRows(slots)
+      // ✅ ADD S.NO HERE (JUST LIKE CONTRACT STATUS)
+      const normalized = slots.map((item, index) => ({
+        ...item,
+        sno: index + 1 + pagination.pageIndex * pagination.pageSize
+      }))
+
+      setRows(normalized)
       setPagination(prev => ({
         ...prev,
         totalCount: total
@@ -222,19 +235,67 @@ const SlotsPageContent = () => {
     toggleDrawer()
   }
 
-  const columns = [
-    { key: 'sno', label: 'S.No' },
-    { key: 'action', label: 'Action' },
-    { key: 'name', label: 'Name' },
-    { key: 'start_time', label: 'Start Time' },
-    { key: 'end_time', label: 'End Time' },
-    { key: 'work_hours', label: 'Work Hours' },
-    { key: 'lunch_deduction', label: 'Lunch Deduction' },
-    { key: 'is_ot', label: 'Is OT' },
-    { key: 'ot_value', label: 'OT Value' },
-    { key: 'is_default', label: 'Is Default' },
-    { key: 'status', label: 'Status' }
-  ]
+  const columnHelper = createColumnHelper()
+
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor('sno', {
+        header: 'S.No',
+        enableSorting: true
+      }),
+
+      columnHelper.display({
+        id: 'actions',
+        header: 'Action',
+        cell: ({ row }) => (
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <IconButton size='small' color='primary' onClick={() => handleEdit(row.original)}>
+              <i className='tabler-edit' />
+            </IconButton>
+            <IconButton size='small' color='error' onClick={() => handleDelete(row.original.id)}>
+              <i className='tabler-trash text-red-600 text-lg' />
+            </IconButton>
+          </Box>
+        )
+      }),
+
+      columnHelper.accessor('name', { header: 'Name', enableSorting: true }),
+      columnHelper.accessor('start_time', { header: 'Start Time', enableSorting: true }),
+      columnHelper.accessor('end_time', { header: 'End Time', enableSorting: true }),
+      columnHelper.accessor('work_hours', { header: 'Work Hours', enableSorting: true }),
+      columnHelper.accessor('lunch_deduction', { header: 'Lunch Deduction' }),
+      columnHelper.accessor('is_ot', {
+        header: 'Is OT',
+        cell: i => (i.getValue() ? 'Yes' : 'No')
+      }),
+      columnHelper.accessor('ot_value', { header: 'OT Value' }),
+      columnHelper.accessor('is_default', {
+        header: 'Is Default',
+        cell: i => (i.getValue() ? 'Yes' : 'No')
+      }),
+      columnHelper.accessor('is_active', {
+        header: 'Status',
+        cell: i =>
+          i.getValue() === 1 ? (
+            <Chip label='Active' color='success' size='small' />
+          ) : (
+            <Chip label='Inactive' color='error' size='small' />
+          )
+      })
+    ],
+    []
+  )
+
+  const table = useReactTable({
+    data: rows,
+    columns,
+    state: { pagination },
+    manualPagination: true,
+    pageCount: Math.ceil((pagination.totalCount || 0) / pagination.pageSize),
+    onPaginationChange: setPagination,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel()
+  })
 
   return (
     <Box>
@@ -424,53 +485,36 @@ const SlotsPageContent = () => {
         <div className='overflow-x-auto'>
           <table className={styles.table}>
             <thead>
-              <tr>
-                {columns.map(col => (
-                  <th key={col.key}>
-                    <div className='flex items-center cursor-default select-none'>{col.label}</div>
-                  </th>
-                ))}
-              </tr>
+              {table.getHeaderGroups().map(hg => (
+                <tr key={hg.id}>
+                  {hg.headers.map(h => (
+                    <th key={h.id}>
+                      <div
+                        className={classnames({
+                          'flex items-center': h.column.getIsSorted(),
+                          'cursor-pointer select-none': h.column.getCanSort()
+                        })}
+                        onClick={h.column.getToggleSortingHandler()}
+                      >
+                        {flexRender(h.column.columnDef.header, h.getContext())}
+                        {{
+                          asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
+                          desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
+                        }[h.column.getIsSorted()] ?? null}
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              ))}
             </thead>
 
             <tbody>
-              {rows.length ? (
-                rows.map((row, index) => (
-                  <tr key={index}>
-                    <td>{pagination.pageIndex * pagination.pageSize + (index + 1)}</td>
-
-                    {/* ACTION BUTTONS */}
-                    <td>
-                      <Box sx={{ display: 'flex', gap: 1 }}>
-                        <IconButton
-                          size='small'
-                          color='primary'
-                          onClick={() => handleEdit(row)} // <-- ADD THIS
-                        >
-                          <i className='tabler-edit ' />
-                        </IconButton>
-
-                        <IconButton size='small' color='error' onClick={() => handleDelete(row.id)}>
-                          <i className='tabler-trash text-red-600 text-lg' />
-                        </IconButton>
-                      </Box>
-                    </td>
-
-                    <td>{row.name}</td>
-                    <td>{row.start_time}</td>
-                    <td>{row.end_time}</td>
-                    <td>{row.work_hours}</td>
-                    <td>{row.lunch_deduction}</td>
-                    <td>{row.is_ot ? 'Yes' : 'No'}</td>
-                    <td>{row.ot_value}</td>
-                    <td>{row.is_default ? 'Yes' : 'No'}</td>
-                    <td>
-                      {row.is_active == 1 ? (
-                        <Chip label='Active' color='success' size='small' />
-                      ) : (
-                        <Chip label='Inactive' color='error' size='small' />
-                      )}
-                    </td>
+              {table.getRowModel().rows.length ? (
+                table.getRowModel().rows.map(row => (
+                  <tr key={row.id}>
+                    {row.getVisibleCells().map(cell => (
+                      <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                    ))}
                   </tr>
                 ))
               ) : (
@@ -696,7 +740,7 @@ const SlotsPageContent = () => {
 // Wrapper for RBAC
 export default function SlotsPage() {
   return (
-    <PermissionGuard permission="Slots">
+    <PermissionGuard permission='Slots'>
       <SlotsPageContent />
     </PermissionGuard>
   )

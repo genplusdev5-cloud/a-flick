@@ -27,6 +27,7 @@ import ProgressCircularCustomization from '@/components/common/ProgressCircularC
 import { getChecklistList, addChecklist, updateChecklist, deleteChecklist } from '@/api/checklist'
 import { showToast } from '@/components/common/Toasts'
 import styles from '@core/styles/table.module.css'
+import GlobalButton from '../common/GlobalButton'
 
 export default function ChecklistDrawerContent({ pestId }) {
   const [rows, setRows] = useState([])
@@ -164,13 +165,8 @@ export default function ChecklistDrawerContent({ pestId }) {
         )}
 
         <Grid item xs={12} display='flex' gap={2}>
-          <Button variant='contained' fullWidth startIcon={<AddIcon />} onClick={handleSubmit}>
-            {editId ? 'Update Checklist' : 'Add Checklist'}
-          </Button>
-
           {editId && (
-            <Button
-              variant='outlined'
+            <GlobalButton
               fullWidth
               color='secondary'
               onClick={() => {
@@ -179,8 +175,11 @@ export default function ChecklistDrawerContent({ pestId }) {
               }}
             >
               Cancel
-            </Button>
+            </GlobalButton>
           )}
+          <GlobalButton variant='contained' fullWidth startIcon={<AddIcon />} onClick={handleSubmit}>
+            {editId ? 'Update Checklist' : 'Add Checklist'}
+          </GlobalButton>
         </Grid>
       </Grid>
 
@@ -213,8 +212,8 @@ export default function ChecklistDrawerContent({ pestId }) {
 
                     <td>
                       <Box sx={{ display: 'flex', gap: 1 }}>
-                        <IconButton size='small' onClick={() => handleEdit(row)}>
-                          <EditIcon fontSize='small' />
+                        <IconButton size='small' color='primary' onClick={() => handleEdit(row)}>
+                          <i className='tabler-edit' />
                         </IconButton>
 
                         <IconButton
@@ -225,7 +224,7 @@ export default function ChecklistDrawerContent({ pestId }) {
                             setOpenDelete(true)
                           }}
                         >
-                          <DeleteIcon fontSize='small' />
+                          <i className='tabler-trash text-red-600 text-lg' />
                         </IconButton>
                       </Box>
                     </td>
@@ -297,13 +296,13 @@ export default function ChecklistDrawerContent({ pestId }) {
         </DialogContent>
 
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-          <Button variant='tonal' color='secondary' onClick={() => setOpenDelete(false)}>
+          <GlobalButton variant='tonal' color='secondary' onClick={() => setOpenDelete(false)}>
             Cancel
-          </Button>
+          </GlobalButton>
 
-          <Button variant='contained' color='error' onClick={confirmDelete}>
+          <GlobalButton variant='contained' color='error' onClick={confirmDelete}>
             Delete
-          </Button>
+          </GlobalButton>
         </DialogActions>
       </Dialog>
     </Box>

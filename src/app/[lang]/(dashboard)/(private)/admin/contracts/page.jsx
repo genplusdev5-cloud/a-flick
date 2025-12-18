@@ -382,6 +382,80 @@ const ContractsPageContent = () => {
         header: 'Customer'
       }),
 
+      columnHelper.display({
+        id: 'serve_column',
+        header: 'Serve',
+        meta: { width: '140px', align: 'center' },
+
+        cell: ({ row }) => {
+          const item = row.original
+
+          return (
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: 'column', // 🔥 MELA–KILE
+                alignItems: 'center',
+                gap: 0.5
+              }}
+            >
+              {/* 🟢 SERVICE BUTTON (TOP) */}
+              <Button
+                variant='outlined'
+                size='small'
+                sx={{
+                  minWidth: 80,
+                  height: 26,
+                  color: '#2e7d32', // green text
+                  borderColor: '#66bb6a', // green border
+                  textTransform: 'none',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  '&:hover': {
+                    bgcolor: '#e8f5e9',
+                    borderColor: '#2e7d32'
+                  }
+                }}
+                onClick={() => {
+                  const encodedContractId = btoa(item.id.toString())
+                  const encodedCustomerId = btoa(item.customer_id.toString())
+
+                  router.push(`/en/admin/service-request?customer=${encodedCustomerId}&contract=${encodedContractId}`)
+                }}
+              >
+                Service
+              </Button>
+
+              {/* 🔵 INVOICE BUTTON (BOTTOM) */}
+              <Button
+                variant='outlined'
+                size='small'
+                sx={{
+                  minWidth: 80,
+                  height: 26,
+                  color: '#c62828', // red text
+                  borderColor: '#ef5350', // red border
+                  textTransform: 'none',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  '&:hover': {
+                    bgcolor: '#ffebee',
+                    borderColor: '#c62828'
+                  }
+                }}
+                onClick={() => {
+                  const encodedContractId = btoa(item.id.toString())
+                  const encodedCustomerId = btoa(item.customer_id.toString())
+
+                  router.push(`/en/admin/invoice?customer=${encodedCustomerId}&contract=${encodedContractId}`)
+                }}
+              >
+                Invoice
+              </Button>
+            </Box>
+          )
+        }
+      }),
       columnHelper.accessor('contractCode', {
         id: 'code_column',
         header: 'Code'
@@ -942,7 +1016,7 @@ const ContractsPageContent = () => {
 // Wrapper for RBAC
 export default function ContractsPage() {
   return (
-    <PermissionGuard permission="Contracts">
+    <PermissionGuard permission='Contracts'>
       <ContractsPageContent />
     </PermissionGuard>
   )

@@ -306,7 +306,7 @@ const ContractStatusPageContent = () => {
       columnHelper.accessor('sno', {
         header: 'S.No',
         meta: { width: '60px', align: 'center' },
-        enableSorting: false
+         enableSorting: true
       }),
       columnHelper.display({
         id: 'actions_column',

@@ -29,6 +29,7 @@ import {
 import { addSiteRisk, getSiteRiskList, getSiteRiskDetails, updateSiteRisk, deleteSiteRisk } from '@/api/siterisk'
 
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
+import PermissionGuard from '@/components/auth/PermissionGuard'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import EditIcon from '@mui/icons-material/Edit'
@@ -842,7 +843,7 @@ const SiteRiskPageContent = () => {
 // Wrapper for RBAC
 export default function SiteRiskPage() {
   return (
-    <PermissionGuard permission="Site Risk">
+    <PermissionGuard permission='Site Risk'>
       <SiteRiskPageContent />
     </PermissionGuard>
   )

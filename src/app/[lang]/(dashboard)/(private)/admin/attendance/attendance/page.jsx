@@ -35,6 +35,8 @@ import {
 import PermissionGuard from '@/components/auth/PermissionGuard'
 
 import { getAttendanceList, deleteAttendance } from '@/api/attendance'
+import { getAttendanceById } from '@/api/attendance/details'
+
 import { getAttendanceDropdowns } from '@/api/attendance/dropdowns'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 
@@ -138,6 +140,27 @@ const AttendancePageContent = () => {
     }
   }
 
+  useEffect(() => {
+    const openScheduleId = searchParams.get('openScheduleId')
+    if (!openScheduleId) return
+
+    // already injected → skip
+    if (rows.some(r => String(r.id) === String(openScheduleId))) return
+
+    const fetchSingle = async () => {
+      try {
+        const res = await getAttendanceById(openScheduleId)
+
+        // 🔥 inject record manually
+        setRows(prev => [res.data || res, ...prev])
+      } catch (err) {
+        console.error('Single attendance fetch failed', err)
+      }
+    }
+
+    fetchSingle()
+  }, [searchParams])
+
   const handleDelete = async id => {
     if (!window.confirm('Are you sure you want to delete this attendance record?')) {
       return
@@ -194,33 +217,39 @@ const AttendancePageContent = () => {
     fetchDropdowns()
   }, [])
 
-  // AUTO-OPEN DRAWER LOGIC
   useEffect(() => {
-    // 1. Get param
     const openScheduleId = searchParams.get('openScheduleId')
-
-    // 2. DEPENDENCIES CHECK:
     if (!openScheduleId) return
-    if (!rows || rows.length === 0) return
-    if (!dropdowns.technicians?.length || !dropdowns.slots?.length) return
 
-    // 3. FIND ROW
-    const matchedRow = rows.find(r => String(r.id) === String(openScheduleId))
+    // Already opened → skip
+    if (autoOpenedRef.current) return
 
-    if (matchedRow) {
-      // 4. OPEN DRAWER
-      setSelectedAttendance(matchedRow)
-      setDrawerOpen(true)
+    const openDrawer = async () => {
+      try {
+        let record = rows.find(r => String(r.id) === String(openScheduleId))
 
-      // 5. CLEANUP URL
-      // Create new params object to preserve other params if they exist
-      const newParams = new URLSearchParams(searchParams.toString())
-      newParams.delete('openScheduleId')
-      
-      // Replace URL without refresh using router.replace
-      router.replace(`${pathname}?${newParams.toString()}`, { scroll: false })
+        // 🔥 NOT FOUND IN LIST → FETCH DIRECTLY
+        if (!record) {
+          const res = await getAttendanceById(openScheduleId)
+          record = res?.data || res
+          if (!record) return
+        }
+
+        setSelectedAttendance(record)
+        setDrawerOpen(true)
+        autoOpenedRef.current = true
+
+        // ✅ clean URL
+        const params = new URLSearchParams(searchParams.toString())
+        params.delete('openScheduleId')
+        router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+      } catch (err) {
+        console.error('Auto open schedule failed', err)
+      }
     }
-  }, [rows, dropdowns, searchParams, pathname, router])
+
+    openDrawer()
+  }, [searchParams, rows])
 
   useEffect(() => {
     fetchAttendances()
@@ -694,8 +723,14 @@ const AttendancePageContent = () => {
 // Wrapper for RBAC
 export default function AttendancePage() {
   return (
-    <PermissionGuard permission="Attendance">
-      <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>}>
+    <PermissionGuard permission='Attendance'>
+      <Suspense
+        fallback={
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+            <CircularProgress />
+          </Box>
+        }
+      >
         <AttendancePageContent />
       </Suspense>
     </PermissionGuard>

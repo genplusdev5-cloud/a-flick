@@ -2,7 +2,7 @@
   inline-size: 100%;
   border-collapse: collapse;
   font-size: 0.8125rem;
-  white-space: nowrap; /* Prevent table header from wrapping */
+  white-space: nowrap;
 
   [align='right'] > * {
     text-align: end;
@@ -23,13 +23,10 @@
       line-height: 1.8462;
       text-align: start;
       block-size: 56px;
-      white-space: nowrap !important; /* HEADER NEVER WRAPS */
-
       &:not(:first-of-type):not(:last-of-type) {
         padding-block: 0.5rem;
         padding-inline: 1rem;
       }
-
       &:first-of-type {
         &:not(:has(input[type='checkbox'])) {
           padding-block: 0.5rem;
@@ -39,7 +36,6 @@
           padding-inline-start: 0.9375rem;
         }
       }
-
       &:last-of-type {
         padding-block: 0.5rem;
         padding-inline: 1rem 1.5rem;
@@ -55,18 +51,10 @@
       font-size: 0.9375rem;
       line-height: 1.4667;
       block-size: 50px;
-
-      /* 🌟 UNIVERSAL WRAP FOR ALL TABLE CELLS */
-      max-inline-size: 300px;
-      white-space: normal !important;
-      overflow-wrap: break-word;
-      word-break: break-word;
-
       &:not(:first-of-type):not(:last-of-type) {
         padding-block: 0.5rem;
         padding-inline: 1rem;
       }
-
       &:first-of-type {
         &:not(:has(input[type='checkbox'])) {
           padding-block: 0.5rem;
@@ -77,7 +65,6 @@
           padding-inline-start: 0.9375rem;
         }
       }
-
       &:last-of-type {
         padding-block: 0.5rem;
         padding-inline: 1rem 1.5rem;
@@ -93,7 +80,6 @@
   }
 }
 
-/* Input cell style */
 .cellWithInput input {
   inline-size: 100%;
   background-color: transparent;
@@ -137,4 +123,3 @@
 .table thead th {
   z-index: 10;
 }
-

@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
+import classnames from 'classnames'
+import ChevronRight from '@menu/svg/ChevronRight'
 
 import {
   Box,
@@ -30,7 +32,14 @@ import axios from 'axios'
 
 import { getDashboardList } from '@/api/dashboard'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
-import { useReactTable, getCoreRowModel, createColumnHelper, flexRender } from '@tanstack/react-table'
+import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel, // 🔥 ADD THIS
+  createColumnHelper,
+  flexRender
+} from '@tanstack/react-table'
+
 import styles from '@core/styles/table.module.css'
 
 let cancelSource = null
@@ -38,6 +47,7 @@ let cancelSource = null
 export default function DashboardList() {
   const [rows, setRows] = useState([])
   const [count, setCount] = useState(0)
+  const [sorting, setSorting] = useState([])
 
   const [filterType, setFilterType] = useState('Contract')
 
@@ -226,7 +236,10 @@ export default function DashboardList() {
     data: rows,
     columns,
     manualPagination: true,
-    getCoreRowModel: getCoreRowModel()
+    state: { sorting },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel()
   })
 
   return (
@@ -366,7 +379,22 @@ export default function DashboardList() {
               {table.getHeaderGroups().map(hg => (
                 <tr key={hg.id}>
                   {hg.headers.map(h => (
-                    <th key={h.id}>{flexRender(h.column.columnDef.header, h.getContext())}</th>
+                    <th key={h.id}>
+                      <div
+                        className={classnames({
+                          'flex items-center': h.column.getIsSorted(),
+                          'cursor-pointer select-none': h.column.getCanSort()
+                        })}
+                        onClick={h.column.getToggleSortingHandler()}
+                      >
+                        {flexRender(h.column.columnDef.header, h.getContext())}
+
+                        {{
+                          asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
+                          desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
+                        }[h.column.getIsSorted()] ?? null}
+                      </div>
+                    </th>
                   ))}
                 </tr>
               ))}

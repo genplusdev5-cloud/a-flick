@@ -31,14 +31,7 @@ import {
 import PermissionGuard from '@/components/auth/PermissionGuard'
 import { usePermission } from '@/hooks/usePermission'
 
-import {
-  getSupplierList,
-  addSupplier,
-  updateSupplier,
-  getSupplierDetails,
-  deleteSupplier,
-  deleteSupplierContact
-} from '@/api/supplier'
+import { getSupplierList, addSupplier, updateSupplier, getSupplierDetails, deleteSupplier } from '@/api/supplier'
 
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
@@ -48,6 +41,7 @@ import DeleteIcon from '@mui/icons-material/Delete'
 import CloseIcon from '@mui/icons-material/Close'
 import PrintIcon from '@mui/icons-material/Print'
 import GlobalButton from '@/components/common/GlobalButton'
+import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import FileDownloadIcon from '@mui/icons-material/FileDownload'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import RefreshIcon from '@mui/icons-material/Refresh'
@@ -444,28 +438,6 @@ const SupplierPageContent = () => {
   // ───────────────────────────────────────────
   return (
     <Box>
-      {loading && (
-        <Box
-          sx={{
-            position: 'fixed',
-            inset: 0,
-            bgcolor: 'rgba(255,255,255,0.7)',
-            backdropFilter: 'blur(2px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 2000
-          }}
-        >
-          <Box textAlign='center'>
-            <ProgressCircularCustomization size={60} thickness={5} />
-            <Typography mt={2} fontWeight={600} color='primary'>
-              Loading Suppliers...
-            </Typography>
-          </Box>
-        </Box>
-      )}
-
       <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
         <Link underline='hover' color='inherit' href='/'>
           Home
@@ -598,9 +570,6 @@ const SupplierPageContent = () => {
           >
             <Box textAlign='center'>
               <ProgressCircularCustomization size={60} thickness={5} />
-              <Typography mt={2} fontWeight={600} color='primary'>
-                Loading Suppliers...
-              </Typography>
             </Box>
           </Box>
         )}
@@ -809,19 +778,22 @@ const SupplierPageContent = () => {
         </Box>
       </Drawer>
 
+      {/* Delete Confirmation Dialog */}
       <Dialog
         onClose={() => setDeleteDialog({ open: false, row: null })}
         aria-labelledby='delete-supplier-dialog'
         open={deleteDialog.open}
+        closeAfterTransition={false}
         PaperProps={{
           sx: {
             overflow: 'visible',
             width: 420,
-            borderRadius: 2,
+            borderRadius: 1,
             textAlign: 'center'
           }
         }}
       >
+        {/* 🔴 Header with Close Button */}
         <DialogTitle
           id='delete-supplier-dialog'
           sx={{
@@ -831,13 +803,23 @@ const SupplierPageContent = () => {
             gap: 1,
             color: 'error.main',
             fontWeight: 700,
-            pb: 1
+            pb: 1,
+            position: 'relative'
           }}
         >
-          <WarningAmberIcon color='error' sx={{ fontSize: 28 }} />
+          <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
           Confirm Delete
+          {/* ❌ Close Button */}
+          <DialogCloseButton
+            onClick={() => setDeleteDialog({ open: false, row: null })}
+            disableRipple
+            sx={{ position: 'absolute', right: 1, top: 1 }}
+          >
+            <i className='tabler-x' />
+          </DialogCloseButton>
         </DialogTitle>
 
+        {/* 🧾 Message */}
         <DialogContent sx={{ px: 5, pt: 1 }}>
           <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
             Are you sure you want to delete supplier{' '}
@@ -848,23 +830,24 @@ const SupplierPageContent = () => {
           </Typography>
         </DialogContent>
 
+        {/* ⚙️ Buttons */}
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-          <Button
+          <GlobalButton
             onClick={() => setDeleteDialog({ open: false, row: null })}
-            variant='tonal'
             color='secondary'
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
           >
             Cancel
-          </Button>
-          <Button
+          </GlobalButton>
+
+          <GlobalButton
             onClick={confirmDelete}
             variant='contained'
             color='error'
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
           >
             Delete
-          </Button>
+          </GlobalButton>
         </DialogActions>
       </Dialog>
     </Box>
@@ -874,7 +857,7 @@ const SupplierPageContent = () => {
 // Wrapper for RBAC
 export default function SupplierPage() {
   return (
-    <PermissionGuard permission="Suppliers">
+    <PermissionGuard permission='Suppliers'>
       <SupplierPageContent />
     </PermissionGuard>
   )

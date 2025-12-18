@@ -72,9 +72,14 @@ import { showToast } from '@/components/common/Toasts'
 // ───────────────────────────────────────
 const MaterialRequestPageContent = () => {
   const router = useRouter()
+  const PAGE_SIZE = 25 // ✅ ADD THIS LINE
 
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(false)
+
+  // 🔴 ADD THESE TWO LINES (YOU MISSED THIS)
+  const [page, setPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
 
   // Filters
   const [enableDateFilter, setEnableDateFilter] = useState(false)
@@ -118,8 +123,12 @@ const MaterialRequestPageContent = () => {
   const loadData = async (showToastMsg = false) => {
     setLoading(true)
     try {
-      const response = await getTmMaterialRequestList()
-      const data = response?.data?.results || []
+      const response = await getTmMaterialRequestList(page)
+
+      setTotalCount(response.count || 0)
+
+      // 🔥 CORRECT PATH
+      const data = response.data?.results || []
 
       // 1️⃣ MAP API → UI FIELDS (camelCase)
       const mapped = data.map(r => {
@@ -166,7 +175,10 @@ const MaterialRequestPageContent = () => {
       })
 
       // 3️⃣ ADD S.NO
-      const withSno = filtered.map((row, i) => ({ ...row, sno: i + 1 }))
+      const withSno = filtered.map((row, i) => ({
+        ...row,
+        sno: (page - 1) * PAGE_SIZE + i + 1
+      }))
 
       setRows(withSno)
 
@@ -183,8 +195,8 @@ const MaterialRequestPageContent = () => {
   }
 
   useEffect(() => {
-    loadData(false) // Never show toast here
-  }, [searchText, enableDateFilter, startDate, endDate, requestStatus, fromLocation, toLocation, requestedBy])
+    loadData(false)
+  }, [page, searchText, enableDateFilter, startDate, endDate, requestStatus, fromLocation, toLocation, requestedBy])
 
   // Actions
   const handleDelete = async row => {
@@ -272,17 +284,11 @@ const MaterialRequestPageContent = () => {
   const columnHelper = createColumnHelper()
   const columns = useMemo(
     () => [
-      columnHelper.accessor('sno', {
-        header: 'S.No',
-        size: 60,
-        enableSorting: false
-      }),
+      columnHelper.accessor('sno', { header: 'S.No' }),
 
       columnHelper.display({
         id: 'actions',
         header: 'Actions',
-        size: 100,
-        enableSorting: false,
         cell: ({ row }) => {
           const encodedId = btoa(String(row.original.id))
 
@@ -293,7 +299,7 @@ const MaterialRequestPageContent = () => {
                 color='primary'
                 onClick={() => router.push(`/admin/stock/material-request/${encodedId}/edit`)}
               >
-                <i className='tabler-edit text-blue-600 text-lg' />
+                <i className='tabler-edit' />
               </IconButton>
 
               <IconButton size='small' color='error' onClick={() => setDeleteDialog({ open: true, row: row.original })}>
@@ -501,77 +507,95 @@ const MaterialRequestPageContent = () => {
 
         <Divider sx={{ mb: 2 }} />
 
-        {/* FILTER WRAPPER */}
+        {/* ---------- FILTER ROW ---------- */}
         <Box
           sx={{
-            display: 'grid',
-            gridTemplateColumns: '260px repeat(4, 220px)',
-            columnGap: 3,
-            rowGap: 1,
-            mb: 3
+            display: 'flex',
+            alignItems: 'flex-end', // ⭐ FIX: Align bottom of all fields
+            gap: 2,
+            mb: 3,
+            flexWrap: 'nowrap'
           }}
         >
-          {/* ---------- ROW 1: LABELS ---------- */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant='body2' sx={{ fontWeight: 500 }}>
-              Date Filter
-            </Typography>
-            <Checkbox size='small' checked={enableDateFilter} onChange={e => setEnableDateFilter(e.target.checked)} />
-          </Box>
-
-          <Typography variant='body2' sx={{ fontWeight: 500 }}>
-            Request Status
-          </Typography>
-          <Typography variant='body2' sx={{ fontWeight: 500 }}>
-            From Location/Supplier
-          </Typography>
-          <Typography variant='body2' sx={{ fontWeight: 500 }}>
-            To Location/Supplier
-          </Typography>
-          <Typography variant='body2' sx={{ fontWeight: 500 }}>
-            Requested By
-          </Typography>
-
-          {/* ---------- ROW 2: INPUTS ---------- */}
-          <Box sx={{ width: '100%' }}>
-            <GlobalDateRange
-              label=''
-              start={startDate}
-              end={endDate}
-              onSelectRange={({ start, end }) => {
-                setStartDate(start)
-                setEndDate(end)
-              }}
-              disabled={!enableDateFilter}
+          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+            <FormControlLabel
+              control={<Checkbox checked={enableDateFilter} onChange={e => setEnableDateFilter(e.target.checked)} />}
+              label='Date Filter'
             />
+            <Box sx={{ width: 220 }}>
+              <GlobalDateRange
+                start={startDate}
+                end={endDate}
+                onSelectRange={({ start, end }) => {
+                  setStartDate(start)
+                  setEndDate(end)
+                }}
+                disabled={!enableDateFilter}
+              />
+            </Box>
           </Box>
-
+          {/* Request Status */}
           <CustomAutocomplete
             options={['Waiting', 'Pending', 'Rejected', 'Approved', 'Issued', 'Completed', 'Declined']}
             value={requestStatus || null}
             onChange={(e, val) => setRequestStatus(val || '')}
-            renderInput={p => <CustomTextField {...p} size='small' />}
+            renderInput={params => (
+              <CustomTextField
+                {...params}
+                size='small'
+                label='Request Status'
+                sx={{ width: 220 }}
+                placeholder='Select status'
+              />
+            )}
           />
 
+          {/* From Location */}
           <CustomAutocomplete
             options={['Stock-TECH STOCK 1', 'Supplier-ABC']}
             value={fromLocation || null}
             onChange={(e, val) => setFromLocation(val || '')}
-            renderInput={p => <CustomTextField {...p} size='small' />}
+            renderInput={params => (
+              <CustomTextField
+                {...params}
+                size='small'
+                label='From Location / Supplier'
+                sx={{ width: 220 }}
+                placeholder='Select from location'
+              />
+            )}
           />
 
+          {/* To Location */}
           <CustomAutocomplete
             options={['Stock-TECH STOCK 1', 'Stock-TECH STOCK 2', 'Site-A', 'Site-B', 'Site-C']}
             value={toLocation || null}
             onChange={(e, val) => setToLocation(val || '')}
-            renderInput={p => <CustomTextField {...p} size='small' />}
+            renderInput={params => (
+              <CustomTextField
+                {...params}
+                size='small'
+                label='To Location / Supplier'
+                sx={{ width: 220 }}
+                placeholder='Select to location'
+              />
+            )}
           />
 
+          {/* Requested By */}
           <CustomAutocomplete
             options={['Admin', 'Tech', 'John Doe', 'Jane Smith']}
             value={requestedBy || null}
             onChange={(e, val) => setRequestedBy(val || '')}
-            renderInput={p => <CustomTextField {...p} size='small' />}
+            renderInput={params => (
+              <CustomTextField
+                {...params}
+                size='small'
+                label='Requested By'
+                sx={{ width: 220 }}
+                placeholder='Select employee'
+              />
+            )}
           />
         </Box>
 
@@ -746,19 +770,16 @@ const MaterialRequestPageContent = () => {
           }}
         >
           <Typography color='text.disabled'>
-            {`Showing ${total === 0 ? 0 : pageIndex * pageSize + 1} to ${Math.min(
-              (pageIndex + 1) * pageSize,
-              total
-            )} of ${total} entries`}
+            Showing {(page - 1) * 25 + 1} to {Math.min(page * 25, totalCount)} of {totalCount} entries
           </Typography>
 
           <Pagination
             shape='rounded'
             color='primary'
             variant='tonal'
-            count={Math.ceil(total / pageSize) || 1}
-            page={pageIndex + 1}
-            onChange={(_, page) => table.setPageIndex(page - 1)}
+            count={Math.ceil(totalCount / 25) || 1}
+            page={page}
+            onChange={(_, p) => setPage(p)}
             showFirstButton
             showLastButton
           />
@@ -848,7 +869,7 @@ const MaterialRequestPageContent = () => {
 // Wrapper for RBAC
 export default function MaterialRequestPage() {
   return (
-    <PermissionGuard permission="Material Request">
+    <PermissionGuard permission='Material Request'>
       <MaterialRequestPageContent />
     </PermissionGuard>
   )

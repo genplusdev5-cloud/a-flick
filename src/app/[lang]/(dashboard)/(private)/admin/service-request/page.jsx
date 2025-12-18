@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { format, isValid } from 'date-fns'
 import {
@@ -94,14 +95,30 @@ const ServiceRequestPageContent = () => {
   const [enableDateFilter, setEnableDateFilter] = useState(false)
   const [startDate, setStartDate] = useState(new Date())
   const [endDate, setEndDate] = useState(new Date())
-  const [customerFilter, setCustomerFilter] = useState('')
-  const [contractFilter, setContractFilter] = useState('')
+
+  const searchParams = useSearchParams()
+
+  const encodedCustomer = searchParams.get('customer')
+  const encodedContract = searchParams.get('contract')
+
+  const decodedCustomerId = encodedCustomer ? Number(atob(encodedCustomer)) : ''
+  const decodedContractId = encodedContract ? Number(atob(encodedContract)) : ''
+
+  const [customerFilter, setCustomerFilter] = useState(decodedCustomerId)
+  const [contractFilter, setContractFilter] = useState(decodedContractId)
+
   const [technicianFilter, setTechnicianFilter] = useState('')
   const [supervisorFilter, setSupervisorFilter] = useState('')
   const [appointmentStatusFilter, setAppointmentStatusFilter] = useState('')
   const [appointmentTypeFilter, setAppointmentTypeFilter] = useState('')
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
-  const [contractOptions, setContractOptions] = useState([])
+
+  // Lazy init Contract Options from URL
+  const [contractOptions, setContractOptions] = useState(() => {
+    const contractId = searchParams.get('contract')
+    const contractCode = searchParams.get('contractCode')
+    return contractId && contractCode ? [{ id: Number(contractId), label: contractCode }] : []
+  })
 
   const [searchText, setSearchText] = useState('')
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 })
@@ -111,10 +128,17 @@ const ServiceRequestPageContent = () => {
   const contractRef = useRef(null)
   const techRef = useRef(null)
 
-  const [customerOptions, setCustomerOptions] = useState([])
+  // Lazy init Customer Options from URL
+  const [customerOptions, setCustomerOptions] = useState(() => {
+    const custId = searchParams.get('customer')
+    const custName = searchParams.get('customerName')
+    return custId && custName ? [{ id: Number(custId), label: custName }] : []
+  })
   const [technicianOptions, setTechnicianOptions] = useState([])
   const [supervisorOptions, setSupervisorOptions] = useState([])
   const [attendanceOptions, setAttendanceOptions] = useState([])
+
+  // ... (existing imports)
 
   const loadReportDropdownData = async () => {
     try {
@@ -127,7 +151,20 @@ const ServiceRequestPageContent = () => {
 
       const attendanceList = dd?.attendance?.label || []
 
-      setCustomerOptions(customerList.map(c => ({ id: c.id, label: c.name || '' })))
+      let formattedCustomers = customerList.map(c => ({ id: c.id, label: c.name || '' }))
+
+      // 🔥 PERSIST URL OPTION (Customer)
+      const urlCustId = searchParams.get('customer')
+      const urlCustName = searchParams.get('customerName')
+
+      if (urlCustId && urlCustName) {
+        const exists = formattedCustomers.find(c => String(c.id) === String(urlCustId))
+        if (!exists) {
+          formattedCustomers.push({ id: Number(urlCustId), label: urlCustName })
+        }
+      }
+
+      setCustomerOptions(formattedCustomers)
       setTechnicianOptions(technicianList.map(t => ({ id: t.id, label: t.name || '' })))
       setSupervisorOptions(supervisorList.map(s => ({ id: s.id, label: s.name || '' })))
       setAttendanceOptions(attendanceList.map(a => ({ id: a.id, label: a.label || '' })))
@@ -137,13 +174,22 @@ const ServiceRequestPageContent = () => {
     }
   }
 
+  // ───────────────────────────────────────────
+  // 🔥 URL Params for Redirection handled in Lazy State Init
+  // ───────────────────────────────────────────
+
   useEffect(() => {
     fetchTicketsFromApi()
-  }, [pagination.pageIndex, pagination.pageSize])
+  }, [pagination.pageIndex, pagination.pageSize, customerFilter, contractFilter])
+
+  useEffect(() => {
+    setPagination(p => ({ ...p, pageIndex: 0 }))
+  }, [customerFilter, contractFilter, technicianFilter, supervisorFilter])
 
   useEffect(() => {
     loadReportDropdownData()
   }, [])
+
 
   const confirmDelete = async () => {
     try {
@@ -348,30 +394,18 @@ const ServiceRequestPageContent = () => {
         page_size: pagination.pageSize
       }
 
-      // Filters will apply only if selected
       if (customerFilter) params.customer_id = customerFilter
       if (contractFilter) params.contract_id = contractFilter
       if (technicianFilter) params.technician_id = technicianFilter
       if (supervisorFilter) params.supervisor_id = supervisorFilter
       if (appointmentStatusFilter) params.ticket_status = appointmentStatusFilter
       if (appointmentTypeFilter) params.ticket_type = appointmentTypeFilter
-      if (enableDateFilter && startDate && endDate) {
-        params.from_date = format(startDate, 'yyyy-MM-dd')
-        params.to_date = format(endDate, 'yyyy-MM-dd')
-      }
-      if (searchText?.trim()) params.search = searchText.trim()
 
-      // Optional filters
       if (enableDateFilter && startDate && endDate) {
         params.from_date = format(startDate, 'yyyy-MM-dd')
         params.to_date = format(endDate, 'yyyy-MM-dd')
       }
 
-      if (technicianFilter) params.technician_id = technicianFilter
-      if (supervisorFilter) params.supervisor_id = supervisorFilter
-      if (appointmentStatusFilter) params.ticket_status = appointmentStatusFilter
-      if (appointmentTypeFilter) params.schedule_status = appointmentTypeFilter
-      if (appointmentTypeFilter) params.ticket_type = appointmentTypeFilter
       if (searchText?.trim()) params.search = searchText.trim()
 
       console.log('Ticket Params =>', params)
@@ -419,14 +453,34 @@ const ServiceRequestPageContent = () => {
         const res = await getReportDropdowns({ customer_id: customerFilter })
 
         const dd = res?.data?.data || {}
-        const list = dd?.contract_list?.label || [] // ⭐ FIXED KEY
+        const list = dd?.contract_list?.label || [] // ⭐ backend key
 
-        setContractOptions(
-          list.map(c => ({
-            id: c.id,
-            label: c.label || ''
-          }))
-        )
+        let formattedContracts = list.map(c => ({
+          id: c.id,
+          label: c.label || ''
+        }))
+
+        // 🔥 URL contract persistence
+        const urlContractCode = searchParams.get('contractCode')
+
+        if (decodedContractId && urlContractCode && customerFilter === decodedCustomerId) {
+          const exists = formattedContracts.find(c => c.id === decodedContractId)
+
+          if (!exists) {
+            formattedContracts.push({
+              id: decodedContractId,
+              label: urlContractCode
+            })
+          }
+        }
+
+        // ✅ set dropdown options
+        setContractOptions(formattedContracts)
+
+        // 🔥 AUTO APPLY CONTRACT FILTER (IMPORTANT)
+        if (decodedContractId && customerFilter === decodedCustomerId) {
+          setContractFilter(decodedContractId)
+        }
       } catch (err) {
         console.error('Contract fetch failed:', err)
         setContractOptions([])
@@ -434,7 +488,7 @@ const ServiceRequestPageContent = () => {
     }
 
     fetchContractByCustomer()
-  }, [customerFilter])
+  }, [customerFilter, decodedContractId, decodedCustomerId])
 
   // react-table
   const table = useReactTable({

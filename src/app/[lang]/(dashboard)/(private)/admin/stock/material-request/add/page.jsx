@@ -85,7 +85,7 @@ export default function AddMaterialRequestPage() {
     ;(async () => {
       try {
         const response = await getMaterialRequestDropdowns()
-        const data = response.data || response
+        const data = response?.data || response
 
         setEmployeeList(data?.employee?.name || [])
         setChemicalList(data?.chemicals?.name || [])
@@ -167,8 +167,13 @@ export default function AddMaterialRequestPage() {
   const handleSaveAll = async () => {
     if (items.length === 0) return
 
+    if (!formData.requestedById) {
+      alert('Please select Requested By')
+      return
+    }
+
     const payload = {
-      supervisor_id: 1,
+      employee_id: formData.requestedById, // ✅ REQUIRED BY BACKEND
       request_date: date.toISOString().split('T')[0],
       remarks: formData.remarks,
       items: items.map(i => ({
@@ -249,7 +254,9 @@ export default function AddMaterialRequestPage() {
             <Grid item xs={12} md={4}>
               <Autocomplete
                 options={employeeList}
-                value={employeeList.find(e => e.id === formData.requestedById) || null}
+                value={
+                  Array.isArray(employeeList) ? employeeList.find(e => e.id === formData.requestedById) || null : null
+                }
                 onChange={(_, v) => {
                   setFormData(prev => ({
                     ...prev,
@@ -454,8 +461,8 @@ export default function AddMaterialRequestPage() {
                     <TableRow key={item.id} sx={{ bgcolor: itemToEditIndex === i ? '#f0f8ff' : 'inherit' }}>
                       <TableCell>{i + 1}</TableCell>
                       <TableCell>
-                        <IconButton size='small' onClick={() => handleEditItem(i)}>
-                          <i className='tabler-edit text-blue-600 text-lg' />
+                        <IconButton size='small' color='primary' onClick={() => handleEditItem(i)}>
+                          <i className='tabler-edit' />
                         </IconButton>
                         <IconButton size='small' onClick={() => handleDeleteItem(i)}>
                           <i className='tabler-trash text-red-600 text-lg' />

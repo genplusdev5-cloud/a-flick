@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import React from 'react'
 import Link from 'next/link'
 import {
@@ -54,6 +54,17 @@ import {
   addSchedule
 } from '@/api/attendanceSchedule'
 
+import classnames from 'classnames'
+import ChevronRight from '@menu/svg/ChevronRight'
+
+import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  flexRender,
+  createColumnHelper
+} from '@tanstack/react-table'
+
 // -----------------------------------------------------
 
 const approvalStatusOptions = [
@@ -79,6 +90,7 @@ const AttendanceSchedulePageContent = () => {
   const [endDate, setEndDate] = useState(addDays(new Date(), 7))
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [sorting, setSorting] = useState([])
 
   const [attendanceList, setAttendanceList] = useState([])
   const [technicianList, setTechnicianList] = useState([])
@@ -157,7 +169,15 @@ const AttendanceSchedulePageContent = () => {
 
       const res = await getScheduleList(params)
 
-      setRows(res.count ? res.results : res)
+      const results = res.count ? res.results : res
+
+      const normalized = results.map((item, index) => ({
+        ...item,
+        sno: index + 1 + pagination.pageIndex * pagination.pageSize
+      }))
+
+      setRows(normalized)
+
       setPagination(prev => ({ ...prev, total: res.count || 0 }))
     } catch (err) {
       console.error('Schedule Load Failed', err)
@@ -210,25 +230,54 @@ const AttendanceSchedulePageContent = () => {
 
   const ForwardDateInput = React.forwardRef(CustomDateInput)
 
+  const columnHelper = createColumnHelper()
+
   const columns = [
-    { key: 's.no', label: 's.no' },
-    { key: 'action', label: 'Action' },
-    { key: 'attendance_date', label: 'Attendance Date' },
-    { key: 'day', label: 'Day' },
-    { key: 'time_in', label: 'Appointment Time In' },
-    { key: 'time_out', label: 'Appointment Time Out' },
-    { key: 'work_hours', label: 'Work Hours' },
-    { key: 'lunch', label: 'Lunch (in Min)' },
-    { key: 'slot', label: 'Slot' },
-    { key: 'technician', label: 'Technician' },
-    { key: 'customer', label: 'Customer' },
-    { key: 'service_address', label: 'Service Address' },
-    { key: 'postal_code', label: 'Postal Code' },
-    { key: 'contact_person', label: 'Contact Person' },
-    { key: 'phone', label: 'Phone' },
-    { key: 'attendance_status', label: 'Attendance Status' },
-    { key: 'status', label: 'Status' }
+    columnHelper.accessor('sno', {
+      header: 'S.No',
+      enableSorting: true
+    }),
+
+    columnHelper.display({
+      id: 'action',
+      header: 'Action',
+      cell: ({ row }) => (
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <IconButton size='small' color='primary' onClick={() => handleEdit(row.original.id)}>
+            <i className='tabler-edit' />
+          </IconButton>
+          <IconButton size='small' color='error' onClick={() => handleDelete(row.original.id)}>
+            <i className='tabler-trash text-red-600 text-lg' />
+          </IconButton>
+        </Box>
+      )
+    }),
+
+    columnHelper.accessor('attendance_date', { header: 'Attendance Date' }),
+    columnHelper.accessor('day', { header: 'Day' }),
+    columnHelper.accessor('time_in', { header: 'Time In' }),
+    columnHelper.accessor('time_out', { header: 'Time Out' }),
+    columnHelper.accessor('work_hours', { header: 'Work Hours' }),
+    columnHelper.accessor('lunch', { header: 'Lunch' }),
+    columnHelper.accessor('slot', { header: 'Slot' }),
+    columnHelper.accessor('technician', { header: 'Technician' }),
+    columnHelper.accessor('customer', { header: 'Customer' }),
+    columnHelper.accessor('service_address', { header: 'Service Address' }),
+    columnHelper.accessor('postal_code', { header: 'Postal Code' }),
+    columnHelper.accessor('contact_person', { header: 'Contact Person' }),
+    columnHelper.accessor('phone', { header: 'Phone' }),
+    columnHelper.accessor('attendance_status', { header: 'Attendance Status' }),
+    columnHelper.accessor('status', { header: 'Status' })
   ]
+
+  const table = useReactTable({
+    data: rows,
+    columns,
+    state: { sorting },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel()
+  })
 
   return (
     <Box>
@@ -539,55 +588,42 @@ const AttendanceSchedulePageContent = () => {
         <div className='overflow-x-auto'>
           <table className={styles.table}>
             <thead>
-              <tr>
-                {columns.map(col => (
-                  <th key={col.key}>
-                    <div className='flex items-center cursor-default'>{col.label}</div>
-                  </th>
-                ))}
-              </tr>
+              {table.getHeaderGroups().map(hg => (
+                <tr key={hg.id}>
+                  {hg.headers.map(h => (
+                    <th key={h.id}>
+                      <div
+                        className={classnames({
+                          'flex items-center': h.column.getIsSorted(),
+                          'cursor-pointer select-none': h.column.getCanSort()
+                        })}
+                        onClick={h.column.getToggleSortingHandler()}
+                      >
+                        {flexRender(h.column.columnDef.header, h.getContext())}
+                        {{
+                          asc: <ChevronRight className='-rotate-90' />,
+                          desc: <ChevronRight className='rotate-90' />
+                        }[h.column.getIsSorted()] ?? null}
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              ))}
             </thead>
 
             <tbody>
-              {rows.length ? (
-                rows.map((row, index) => (
-                  <tr key={index}>
-                    {/* S.No */}
-                    <td>{pagination.pageIndex * pagination.pageSize + index + 1}</td>
-
-                    {/* ACTION */}
-                    <td>
-                      <Box sx={{ display: 'flex', gap: 1 }}>
-                        <IconButton size='small' color='primary' onClick={() => handleEdit(row.id)}>
-                          <i className='tabler-edit' />
-                        </IconButton>
-                        <IconButton size='small' color='error' onClick={() => handleDelete(row.id)}>
-                          <i className='tabler-trash text-red-600 text-lg' />
-                        </IconButton>
-                      </Box>
-                    </td>
-
-                    <td>{row.attendance_date}</td>
-                    <td>{row.day}</td>
-                    <td>{row.time_in}</td>
-                    <td>{row.time_out}</td>
-                    <td>{row.work_hours}</td>
-                    <td>{row.lunch}</td>
-                    <td>{row.slot}</td>
-                    <td>{row.technician}</td>
-                    <td>{row.customer}</td>
-                    <td>{row.service_address}</td>
-                    <td>{row.postal_code}</td>
-                    <td>{row.contact_person}</td>
-                    <td>{row.phone}</td>
-                    <td>{row.attendance_status}</td>
-                    <td>{row.status}</td>
+              {table.getRowModel().rows.length ? (
+                table.getRowModel().rows.map(row => (
+                  <tr key={row.id}>
+                    {row.getVisibleCells().map(cell => (
+                      <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                    ))}
                   </tr>
                 ))
               ) : (
                 <tr>
                   <td colSpan={columns.length} className='text-center py-4'>
-                    No data available in table
+                    No data available
                   </td>
                 </tr>
               )}
@@ -604,7 +640,7 @@ const AttendanceSchedulePageContent = () => {
 // Wrapper for RBAC
 export default function AttendanceSchedulePage() {
   return (
-    <PermissionGuard permission="Schedule">
+    <PermissionGuard permission='Schedule'>
       <AttendanceSchedulePageContent />
     </PermissionGuard>
   )

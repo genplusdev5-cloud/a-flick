@@ -28,6 +28,7 @@ import { getPestChemicalsList, addPestChemical, updatePestChemical, deletePestCh
 
 import { showToast } from '@/components/common/Toasts'
 import styles from '@core/styles/table.module.css'
+import GlobalButton from '../common/GlobalButton'
 
 export default function PestChemicalsDrawerContent({ pestId }) {
   const [rows, setRows] = useState([])
@@ -165,13 +166,8 @@ export default function PestChemicalsDrawerContent({ pestId }) {
         )}
 
         <Grid item xs={12} display='flex' gap={2}>
-          <Button variant='contained' fullWidth startIcon={<AddIcon />} onClick={handleSubmit}>
-            {editId ? 'Update Chemical' : 'Add Chemical'}
-          </Button>
-
           {editId && (
-            <Button
-              variant='outlined'
+            <GlobalButton
               fullWidth
               color='secondary'
               onClick={() => {
@@ -180,8 +176,11 @@ export default function PestChemicalsDrawerContent({ pestId }) {
               }}
             >
               Cancel
-            </Button>
+            </GlobalButton>
           )}
+          <GlobalButton variant='contained' fullWidth startIcon={<AddIcon />} onClick={handleSubmit}>
+            {editId ? 'Update Chemical' : 'Add Chemical'}
+          </GlobalButton>
         </Grid>
       </Grid>
 
@@ -215,8 +214,8 @@ export default function PestChemicalsDrawerContent({ pestId }) {
 
                     <td>
                       <Box sx={{ display: 'flex', gap: 1 }}>
-                        <IconButton size='small' onClick={() => handleEdit(row)}>
-                          <EditIcon fontSize='small' />
+                        <IconButton size='small' color='primary' onClick={() => handleEdit(row)}>
+                          <i className='tabler-edit' />
                         </IconButton>
 
                         <IconButton
@@ -227,7 +226,7 @@ export default function PestChemicalsDrawerContent({ pestId }) {
                             setOpenDelete(true)
                           }}
                         >
-                          <DeleteIcon fontSize='small' />
+                          <i className='tabler-trash text-red-600 text-lg' />
                         </IconButton>
                       </Box>
                     </td>

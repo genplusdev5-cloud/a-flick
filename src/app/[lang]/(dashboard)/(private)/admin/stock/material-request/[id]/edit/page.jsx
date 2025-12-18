@@ -414,8 +414,8 @@ export default function EditMaterialRequestPage() {
                     <TableRow key={idx}>
                       <TableCell>{idx + 1}</TableCell>
                       <TableCell>
-                        <IconButton size='small' onClick={() => handleEditItem(idx)}>
-                          <i className='tabler-edit text-blue-600 text-lg' />
+                        <IconButton size='small' color='primary' onClick={() => handleEditItem(idx)}>
+                          <i className='tabler-edit' />
                         </IconButton>
                         <IconButton size='small' onClick={() => handleDeleteItem(idx)}>
                           <i className='tabler-trash text-red-600 text-lg' />

@@ -28,6 +28,7 @@ import { showToast } from '@/components/common/Toasts'
 import { getUnitList, addUnit, updateUnit, deleteUnit } from '@/api/unit'
 
 import styles from '@core/styles/table.module.css'
+import GlobalButton from '../common/GlobalButton'
 
 export default function UnitDrawerContent({ pestId }) {
   const [rows, setRows] = useState([])
@@ -171,13 +172,8 @@ export default function UnitDrawerContent({ pestId }) {
         )}
 
         <Grid item xs={12} display='flex' gap={2}>
-          <Button variant='contained' fullWidth onClick={handleSubmit} disabled={loading}>
-            {editId ? 'Update Unit' : 'Add Unit'}
-          </Button>
-
           {editId && (
-            <Button
-              variant='outlined'
+            <GlobalButton
               color='secondary'
               fullWidth
               onClick={() => {
@@ -186,8 +182,11 @@ export default function UnitDrawerContent({ pestId }) {
               }}
             >
               Cancel
-            </Button>
+            </GlobalButton>
           )}
+          <GlobalButton variant='contained' fullWidth onClick={handleSubmit} disabled={loading}>
+            {editId ? 'Update Unit' : 'Add Unit'}
+          </GlobalButton>
         </Grid>
       </Grid>
 
@@ -221,7 +220,7 @@ export default function UnitDrawerContent({ pestId }) {
                     <td>
                       <Box sx={{ display: 'flex', gap: 1 }}>
                         <IconButton size='small' color='primary' onClick={() => handleEdit(row)}>
-                          <EditIcon fontSize='small' />
+                          <i className='tabler-edit' />
                         </IconButton>
 
                         <IconButton
@@ -232,7 +231,7 @@ export default function UnitDrawerContent({ pestId }) {
                             setOpenDelete(true)
                           }}
                         >
-                          <DeleteIcon fontSize='small' />
+                          <i className='tabler-trash text-red-600 text-lg' />
                         </IconButton>
                       </Box>
                     </td>
