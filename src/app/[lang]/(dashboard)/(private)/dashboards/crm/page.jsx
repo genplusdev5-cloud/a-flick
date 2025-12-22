@@ -13,6 +13,7 @@ import ProjectStatus from '@views/dashboards/crm/ProjectStatus'
 import ActiveProjects from '@views/dashboards/crm/ActiveProjects'
 import LastTransaction from '@views/dashboards/crm/LastTransaction'
 import ActivityTimeline from '@views/dashboards/crm/ActivityTimeline'
+import DailyOutputWithTabs from '@views/dashboards/crm/DailyOutputWithTabs'
 
 // Server Action Imports
 import { getServerMode } from '@core/utils/serverHelpers'
@@ -57,8 +58,47 @@ const DashboardCRM = async () => {
           chipVariant='tonal'
         />
       </Grid>
-      <Grid size={{ xs: 12, md: 8, lg: 4 }}>
-        <BarChartRevenueGrowth />
+      <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2 }}>
+        <CardStatVertical
+          title='Total Customers'
+          stats='4.5k'
+          avatarColor='info'
+          avatarIcon='tabler-users'
+          avatarSkin='light'
+          avatarSize={44}
+          chipText='+15.4%'
+          chipColor='info'
+          chipVariant='tonal'
+        />
+      </Grid>
+      <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2 }}>
+        <CardStatVertical
+          title='Total Tickets'
+          stats='12.2k'
+          avatarColor='warning'
+          avatarIcon='tabler-ticket'
+          avatarSkin='light'
+          avatarSize={44}
+          chipText='+8.2%'
+          chipColor='warning'
+          chipVariant='tonal'
+        />
+      </Grid>
+      <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2 }}>
+        <CardStatVertical
+          title='Total Invoiced'
+          stats='₹ 5.2M'
+          avatarColor='primary'
+          avatarIcon='tabler-file-invoice'
+          avatarSkin='light'
+          avatarSize={44}
+          chipText='+21%'
+          chipColor='primary'
+          chipVariant='tonal'
+        />
+      </Grid>
+      <Grid size={{ xs: 12, md: 6, lg: 6 }}>
+        <DailyOutputWithTabs />
       </Grid>
       <Grid size={{ xs: 12, lg: 8 }}>
         <EarningReportsWithTabs />

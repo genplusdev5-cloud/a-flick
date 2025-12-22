@@ -1,6 +1,7 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { openDB } from 'idb'
 import {
   Box,
@@ -57,8 +58,6 @@ import CancelIcon from '@mui/icons-material/Cancel'
 import GroupIcon from '@mui/icons-material/Group'
 import BarChartIcon from '@mui/icons-material/BarChart'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
-import { useRouter } from 'next/navigation'
-import { toast } from 'react-toastify'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 import classnames from 'classnames'
 import { rankItem } from '@tanstack/match-sorter-utils'
@@ -72,6 +71,7 @@ import {
 } from '@tanstack/react-table'
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
+import { dateSortingFn } from '@/utils/tableUtils'
 
 // Debounced Input
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
@@ -91,10 +91,17 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
 const CustomersPageContent = () => {
   const { canAccess } = usePermission()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const pathname = usePathname()
+
+  // Initialize pagination from URL search params
+  const initialPageIndex = searchParams.get('pageIndex') ? Number(searchParams.get('pageIndex')) : 0
+  const initialPageSize = searchParams.get('pageSize') ? Number(searchParams.get('pageSize')) : 25
+
   const [rows, setRows] = useState([])
   const [rowCount, setRowCount] = useState(0)
   const [searchText, setSearchText] = useState('')
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
+  const [pagination, setPagination] = useState({ pageIndex: initialPageIndex, pageSize: initialPageSize })
   const [loading, setLoading] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
@@ -105,7 +112,28 @@ const CustomersPageContent = () => {
   const [companyOptions, setCompanyOptions] = useState([])
   const [sorting, setSorting] = useState([])
 
-  const loadData = async () => {
+  // Sync pagination state to URL search params
+  const isFirstRender = useRef(true)
+  useEffect(() => {
+    // Avoid double update on mount if URL already matches
+    const currentUrlPageIndex = searchParams.get('pageIndex')
+    const currentUrlPageSize = searchParams.get('pageSize')
+
+    if (
+      currentUrlPageIndex === pagination.pageIndex.toString() &&
+      currentUrlPageSize === pagination.pageSize.toString()
+    ) {
+      return
+    }
+
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('pageIndex', pagination.pageIndex.toString())
+    params.set('pageSize', pagination.pageSize.toString())
+    
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }, [pagination.pageIndex, pagination.pageSize, pathname, router]) // Removed searchParams to break loop
+
+  const loadData = useCallback(async () => {
     setLoading(true)
     try {
       const params = {
@@ -151,7 +179,7 @@ const CustomersPageContent = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [pagination.pageIndex, pagination.pageSize, searchText, filterOrigin, filterMyob, originMap])
 
   useEffect(() => {
     const loadCompanies = async () => {
@@ -243,12 +271,26 @@ const CustomersPageContent = () => {
         header: 'Action',
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
+            {/* 1. CONTRACTS ICON (LEFT) */}
+            <IconButton
+              size='small'
+              color='success'
+              onClick={() => {
+                const encodedId = btoa(info.row.original.id.toString())
+                router.push(`/en/admin/contracts?customer=${encodedId}`)
+              }}
+            >
+              <i className='tabler-file-text' />
+            </IconButton>
+
+            {/* 2. EDIT ICON */}
             {canAccess('Customers', 'update') && (
               <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original.id)}>
                 <i className='tabler-edit ' />
               </IconButton>
             )}
 
+            {/* 3. DELETE ICON */}
             {canAccess('Customers', 'delete') && (
               <IconButton
                 size='small'
@@ -271,6 +313,7 @@ const CustomersPageContent = () => {
 
       columnHelper.accessor('commenceDate', {
         header: 'Commence Date',
+        sortingFn: dateSortingFn,
         cell: info => {
           const date = info.getValue()
           return date ? new Date(date).toLocaleDateString('en-GB') : '-'
@@ -284,29 +327,6 @@ const CustomersPageContent = () => {
         header: 'ABSS Customer Name'
       }),
 
-      columnHelper.display({
-        id: 'contracts',
-        header: 'Contract',
-        cell: info => (
-          <GlobalButton
-            size='small'
-            variant='outlined'
-            color='success'
-            sx={{
-              borderRadius: '5px',
-              textTransform: 'none',
-              fontWeight: 500,
-              py: 0.5
-            }}
-            onClick={() => {
-              const encodedId = btoa(info.row.original.id.toString())
-              router.push(`/en/admin/contracts?customer=${encodedId}`)
-            }}
-          >
-            Contracts
-          </GlobalButton>
-        )
-      }),
 
       columnHelper.accessor('email', { header: 'Contact Email' }),
       columnHelper.accessor('phone', { header: 'Contact Phone' }),

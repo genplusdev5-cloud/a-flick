@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useState, useRef } from 'react'
+import { useEffect, useMemo, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import {
   Box,
   Button,
@@ -65,6 +65,8 @@ import {
 } from '@tanstack/react-table'
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
+import { loadRowOrder, saveRowOrder } from '@/utils/tableUtils'
+import { useDragAndDrop } from '@formkit/drag-and-drop/react'
 
 const getEmployees = async () => {
   const db = await openDBInstance()
@@ -94,15 +96,40 @@ import { usePermission } from '@/hooks/usePermission'
 const EmployeePageContent = () => {
   const { canAccess } = usePermission()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const pathname = usePathname()
+
+  // Initialize pagination from URL search params
+  const initialPageIndex = searchParams.get('pageIndex') ? Number(searchParams.get('pageIndex')) : 0
+  const initialPageSize = searchParams.get('pageSize') ? Number(searchParams.get('pageSize')) : 25
+
   const [rows, setRows] = useState([])
   const [rowCount, setRowCount] = useState(0)
   const [searchText, setSearchText] = useState('')
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
+  const [pagination, setPagination] = useState({ pageIndex: initialPageIndex, pageSize: initialPageSize })
   const [loading, setLoading] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
 
-  const loadData = async () => {
+  // Sync pagination state to URL search params
+  useEffect(() => {
+    const currentUrlPageIndex = searchParams.get('pageIndex')
+    const currentUrlPageSize = searchParams.get('pageSize')
+
+    if (
+      currentUrlPageIndex === pagination.pageIndex.toString() &&
+      currentUrlPageSize === pagination.pageSize.toString()
+    ) {
+      return
+    }
+
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('pageIndex', pagination.pageIndex.toString())
+    params.set('pageSize', pagination.pageSize.toString())
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }, [pagination.pageIndex, pagination.pageSize, pathname, router])
+
+  const loadData = useCallback(async () => {
     setLoading(true)
     try {
       // ✅ API returns { message, status, count, data: { results: [...] } }
@@ -159,15 +186,30 @@ const EmployeePageContent = () => {
 
       console.log('✅ Formatted Data for Table:', formatted)
 
-      setRows(formatted)
       setRowCount(res.count) // ✔ backend count — correct pagination
+
+      // Restore order if exists
+      const savedOrder = loadRowOrder('employee-list')
+      if (savedOrder && savedOrder.length > 0) {
+        const sorted = [...formatted].sort((a, b) => {
+          const idxA = savedOrder.indexOf(a.id)
+          const idxB = savedOrder.indexOf(b.id)
+          if (idxA === -1 && idxB === -1) return 0
+          if (idxA === -1) return 1
+          if (idxB === -1) return -1
+          return idxA - idxB
+        })
+        setRows(sorted)
+      } else {
+        setRows(formatted)
+      }
     } catch (error) {
       console.error('❌ Employee List Error:', error)
       showToast('error', 'Failed to load employees')
     } finally {
       setLoading(false)
     }
-  }
+  }, [pagination.pageIndex, pagination.pageSize, searchText])
 
   useEffect(() => {
     // ✅ Auto refresh after adding new employee
@@ -216,6 +258,15 @@ const EmployeePageContent = () => {
   const columnHelper = createColumnHelper()
   const columns = useMemo(
     () => [
+      columnHelper.display({
+        id: 'drag-handle',
+        header: '',
+        cell: () => (
+          <Box className='drag-handle' sx={{ cursor: 'grab', display: 'flex', alignItems: 'center' }}>
+            <i className='tabler-grip-vertical text-gray-400' />
+          </Box>
+        )
+      }),
       columnHelper.accessor('sno', { header: 'S.No' }),
       columnHelper.display({
         id: 'actions',
@@ -440,6 +491,15 @@ const EmployeePageContent = () => {
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel()
+  })
+
+  // DND implementation
+  const [parent, employeeRows] = useDragAndDrop(rows, {
+    handle: '.drag-handle',
+    onSort: newRows => {
+      setRows(newRows)
+      saveRowOrder('employee-list', newRows.map(r => r.id))
+    }
   })
 
   // --- Export ---
@@ -694,7 +754,7 @@ const EmployeePageContent = () => {
                 </tr>
               ))}
             </thead>
-            <tbody>
+            <tbody ref={parent}>
               {rows.length ? (
                 table.getRowModel().rows.map(row => (
                   <tr key={row.id}>

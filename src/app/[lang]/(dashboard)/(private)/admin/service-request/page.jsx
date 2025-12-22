@@ -51,6 +51,7 @@ import { showToast } from '@/components/common/Toasts'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import GlobalButton from '@/components/common/GlobalButton'
+import SummaryCards from '@/components/common/SummaryCards'
 
 import {
   useReactTable,
@@ -65,6 +66,7 @@ import {
 import classnames from 'classnames'
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
+import { dateSortingFn } from '@/utils/tableUtils'
 
 const appointmentStatusList = [
   { id: 'NOT STARTED', label: 'NOT STARTED' },
@@ -137,6 +139,7 @@ const ServiceRequestPageContent = () => {
   const [technicianOptions, setTechnicianOptions] = useState([])
   const [supervisorOptions, setSupervisorOptions] = useState([])
   const [attendanceOptions, setAttendanceOptions] = useState([])
+  const [summaryData, setSummaryData] = useState([])
 
   // ... (existing imports)
 
@@ -265,6 +268,7 @@ const ServiceRequestPageContent = () => {
       }),
       columnHelper.accessor('scheduleDate', {
         header: 'Schedule Date',
+        sortingFn: dateSortingFn,
         cell: info => (info.getValue() ? format(new Date(info.getValue()), 'dd/MM/yyyy') : '')
       }),
       columnHelper.accessor('day', { header: 'Day' }),
@@ -427,6 +431,31 @@ const ServiceRequestPageContent = () => {
       setRows(withSno)
       setRowCount(total)
 
+      // Calculate summary stats (example - ideally from separate API or full fetch)
+      // This is a POC for summary cards. In production, use backend metrics.
+      const summaryStats = [
+        { title: 'Total Requests', value: total, icon: 'tabler-file-report', color: '#7367f0' },
+        {
+          title: 'Completed',
+          value: mapped.filter(t => t.status === 'Completed').length,
+          icon: 'tabler-circle-check',
+          color: '#28c76f'
+        },
+        {
+          title: 'Pending',
+          value: mapped.filter(t => t.status === 'Pending').length,
+          icon: 'tabler-clock',
+          color: '#ff9f43'
+        },
+        {
+          title: 'Cancelled',
+          value: mapped.filter(t => t.status === 'Cancelled').length,
+          icon: 'tabler-circle-x',
+          color: '#ea5455'
+        }
+      ]
+      setSummaryData(summaryStats)
+
       if (showToastMsg) {
         if (total > 0) showToast('success', `${total} service request(s) found`)
         else showToast('info', 'No service requests found for selected filters')
@@ -566,6 +595,8 @@ const ServiceRequestPageContent = () => {
           <Typography color='text.primary'>Service Request</Typography>
         </Breadcrumbs>
       </Box>
+
+      {summaryData.length > 0 && <SummaryCards data={summaryData} />}
 
       <Card sx={{ p: 3 }}>
         {/* Header */}

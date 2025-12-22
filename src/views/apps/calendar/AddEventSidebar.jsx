@@ -44,7 +44,7 @@ const defaultState = {
 
 const AddEventSidebar = props => {
   // Props
-  const { calendarStore, dispatch, addEventSidebarOpen, handleAddEventSidebarToggle } = props
+  const { calendarStore, dispatch, addEventSidebarOpen, handleAddEventSidebarToggle, onRefresh } = props
 
   // States
   const [values, setValues] = useState(defaultState)
@@ -130,6 +130,7 @@ const AddEventSidebar = props => {
     }
 
     dispatch(filterEvents())
+    if (onRefresh) onRefresh()
     handleSidebarClose()
   }
 
@@ -139,7 +140,7 @@ const AddEventSidebar = props => {
       dispatch(filterEvents())
     }
 
-    // calendarApi.getEventById(calendarStore.selectedEvent.id).remove()
+    if (onRefresh) onRefresh()
     handleSidebarClose()
   }
 

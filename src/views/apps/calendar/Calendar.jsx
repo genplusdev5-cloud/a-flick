@@ -87,7 +87,9 @@ const Calendar = ({
   setCalendarApi,
   dispatch,
   handleAddEventSidebarToggle,
-  selectedEmployees = []
+  selectedEmployees = [],
+  refreshSignal = 0,
+  onRefresh
 }) => {
   const calendarRef = useRef()
   const theme = useTheme()
@@ -158,6 +160,18 @@ const Calendar = ({
     loadEvents(from, to)
   }, [selectedEmployees, loadEvents])
 
+  /* RELOAD ON REFRESH SIGNAL */
+  useEffect(() => {
+    if (refreshSignal > 0) {
+      const api = calendarRef.current?.getApi()
+      if (api) {
+        const from = toApiDate(api.view.activeStart)
+        const to = toApiDate(api.view.activeEnd)
+        loadEvents(from, to)
+      }
+    }
+  }, [refreshSignal, loadEvents])
+
   /* RESOURCES COLUMN */
   const resources = selectedEmployees.map(emp => ({
     id: String(emp.id),
@@ -205,6 +219,7 @@ const Calendar = ({
       jsEvent.preventDefault()
       dispatch(selectedEvent(event))
       handleAddEventSidebarToggle()
+      if (onRefresh) onRefresh()
     },
 
     /* -------------------------------------------------------------
@@ -316,6 +331,7 @@ const Calendar = ({
         const view = api.view
 
         loadEvents(toApiDate(view.activeStart), toApiDate(view.activeEnd))
+        if (onRefresh) onRefresh()
       } catch (err) {
         console.error('eventDrop error', err)
         showToast('Update failed', 'error')
@@ -390,6 +406,7 @@ const Calendar = ({
 
         dispatch(updateEvent(event))
         dispatch(filterEvents())
+        if (onRefresh) onRefresh()
       } catch (err) {
         console.error('eventResize error', err)
         showToast('Update failed', 'error')

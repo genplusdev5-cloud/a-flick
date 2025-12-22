@@ -22,9 +22,12 @@ const AppCalendar = () => {
   const [calendarApi, setCalendarApi] = useState(null)
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(false)
   const [addEventSidebarOpen, setAddEventSidebarOpen] = useState(false)
+  const [refreshSignal, setRefreshSignal] = useState(0)
 
   const [searchText, setSearchText] = useState('')
   const [selectedEmployees, setSelectedEmployees] = useState([])
+
+  const handleToggleRefresh = () => setRefreshSignal(prev => prev + 1)
 
   const dispatch = useDispatch()
   const calendarStore = useSelector(state => state.calendarReducer)
@@ -52,6 +55,7 @@ const AppCalendar = () => {
           handleLeftSidebarToggle={() => setLeftSidebarOpen(!leftSidebarOpen)}
           handleAddEventSidebarToggle={() => setAddEventSidebarOpen(!addEventSidebarOpen)}
           selectedEmployees={selectedEmployees}
+          refreshSignal={refreshSignal}
         />
       </div>
 
@@ -61,6 +65,7 @@ const AppCalendar = () => {
         calendarStore={calendarStore}
         addEventSidebarOpen={addEventSidebarOpen}
         handleAddEventSidebarToggle={() => setAddEventSidebarOpen(!addEventSidebarOpen)}
+        onRefresh={handleToggleRefresh}
       />
     </>
   )

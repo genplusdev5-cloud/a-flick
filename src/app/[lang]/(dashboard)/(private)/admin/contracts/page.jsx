@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import Link from 'next/link'
 import {
   Box,
@@ -31,7 +31,7 @@ import { getContractList, deleteContractApi } from '@/api/contract'
 import api from '@/utils/axiosInstance'
 
 import VisibilityIcon from '@mui/icons-material/Visibility'
-import { useSearchParams } from 'next/navigation'
+
 
 // Custom Autocomplete + TextField
 import CustomAutocomplete from '@core/components/mui/Autocomplete'
@@ -61,8 +61,7 @@ import FileDownloadIcon from '@mui/icons-material/FileDownload'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
-import { useRouter } from 'next/navigation'
-import { toast } from 'react-toastify'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 import ServicePlanDrawer from './service-plan/ServicePlanDrawer'
 import { getTicketBackendDataApi } from '@/api/schedule'
@@ -79,7 +78,7 @@ import {
 } from '@tanstack/react-table'
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
-
+import { dateSortingFn } from '@/utils/tableUtils'
 // Debounced Input
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
   const [value, setValue] = useState(initialValue)
@@ -124,7 +123,10 @@ const ContractsPageContent = () => {
     setPlanDrawer({ open: false, contract: null, pestOptions: [] })
   }
 
+  const searchParams = useSearchParams()
   const router = useRouter()
+  const pathname = usePathname()
+
   const [rows, setRows] = useState([])
   const [rowCount, setRowCount] = useState(0)
   const [searchText, setSearchText] = useState('')
@@ -137,16 +139,60 @@ const ContractsPageContent = () => {
   const [openDrawer, setOpenDrawer] = useState(false)
   const [selectedContract, setSelectedContract] = useState(null)
 
-  const searchParams = useSearchParams()
-  const newContractId = searchParams.get('openDrawer')
   const encodedCustomerId = searchParams.get('customer')
-
   const decodedCustomerId = encodedCustomerId ? parseInt(atob(encodedCustomerId)) : null
   const [uuidFilter, setUuidFilter] = useState(null)
 
   const [customerFilter, setCustomerFilter] = useState(null)
   const [typeFilter, setTypeFilter] = useState(null)
   const [statusFilter, setStatusFilter] = useState(null)
+
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const params = {
+        page: pagination.pageIndex + 1,
+        page_size: pagination.pageSize,
+        search: searchText
+      }
+
+      if (customerFilter?.id) params.customer_id = customerFilter.id
+      if (typeFilter?.value) params.contract_type = typeFilter.value
+      if (statusFilter?.value) params.contract_status = statusFilter.value
+
+      const res = await getContractList(params)
+      
+      // Extract results - handle { data: { results: [] } } or { results: [] } or just []
+      const resultsArray = res?.results || res?.data?.results || (Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []))
+
+      const normalized = resultsArray.map((item, index) => ({
+        sno: index + 1 + pagination.pageIndex * pagination.pageSize,
+        id: item.id,
+        customer_id: item.customer_id, // 🔥 REQUIRED FOR NAVIGATION
+        customer: item.customer_name || item.customer?.name || item.customer || '-', // 🔥 REQUIRED FOR TABLE ACCESSOR
+        uuid: item.uuid || '',
+        contractCode: item.contract_code || `CON-${item.id}`,
+        customerName: item.customer_name || '-',
+        type: item.contract_type || '-',
+        status: item.contract_status || '-',
+        startDate: item.commence_date || '-',
+        endDate: item.expiry_date || '-',
+        address: item.service_address || '-',
+        total: item.total_amount || 0
+      }))
+
+      setRows(normalized)
+      setRowCount(res?.count || res?.data?.count || normalized.length)
+    } catch (err) {
+      showToast('error', 'Failed to load contracts')
+    } finally {
+      setLoading(false)
+    }
+  }, [pagination.pageIndex, pagination.pageSize, searchText, customerFilter, typeFilter, statusFilter])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   const openPlanDrawer = async item => {
     try {
@@ -181,75 +227,7 @@ const ContractsPageContent = () => {
     }
   }
 
-  const loadData = async (extraFilters = {}) => {
-    setLoading(true)
-    try {
-      // 👇 base filters from state + anything extra you pass
-      const filters = { ...extraFilters }
 
-      if (customerFilter?.id) filters.customer_id = customerFilter.id
-      if (typeFilter) filters.contract_type = typeFilter
-      if (statusFilter) filters.contract_status = statusFilter
-
-      // 🔹 UUID filter from state (either from URL or search)
-      if (uuidFilter) filters.uuid = uuidFilter
-
-      console.log('🧠 Filters Sent →', filters)
-
-      const all = await getContractList(filters)
-
-      const sorted = all.sort((a, b) => (b.id || 0) - (a.id || 0))
-
-      const start = pagination.pageIndex * pagination.pageSize
-      const end = start + pagination.pageSize
-      const paginated = sorted.slice(start, end)
-
-      const normalized = paginated.map((item, idx) => ({
-        ...item,
-        original_id: item.id, // keep real DB id
-        uuid: item.uuid, // explicit uuid
-        sno: start + idx + 1,
-
-        // Try to map proper customer name (backend may give different shapes)
-        customer: item.customer_name || item.customer?.name || item.customer || '',
-
-        contractCode: item.contract_code || '',
-        serviceAddress: item.service_address || '',
-        contractType: item.contract_type || '',
-
-        postalCode: item.postal_address || item.postal_code || '',
-        productValue: item.product_value || 0,
-        contractValue: item.contract_value || 0,
-
-        contactName: item.contact_person_name || '',
-        contactPhone: item.phone || '',
-        mobile: item.mobile || '',
-
-        // Services column – use pest names if available
-        services: item.pest_items?.map(p => p.pest_name || p.pest || '').filter(Boolean) || [],
-
-        // Pests column – show nice string
-        pestList:
-          item.pest_items
-            ?.map(p => p.pest_name || p.pest || '')
-            .filter(Boolean)
-            .join(', ') || 'N/A',
-
-        startDate: item.start_date ? new Date(item.start_date).toLocaleDateString('en-GB') : '',
-        endDate: item.end_date ? new Date(item.end_date).toLocaleDateString('en-GB') : '',
-
-        contractStatus: item.contract_status || item.status || 'N/A'
-      }))
-
-      setRows(normalized)
-      setRowCount(all.length)
-    } catch (err) {
-      console.error(err)
-      showToast('error', 'Failed to load contracts')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const loadCustomers = async () => {
     try {
@@ -473,12 +451,14 @@ const ContractsPageContent = () => {
 
       columnHelper.accessor('startDate', {
         id: 'startDate_column',
-        header: 'Start Date'
+        header: 'Start Date',
+        sortingFn: dateSortingFn
       }),
 
       columnHelper.accessor('endDate', {
         id: 'endDate_column',
-        header: 'End Date'
+        header: 'End Date',
+        sortingFn: dateSortingFn
       }),
 
       columnHelper.accessor('postalCode', {

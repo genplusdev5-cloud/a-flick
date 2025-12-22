@@ -18,11 +18,9 @@ export const getContractList = async (filters = {}) => {
     console.log('📡 Fetching:', url)
 
     const res = await api.get(url)
-    const results = res?.data?.data?.results
-
-    return Array.isArray(results) ? results : []
+    return res.data
   } catch (error) {
     console.error('❌ Contract list API error:', error)
-    return []
+    return { data: { results: [] }, count: 0 }
   }
 }

@@ -45,11 +45,13 @@ import CustomAutocomplete from '@core/components/mui/Autocomplete'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import tableStyles from '@core/styles/table.module.css'
 import InvoicePDF from '@/components/invoice/InvoicePDF'
+import { dateSortingFn } from '@/utils/tableUtils'
 
 // API
 import { getInvoiceSummary, getInvoiceDropdowns } from '@/api/invoice' // adjust path if needed
 
 import { showToast } from '@/components/common/Toasts'
+import SummaryCards from '@/components/common/SummaryCards'
 import PermissionGuard from '@/components/auth/PermissionGuard'
 import { usePermission } from '@/hooks/usePermission'
 
@@ -120,6 +122,7 @@ const InvoiceListPageFullContent = () => {
   const [selectedInvoiceData, setSelectedInvoiceData] = useState(null)
   // ── Pagination ───────────────────────────────
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
+  const [summaryData, setSummaryData] = useState([])
 
   // ───────────────────────────────────────────
   // 🔥 URL Params for Redirection handled in Lazy State Init
@@ -321,6 +324,30 @@ const InvoiceListPageFullContent = () => {
 
       setData(results.map(inv => mapInvoice(inv, processedDropdowns)))
       setTotalCount(count)
+
+      // Calculate summary stats
+      const summaryStats = [
+        { title: 'Total Invoices', value: count, icon: 'tabler-file-invoice', color: '#7367f0' },
+        {
+          title: 'Total Amount',
+          value: `₹ ${results.reduce((acc, curr) => acc + (curr.total || 0), 0).toLocaleString()}`,
+          icon: 'tabler-currency-dollar',
+          color: '#28c76f'
+        },
+        {
+          title: 'Issued',
+          value: results.filter(i => i.is_issued === 1 || i.is_issued === true).length,
+          icon: 'tabler-circle-check',
+          color: '#00cfe8'
+        },
+        {
+          title: 'Draft',
+          value: results.filter(i => i.is_issued === 0 || i.is_issued === false).length,
+          icon: 'tabler-pencil',
+          color: '#ff9f43'
+        }
+      ]
+      setSummaryData(summaryStats)
     } catch (err) {
       console.error(err)
       showToast('error', 'Failed to load invoices')
@@ -569,6 +596,7 @@ const InvoiceListPageFullContent = () => {
 
       columnHelper.accessor('invDate', {
         header: 'INV.Date',
+        sortingFn: dateSortingFn,
         cell: info => {
           const val = info.getValue()
           if (!val) return '-'
@@ -609,6 +637,7 @@ const InvoiceListPageFullContent = () => {
       }),
       columnHelper.accessor('lastSvcDate', {
         header: 'Last SVC Date',
+        sortingFn: dateSortingFn,
         cell: info => {
           const val = info.getValue()
           if (!val) return '-'
@@ -734,6 +763,8 @@ const InvoiceListPageFullContent = () => {
           <Typography color='text.primary'>Invoice List</Typography>
         </Breadcrumbs>
       </Box>
+
+      {summaryData.length > 0 && <SummaryCards data={summaryData} />}
 
       <Card sx={{ p: 3 }}>
         {/* HEADER */}

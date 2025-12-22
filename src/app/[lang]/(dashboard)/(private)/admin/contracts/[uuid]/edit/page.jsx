@@ -3,28 +3,38 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
+import {
+  Box,
+  Card,
+  Typography,
+  Divider,
+  Grid,
+  Tabs,
+  Tab,
+  IconButton
+} from '@mui/material'
 
-import { useParams } from 'next/navigation'
 import { getContractDetails } from '@/api/contract/details'
-import { updateContractValueApi } from '@/api/contract/icons/contractValueUpdate'
-import ContractValueDrawer from '@/components/service-pages/contract-actions/ContractValueDrawer'
-import ContractValueDrawerContent from '@/components/service-pages/contract-actions/ContractValueDrawerContent'
-import EditIcon from '@mui/icons-material/Edit'
-import IconButton from '@mui/material/IconButton' // <--- IDHU MISSING!
+import { getAllDropdowns } from '@/api/contract/dropdowns'
+import { updateContract } from '@/api/contract/update'
+import { showToast } from '@/components/common/Toasts'
 
-import { Box, Card, Typography, Divider, Grid } from '@mui/material'
+// Components
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalTextField from '@/components/common/GlobalTextField'
 import GlobalTextarea from '@/components/common/GlobalTextarea'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
-import { showToast } from '@/components/common/Toasts'
-import { getAllDropdowns } from '@/api/contract/dropdowns'
-import { updateContract } from '@/api/contract/update'
+import ContractValueDrawer from '@/components/service-pages/contract-actions/ContractValueDrawer'
 
-export default function ContractViewPage() {
-  const [form, setForm] = useState({})
+export default function ContractEditPage() {
   const router = useRouter()
+  const { uuid } = useParams()
+
+  const [form, setForm] = useState({})
+  const [loading, setLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState(0)
+  const [openValueDrawer, setOpenValueDrawer] = useState(false)
 
   const [dropdowns, setDropdowns] = useState({
     customers: [],
@@ -36,96 +46,56 @@ export default function ContractViewPage() {
     employees: []
   })
 
-  const { uuid } = useParams()
-
   // -----------------------------
   // Helpers
   // -----------------------------
   const setVal = (name, value) => setForm(prev => ({ ...prev, [name]: value }))
-  const [openValueDrawer, setOpenValueDrawer] = useState(false)
+  const handleTabChange = (event, newValue) => setActiveTab(newValue)
   const toggleValueDrawer = () => setOpenValueDrawer(prev => !prev)
 
-  // works whether GlobalAutocomplete gives (value) or (event, value)
-  const handleAutoChange =
-    name =>
-    (...args) => {
-      const value = args[args.length - 1]
-      setVal(name, value)
-    }
+  const handleAutoChange = name => (...args) => {
+    const value = args[args.length - 1]
+    setVal(name, value)
+  }
 
   const mapContractType = type => {
     if (!type) return ''
-
-    // If Autocomplete returns object → extract label/name
     const val = typeof type === 'string' ? type : type.name || type.label || type.contract_type || ''
-
     if (!val || typeof val !== 'string') return ''
-
     const lower = val.toLowerCase()
-
     if (lower === 'limited contract') return 'limited_contract'
     if (lower === 'continuous contract') return 'continuous_contract'
     if (lower === 'warranty') return 'warranty'
-
     return val
   }
 
   const formatDateToYMD = date => {
-    if (!date || date === '' || date === null || date === undefined) {
-      return null // Let backend accept null for optional dates
-    }
-
+    if (!date || date === '') return null
     const str = String(date).trim()
-
-    // Already perfect YYYY-MM-DD
-    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
-      return str
-    }
-
-    // Handle ISO with time: 2025-12-31T00:00:00 or 2025-12-31T00:00:00Z
-    if (str.includes('T')) {
-      return str.split('T')[0]
-    }
-
-    // DD-MM-YYYY
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str
+    if (str.includes('T')) return str.split('T')[0]
     if (/^\d{2}-\d{2}-\d{4}$/.test(str)) {
       const [dd, mm, yyyy] = str.split('-')
       return `${yyyy}-${mm}-${dd}`
     }
-
-    // DD/MM/YYYY
     if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) {
       const [dd, mm, yyyy] = str.split('/')
       return `${yyyy}-${mm}-${dd}`
     }
-
-    // MM/DD/YYYY (American format - be careful, but common in some systems)
-    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(str) && !str.includes('-')) {
-      const parts = str.split('/')
-      const mm = parts[0].padStart(2, '0')
-      const dd = parts[1].padStart(2, '0')
-      const yyyy = parts[2]
-      return `${yyyy}-${mm}-${dd}`
-    }
-
-    // If all else fails, return null instead of invalid garbage
-    console.warn('Unrecognized date format:', date)
     return null
   }
+
   // -----------------------------
   // Load Contract
   // -----------------------------
   useEffect(() => {
     const loadContract = async () => {
       if (!uuid) return
-
       try {
         const data = await getContractDetails(uuid)
-
         if (data) {
           setForm({
             id: data.id,
-
             salesModel: data.sales_mode || '',
             client: { id: data.customer_id, name: data.customer },
             contractType: data.contract_type || '',
@@ -171,7 +141,6 @@ export default function ContractViewPage() {
         showToast('error', 'Failed to load contract details')
       }
     }
-
     loadContract()
   }, [uuid])
 
@@ -182,18 +151,8 @@ export default function ContractViewPage() {
     const loadDropdowns = async () => {
       try {
         const data = (await getAllDropdowns()) || {}
-
-        const rawCustomers = data.customers || []
-        const seen = new Set()
-        const uniqueCustomers = rawCustomers.filter(item => {
-          const key = typeof item === 'string' ? item : item.id || item.name || item.label
-          if (seen.has(key)) return false
-          seen.add(key)
-          return true
-        })
-
         setDropdowns({
-          customers: uniqueCustomers,
+          customers: data.customers || [],
           callTypes: data.callTypes || data.call_types || [],
           billingFreq: data.billingFreq || data.billing_freq || [],
           serviceFreq: data.serviceFreq || data.service_freq || [],
@@ -203,61 +162,28 @@ export default function ContractViewPage() {
         })
       } catch (err) {
         console.error('Failed to load dropdowns', err)
-        showToast('error', 'Failed to load contract dropdowns')
       }
     }
-
     loadDropdowns()
   }, [])
 
-  // -----------------------------
-  // Employee-based dropdowns
-  // -----------------------------
   const employees = dropdowns.employees || []
-
-  const technicianOptions = employees
-    .filter(e => e.designation === 'Technician')
-    .map(e => ({ ...e, uniqueKey: `tech-${e.id || e.name}` }))
-
-  const salesOptions = employees
-    .filter(e => e.designation === 'Sales')
-    .map(e => ({ ...e, uniqueKey: `sales-${e.id || e.name}` }))
-
-  const directorOptions = employees
-    .filter(e => e.designation === 'Supervisor' || e.designation === 'Manager')
-    .map(e => ({ ...e, uniqueKey: `dir-${e.id || e.name}` }))
-
-  // -----------------------------
-  // File upload
-  // -----------------------------
-  const handleFileChange = e => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setVal('floorPlanFile', file)
-    setVal('floorPlanName', file.name)
-  }
+  const technicianOptions = employees.filter(e => e.designation === 'Technician')
+  const salesOptions = employees.filter(e => e.designation === 'Sales')
+  const directorOptions = employees.filter(e => e.designation === 'Supervisor' || e.designation === 'Manager')
 
   const handleSave = async () => {
     try {
-      // Make sure UUID exists
-      if (!uuid) {
-        showToast('error', 'Invalid contract ID')
-        return
-      }
-
-      // Convert UUID → ID (your API expects ?id=NUMBER)
-      const contractId = form.id || form.contractId || form.db_id || null
-
+      setLoading(true)
+      const contractId = form.id
       if (!contractId) {
-        showToast('error', 'Contract numeric ID missing in API data')
+        showToast('error', 'Contract ID missing')
         return
       }
 
-      // Build payload exactly like API needs
       const payload = {
         sales_mode: form.salesModel,
         customer_id: form.client?.id || form.client,
-
         contract_type: mapContractType(form.contractType),
         contract_code: form.contractCode,
         contract_status: form.status,
@@ -265,41 +191,26 @@ export default function ContractViewPage() {
         postal_address: form.postal,
         covered_location: form.coverage,
         po_number: form.poNumber,
-
-        // IMPORTANT FIX
         po_expiry_date: formatDateToYMD(form.poDueDate),
-
         preferred_time: form.preferredTime,
         report_email: form.reportEmail,
         contact_person_name: form.contactName,
         phone: form.contactPhone,
-
         call_type_id: form.callType?.id || form.callType,
         mobile: form.cellPhone,
         grouping_code: form.grouping,
-
         start_date: formatDateToYMD(form.startDate),
         end_date: formatDateToYMD(form.endDate),
         reminder_date: formatDateToYMD(form.reminderDate),
-
         service_frequency_id: form.industry?.id || form.industry,
         commencement_date: formatDateToYMD(form.serviceStartDate),
-
-        technician_id: form.technicians?.[0]?.id
-          ? String(form.technicians[0].id)
-          : form.technicians?.[0]
-            ? String(form.technicians[0])
-            : null,
-
+        technician_id: form.technicians?.[0]?.id || form.technicians?.[0] || null,
         billing_term: form.paymentTerms,
         account_item_id: parseInt(form.accountCode) || null,
-
         sales_person_id: parseInt(form.salesPerson) || null,
         supervisor_id: parseInt(form.director) || null,
-
         latitude: form.latitude ? Number(form.latitude) : 0,
         longitude: form.longitude ? Number(form.longitude) : 0,
-
         invoice_remarks: form.invoiceRemarks,
         billing_frequency_id: form.invoiceFrequency?.id || form.invoiceFrequency,
         billing_remarks: form.billingRemarks,
@@ -310,528 +221,189 @@ export default function ContractViewPage() {
         contract_value: Number(form.amount)
       }
 
-      console.log('Sending Payload:', payload)
-
       const result = await updateContract(contractId, payload)
-
       if (result?.status === 'success') {
         showToast('success', 'Contract updated successfully!')
-
-        // 🔥 Redirect to contract list
-        router.push('/admin/contracts')
+        router.back()
       } else {
         showToast('error', result?.message || 'Update failed!')
       }
     } catch (err) {
       console.error('Update error:', err)
-      showToast('error', 'Something went wrong while updating the contract')
+      showToast('error', 'Update Failed')
+    } finally {
+      setLoading(false)
     }
   }
 
-  // -----------------------------
-  // UI
-  // -----------------------------
+  const handleFileChange = e => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setVal('floorPlanName', file.name)
+  }
+
   return (
     <Box className='mt-2'>
-      <Card
-        sx={{
-          p: 3,
-          height: '85vh',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column'
-        }}
-      >
-        {/* TOP BAR – like screenshot */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      <Card sx={{ p: 3, height: '85vh', display: 'flex', flexDirection: 'column' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
           <Typography variant='h5' fontWeight={600}>
-            Contract Details
+            Edit Contract
           </Typography>
         </Box>
 
-        <Divider sx={{ mb: 3 }} />
+        <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}>
+          <Tab label='Location & Date' />
+          <Tab label='Amount & Remarks' />
+        </Tabs>
 
-        {/* SCROLL AREA */}
         <Box sx={{ overflowY: 'auto', flexGrow: 1, pr: 2 }}>
-          <Grid container spacing={3}>
-            {/* ========== SECTION 1: BASIC INFO ========== */}
-            <Grid item xs={12} md={4}>
-              <GlobalAutocomplete
-                label='Sales mode'
-                options={['Confirmed Sales', 'Quotation']}
-                value={form.salesModel || ''} // ← correct
-                onChange={handleAutoChange('salesModel')}
-              />
+          {activeTab === 0 && (
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={4}>
+                <GlobalAutocomplete
+                  label='Sales mode'
+                  options={['Confirmed Sales', 'Quotation']}
+                  value={form.salesModel || ''}
+                  onChange={handleAutoChange('salesModel')}
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <GlobalAutocomplete
+                  label='Customer'
+                  options={dropdowns.customers}
+                  getOptionLabel={opt => opt.name || opt.label || (typeof opt === 'string' ? opt : '')}
+                  value={form.client || null}
+                  onChange={handleAutoChange('client')}
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <GlobalAutocomplete
+                  label='Contract Type'
+                  options={['Limited Contract', 'Continuous Contract', 'Warranty']}
+                  value={form.contractType || ''}
+                  onChange={handleAutoChange('contractType')}
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <GlobalTextField label='Contract Code' value={form.contractCode || ''} onChange={e => setVal('contractCode', e.target.value)} />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <GlobalAutocomplete label='Contract Status' options={['Current', 'Pending', 'Expired', 'Closed']} value={form.status || ''} onChange={handleAutoChange('status')} />
+              </Grid>
+              <Grid item xs={12} md={8}>
+                <GlobalTextField label='Service Address' value={form.serviceAddress || ''} onChange={e => setVal('serviceAddress', e.target.value)} />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <GlobalTextField label='Postal Code' value={form.postal || ''} onChange={e => setVal('postal', e.target.value)} />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <GlobalTextField label='Covered Location' value={form.coverage || ''} onChange={e => setVal('coverage', e.target.value)} />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <GlobalTextField label='PO Number' value={form.poNumber || ''} onChange={e => setVal('poNumber', e.target.value)} />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <GlobalTextField label='PO Expiry Date' placeholder='dd-mm-yyyy' value={form.poDueDate || ''} onChange={e => setVal('poDueDate', e.target.value)} />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <GlobalTextField label='Preferred Time' value={form.preferredTime || ''} onChange={e => setVal('preferredTime', e.target.value)} />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <GlobalTextField label='Report Email' value={form.reportEmail || ''} onChange={e => setVal('reportEmail', e.target.value)} />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <GlobalTextField label='Site Contact Name' value={form.contactName || ''} onChange={e => setVal('contactName', e.target.value)} />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <GlobalTextField label='Site Contact Phone' value={form.contactPhone || ''} onChange={e => setVal('contactPhone', e.target.value)} />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <GlobalAutocomplete label='Call Type' options={dropdowns.callTypes} getOptionLabel={opt => opt.name || opt.label || ''} value={form.callType || ''} onChange={handleAutoChange('callType')} />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <GlobalTextField label='Start Date' placeholder='dd-mm-yyyy' value={form.startDate || ''} onChange={e => setVal('startDate', e.target.value)} />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <GlobalTextField label='End Date' placeholder='dd-mm-yyyy' value={form.endDate || ''} onChange={e => setVal('endDate', e.target.value)} />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <GlobalTextField label='Commencement Date' placeholder='dd-mm-yyyy' value={form.serviceStartDate || ''} onChange={e => setVal('serviceStartDate', e.target.value)} />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <GlobalAutocomplete label='Technicians' multiple options={technicianOptions} getOptionLabel={opt => opt.name || ''} value={form.technicians || []} onChange={handleAutoChange('technicians')} />
+              </Grid>
             </Grid>
+          )}
 
-            <Grid item xs={12} md={4}>
-              <GlobalAutocomplete
-                label='Customer'
-                options={dropdowns.customers}
-                getOptionLabel={opt =>
-                  typeof opt === 'string' ? opt : opt.name || opt.label || opt.customer_name || ''
-                }
-                isOptionEqualToValue={(opt, val) => {
-                  const a = typeof opt === 'string' ? opt : opt.id || opt.name
-                  const b = typeof val === 'string' ? val : val?.id || val?.name || val
-                  return a === b
-                }}
-                value={form.client || null}
-                onChange={handleAutoChange('client')}
-                renderOption={(props, option) => {
-                  const key = typeof option === 'string' ? option : option.id || option.name
-                  return (
-                    <li {...props} key={key}>
-                      {typeof option === 'string' ? option : option.name || option.label || option.customer_name}
-                    </li>
-                  )
-                }}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <GlobalAutocomplete
-                label='Contract Type'
-                options={['Limited Contract', 'Continuous Contract', 'Warranty']}
-                value={form.contractType || ''}
-                onChange={handleAutoChange('contractType')}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <GlobalTextField
-                label='Contract Code'
-                value={form.contractCode || ''}
-                onChange={e => setVal('contractCode', e.target.value)}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <GlobalAutocomplete
-                label='Contract Status'
-                options={['Current', 'Pending', 'Expired', 'Closed']}
-                value={form.status || ''}
-                onChange={handleAutoChange('status')}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <GlobalAutocomplete
-                label='New/Renewed Sales Status'
-                options={['New', 'Renewal']}
-                value={form.salesStatus || ''}
-                onChange={handleAutoChange('salesStatus')}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={8}>
-              <GlobalTextField
-                label='Service Address'
-                value={form.serviceAddress || ''}
-                onChange={e => setVal('serviceAddress', e.target.value)}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <GlobalTextField
-                label='Postal Code'
-                value={form.postal || ''}
-                onChange={e => setVal('postal', e.target.value)}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <GlobalTextField
-                label='Covered Location'
-                value={form.coverage || ''}
-                onChange={e => setVal('coverage', e.target.value)}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <GlobalTextField
-                label='PO Number'
-                value={form.poNumber || ''}
-                onChange={e => setVal('poNumber', e.target.value)}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <GlobalTextField
-                label='PO Expiry Date'
-                placeholder='dd-mm-yyyy'
-                value={form.poDueDate || ''}
-                onChange={e => setVal('poDueDate', e.target.value)}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <GlobalTextField
-                label='Preferred Time'
-                value={form.preferredTime || ''}
-                onChange={e => setVal('preferredTime', e.target.value)}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <GlobalTextField
-                label='Report Email'
-                value={form.reportEmail || ''}
-                onChange={e => setVal('reportEmail', e.target.value)}
-              />
-            </Grid>
-
-            {/* Divider between main blocks */}
-            <Grid item xs={12}>
-              <Divider sx={{ my: 1 }} />
-            </Grid>
-
-            {/* ========== SECTION 2: CONTACT DETAILS ========== */}
-            <Grid item xs={12} md={4}>
-              <GlobalTextField
-                label='Site Contact Person Name'
-                value={form.contactName || ''}
-                onChange={e => setVal('contactName', e.target.value)}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <GlobalTextField
-                label='Site Incharge Phone Number'
-                value={form.contactPhone || ''}
-                onChange={e => setVal('contactPhone', e.target.value)}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <GlobalAutocomplete
-                label='Call Type'
-                options={dropdowns.callTypes}
-                getOptionLabel={opt => (typeof opt === 'string' ? opt : opt.name || opt.label || opt.call_type || '')}
-                value={form.callType || ''}
-                onChange={handleAutoChange('callType')}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <GlobalTextField
-                label='Mobile'
-                value={form.cellPhone || ''}
-                onChange={e => setVal('cellPhone', e.target.value)}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <GlobalTextField
-                label='Group code'
-                value={form.grouping || ''}
-                onChange={e => setVal('grouping', e.target.value)}
-              />
-            </Grid>
-
-            {/* Divider */}
-            <Grid item xs={12}>
-              <Divider sx={{ my: 1 }} />
-            </Grid>
-
-            {/* ========== SECTION 3: DATES & SALES INFO ========== */}
-            <Grid item xs={12} md={4}>
-              <GlobalTextField
-                label='Start Date'
-                placeholder='dd-mm-yyyy'
-                value={form.startDate || ''}
-                onChange={e => setVal('startDate', e.target.value)}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <GlobalTextField
-                label='End Date'
-                placeholder='dd-mm-yyyy'
-                value={form.endDate || ''}
-                onChange={e => setVal('endDate', e.target.value)}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <GlobalTextField
-                label='Reminder Date'
-                placeholder='dd-mm-yyyy'
-                value={form.reminderDate || ''}
-                onChange={e => setVal('reminderDate', e.target.value)}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <GlobalAutocomplete
-                label='Industry'
-                options={dropdowns.serviceFreq}
-                getOptionLabel={opt => (typeof opt === 'string' ? opt : opt.name || opt.label || opt.frequency || '')}
-                value={form.industry || ''}
-                onChange={handleAutoChange('industry')}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <GlobalTextField
-                label='Commencement Date'
-                placeholder='dd-mm-yyyy'
-                value={form.serviceStartDate || ''}
-                onChange={e => setVal('serviceStartDate', e.target.value)}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <GlobalAutocomplete
-                label='Technicians'
-                multiple
-                options={technicianOptions}
-                getOptionLabel={opt => opt.name || opt.label || ''}
-                isOptionEqualToValue={(o, v) => o.id === v.id || o.name === v.name}
-                value={form.technicians || []}
-                onChange={handleAutoChange('technicians')}
-                renderOption={(props, option) => (
-                  <li {...props} key={option.uniqueKey || option.id || option.name}>
-                    {option.name || option.label}
-                  </li>
-                )}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <GlobalAutocomplete
-                label='Payment Term'
-                options={['0 days', '15 days', '30 days', '45 days', '60 days']}
-                value={form.paymentTerms || ''}
-                onChange={handleAutoChange('paymentTerms')}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <GlobalTextField
-                label='Account Item Code'
-                value={form.accountCode || ''}
-                onChange={e => setVal('accountCode', e.target.value)}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <GlobalAutocomplete
-                label='Sales Person'
-                options={salesOptions}
-                getOptionLabel={opt => opt.name || ''}
-                isOptionEqualToValue={(o, v) => o.id === (v?.id || v)}
-                value={form.salesPerson || null}
-                onChange={handleAutoChange('salesPerson')}
-                renderOption={(props, option) => (
-                  <li {...props} key={option.uniqueKey || option.id}>
-                    {option.name}
-                  </li>
-                )}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <GlobalAutocomplete
-                label='Supervisor'
-                options={directorOptions}
-                getOptionLabel={opt => opt.name || ''}
-                isOptionEqualToValue={(o, v) => o.id === (v?.id || v)}
-                value={form.director || null}
-                onChange={handleAutoChange('director')}
-                renderOption={(props, option) => (
-                  <li {...props} key={option.uniqueKey || option.id}>
-                    {option.name}
-                  </li>
-                )}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <GlobalTextField
-                label='Latitude'
-                value={form.latitude || ''}
-                onChange={e => setVal('latitude', e.target.value)}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <GlobalTextField
-                label='Longitude'
-                value={form.longitude || ''}
-                onChange={e => setVal('longitude', e.target.value)}
-              />
-            </Grid>
-
-            {/* Divider */}
-            <Grid item xs={12}>
-              <Divider sx={{ my: 1 }} />
-            </Grid>
-
-            {/* ========== SECTION 4: REMARKS & FLOOR PLAN ========== */}
-            <Grid item xs={12} md={9}>
-              {/* Invoice Remarks + REFRESH button like screenshot */}
-              <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
-                <Box sx={{ flex: 1 }}>
-                  <GlobalTextarea
-                    label='Invoice Remarks'
-                    value={form.invoiceRemarks || ''}
-                    onChange={e => setVal('invoiceRemarks', e.target.value)}
-                  />
+          {activeTab === 1 && (
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={4}>
+                <GlobalAutocomplete label='Payment Term' options={['0 days', '15 days', '30 days', '45 days', '60 days']} value={form.paymentTerms || ''} onChange={handleAutoChange('paymentTerms')} />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <GlobalTextField label='Account Code' value={form.accountCode || ''} onChange={e => setVal('accountCode', e.target.value)} />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <GlobalAutocomplete label='Sales Person' options={salesOptions} getOptionLabel={opt => opt.name || ''} value={form.salesPerson || null} onChange={handleAutoChange('salesPerson')} />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <GlobalAutocomplete label='Supervisor' options={directorOptions} getOptionLabel={opt => opt.name || ''} value={form.director || null} onChange={handleAutoChange('director')} />
+              </Grid>
+              <Grid item xs={12} md={9}>
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                  <GlobalTextarea label='Invoice Remarks' value={form.invoiceRemarks || ''} onChange={e => setVal('invoiceRemarks', e.target.value)} fullWidth />
+                  <GlobalButton variant='contained' onClick={() => showToast('info', 'Refreshed')}>REFRESH</GlobalButton>
                 </Box>
-                <GlobalButton
-                  variant='contained'
-                  size='small'
-                  onClick={() => showToast('info', 'Invoice remark refreshed')}
-                >
-                  REFRESH
-                </GlobalButton>
-              </Box>
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <GlobalAutocomplete label='Invoice Frequency' options={dropdowns.billingFreq} getOptionLabel={opt => opt.name || opt.label || ''} value={form.invoiceFrequency || ''} onChange={handleAutoChange('invoiceFrequency')} />
+              </Grid>
+              <Grid item xs={12} md={12}>
+                <GlobalTextarea label='Billing Remarks' value={form.billingRemarks || ''} onChange={e => setVal('billingRemarks', e.target.value)} fullWidth />
+              </Grid>
+              <Grid item xs={12} md={12}>
+                <Typography variant='subtitle1' fontWeight={600} sx={{ mb: 1 }}>Contract Value ($)</Typography>
+                <GlobalTextField
+                  fullWidth
+                  value={form.amount ? `$${Number(form.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '$0.00'}
+                  InputProps={{ readOnly: true }}
+                  onClick={toggleValueDrawer}
+                  sx={{ cursor: 'pointer' }}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <GlobalTextarea label='Agreement Add On 1' value={form.agree1 || ''} onChange={e => setVal('agree1', e.target.value)} fullWidth />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <GlobalTextarea label='Agreement Add On 2' value={form.agree2 || ''} onChange={e => setVal('agree2', e.target.value)} fullWidth />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <GlobalTextarea label='Technician Remarks' value={form.techNotes || ''} onChange={e => setVal('techNotes', e.target.value)} fullWidth />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <GlobalTextarea label='Appointment Remarks' value={form.appointmentNotes || ''} onChange={e => setVal('appointmentNotes', e.target.value)} fullWidth />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Typography variant='body2' sx={{ mb: 1 }}>Floor Plan</Typography>
+                <input type='file' onChange={handleFileChange} />
+                <Typography variant='caption'>{form.floorPlanName || 'No file chosen'}</Typography>
+              </Grid>
             </Grid>
+          )}
 
-            <Grid item xs={12} md={3}>
-              <GlobalAutocomplete
-                label='Invoice Frequency'
-                options={dropdowns.billingFreq}
-                getOptionLabel={opt => (typeof opt === 'string' ? opt : opt.name || opt.label || opt.frequency || '')}
-                value={form.invoiceFrequency || ''}
-                onChange={handleAutoChange('invoiceFrequency')}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={7}>
-              <GlobalTextarea
-                label='Billing Remarks'
-                value={form.billingRemarks || ''}
-                onChange={e => setVal('billingRemarks', e.target.value)}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={5}>
-              <Typography variant='body2' sx={{ mb: 1, fontWeight: 500 }}>
-                Upload Floor Plan
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <input type='file' id='floor-plan-input' style={{ display: 'none' }} onChange={handleFileChange} />
-                <GlobalButton
-                  variant='outlined'
-                  size='small'
-                  onClick={() => document.getElementById('floor-plan-input')?.click()}
-                >
-                  Choose File
-                </GlobalButton>
-                <Typography variant='body2' color='text.secondary'>
-                  {form.floorPlanName || 'No file chosen'}
-                </Typography>
-              </Box>
-            </Grid>
-
-            <Grid item xs={12} md={7}>
-              <GlobalTextarea
-                label='Technician Remarks'
-                value={form.techNotes || ''}
-                onChange={e => setVal('techNotes', e.target.value)}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={5}>
-              <GlobalTextarea
-                label='Appointment Remarks'
-                value={form.appointmentNotes || ''}
-                onChange={e => setVal('appointmentNotes', e.target.value)}
-              />
-            </Grid>
-
-            {/* ========== SECTION 5: AGREEMENTS & VALUE ========== */}
-            <Grid item xs={12} md={6}>
-              <GlobalTextarea
-                label='Agreement Add On 1'
-                value={form.agree1 || ''}
-                onChange={e => setVal('agree1', e.target.value)}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <GlobalTextarea
-                label='Agreement Add On 2'
-                value={form.agree2 || ''}
-                onChange={e => setVal('agree2', e.target.value)}
-              />
-            </Grid>
-
-            <Grid item xs={12}>
-              <Box
-                sx={{
-                  mt: 3,
-                  pt: 2,
-                  gap: 2,
-                  borderTop: '1px solid #eee',
-                  display: 'flex',
-                  justifyContent: 'flex-end', // 👈 ALWAYS RIGHT SIDE
-                  width: '100%', // 👈 FULL WIDTH
-                  pr: 1 // 👈 LITTLE RIGHT PADDING (OPTIONAL)
-                }}
-              >
-                <GlobalButton color='secondary' onClick={() => showToast('info', 'Closed')}>
-                  Close
-                </GlobalButton>
-                <GlobalButton variant='contained' onClick={handleSave}>
-                  Save
-                </GlobalButton>
-              </Box>
-            </Grid>
-
-            {/* ========== CONTRACT VALUE SECTION WITH INLINE EDIT ICON ========== */}
-            <Grid item xs={12} sx={{ mt: 3 }}>
-              <Divider sx={{ my: 2 }} />
-
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                <Typography variant='subtitle1' fontWeight={600}>
-                  Contract Value ($)
-                </Typography>
-
-                {/* Edit Icon Button */}
-              </Box>
-
-              {/* Readonly + Clickable Field with proper money format */}
-              <GlobalTextField
-                value={
-                  form.amount
-                    ? `$${Number(form.amount).toLocaleString('en-US', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2
-                      })}`
-                    : '$0.00'
-                }
-                InputProps={{
-                  readOnly: true,
-                  startAdornment: null // we already show $ in value
-                }}
-                onClick={toggleValueDrawer}
-                sx={{
-                  width: 300,
-                  cursor: 'pointer',
-                  '& .MuiOutlinedInput-root': {
-                    bgcolor: 'grey.50',
-                    fontWeight: 600,
-                    '&:hover': { bgcolor: 'grey.100' }
-                  }
-                }}
-              />
-            </Grid>
-
-            {/* ==================== CONTRACT VALUE DRAWER (MUST BE HERE!) ==================== */}
-            <ContractValueDrawer
-              open={openValueDrawer}
-              onClose={toggleValueDrawer}
-              contractId={form.id}
-              initialValue={form.amount || ''}
-              onValueUpdate={newValue => {
-                setVal('amount', newValue)
-              }}
-            />
-          </Grid>
+          <Box sx={{ mt: 3, pt: 2, borderTop: 1, borderColor: 'divider', display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+            <GlobalButton color='secondary' onClick={() => router.back()}>Close</GlobalButton>
+            <GlobalButton variant='contained' onClick={handleSave} disabled={loading}>{loading ? 'Saving...' : 'Save'}</GlobalButton>
+          </Box>
         </Box>
+
+        <ContractValueDrawer
+          open={openValueDrawer}
+          onClose={toggleValueDrawer}
+          contractId={form.id}
+          initialValue={form.amount || ''}
+          onValueUpdate={val => setVal('amount', val)}
+        />
       </Card>
     </Box>
   )
