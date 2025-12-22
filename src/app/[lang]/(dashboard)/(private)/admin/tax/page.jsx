@@ -408,7 +408,8 @@ const TaxPageContent = () => {
       ${rows
         .map(
           r =>
-            `<tr><td>${r.sno}</td><td>${r.name}</td><td>${r.tax}</td><td>${r.is_active === 1 ? 'Active' : 'Inactive'
+            `<tr><td>${r.sno}</td><td>${r.name}</td><td>${r.tax}</td><td>${
+              r.is_active === 1 ? 'Active' : 'Inactive'
             }</td></tr>`
         )
         .join('')}
@@ -470,7 +471,7 @@ const TaxPageContent = () => {
   }
 
   return (
-    <PermissionGuard permission="Tax">
+    <PermissionGuard permission='Tax'>
       <Box>
         <Box sx={{ mb: 2 }}>
           <Breadcrumbs aria-label='breadcrumb'>
@@ -637,7 +638,7 @@ const TaxPageContent = () => {
             />
           </Box>
 
-          <div className='overflow-x-auto'>
+          <div className='table-scroll-wrapper'>
             <table className={styles.table}>
               <thead>
                 {table.getHeaderGroups().map(hg => (
@@ -838,12 +839,7 @@ const TaxPageContent = () => {
             <GlobalButton color='secondary' onClick={() => setDeleteDialog({ open: false, row: null })}>
               Cancel
             </GlobalButton>
-            <GlobalButton
-              onClick={confirmDelete}
-              variant='contained'
-              color='error'
-              disabled={loading}
-            >
+            <GlobalButton onClick={confirmDelete} variant='contained' color='error' disabled={loading}>
               {loading ? 'Deleting...' : 'Delete'}
             </GlobalButton>
           </DialogActions>

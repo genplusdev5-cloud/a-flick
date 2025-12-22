@@ -29,6 +29,7 @@ import {
 
 import PermissionGuard from '@/components/auth/PermissionGuard'
 import { usePermission } from '@/hooks/usePermission'
+import StickyListLayout from '@/components/common/StickyListLayout'
 
 import { getTicketReportList } from '@/api/service_request/report'
 import { getReportDropdowns } from '@/api/service_request/report'
@@ -598,29 +599,22 @@ const ServiceRequestPageContent = () => {
 
       {summaryData.length > 0 && <SummaryCards data={summaryData} />}
 
-      <Card sx={{ p: 3 }}>
-        {/* Header */}
+      <Card sx={{ mt: 2 }}>
         <CardHeader
-          title={
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Typography variant='h5' sx={{ fontWeight: 600 }}>
-                  Service Request
-                </Typography>
-
-                <Button
-                  variant='contained'
-                  startIcon={<RefreshIcon />}
-                  onClick={async () => {
-                    // Always fetch full list or filtered list
-                    setPagination({ pageIndex: 0, pageSize: pagination.pageSize })
-                    await fetchTicketsFromApi(true)
-                  }}
-                  sx={{ textTransform: 'none' }}
-                >
-                  Refresh
-                </Button>
-              </Box>
+          title='Service Request'
+          action={
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Button
+                variant='contained'
+                startIcon={<RefreshIcon />}
+                onClick={async () => {
+                  setPagination({ pageIndex: 0, pageSize: pagination.pageSize })
+                  await fetchTicketsFromApi(true)
+                }}
+                sx={{ textTransform: 'none' }}
+              >
+                Refresh
+              </Button>
 
               {canAccess('Service Request', 'create') && (
                 <Button variant='contained' startIcon={<AddIcon />} sx={{ textTransform: 'none' }}>
@@ -629,378 +623,367 @@ const ServiceRequestPageContent = () => {
               )}
             </Box>
           }
-          sx={{ pb: 1.5, pt: 1.5 }}
-          action={null}
         />
 
-        <Divider sx={{ mb: 2 }} />
+        <Divider />
 
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'flex-end', // ⭐ FIX: Align bottom of all fields
-            gap: 2,
-            mb: 3,
-            flexWrap: 'nowrap'
-          }}
-        >
-          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-            <FormControlLabel
-              control={<Checkbox checked={enableDateFilter} onChange={e => setEnableDateFilter(e.target.checked)} />}
-              label='Date Filter'
-            />
-            <Box sx={{ width: 220 }}>
-              <GlobalDateRange
-                start={startDate}
-                end={endDate}
-                onSelectRange={({ start, end }) => {
-                  setStartDate(start)
-                  setEndDate(end)
-                }}
-                disabled={!enableDateFilter}
-              />
-            </Box>
-          </Box>
-
-          <CustomAutocomplete
-            options={customerOptions}
-            value={customerOptions.find(o => o.id === customerFilter) || null}
-            getOptionLabel={option => option?.label || ''} // ✔ only once
-            getOptionKey={option => option?.id}
-            isOptionEqualToValue={(o, v) => o.id === v?.id} // ⭐ IMPORTANT
-            onChange={(_, v) => {
-              const id = v?.id || ''
-              setCustomerFilter(id)
-              setContractFilter('')
-            }}
-            renderInput={params => (
-              <CustomTextField
-                {...params}
-                label='Customer'
-                size='small'
-                sx={{ width: 220 }}
-                placeholder='Select customer...'
-              />
-            )}
-          />
-
-          <CustomAutocomplete
-            options={contractOptions}
-            value={contractOptions.find(o => o.id === contractFilter) || null}
-            getOptionLabel={option => option?.label || ''}
-            getOptionKey={option => option?.id}
-            isOptionEqualToValue={(o, v) => o.id === v?.id}
-            onChange={(_, v) => setContractFilter(v?.id || '')}
-            renderInput={params => (
-              <CustomTextField
-                {...params}
-                label='Contract'
-                size='small'
-                sx={{ width: 220 }}
-                placeholder='Select contract...'
-              />
-            )}
-          />
-
-          {/* Technician */}
-          <CustomAutocomplete
-            options={technicianOptions}
-            value={technicianOptions.find(o => o.id === technicianFilter) || null}
-            onChange={(_, v) => setTechnicianFilter(v?.id || '')}
-            getOptionLabel={option => option?.label || ''}
-            renderInput={params => (
-              <CustomTextField
-                {...params}
-                label='Technician'
-                size='small'
-                sx={{ width: 220 }}
-                placeholder='Select Technician...'
-              />
-            )}
-          />
-
-          {/* Supervisor */}
-          <CustomAutocomplete
-            options={supervisorOptions}
-            value={supervisorOptions.find(o => o.id === supervisorFilter) || null}
-            onChange={(_, v) => setSupervisorFilter(v?.id || '')}
-            getOptionLabel={option => option?.label || ''}
-            renderInput={params => (
-              <CustomTextField
-                {...params}
-                label='Supervisor'
-                size='small'
-                sx={{ width: 220 }}
-                placeholder='Select Supervisor...'
-              />
-            )}
-          />
-
-          {/* Appointment Status */}
-          <CustomAutocomplete
-            options={appointmentStatusList}
-            value={appointmentStatusList.find(o => o.id === appointmentStatusFilter) || null}
-            onChange={(_, v) => setAppointmentStatusFilter(v?.id || '')}
-            getOptionLabel={option => option?.label || ''}
-            renderInput={params => (
-              <CustomTextField
-                {...params}
-                label='Appointment Status'
-                size='small'
-                sx={{ width: 200 }}
-                placeholder='Select Status...'
-              />
-            )}
-          />
-
-          {/* Appointment */}
-          <CustomAutocomplete
-            options={appointmentList}
-            value={appointmentList.find(o => o.id === appointmentTypeFilter) || null}
-            onChange={(_, v) => setAppointmentTypeFilter(v?.id || '')}
-            getOptionLabel={option => option?.label || ''}
-            renderInput={params => (
-              <CustomTextField
-                {...params}
-                label='Appointment'
-                size='small'
-                sx={{ width: 200 }}
-                placeholder='Select Appointment...'
-              />
-            )}
-          />
-        </Box>
-
-        <Divider sx={{ mb: 2 }} />
-
-        {/* Toolbar: entries + export + search */}
-        <Box
-          sx={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 2,
-            mb: 2,
-            flexWrap: 'wrap'
-          }}
-        >
-          {/* left: entries + export */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <FormControl size='small' sx={{ width: 120 }}>
-              <Select
-                value={pagination.pageSize}
-                onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
-              >
-                {[10, 25, 50, 100].map(s => (
-                  <MenuItem key={s} value={s}>
-                    {s} entries
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              {['Copy', 'CSV', 'Excel', 'PDF', 'Print'].map(b => (
-                <Button
-                  key={b}
-                  variant='contained'
-                  size='small'
-                  onClick={
-                    b === 'CSV' ? exportCSV : b === 'Print' ? exportPrint : () => showToast('info', `${b} coming soon`)
-                  }
-                  sx={{ bgcolor: '#6c757d', color: '#fff', textTransform: 'none' }}
-                >
-                  {b}
-                </Button>
-              ))}
-            </Box>
-          </Box>
-
-          {/* right: search */}
-          <TextField
-            size='small'
-            placeholder='Search any field...'
-            value={searchText}
-            onChange={e => {
-              setSearchText(e.target.value)
-              setPagination(p => ({ ...p, pageIndex: 0 }))
-            }}
-            sx={{ width: 360 }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position='start'>
-                  <SearchIcon />
-                </InputAdornment>
-              )
-            }}
-          />
-        </Box>
-
-        {/* Loading overlay */}
-        {loading && (
+        <Box sx={{ p: 4 }}>
           <Box
             sx={{
-              position: 'fixed',
-              inset: 0,
-              bgcolor: 'rgba(255,255,255,0.7)',
-              backdropFilter: 'blur(2px)',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 2000
+              gap: 2,
+              mb: 3,
+              flexWrap: 'wrap'
             }}
           >
-            <ProgressCircularCustomization size={60} thickness={5} />
-          </Box>
-        )}
-        {/* Table */}
-        <div className='overflow-x-auto'>
-          <table className={styles.table}>
-            <thead>
-              {table.getHeaderGroups().map(hg => (
-                <tr key={hg.id}>
-                  {hg.headers.map(h => (
-                    <th key={h.id}>
-                      <div
-                        className={classnames({
-                          'flex items-center': h.column.getIsSorted(),
-                          'cursor-pointer select-none': h.column.getCanSort()
-                        })}
-                        onClick={h.column.getToggleSortingHandler()}
-                      >
-                        {flexRender(h.column.columnDef.header, h.getContext())}
-                        {h.column.getIsSorted() === 'asc' && <ChevronRight className='-rotate-90' fontSize='small' />}
-                        {h.column.getIsSorted() === 'desc' && <ChevronRight className='rotate-90' fontSize='small' />}
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              ))}
-            </thead>
+            <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+              <FormControlLabel
+                control={<Checkbox checked={enableDateFilter} onChange={e => setEnableDateFilter(e.target.checked)} />}
+                label='Date Filter'
+                sx={{ mb: -0.5 }}
+              />
+              <Box sx={{ width: 220 }}>
+                <GlobalDateRange
+                  start={startDate}
+                  end={endDate}
+                  onSelectRange={({ start, end }) => {
+                    setStartDate(start)
+                    setEndDate(end)
+                  }}
+                  disabled={!enableDateFilter}
+                />
+              </Box>
+            </Box>
 
-            <tbody>
-              {rows.length === 0 ? (
-                <tr>
-                  <td colSpan={columns.length} className='text-center py-4'>
-                    {loading ? 'Loading...' : 'No data available'}
-                  </td>
-                </tr>
-              ) : (
-                table.getRowModel().rows.map(row => (
-                  <tr key={row.id}>
-                    {row.getVisibleCells().map(cell => (
-                      <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
-                    ))}
-                  </tr>
-                ))
+            <CustomAutocomplete
+              options={customerOptions}
+              value={customerOptions.find(o => o.id === customerFilter) || null}
+              getOptionLabel={option => option?.label || ''}
+              getOptionKey={option => option?.id}
+              isOptionEqualToValue={(o, v) => o.id === v?.id}
+              onChange={(_, v) => {
+                const id = v?.id || ''
+                setCustomerFilter(id)
+                setContractFilter('')
+              }}
+              renderInput={params => (
+                <CustomTextField
+                  {...params}
+                  label='Customer'
+                  size='small'
+                  sx={{ width: 200 }}
+                  placeholder='Select customer...'
+                />
               )}
-            </tbody>
-          </table>
-        </div>
+            />
 
-        {/* Pagination Footer */}
-        <Box
-          sx={{
-            mt: 2,
-            px: 3,
-            py: 1.5,
-            borderTop: '1px solid #e0e0e0',
-            display: 'flex',
-            justifyContent: 'space-between', // 👈 Left text + Right pagination
-            alignItems: 'center',
-            flexWrap: 'wrap'
-          }}
-        >
-          {/* Left text */}
-          <Typography color='text.disabled'>
-            {`Showing ${rowCount === 0 ? 0 : pagination.pageIndex * pagination.pageSize + 1} to ${Math.min(
-              (pagination.pageIndex + 1) * pagination.pageSize,
-              rowCount
-            )} of ${rowCount} entries`}
-          </Typography>
+            <CustomAutocomplete
+              options={contractOptions}
+              value={contractOptions.find(o => o.id === contractFilter) || null}
+              getOptionLabel={option => option?.label || ''}
+              getOptionKey={option => option?.id}
+              isOptionEqualToValue={(o, v) => o.id === v?.id}
+              onChange={(_, v) => setContractFilter(v?.id || '')}
+              renderInput={params => (
+                <CustomTextField
+                  {...params}
+                  label='Contract'
+                  size='small'
+                  sx={{ width: 200 }}
+                  placeholder='Select contract...'
+                />
+              )}
+            />
 
-          {/* Right Pagination */}
-          <Pagination
-            shape='rounded'
-            color='primary'
-            variant='tonal'
-            count={Math.ceil(rowCount / pagination.pageSize) || 1}
-            page={pagination.pageIndex + 1}
-            onChange={(_, page) => setPagination(p => ({ ...p, pageIndex: page - 1 }))}
-            showFirstButton
-            showLastButton
-          />
-        </Box>
+            <CustomAutocomplete
+              options={technicianOptions}
+              value={technicianOptions.find(o => o.id === technicianFilter) || null}
+              onChange={(_, v) => setTechnicianFilter(v?.id || '')}
+              getOptionLabel={option => option?.label || ''}
+              renderInput={params => (
+                <CustomTextField
+                  {...params}
+                  label='Technician'
+                  size='small'
+                  sx={{ width: 180 }}
+                  placeholder='Select Technician...'
+                />
+              )}
+            />
 
-        <Dialog
-          onClose={() => setDeleteDialog({ open: false, row: null })}
-          aria-labelledby='customized-dialog-title'
-          open={deleteDialog.open}
-          closeAfterTransition={false}
-          PaperProps={{
-            sx: {
-              overflow: 'visible',
-              width: 420,
-              borderRadius: 1,
-              textAlign: 'center'
-            }
-          }}
-        >
-          {/* 🔴 Title with Warning Icon */}
-          <DialogTitle
-            id='customized-dialog-title'
+            <CustomAutocomplete
+              options={supervisorOptions}
+              value={supervisorOptions.find(o => o.id === supervisorFilter) || null}
+              onChange={(_, v) => setSupervisorFilter(v?.id || '')}
+              getOptionLabel={option => option?.label || ''}
+              renderInput={params => (
+                <CustomTextField
+                  {...params}
+                  label='Supervisor'
+                  size='small'
+                  sx={{ width: 180 }}
+                  placeholder='Select Supervisor...'
+                />
+              )}
+            />
+
+            <CustomAutocomplete
+              options={appointmentStatusList}
+              value={appointmentStatusList.find(o => o.id === appointmentStatusFilter) || null}
+              onChange={(_, v) => setAppointmentStatusFilter(v?.id || '')}
+              getOptionLabel={option => option?.label || ''}
+              renderInput={params => (
+                <CustomTextField
+                  {...params}
+                  label='Status'
+                  size='small'
+                  sx={{ width: 180 }}
+                  placeholder='Select Status...'
+                />
+              )}
+            />
+
+            <CustomAutocomplete
+              options={appointmentList}
+              value={appointmentList.find(o => o.id === appointmentTypeFilter) || null}
+              onChange={(_, v) => setAppointmentTypeFilter(v?.id || '')}
+              getOptionLabel={option => option?.label || ''}
+              renderInput={params => (
+                <CustomTextField
+                  {...params}
+                  label='Appointment'
+                  size='small'
+                  sx={{ width: 180 }}
+                  placeholder='Select Appointment...'
+                />
+              )}
+            />
+          </Box>
+
+          <Divider sx={{ mb: 2 }} />
+
+          <Box
             sx={{
               display: 'flex',
+              justifyContent: 'space-between',
               alignItems: 'center',
-              justifyContent: 'center',
-              gap: 1,
-              color: 'error.main',
-              fontWeight: 700,
-              pb: 1,
-              position: 'relative'
+              gap: 2,
+              mb: 2,
+              flexWrap: 'wrap'
             }}
           >
-            <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
-            Confirm Delete
-            <DialogCloseButton
-              onClick={() => setDeleteDialog({ open: false, row: null })}
-              disableRipple
-              sx={{ position: 'absolute', right: 1, top: 1 }}
-            >
-              <i className='tabler-x' />
-            </DialogCloseButton>
-          </DialogTitle>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <FormControl size='small' sx={{ width: 120 }}>
+                <Select
+                  value={pagination.pageSize}
+                  onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
+                >
+                  {[10, 25, 50, 100].map(s => (
+                    <MenuItem key={s} value={s}>
+                      {s} entries
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
 
-          {/* Centered Text */}
-          <DialogContent sx={{ px: 5, pt: 1 }}>
-            <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
-              Are you sure you want to delete{' '}
-              <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name || 'this incident'}</strong>?
-              <br />
-              This action cannot be undone.
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                {['Copy', 'CSV', 'Excel', 'PDF', 'Print'].map(b => (
+                  <Button
+                    key={b}
+                    variant='contained'
+                    size='small'
+                    onClick={
+                      b === 'CSV' ? exportCSV : b === 'Print' ? exportPrint : () => showToast('info', `${b} coming soon`)
+                    }
+                    sx={{ bgcolor: '#6c757d', color: '#fff', textTransform: 'none' }}
+                  >
+                    {b}
+                  </Button>
+                ))}
+              </Box>
+            </Box>
+
+            <TextField
+              size='small'
+              placeholder='Search any field...'
+              value={searchText}
+              onChange={e => {
+                setSearchText(e.target.value)
+                setPagination(p => ({ ...p, pageIndex: 0 }))
+              }}
+              sx={{ width: 360 }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position='start'>
+                    <SearchIcon />
+                  </InputAdornment>
+                )
+              }}
+            />
+          </Box>
+
+          <Box sx={{ position: 'relative' }}>
+            {loading && (
+              <Box
+                sx={{
+                  position: 'absolute',
+                  inset: 0,
+                  bgcolor: 'rgba(255,255,255,0.7)',
+                  backdropFilter: 'blur(2px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 10
+                }}
+              >
+                <ProgressCircularCustomization size={60} thickness={5} />
+              </Box>
+            )}
+
+            <div className='overflow-x-auto'>
+              <table className={styles.table}>
+                <thead>
+                  {table.getHeaderGroups().map(hg => (
+                    <tr key={hg.id}>
+                      {hg.headers.map(h => (
+                        <th key={h.id}>
+                          <div
+                            className={classnames({
+                              'flex items-center': h.column.getIsSorted(),
+                              'cursor-pointer select-none': h.column.getCanSort()
+                            })}
+                            onClick={h.column.getToggleSortingHandler()}
+                          >
+                            {flexRender(h.column.columnDef.header, h.getContext())}
+                            {h.column.getIsSorted() === 'asc' && <ChevronRight className='-rotate-90' fontSize='small' />}
+                            {h.column.getIsSorted() === 'desc' && <ChevronRight className='rotate-90' fontSize='small' />}
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  ))}
+                </thead>
+
+                <tbody>
+                  {rows.length === 0 ? (
+                    <tr>
+                      <td colSpan={columns.length} className='text-center py-4'>
+                        {loading ? 'Loading...' : 'No data available'}
+                      </td>
+                    </tr>
+                  ) : (
+                    table.getRowModel().rows.map(row => (
+                      <tr key={row.id}>
+                        {row.getVisibleCells().map(cell => (
+                          <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                        ))}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Box>
+
+          <Box
+            sx={{
+              py: 1.5,
+              borderTop: '1px solid #e0e0e0',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              mt: 4
+            }}
+          >
+            <Typography color='text.disabled' variant='body2'>
+              {`Showing ${rowCount === 0 ? 0 : pagination.pageIndex * pagination.pageSize + 1} to ${Math.min(
+                (pagination.pageIndex + 1) * pagination.pageSize,
+                rowCount
+              )} of ${rowCount} entries`}
             </Typography>
-          </DialogContent>
 
-          {/* Centered Buttons */}
-          <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-            <GlobalButton
-              onClick={() => setDeleteDialog({ open: false, row: null })}
-              color='secondary'
-              sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
-            >
-              Cancel
-            </GlobalButton>
-            <GlobalButton
-              onClick={confirmDelete}
-              variant='contained'
-              color='error'
-              sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
-            >
-              Delete
-            </GlobalButton>
-          </DialogActions>
-        </Dialog>
+            <Pagination
+              shape='rounded'
+              color='primary'
+              variant='tonal'
+              count={Math.ceil(rowCount / pagination.pageSize) || 1}
+              page={pagination.pageIndex + 1}
+              onChange={(_, page) => setPagination(p => ({ ...p, pageIndex: page - 1 }))}
+              showFirstButton
+              showLastButton
+              size='small'
+            />
+          </Box>
+        </Box>
       </Card>
+
+      <Dialog
+        onClose={() => setDeleteDialog({ open: false, row: null })}
+        aria-labelledby='customized-dialog-title'
+        open={deleteDialog.open}
+        closeAfterTransition={false}
+        PaperProps={{
+          sx: {
+            overflow: 'visible',
+            width: 420,
+            borderRadius: 1,
+            textAlign: 'center'
+          }
+        }}
+      >
+        <DialogTitle
+          id='customized-dialog-title'
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1,
+            color: 'error.main',
+            fontWeight: 700,
+            pb: 1,
+            position: 'relative'
+          }}
+        >
+          <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
+          Confirm Delete
+          <DialogCloseButton
+            onClick={() => setDeleteDialog({ open: false, row: null })}
+            disableRipple
+            sx={{ position: 'absolute', right: 1, top: 1 }}
+          >
+            <i className='tabler-x' />
+          </DialogCloseButton>
+        </DialogTitle>
+
+        <DialogContent sx={{ px: 5, pt: 1 }}>
+          <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
+            Are you sure you want to delete{' '}
+            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name || 'this incident'}</strong>?
+            <br />
+            This action cannot be undone.
+          </Typography>
+        </DialogContent>
+
+        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+          <GlobalButton
+            onClick={() => setDeleteDialog({ open: false, row: null })}
+            color='secondary'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+          >
+            Cancel
+          </GlobalButton>
+          <GlobalButton
+            onClick={confirmDelete}
+            variant='contained'
+            color='error'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+          >
+            Delete
+          </GlobalButton>
+        </DialogActions>
+      </Dialog>
     </Box>
   )
 }

@@ -1,3 +1,4 @@
+
 'use client'
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
@@ -72,6 +73,7 @@ import {
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
 import { dateSortingFn } from '@/utils/tableUtils'
+import StickyListLayout from '@/components/common/StickyListLayout'
 
 // Debounced Input
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
@@ -129,7 +131,7 @@ const CustomersPageContent = () => {
     const params = new URLSearchParams(searchParams.toString())
     params.set('pageIndex', pagination.pageIndex.toString())
     params.set('pageSize', pagination.pageSize.toString())
-    
+
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })
   }, [pagination.pageIndex, pagination.pageSize, pathname, router]) // Removed searchParams to break loop
 
@@ -551,19 +553,11 @@ const CustomersPageContent = () => {
         </Grid>
       </Card>
 
-      <Card sx={{ p: 3 }}>
+      <Card>
         <CardHeader
-          sx={{
-            pb: 1.5,
-            pt: 1.5,
-            '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
-            '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
-          }}
-          title={
+          title='Customer List'
+          action={
             <Box display='flex' alignItems='center' gap={2}>
-              <Typography variant='h5' sx={{ fontWeight: 600 }}>
-                Customer List
-              </Typography>
               <GlobalButton
                 variant='contained'
                 color='primary'
@@ -588,10 +582,7 @@ const CustomersPageContent = () => {
               >
                 {loading ? 'Refreshing...' : 'Refresh'}
               </GlobalButton>
-            </Box>
-          }
-          action={
-            <Box display='flex' alignItems='center' gap={2}>
+
               <GlobalButton
                 color='secondary'
                 endIcon={<ArrowDropDownIcon />}
@@ -660,161 +651,172 @@ const CustomersPageContent = () => {
             </Box>
           }
         />
-        {loading && (
-          <Box
-            sx={{
-              position: 'fixed',
-              inset: 0,
-              bgcolor: 'rgba(255,255,255,0.8)',
-              backdropFilter: 'blur(2px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 9999
-            }}
-          >
-            <ProgressCircularCustomization size={60} thickness={5} />
-          </Box>
-        )}
 
-        <Divider sx={{ mb: 2 }} />
-        <Box
-          sx={{
-            mb: 3,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'nowrap',
-            gap: 2
-          }}
-        >
-          {/* LEFT SIDE FILTERS */}
+        <Divider />
+
+        <Box sx={{ p: 4 }}>
           <Box
             sx={{
+              mb: 3,
               display: 'flex',
               justifyContent: 'space-between',
-              alignItems: 'flex-end', // ⭐ FIX: Align by bottom (input line)
-              mb: 2,
-              gap: 2,
-              flexWrap: 'nowrap'
+              alignItems: 'center',
+              flexWrap: 'nowrap',
+              gap: 2
             }}
           >
-            {/* 25 Entries */}
-            <FormControl size='small' sx={{ width: 140 }}>
-              <Select
-                value={pagination.pageSize}
-                onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
-              >
-                {[25, 50, 75, 100].map(s => (
-                  <MenuItem key={s} value={s}>
-                    {s} entries
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            {/* LEFT SIDE FILTERS */}
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-end',
+                gap: 2,
+                flexWrap: 'nowrap'
+              }}
+            >
+              {/* Entries Select */}
+              <FormControl size='small' sx={{ width: 140 }}>
+                <Select
+                  value={pagination.pageSize}
+                  onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
+                >
+                  {[25, 50, 75, 100].map(s => (
+                    <MenuItem key={s} value={s}>
+                      {s} entries
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
 
-            {/* Origin */}
-            <Box sx={{ width: 200 }}>
-              <GlobalAutocomplete
-                label='Origin'
-                placeholder='Select Origin'
-                options={companyOptions}
-                value={filterOrigin}
-                onChange={val => {
-                  setFilterOrigin(val)
-                  setPagination(p => ({ ...p, pageIndex: 0 }))
-                }}
-              />
+              {/* Origin */}
+              <Box sx={{ width: 200 }}>
+                <GlobalAutocomplete
+                  label='Origin'
+                  placeholder='Select Origin'
+                  options={companyOptions}
+                  value={filterOrigin}
+                  onChange={val => {
+                    setFilterOrigin(val)
+                    setPagination(p => ({ ...p, pageIndex: 0 }))
+                  }}
+                />
+              </Box>
+
+              {/* MYOB Status */}
+              <Box sx={{ width: 200 }}>
+                <GlobalAutocomplete
+                  label='MYOB Status'
+                  placeholder='Select'
+                  options={[
+                    { id: 1, label: 'Exported', value: 'Exported' },
+                    { id: 2, label: 'Not Exported', value: 'Not Exported' }
+                  ]}
+                  value={filterMyob}
+                  onChange={val => {
+                    setFilterMyob(val)
+                    setPagination(p => ({ ...p, pageIndex: 0 }))
+                  }}
+                />
+              </Box>
             </Box>
 
-            {/* MYOB */}
-            <Box sx={{ width: 200 }}>
-              <GlobalAutocomplete
-                label='MYOB Status'
-                placeholder='Select'
-                options={[
-                  { id: 1, label: 'Exported', value: 'Exported' },
-                  { id: 2, label: 'Not Exported', value: 'Not Exported' }
-                ]}
-                value={filterMyob}
-                onChange={val => {
-                  setFilterMyob(val)
-                  setPagination(p => ({ ...p, pageIndex: 0 }))
-                }}
-              />
-            </Box>
+            {/* SEARCH RIGHT SIDE */}
+            <DebouncedInput
+              value={searchText}
+              onChange={v => {
+                setSearchText(String(v))
+                setPagination(p => ({ ...p, pageIndex: 0 }))
+              }}
+              placeholder='Search by Name, Email, Address, Origin...'
+              sx={{ width: 420 }}
+              variant='outlined'
+              size='small'
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position='start'>
+                      <SearchIcon />
+                    </InputAdornment>
+                  )
+                }
+              }}
+            />
           </Box>
 
-          {/* SEARCH RIGHT SIDE */}
-          <DebouncedInput
-            value={searchText}
-            onChange={v => {
-              setSearchText(String(v))
-              setPagination(p => ({ ...p, pageIndex: 0 }))
-            }}
-            placeholder='Search by Name, Email, Address, Origin...'
-            sx={{ width: 420 }}
-            variant='outlined'
-            size='small'
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position='start'>
-                    <SearchIcon />
-                  </InputAdornment>
-                )
-              }
-            }}
+          <Box sx={{ position: 'relative' }}>
+            {loading && (
+              <Box
+                sx={{
+                  position: 'absolute',
+                  inset: 0,
+                  bgcolor: 'rgba(255,255,255,0.8)',
+                  backdropFilter: 'blur(2px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 10
+                }}
+              >
+                <ProgressCircularCustomization size={60} thickness={5} />
+              </Box>
+            )}
+
+            <div className='overflow-x-auto'>
+              <table className={styles.table}>
+                <thead>
+                  {table.getHeaderGroups().map(hg => (
+                    <tr key={hg.id}>
+                      {hg.headers.map(h => (
+                        <th key={h.id}>
+                          <div
+                            className={classnames({
+                              'flex items-center': h.column.getIsSorted(),
+                              'cursor-pointer select-none': h.column.getCanSort()
+                            })}
+                            onClick={h.column.getToggleSortingHandler()}
+                          >
+                            {flexRender(h.column.columnDef.header, h.getContext())}
+                            {{
+                              asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
+                              desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
+                            }[h.column.getIsSorted()] ?? null}
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  ))}
+                </thead>
+                <tbody>
+                  {rows.length ? (
+                    table.getRowModel().rows.map(row => (
+                      <tr key={row.id}>
+                        {row.getVisibleCells().map(cell => (
+                          <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                        ))}
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={columns.length} className='text-center py-4'>
+                        {loading ? 'Loading customers...' : 'No results found'}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Box>
+
+          <TablePaginationComponent
+            totalCount={rowCount}
+            pagination={pagination}
+            setPagination={setPagination}
           />
         </Box>
-
-        <div className='overflow-x-auto'>
-          <table className={styles.table}>
-            <thead>
-              {table.getHeaderGroups().map(hg => (
-                <tr key={hg.id}>
-                  {hg.headers.map(h => (
-                    <th key={h.id}>
-                      <div
-                        className={classnames({
-                          'flex items-center': h.column.getIsSorted(),
-                          'cursor-pointer select-none': h.column.getCanSort()
-                        })}
-                        onClick={h.column.getToggleSortingHandler()}
-                      >
-                        {flexRender(h.column.columnDef.header, h.getContext())}
-                        {{
-                          asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
-                          desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
-                        }[h.column.getIsSorted()] ?? null}
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody>
-              {rows.length ? (
-                table.getRowModel().rows.map(row => (
-                  <tr key={row.id}>
-                    {row.getVisibleCells().map(cell => (
-                      <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
-                    ))}
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={columns.length} className='text-center py-4'>
-                    No results found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
       </Card>
 
+      {/* Delete Confirmation Dialog */}
       <Dialog
         onClose={() => setDeleteDialog({ open: false })}
         aria-labelledby='customized-dialog-title'
@@ -829,7 +831,6 @@ const CustomersPageContent = () => {
           }
         }}
       >
-        {/* 🔴 Title with Warning Icon */}
         <DialogTitle
           id='customized-dialog-title'
           sx={{
@@ -853,8 +854,6 @@ const CustomersPageContent = () => {
             <i className='tabler-x' />
           </DialogCloseButton>
         </DialogTitle>
-
-        {/* 🧾 Message */}
         <DialogContent sx={{ px: 5, pt: 1 }}>
           <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
             Are you sure you want to delete customer{' '}
@@ -863,8 +862,6 @@ const CustomersPageContent = () => {
             This action cannot be undone.
           </Typography>
         </DialogContent>
-
-        {/* ⚙️ Buttons */}
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
           <GlobalButton
             onClick={() => setDeleteDialog({ open: false })}

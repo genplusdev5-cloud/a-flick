@@ -63,6 +63,7 @@ import AttendanceScheduleDrawer from './service-plan/AttendanceScheduleDrawer'
 
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 import styles from '@core/styles/table.module.css'
+import StickyListLayout from '@/components/common/StickyListLayout'
 import CustomTextField from '@core/components/mui/TextField'
 import { format } from 'date-fns'
 import { showToast } from '@/components/common/Toasts' // ← Idhu add pannu (exact path unakku theriyum)
@@ -284,24 +285,6 @@ const AttendancePageContent = () => {
 
   return (
     <Box>
-      {loading && (
-        <Box
-          sx={{
-            position: 'fixed',
-            inset: 0,
-            bgcolor: 'rgba(255,255,255,0.8)',
-            backdropFilter: 'blur(2px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999
-          }}
-        >
-          <ProgressCircularCustomization size={60} thickness={5} />
-        </Box>
-      )}
-
-      {/* Breadcrumb */}
       <Box sx={{ mb: 2 }}>
         <Link href='/admin/dashboards' className='text-primary'>
           Dashboard
@@ -309,28 +292,16 @@ const AttendancePageContent = () => {
         / <Typography component='span'>Attendance</Typography>
       </Box>
 
-      {/* MAIN CARD */}
-      <Card sx={{ p: 3 }}>
-        {/* TOP TITLE + ADD BUTTON */}
+      <Card>
         <CardHeader
-          sx={{
-            pb: 1.5,
-            pt: 1.5,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
-          }}
-          title={
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Typography sx={{ fontWeight: 600, fontSize: '1.125rem' }}>Attendance</Typography>
-
-              {/* LEFT SIDE REFRESH */}
+          title='Attendance'
+          action={
+            <Box display='flex' alignItems='center' gap={2}>
               <GlobalButton
                 variant='contained'
                 color='primary'
                 startIcon={<RefreshIcon />}
-                onClick={fetchAttendances} // 🔥 Auto reload list
+                onClick={fetchAttendances}
                 sx={{
                   textTransform: 'none',
                   fontWeight: 500,
@@ -340,10 +311,7 @@ const AttendancePageContent = () => {
               >
                 Refresh
               </GlobalButton>
-            </Box>
-          }
-          action={
-            <Box display='flex' alignItems='center' gap={2}>
+
               <GlobalButton
                 color='secondary'
                 endIcon={<ArrowDropDownIcon />}
@@ -399,7 +367,6 @@ const AttendancePageContent = () => {
                 </MenuItem>
               </Menu>
 
-              {/* ADD */}
               <GlobalButton
                 variant='contained'
                 startIcon={<AddIcon />}
@@ -412,24 +379,20 @@ const AttendancePageContent = () => {
           }
         />
 
-        <Divider sx={{ my: 3 }} />
+        <Divider />
 
-        {/* FILTER SECTION */}
-        {/* FILTER SECTION */}
-        <Box sx={{ mb: 3 }}>
+        <Box sx={{ p: 4 }}>
           <Box
             sx={{
               display: 'flex',
-              alignItems: 'flex-end',
+              alignItems: 'center',
               justifyContent: 'space-between',
               gap: 3,
               flexWrap: 'wrap',
               mb: 3
             }}
           >
-            {/* LEFT GROUP */}
             <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 2, flexWrap: 'wrap' }}>
-              {/* Entries */}
               <FormControl size='small' sx={{ width: 130 }}>
                 <Select
                   value={pagination.pageSize}
@@ -443,11 +406,11 @@ const AttendancePageContent = () => {
                 </Select>
               </FormControl>
 
-              {/* Date Filter */}
               <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                 <FormControlLabel
                   control={<Checkbox checked={dateFilter} onChange={e => setDateFilter(e.target.checked)} />}
                   label='Date Filter'
+                  sx={{ mb: -0.5 }}
                 />
                 <Box sx={{ width: 220 }}>
                   <GlobalDateRange
@@ -459,9 +422,7 @@ const AttendancePageContent = () => {
                 </Box>
               </Box>
 
-              {/* Customer */}
-              {/* Customer */}
-              <Box sx={{ width: 200 }}>
+              <Box sx={{ width: 180 }}>
                 <GlobalAutocomplete
                   label='Customer'
                   options={dropdowns.customers.map(c => ({
@@ -477,8 +438,7 @@ const AttendancePageContent = () => {
                 />
               </Box>
 
-              {/* Technician */}
-              <Box sx={{ width: 200 }}>
+              <Box sx={{ width: 180 }}>
                 <GlobalAutocomplete
                   label='Technician'
                   options={dropdowns.technicians.map(t => ({
@@ -493,8 +453,7 @@ const AttendancePageContent = () => {
                 />
               </Box>
 
-              {/* Supervisor */}
-              <Box sx={{ width: 200 }}>
+              <Box sx={{ width: 180 }}>
                 <GlobalAutocomplete
                   label='Supervisor'
                   options={dropdowns.supervisors.map(s => ({
@@ -505,13 +464,12 @@ const AttendancePageContent = () => {
                   onChange={value => {
                     setSelectedSupervisor(value)
                     setPagination(p => ({ ...p, pageIndex: 0 }))
-                    fetchAttendances() // 🔥 Add this
+                    fetchAttendances()
                   }}
                 />
               </Box>
 
-              {/* Slot */}
-              <Box sx={{ width: 180 }}>
+              <Box sx={{ width: 150 }}>
                 <GlobalAutocomplete
                   label='Slot'
                   options={dropdowns.slots.map(s => ({
@@ -527,12 +485,11 @@ const AttendancePageContent = () => {
               </Box>
             </Box>
 
-            {/* Search */}
             <TextField
               value={searchText}
               onChange={e => setSearchText(e.target.value)}
               placeholder='Search...'
-              sx={{ width: 280 }}
+              sx={{ width: 250 }}
               size='small'
               slotProps={{
                 input: {
@@ -545,97 +502,97 @@ const AttendancePageContent = () => {
               }}
             />
           </Box>
-        </Box>
 
-        {/* TABLE */}
-        <div className='overflow-x-auto'>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                {columns.map(col => (
-                  <th key={col.key}>
-                    <div className='flex items-center cursor-default'>{col.label}</div>
-                  </th>
-                ))}
-              </tr>
-            </thead>
+          <Box sx={{ position: 'relative' }}>
+            {loading && (
+              <Box
+                sx={{
+                  position: 'absolute',
+                  inset: 0,
+                  bgcolor: 'rgba(255,255,255,0.8)',
+                  backdropFilter: 'blur(2px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 10
+                }}
+              >
+                <ProgressCircularCustomization size={60} thickness={5} />
+              </Box>
+            )}
 
-            <tbody>
-              {rows.length ? (
-                rows.map((row, i) => (
-                  <tr key={row.id}>
-                    <td>{i + 1}</td>
-
-                    {/* Action */}
-                    {/* Action */}
-                    <td>
-                      <Box sx={{ display: 'flex', gap: 1 }}>
-                        {/* Edit */}
-                        <IconButton
-                          size='small'
-                          color='primary'
-                          onClick={() => router.push(`/admin/attendance/attendance/edit/${row.id}`)}
-                        >
-                          <i className='tabler-edit' />
-                        </IconButton>
-
-                        {/* 🔥 NEW → Schedule */}
-                        <IconButton
-                          size='small'
-                          color='secondary'
-                          onClick={() => {
-                            setSelectedAttendance(row) // 👈 store selected row
-                            setDrawerOpen(true) // 👈 open Drawer
-                          }}
-                        >
-                          <i className='tabler-calendar-event' />
-                        </IconButton>
-
-                        {/* Delete */}
-                        <IconButton size='small' color='error' onClick={() => setDeleteDialog({ open: true, row })}>
-                          <i className='tabler-trash text-red-600 text-lg' />
-                        </IconButton>
-                      </Box>
-                    </td>
-
-                    {/* Customer ID */}
-                    <td>{row.customer_id}</td>
-
-                    {/* SERVICE - You can link from contract or service_type later */}
-                    <td>
-                      {row.service_type || row.service_name || 'General Pest Control'}
-                      {/* fallback text - change as per your data */}
-                    </td>
-
-                    {/* SUPERVISOR - Show name if available, else ID or '-' */}
-                    <td>
-                      {row.supervisor_name ? row.supervisor_name : row.supervisor_id ? `ID: ${row.supervisor_id}` : '-'}
-                    </td>
-
-                    {/* Rest of the columns */}
-                    <td>{row.service_address || '-'}</td>
-                    <td>{row.postal_code || '-'}</td>
-                    <td>{row.start_date || '-'}</td>
-                    <td>{row.end_date || '-'}</td>
-                    <td>{row.contact_person_name || '-'}</td>
-                    <td>{row.phone || '-'}</td>
-                    <td>{row.mobile || '-'}</td>
-                    <td>{row.attendance_code || '-'}</td>
+            <div className='overflow-x-auto'>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    {columns.map(col => (
+                      <th key={col.key}>
+                        <div className='flex items-center cursor-default'>{col.label}</div>
+                      </th>
+                    ))}
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={columns.length} className='text-center py-8 text-gray-500'>
-                    No attendance records found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                </thead>
 
-        {/* Pagination */}
-        <TablePaginationComponent totalCount={rows.length} pagination={pagination} setPagination={setPagination} />
+                <tbody>
+                  {rows.length ? (
+                    rows.map((row, i) => (
+                      <tr key={row.id}>
+                        <td>{i + 1}</td>
+                        <td>
+                          <Box sx={{ display: 'flex', gap: 1 }}>
+                            <IconButton
+                              size='small'
+                              color='primary'
+                              onClick={() => router.push(`/admin/attendance/attendance/edit/${row.id}`)}
+                            >
+                              <i className='tabler-edit' />
+                            </IconButton>
+
+                            <IconButton
+                              size='small'
+                              color='secondary'
+                              onClick={() => {
+                                setSelectedAttendance(row)
+                                setDrawerOpen(true)
+                              }}
+                            >
+                              <i className='tabler-calendar-event' />
+                            </IconButton>
+
+                            <IconButton size='small' color='error' onClick={() => setDeleteDialog({ open: true, row })}>
+                              <i className='tabler-trash text-red-600 text-lg' />
+                            </IconButton>
+                          </Box>
+                        </td>
+                        <td>{row.customer_id}</td>
+                        <td>{row.service_type || row.service_name || 'General Pest Control'}</td>
+                        <td>
+                          {row.supervisor_name ? row.supervisor_name : row.supervisor_id ? `ID: ${row.supervisor_id}` : '-'}
+                        </td>
+                        <td>{row.service_address || '-'}</td>
+                        <td>{row.postal_code || '-'}</td>
+                        <td>{row.start_date || '-'}</td>
+                        <td>{row.end_date || '-'}</td>
+                        <td>{row.contact_person_name || '-'}</td>
+                        <td>{row.phone || '-'}</td>
+                        <td>{row.mobile || '-'}</td>
+                        <td>{row.attendance_code || '-'}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={columns.length} className='text-center py-8 text-gray-500'>
+                        No attendance records found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Box>
+
+          <TablePaginationComponent totalCount={rows.length} pagination={pagination} setPagination={setPagination} />
+        </Box>
       </Card>
 
       <Dialog
@@ -652,7 +609,6 @@ const AttendancePageContent = () => {
           }
         }}
       >
-        {/* 🔴 Title with Warning Icon */}
         <DialogTitle
           id='customized-dialog-title'
           sx={{
@@ -676,8 +632,6 @@ const AttendancePageContent = () => {
             <i className='tabler-x' />
           </DialogCloseButton>
         </DialogTitle>
-
-        {/* Centered text */}
         <DialogContent sx={{ px: 5, pt: 1 }}>
           <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
             Are you sure you want to delete{' '}
@@ -689,18 +643,11 @@ const AttendancePageContent = () => {
             This action cannot be undone.
           </Typography>
         </DialogContent>
-
-        {/* Centered buttons */}
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
           <GlobalButton color='secondary' onClick={() => setDeleteDialog({ open: false, row: null })}>
             Cancel
           </GlobalButton>
-
-          <GlobalButton
-            variant='contained'
-            color='error'
-            onClick={confirmDelete} // ✅ FIXED
-          >
+          <GlobalButton variant='contained' color='error' onClick={confirmDelete}>
             Delete
           </GlobalButton>
         </DialogActions>

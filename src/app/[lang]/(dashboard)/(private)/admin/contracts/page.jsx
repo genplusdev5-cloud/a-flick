@@ -79,6 +79,7 @@ import {
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
 import { dateSortingFn } from '@/utils/tableUtils'
+import StickyListLayout from '@/components/common/StickyListLayout'
 // Debounced Input
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
   const [value, setValue] = useState(initialValue)
@@ -161,7 +162,7 @@ const ContractsPageContent = () => {
       if (statusFilter?.value) params.contract_status = statusFilter.value
 
       const res = await getContractList(params)
-      
+
       // Extract results - handle { data: { results: [] } } or { results: [] } or just []
       const resultsArray = res?.results || res?.data?.results || (Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []))
 
@@ -628,19 +629,12 @@ const ContractsPageContent = () => {
         <Typography color='text.primary'>Contracts</Typography>
       </Breadcrumbs>
 
-      <Card sx={{ p: 3 }}>
+      <Card>
         <CardHeader
-          sx={{
-            pb: 1.5,
-            pt: 1.5,
-            '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
-            '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
-          }}
-          title={
+          title='Contracts List'
+          subheader='Manage contracts'
+          action={
             <Box display='flex' alignItems='center' gap={2}>
-              <Typography variant='h5' sx={{ fontWeight: 600 }}>
-                Contracts List
-              </Typography>
               <GlobalButton
                 variant='contained'
                 color='primary'
@@ -665,10 +659,7 @@ const ContractsPageContent = () => {
               >
                 {loading ? 'Refreshing...' : 'Refresh'}
               </GlobalButton>
-            </Box>
-          }
-          action={
-            <Box display='flex' alignItems='center' gap={2}>
+
               <GlobalButton
                 color='secondary'
                 endIcon={<ArrowDropDownIcon />}
@@ -737,181 +728,189 @@ const ContractsPageContent = () => {
             </Box>
           }
         />
-        {loading && (
+
+        <Divider />
+
+        <Box sx={{ p: 4 }}>
           <Box
             sx={{
-              position: 'fixed',
-              inset: 0,
-              bgcolor: 'rgba(255,255,255,0.8)',
-              backdropFilter: 'blur(2px)',
               display: 'flex',
+              justifyContent: 'space-between',
               alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 9999
-            }}
-          >
-            <ProgressCircularCustomization size={60} thickness={5} />
-          </Box>
-        )}
-
-        <Divider sx={{ mb: 6 }} />
-        <Box
-          sx={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-end', // ⭐ FIX: Align by bottom (input line)
-            mb: 4,
-            gap: 2,
-            flexWrap: 'nowrap'
-          }}
-        >
-          {/* 🔥 LEFT SIDE: Entries + Filters */}
-
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'flex-end', // ⭐ FIX: Align bottom of all fields
+              mb: 3,
               gap: 2,
               flexWrap: 'nowrap'
             }}
           >
-            {/* Entries per page */}
-            <FormControl size='small' sx={{ width: 120 }}>
-              <Select
-                value={pagination.pageSize}
-                onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
-              >
-                {[10, 25, 50, 100].map(s => (
-                  <MenuItem key={s} value={s}>
-                    {s} entries
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            {/* Customer Filter (AutoComplete) */}
-
-            <GlobalAutocomplete
-              fullWidth
-              id='customer-filter'
-              options={customerOptions}
-              getOptionLabel={option => option?.name || ''}
-              value={customerOptions.find(opt => opt.id === customerFilter?.id) || null} // <-- FIXED
-              onChange={newVal => setCustomerFilter(newVal)} // <-- FIXED
-              renderInput={params => (
-                <GlobalTextField {...params} label='Customer' placeholder='Select Customer' size='small' />
-              )}
-              sx={{ width: 300 }}
-            />
-
-            {/* Contract Type (AutoComplete) */}
-            <GlobalAutocomplete
-              fullWidth
-              options={CONTRACT_TYPES}
-              getOptionLabel={o => o.label}
-              value={CONTRACT_TYPES.find(t => t.value === typeFilter) || null}
-              onChange={newVal => setTypeFilter(newVal?.value || null)}
-              renderInput={params => (
-                <GlobalTextField {...params} label='Contract Type' placeholder='Select Type' size='small' />
-              )}
-              sx={{ width: 220 }}
-            />
-
-            {/* Contract Status (AutoComplete) */}
-            <GlobalAutocomplete
-              fullWidth
-              options={CONTRACT_STATUS}
-              getOptionLabel={o => o.label}
-              value={CONTRACT_STATUS.find(s => s.value === statusFilter) || null}
-              onChange={newValue => {
-                setStatusFilter(newValue?.value || null)
+            {/* LEFT SIDE FILTERS */}
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'flex-end',
+                gap: 2,
+                flexWrap: 'nowrap'
               }}
-              renderInput={params => (
-                <GlobalTextField {...params} label='Contract Status' placeholder='Select Status' size='small' />
-              )}
-              sx={{ width: 220 }}
+            >
+              {/* Entries per page */}
+              <FormControl size='small' sx={{ width: 120 }}>
+                <Select
+                  value={pagination.pageSize}
+                  onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
+                >
+                  {[10, 25, 50, 100].map(s => (
+                    <MenuItem key={s} value={s}>
+                      {s} entries
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              {/* Customer Filter */}
+              <Box sx={{ width: 220 }}>
+                <GlobalAutocomplete
+                  fullWidth
+                  id='customer-filter'
+                  options={customerOptions}
+                  getOptionLabel={option => option?.name || ''}
+                  value={customerOptions.find(opt => opt.id === customerFilter?.id) || null}
+                  onChange={newVal => setCustomerFilter(newVal)}
+                  renderInput={params => (
+                    <GlobalTextField {...params} label='Customer' placeholder='Select Customer' size='small' />
+                  )}
+                />
+              </Box>
+
+              {/* Contract Type Filter */}
+              <GlobalAutocomplete
+                fullWidth
+                options={CONTRACT_TYPES}
+                getOptionLabel={o => o.label}
+                value={CONTRACT_TYPES.find(v => v.value === typeFilter) || null}
+                onChange={newValue => {
+                  setTypeFilter(newValue?.value || null)
+                }}
+                renderInput={params => (
+                  <GlobalTextField {...params} label='Contract Type' placeholder='Select Type' size='small' />
+                )}
+                sx={{ width: 220 }}
+              />
+
+              {/* Contract Status Filter */}
+              <GlobalAutocomplete
+                fullWidth
+                options={CONTRACT_STATUS}
+                getOptionLabel={o => o.label}
+                value={CONTRACT_STATUS.find(s => s.value === statusFilter) || null}
+                onChange={newValue => {
+                  setStatusFilter(newValue?.value || null)
+                }}
+                renderInput={params => (
+                  <GlobalTextField {...params} label='Contract Status' placeholder='Select Status' size='small' />
+                )}
+                sx={{ width: 220 }}
+              />
+            </Box>
+
+            {/* SEARCH RIGHT SIDE */}
+            <DebouncedInput
+              value={searchText}
+              onChange={v => {
+                const value = String(v)
+
+                if (value.startsWith('uuid:')) {
+                  const uid = value.replace('uuid:', '').trim()
+                  setUuidFilter(uid)
+                  return
+                }
+
+                setUuidFilter(null)
+                setSearchText(value)
+                setPagination(p => ({ ...p, pageIndex: 0 }))
+              }}
+              placeholder='Search customer, code, address, pests...'
+              size='small'
+              sx={{
+                width: 320,
+                '& .MuiInputBase-root': {
+                  height: 36
+                }
+              }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position='start'>
+                    <SearchIcon fontSize='small' />
+                  </InputAdornment>
+                )
+              }}
             />
           </Box>
 
-          {/* 🔍 RIGHT SIDE: Search */}
-          <DebouncedInput
-            value={searchText}
-            onChange={v => {
-              const value = String(v)
+          <Box sx={{ position: 'relative' }}>
+            {loading && (
+              <Box
+                sx={{
+                  position: 'absolute',
+                  inset: 0,
+                  bgcolor: 'rgba(255,255,255,0.8)',
+                  backdropFilter: 'blur(2px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 10
+                }}
+              >
+                <ProgressCircularCustomization size={60} thickness={5} />
+              </Box>
+            )}
 
-              if (value.startsWith('uuid:')) {
-                const uid = value.replace('uuid:', '').trim()
-                setUuidFilter(uid)
-                return
-              }
-
-              setUuidFilter(null)
-              setSearchText(value)
-              setPagination(p => ({ ...p, pageIndex: 0 }))
-            }}
-            placeholder='Search customer, code, address, pests...'
-            size='small'
-            sx={{
-              width: 320, // 🔥 same width
-              '& .MuiInputBase-root': {
-                height: 36 // 🔥 same height
-              }
-            }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position='start'>
-                  <SearchIcon fontSize='small' />
-                </InputAdornment>
-              )
-            }}
-          />
-        </Box>
-
-        <div className='overflow-x-auto'>
-          <table className={styles.table}>
-            <thead>
-              {table.getHeaderGroups().map(hg => (
-                <tr key={hg.id}>
-                  {hg.headers.map(h => (
-                    <th key={h.id}>
-                      <div
-                        className={classnames({
-                          'flex items-center': h.column.getIsSorted(),
-                          'cursor-pointer select-none': h.column.getCanSort()
-                        })}
-                        onClick={h.column.getToggleSortingHandler()}
-                      >
-                        {flexRender(h.column.columnDef.header, h.getContext())}
-                        {{
-                          asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
-                          desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
-                        }[h.column.getIsSorted()] ?? null}
-                      </div>
-                    </th>
+            <div className='overflow-x-auto'>
+              <table className={styles.table}>
+                <thead>
+                  {table.getHeaderGroups().map(hg => (
+                    <tr key={hg.id}>
+                      {hg.headers.map(h => (
+                        <th key={h.id}>
+                          <div
+                            className={classnames({
+                              'flex items-center': h.column.getIsSorted(),
+                              'cursor-pointer select-none': h.column.getCanSort()
+                            })}
+                            onClick={h.column.getToggleSortingHandler()}
+                          >
+                            {flexRender(h.column.columnDef.header, h.getContext())}
+                            {{
+                              asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
+                              desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
+                            }[h.column.getIsSorted()] ?? null}
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
                   ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody>
-              {rows.length ? (
-                table.getRowModel().rows.map(row => (
-                  <tr key={row.id}>
-                    {row.getVisibleCells().map(cell => (
-                      <td key={cell.column.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
-                    ))}
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={columns.length} className='text-center py-4'>
-                    {loading ? 'Loading contracts...' : 'No results found'}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+                </thead>
+                <tbody>
+                  {rows.length ? (
+                    table.getRowModel().rows.map(row => (
+                      <tr key={row.id}>
+                        {row.getVisibleCells().map(cell => (
+                          <td key={cell.column.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                        ))}
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={columns.length} className='text-center py-4'>
+                        {loading ? 'Loading contracts...' : 'No results found'}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Box>
+
+          <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+        </Box>
       </Card>
 
       <Dialog
@@ -928,7 +927,6 @@ const ContractsPageContent = () => {
           }
         }}
       >
-        {/* 🔴 Title with Warning Icon */}
         <DialogTitle
           id='customized-dialog-title'
           sx={{
@@ -952,8 +950,6 @@ const ContractsPageContent = () => {
             <i className='tabler-x' />
           </DialogCloseButton>
         </DialogTitle>
-
-        {/* 🧾 Message */}
         <DialogContent sx={{ px: 5, pt: 1 }}>
           <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
             Are you sure you want to delete contract{' '}
@@ -962,8 +958,6 @@ const ContractsPageContent = () => {
             This action cannot be undone.
           </Typography>
         </DialogContent>
-
-        {/* ⚙️ Buttons */}
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
           <GlobalButton
             onClick={() => setDeleteDialog({ open: false })}

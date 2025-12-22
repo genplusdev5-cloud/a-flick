@@ -46,6 +46,7 @@ import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import tableStyles from '@core/styles/table.module.css'
 import InvoicePDF from '@/components/invoice/InvoicePDF'
 import { dateSortingFn } from '@/utils/tableUtils'
+import StickyListLayout from '@/components/common/StickyListLayout'
 
 // API
 import { getInvoiceSummary, getInvoiceDropdowns } from '@/api/invoice' // adjust path if needed
@@ -766,46 +767,40 @@ const InvoiceListPageFullContent = () => {
 
       {summaryData.length > 0 && <SummaryCards data={summaryData} />}
 
-      <Card sx={{ p: 3 }}>
-        {/* HEADER */}
-        <CardHeader
-          title={
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Typography variant='h5' sx={{ fontWeight: 600 }}>
-                  Invoice List
-                </Typography>
+      <Card sx={{ p: 4 }}>
+        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Typography variant='h5' sx={{ fontWeight: 600 }}>
+              Invoice List
+            </Typography>
 
-                <Button
-                  variant='contained'
-                  startIcon={
-                    <RefreshIcon
-                      sx={{
-                        animation: loading ? 'spin 1s linear infinite' : 'none',
-                        '@keyframes spin': {
-                          '0%': { transform: 'rotate(0deg)' },
-                          '100%': { transform: 'rotate(360deg)' }
-                        }
-                      }}
-                    />
-                  }
-                  disabled={loading}
-                  onClick={handleRefresh}
-                  sx={{ textTransform: 'none', height: 36, px: 2.5 }}
-                  size='small'
-                >
-                  {loading ? 'Refreshing...' : 'Refresh'}
-                </Button>
-              </Box>
-            </Box>
-          }
-          sx={{ pb: 1.5, pt: 1.5, mb: 2 }}
-        />
+            <Button
+              variant='contained'
+              startIcon={
+                <RefreshIcon
+                  sx={{
+                    animation: loading ? 'spin 1s linear infinite' : 'none',
+                    '@keyframes spin': {
+                      '0%': { transform: 'rotate(0deg)' },
+                      '100%': { transform: 'rotate(360deg)' }
+                    }
+                  }}
+                />
+              }
+              disabled={loading}
+              onClick={handleRefresh}
+              sx={{ textTransform: 'none', height: 36, px: 2.5 }}
+              size='small'
+            >
+              {loading ? 'Refreshing...' : 'Refresh'}
+            </Button>
+          </Box>
+        </Box>
 
         <Divider sx={{ mb: 2 }} />
 
         {/* FILTERS */}
-        <Box px={3} pb={3}>
+        <Box pb={2}>
           <Grid container spacing={3}>
             {/* Row 1 */}
             <Grid item xs={12} sm={6} md={3}>
@@ -818,7 +813,7 @@ const InvoiceListPageFullContent = () => {
                       setDateRange([null, null])
                     } else {
                       const today = new Date()
-                      setDateRange([today, today]) // 👉 Enable pannumbodhum today set aagum
+                      setDateRange([today, today])
                     }
                   }}
                   size='small'
@@ -928,12 +923,11 @@ const InvoiceListPageFullContent = () => {
                   setContractFilter(null)
 
                   if (v?.id) {
-                    // Load contracts for this customer AND save it separately
                     getInvoiceDropdowns({ customer_id: v.id })
                       .then(res => {
                         const dd = res?.data?.data || {}
                         const contracts = dedupeById(dd.contract_list?.label || [])
-                        setCustomerSpecificContracts(contracts) // ← SAVE HERE
+                        setCustomerSpecificContracts(contracts)
                         setDropdownData(prev => ({ ...prev, contracts }))
                       })
                       .catch(() => {
@@ -942,9 +936,7 @@ const InvoiceListPageFullContent = () => {
                         setDropdownData(prev => ({ ...prev, contracts: [] }))
                       })
                   } else {
-                    // Customer cleared → go back to all contracts
                     setCustomerSpecificContracts(null)
-                    // This will be handled in loadEverything
                   }
                 }}
                 renderOption={(props, option) => (
@@ -963,7 +955,6 @@ const InvoiceListPageFullContent = () => {
                 getOptionLabel={opt => opt?.label || ''}
                 isOptionEqualToValue={(a, b) => a?.id === b?.id}
                 onChange={(_, v) => setContractFilter(v || null)}
-                // THIS LINE IS THE FIX
                 renderOption={(props, option) => (
                   <li {...props} key={option.id}>
                     {option.label}
@@ -977,7 +968,7 @@ const InvoiceListPageFullContent = () => {
           <Divider sx={{ mb: 2 }} />
 
           {/* SEARCH + ENTRIES */}
-          <Box display='flex' justifyContent='space-between' alignItems='center' mb={2} gap={2}>
+          <Box display='flex' justifyContent='space-between' alignItems='center' gap={2} mb={4}>
             <Select
               size='small'
               value={pageSize}
@@ -1012,7 +1003,6 @@ const InvoiceListPageFullContent = () => {
             />
           </Box>
 
-          {/* TABLE */}
           <div className='overflow-x-auto'>
             <table className={tableStyles.table}>
               <thead>
@@ -1044,12 +1034,9 @@ const InvoiceListPageFullContent = () => {
             </table>
           </div>
 
-          {/* PAGINATION */}
           <Box
             sx={{
-              mt: 2,
-              py: 1.5,
-              borderTop: '1px solid #e0e0e0',
+              py: 2,
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center'

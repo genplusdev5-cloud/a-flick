@@ -123,3 +123,14 @@
 .table thead th {
   z-index: 10;
 }
+
+/* .table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+
+  table-layout: fixed;
+} */
+
+
