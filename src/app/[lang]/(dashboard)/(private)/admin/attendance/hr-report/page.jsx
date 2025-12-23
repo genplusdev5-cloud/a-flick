@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'react-redux'
+import Link from 'next/link'
 import {
   Box,
   Card,

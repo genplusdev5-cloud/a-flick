@@ -285,296 +285,301 @@ const AttendanceSchedulePageContent = () => {
   })
 
   return (
-    <StickyListLayout
-      header={
-        <Box sx={{ mb: 6 }}>
-          <Box sx={{ mb: 2 }}>
-            <Link href='/en/admin/dashboards' className='text-primary'>
-              Dashboard
-            </Link>{' '}
-            / <Typography component='span'>Attendance Schedule</Typography>
+    <>
+      <StickyListLayout
+        header={
+          <Box sx={{ mb: 6 }}>
+            <Box sx={{ mb: 2 }}>
+              <Link href='/en/admin/dashboards' className='text-primary'>
+                Dashboard
+              </Link>{' '}
+              / <Typography component='span'>Attendance Schedule</Typography>
+            </Box>
+            <Typography variant='h5' sx={{ fontWeight: 600 }}>
+              Attendance Schedule
+            </Typography>
           </Box>
-          <Typography variant='h5' sx={{ fontWeight: 600 }}>
-            Attendance Schedule
-          </Typography>
-        </Box>
-      }
-    >
-      <Card
-        sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          height: '100%',
-          minHeight: 0,
-          position: 'relative'
-        }}
+        }
       >
-        {loading && (
-          <Box
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              bgcolor: 'rgba(255,255,255,0.8)',
-              backdropFilter: 'blur(2px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 10
-            }}
-          >
-            <ProgressCircularCustomization size={60} thickness={5} />
-          </Box>
-        )}
-        <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <Divider sx={{ mb: 3 }} />
-          <Box sx={{ mb: 3, flexShrink: 0 }}>
-            {/* ---------- ROW 1 ---------- */}
+        <Card
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100%',
+            minHeight: 0,
+            position: 'relative'
+          }}
+        >
+          {loading && (
             <Box
               sx={{
+                position: 'absolute',
+                inset: 0,
+                bgcolor: 'rgba(255,255,255,0.8)',
+                backdropFilter: 'blur(2px)',
                 display: 'flex',
-                alignItems: 'flex-end',
-                gap: 4,
-                flexWrap: 'wrap',
-                mb: 2
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 10
               }}
             >
+              <ProgressCircularCustomization size={60} thickness={5} />
+            </Box>
+          )}
+          <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <Divider sx={{ mb: 3 }} />
+            <Box sx={{ mb: 3, flexShrink: 0 }}>
+              {/* ---------- ROW 1 ---------- */}
               <Box
                 sx={{
                   display: 'flex',
-                  justifyContent: 'space-between',
                   alignItems: 'flex-end',
-                  mb: 4,
-                  gap: 2,
-                  flexWrap: 'nowrap'
+                  gap: 4,
+                  flexWrap: 'wrap',
+                  mb: 2
                 }}
               >
-                {/* Date Filter + Range */}
-                <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                  <FormControlLabel
-                    control={<Checkbox checked={dateFilter} onChange={e => setDateFilter(e.target.checked)} />}
-                    label='Date Filter'
-                  />
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-end',
+                    mb: 4,
+                    gap: 2,
+                    flexWrap: 'nowrap'
+                  }}
+                >
+                  {/* Date Filter + Range */}
+                  <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                    <FormControlLabel
+                      control={<Checkbox checked={dateFilter} onChange={e => setDateFilter(e.target.checked)} />}
+                      label='Date Filter'
+                    />
 
+                    <Box sx={{ width: 220 }}>
+                      <GlobalDateRange
+                        label=''
+                        start={dateRange[0]}
+                        end={dateRange[1]}
+                        onSelectRange={({ start, end }) => setDateRange([start, end])}
+                        disabled={!dateFilter}
+                      />
+                    </Box>
+                  </Box>
+
+                  {/* Attendance */}
                   <Box sx={{ width: 220 }}>
-                    <GlobalDateRange
-                      label=''
-                      start={dateRange[0]}
-                      end={dateRange[1]}
-                      onSelectRange={({ start, end }) => setDateRange([start, end])}
-                      disabled={!dateFilter}
+                    <GlobalAutocomplete
+                      label='Attendance'
+                      placeholder='Select'
+                      options={attendanceList.map(a => ({
+                        label: a.label,
+                        value: a.id
+                      }))}
+                      value={selectedAttendance}
+                      onChange={setSelectedAttendance}
+                    />
+                  </Box>
+
+                  {/* Technician */}
+                  <Box sx={{ width: 220 }}>
+                    <GlobalAutocomplete
+                      label='Technician'
+                      placeholder='Select'
+                      options={technicianList.map(t => ({
+                        label: t.name,
+                        value: t.id
+                      }))}
+                      value={selectedTechnician}
+                      onChange={setSelectedTechnician}
+                    />
+                  </Box>
+
+                  {/* Supervisor */}
+                  <Box sx={{ width: 220 }}>
+                    <GlobalAutocomplete
+                      label='Supervisor'
+                      placeholder='Select'
+                      options={supervisorList.map(s => ({
+                        label: s.name,
+                        value: s.id
+                      }))}
+                      value={selectedSupervisor}
+                      onChange={setSelectedSupervisor}
+                    />
+                  </Box>
+
+                  {/* Customer */}
+                  <Box sx={{ width: 220 }}>
+                    <GlobalAutocomplete
+                      label='Customer'
+                      placeholder='Select'
+                      options={customerList.map(c => ({
+                        label: c.name,
+                        value: c.id
+                      }))}
+                      value={selectedCustomer}
+                      onChange={setSelectedCustomer}
+                    />
+                  </Box>
+
+                  {/* Approval Status */}
+                  <Box sx={{ width: 200 }}>
+                    <GlobalAutocomplete
+                      label='Approval Status'
+                      placeholder='Select'
+                      options={approvalStatusOptions}
+                      value={selectedApproval}
+                      onChange={setSelectedApproval}
+                    />
+                  </Box>
+
+                  {/* Appointment Status */}
+                  <Box sx={{ width: 200 }}>
+                    <GlobalAutocomplete
+                      label='Appointment Status'
+                      placeholder='Select'
+                      options={appointmentStatusOptions}
+                      value={selectedAppointment}
+                      onChange={setSelectedAppointment}
                     />
                   </Box>
                 </Box>
 
-                {/* Attendance */}
-                <Box sx={{ width: 220 }}>
-                  <GlobalAutocomplete
-                    label='Attendance'
-                    placeholder='Select'
-                    options={attendanceList.map(a => ({
-                      label: a.label,
-                      value: a.id
-                    }))}
-                    value={selectedAttendance}
-                    onChange={setSelectedAttendance}
-                  />
-                </Box>
+                {/* Refresh Button */}
+                <GlobalButton variant='contained' color='primary' sx={{ height: 40 }} onClick={loadScheduleList}>
+                  Refresh
+                </GlobalButton>
 
-                {/* Technician */}
-                <Box sx={{ width: 220 }}>
-                  <GlobalAutocomplete
-                    label='Technician'
-                    placeholder='Select'
-                    options={technicianList.map(t => ({
-                      label: t.name,
-                      value: t.id
-                    }))}
-                    value={selectedTechnician}
-                    onChange={setSelectedTechnician}
-                  />
-                </Box>
+                {/* Global Change */}
+                <GlobalButton variant='contained' color='secondary' sx={{ height: 40 }}>
+                  Global Change
+                </GlobalButton>
+              </Box>
+            </Box>
 
-                {/* Supervisor */}
-                <Box sx={{ width: 220 }}>
-                  <GlobalAutocomplete
-                    label='Supervisor'
-                    placeholder='Select'
-                    options={supervisorList.map(s => ({
-                      label: s.name,
-                      value: s.id
-                    }))}
-                    value={selectedSupervisor}
-                    onChange={setSelectedSupervisor}
-                  />
-                </Box>
+            <Divider sx={{ mb: 3 }} />
 
-                {/* Customer */}
-                <Box sx={{ width: 220 }}>
-                  <GlobalAutocomplete
-                    label='Customer'
-                    placeholder='Select'
-                    options={customerList.map(c => ({
-                      label: c.name,
-                      value: c.id
-                    }))}
-                    value={selectedCustomer}
-                    onChange={setSelectedCustomer}
-                  />
-                </Box>
+            {/* EXPORT + ENTRIES + SEARCH ROW */}
+            <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 2, flexShrink: 0 }}>
+              <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 2 }}>
+                <GlobalButton
+                  color='secondary'
+                  endIcon={<ArrowDropDownIcon />}
+                  onClick={e => setExportAnchorEl(e.currentTarget)}
+                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                >
+                  Export
+                </GlobalButton>
+                <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
+                  <MenuItem onClick={() => { setExportAnchorEl(null); exportPrint(); }}>
+                    <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
+                  </MenuItem>
+                  <MenuItem onClick={() => { setExportAnchorEl(null); exportCSV(); }}>
+                    <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
+                  </MenuItem>
+                  <MenuItem onClick={async () => { setExportAnchorEl(null); exportExcel(); }}>
+                    <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
+                  </MenuItem>
+                  <MenuItem onClick={async () => { setExportAnchorEl(null); exportPDF(); }}>
+                    <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
+                  </MenuItem>
+                  <MenuItem onClick={() => { setExportAnchorEl(null); exportCopy(); }}>
+                    <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
+                  </MenuItem>
+                </Menu>
 
-                {/* Approval Status */}
-                <Box sx={{ width: 200 }}>
-                  <GlobalAutocomplete
-                    label='Approval Status'
-                    placeholder='Select'
-                    options={approvalStatusOptions}
-                    value={selectedApproval}
-                    onChange={setSelectedApproval}
-                  />
-                </Box>
-
-                {/* Appointment Status */}
-                <Box sx={{ width: 200 }}>
-                  <GlobalAutocomplete
-                    label='Appointment Status'
-                    placeholder='Select'
-                    options={appointmentStatusOptions}
-                    value={selectedAppointment}
-                    onChange={setSelectedAppointment}
-                  />
-                </Box>
+                <FormControl size='small' sx={{ width: 150 }}>
+                  <Select
+                    value={pagination.pageSize}
+                    onChange={e => setPagination(prev => ({ ...prev, pageSize: Number(e.target.value), pageIndex: 0 }))}
+                  >
+                    {[25, 50, 75, 100].map(num => (
+                      <MenuItem key={num} value={num}>
+                        {num} entries
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
               </Box>
 
-              {/* Refresh Button */}
-              <GlobalButton variant='contained' color='primary' sx={{ height: 40 }} onClick={loadScheduleList}>
-                Refresh
-              </GlobalButton>
-
-              {/* Global Change */}
-              <GlobalButton variant='contained' color='secondary' sx={{ height: 40 }}>
-                Global Change
-              </GlobalButton>
-            </Box>
-          <Divider sx={{ mb: 3 }} />
-          {/* EXPORT + ENTRIES + SEARCH ROW */}
-          <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 2, flexShrink: 0 }}>
-            <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 2 }}>
-              <GlobalButton
-                color='secondary'
-                endIcon={<ArrowDropDownIcon />}
-                onClick={e => setExportAnchorEl(e.currentTarget)}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-              >
-                Export
-              </GlobalButton>
-              <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
-                <MenuItem onClick={() => { setExportAnchorEl(null); exportPrint(); }}>
-                  <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
-                </MenuItem>
-                <MenuItem onClick={() => { setExportAnchorEl(null); exportCSV(); }}>
-                  <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
-                </MenuItem>
-                <MenuItem onClick={async () => { setExportAnchorEl(null); await exportExcel(); }}>
-                  <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
-                </MenuItem>
-                <MenuItem onClick={async () => { setExportAnchorEl(null); await exportPDF(); }}>
-                  <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
-                </MenuItem>
-                <MenuItem onClick={() => { setExportAnchorEl(null); exportCopy(); }}>
-                  <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
-                </MenuItem>
-              </Menu>
-
-              <FormControl size='small' sx={{ width: 150 }}>
-                <Select
-                  value={pagination.pageSize}
-                  onChange={e => setPagination(prev => ({ ...prev, pageSize: Number(e.target.value), pageIndex: 0 }))}
-                >
-                  {[25, 50, 75, 100].map(num => (
-                    <MenuItem key={num} value={num}>
-                      {num} entries
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <Box>
+                <TextField
+                  value={searchText}
+                  onChange={e => setSearchText(e.target.value)}
+                  placeholder='Search...'
+                  sx={{ width: 300 }}
+                  size='small'
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position='start'>
+                        <SearchIcon />
+                      </InputAdornment>
+                    )
+                  }}
+                />
+              </Box>
             </Box>
 
-            <Box>
-              <TextField
-                value={searchText}
-                onChange={e => setSearchText(e.target.value)}
-                placeholder='Search...'
-                sx={{ width: 300 }}
-                size='small'
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position='start'>
-                      <SearchIcon />
-                    </InputAdornment>
-                  )
-                }}
+            <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              <StickyTableWrapper rowCount={rows.length}>
+                <table className={styles.table}>
+                  <thead>
+                    {table.getHeaderGroups().map(hg => (
+                      <tr key={hg.id}>
+                        {hg.headers.map(h => (
+                          <th key={h.id}>
+                            <div
+                              className={classnames({
+                                'flex items-center': h.column.getIsSorted(),
+                                'cursor-pointer select-none': h.column.getCanSort()
+                              })}
+                              onClick={h.column.getToggleSortingHandler()}
+                            >
+                              {flexRender(h.column.columnDef.header, h.getContext())}
+                              {{
+                                asc: <ChevronRight className='-rotate-90' />,
+                                desc: <ChevronRight className='rotate-90' />
+                              }[h.column.getIsSorted()] ?? null}
+                            </div>
+                          </th>
+                        ))}
+                      </tr>
+                    ))}
+                  </thead>
+
+                  <tbody>
+                    {table.getRowModel().rows.length ? (
+                      table.getRowModel().rows.map(row => (
+                        <tr key={row.id}>
+                          {row.getVisibleCells().map(cell => (
+                            <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                          ))}
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={columns.length} className='text-center py-4'>
+                          No data available
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </StickyTableWrapper>
+            </Box>
+
+            <Box sx={{ mt: 'auto', flexShrink: 0, pt: 4 }}>
+              <TablePaginationComponent
+                totalCount={pagination.total || 0}
+                pagination={pagination}
+                setPagination={setPagination}
               />
             </Box>
           </Box>
-
-          <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-            <StickyTableWrapper rowCount={rows.length}>
-              <table className={styles.table}>
-                <thead>
-                  {table.getHeaderGroups().map(hg => (
-                    <tr key={hg.id}>
-                      {hg.headers.map(h => (
-                        <th key={h.id}>
-                          <div
-                            className={classnames({
-                              'flex items-center': h.column.getIsSorted(),
-                              'cursor-pointer select-none': h.column.getCanSort()
-                            })}
-                            onClick={h.column.getToggleSortingHandler()}
-                          >
-                            {flexRender(h.column.columnDef.header, h.getContext())}
-                            {{
-                              asc: <ChevronRight className='-rotate-90' />,
-                              desc: <ChevronRight className='rotate-90' />
-                            }[h.column.getIsSorted()] ?? null}
-                          </div>
-                        </th>
-                      ))}
-                    </tr>
-                  ))}
-                </thead>
-
-                <tbody>
-                  {table.getRowModel().rows.length ? (
-                    table.getRowModel().rows.map(row => (
-                      <tr key={row.id}>
-                        {row.getVisibleCells().map(cell => (
-                          <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
-                        ))}
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={columns.length} className='text-center py-4'>
-                        No data available
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </StickyTableWrapper>
-          </Box>
-
-          <Box sx={{ mt: 'auto', flexShrink: 0, pt: 4 }}>
-            <TablePaginationComponent
-              totalCount={pagination.total || 0}
-              pagination={pagination}
-              setPagination={setPagination}
-            />
-          </Box>
-        </Box>
-      </Card>
-    </StickyListLayout>
+        </Card>
+      </StickyListLayout>
+    </>
   )
 }
 

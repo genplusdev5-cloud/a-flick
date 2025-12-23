@@ -330,6 +330,7 @@ const KivFinderPageContent = () => {
   // RENDER
   // -----------------------------
   return (
+    <Box>
     <StickyListLayout
       header={
         <Box sx={{ mb: 6 }}>
