@@ -155,13 +155,19 @@ const MaterialRequestPageContent = () => {
 
   const getStatusColor = status => {
     switch (status) {
-      case 'Completed': return '#4caf50'
-      case 'Pending': return '#ff9800'
-      case 'Issued': return '#2196f3'
-      case 'Approved': return '#8bc34a'
+      case 'Completed':
+        return '#4caf50'
+      case 'Pending':
+        return '#ff9800'
+      case 'Issued':
+        return '#2196f3'
+      case 'Approved':
+        return '#8bc34a'
       case 'Declined':
-      case 'Rejected': return '#f44336'
-      default: return '#9e9e9e'
+      case 'Rejected':
+        return '#f44336'
+      default:
+        return '#9e9e9e'
     }
   }
 
@@ -195,13 +201,21 @@ const MaterialRequestPageContent = () => {
       <table><thead><tr>
       ${columns.map(c => `<th>${c.header}</th>`).join('')}
       </tr></thead><tbody>
-      ${rows.map(r => `<tr>${columns.map(col => {
-        const raw = r[col.accessorKey ?? col.id] ?? ''
-        let val = raw
-        if (col.accessorKey?.includes('Date') && raw) val = new Date(raw).toLocaleDateString('en-GB')
-        else if (col.id === 'status') val = `<span class="pill" style="background:${getStatusColor(raw)}">${raw}</span>`
-        return `<td>${val}</td>`
-      }).join('')}</tr>`).join('')}
+      ${rows
+        .map(
+          r =>
+            `<tr>${columns
+              .map(col => {
+                const raw = r[col.accessorKey ?? col.id] ?? ''
+                let val = raw
+                if (col.accessorKey?.includes('Date') && raw) val = new Date(raw).toLocaleDateString('en-GB')
+                else if (col.id === 'status')
+                  val = `<span class="pill" style="background:${getStatusColor(raw)}">${raw}</span>`
+                return `<td>${val}</td>`
+              })
+              .join('')}</tr>`
+        )
+        .join('')}
       </tbody></table></body></html>`
     w?.document.write(html)
     w?.document.close()
@@ -211,7 +225,7 @@ const MaterialRequestPageContent = () => {
   const columnHelper = createColumnHelper()
   const columns = useMemo(
     () => [
-      columnHelper.accessor('sno', { header: 'S.No', size: 60 }),
+      columnHelper.accessor('sno', { header: 'S.No' }),
       columnHelper.display({
         id: 'actions',
         header: 'Actions',
@@ -220,7 +234,11 @@ const MaterialRequestPageContent = () => {
           const encodedId = btoa(String(row.original.id))
           return (
             <Box sx={{ display: 'flex', gap: 1 }}>
-              <IconButton size='small' color='primary' onClick={() => router.push(`/admin/stock/material-request/${encodedId}/edit`)}>
+              <IconButton
+                size='small'
+                color='primary'
+                onClick={() => router.push(`/admin/stock/material-request/${encodedId}/edit`)}
+              >
                 <i className='tabler-edit' />
               </IconButton>
               <IconButton size='small' color='error' onClick={() => setDeleteDialog({ open: true, row: row.original })}>
@@ -290,46 +308,11 @@ const MaterialRequestPageContent = () => {
     <>
       <StickyListLayout
         header={
-          <Box sx={{ mb: 6 }}>
-            <Box sx={{ mb: 2 }}>
-              <Link href='/admin/dashboards' className='text-primary'>
-                Dashboard
-              </Link>{' '}
-              / <Typography component='span'>Material Request</Typography>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Typography variant='h5' sx={{ fontWeight: 600 }}>
-                  Material Request List
-                </Typography>
-                <Button
-                  variant='contained'
-                  color='primary'
-                  startIcon={
-                    <RefreshIcon
-                      sx={{
-                        animation: loading ? 'spin 1s linear infinite' : 'none',
-                        '@keyframes spin': { '0%': { transform: 'rotate(0deg)' }, '100%': { transform: 'rotate(360deg)' } }
-                      }}
-                    />
-                  }
-                  disabled={loading}
-                  onClick={() => loadData(true)}
-                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-                >
-                  {loading ? 'Refreshing...' : 'Refresh'}
-                </Button>
-              </Box>
-              <Button
-                variant='contained'
-                color='primary'
-                startIcon={<AddIcon />}
-                onClick={() => router.push('/admin/stock/material-request/add')}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-              >
-                Add Request
-              </Button>
-            </Box>
+          <Box sx={{ mb: 2 }}>
+            <Link href='/admin/dashboards' className='text-primary'>
+              Dashboard
+            </Link>{' '}
+            / <Typography component='span'>Material Request</Typography>
           </Box>
         }
       >
@@ -342,6 +325,59 @@ const MaterialRequestPageContent = () => {
             position: 'relative'
           }}
         >
+          <CardHeader
+            title={
+              <Box display='flex' alignItems='center' gap={2}>
+                <Typography variant='h5' sx={{ fontWeight: 600 }}>
+                  Material Request List
+                </Typography>
+
+                <Button
+                  variant='contained'
+                  color='primary'
+                  startIcon={
+                    <RefreshIcon
+                      sx={{
+                        animation: loading ? 'spin 1s linear infinite' : 'none',
+                        '@keyframes spin': {
+                          '0%': { transform: 'rotate(0deg)' },
+                          '100%': { transform: 'rotate(360deg)' }
+                        }
+                      }}
+                    />
+                  }
+                  disabled={loading}
+                  onClick={() => loadData(true)}
+                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                >
+                  {loading ? 'Refreshing...' : 'Refresh'}
+                </Button>
+              </Box>
+            }
+            action={
+              <Box display='flex' alignItems='center' gap={2}>
+                <Button
+                  variant='contained'
+                  color='primary'
+                  startIcon={<AddIcon />}
+                  onClick={() => router.push('/admin/stock/material-request/add')}
+                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                >
+                  Add Request
+                </Button>
+              </Box>
+            }
+            sx={{
+              pb: 1.5,
+              pt: 5,
+              px: 10,
+              '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
+              '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
+            }}
+          />
+
+          <Divider />
+
           {loading && (
             <Box
               sx={{
@@ -359,13 +395,13 @@ const MaterialRequestPageContent = () => {
             </Box>
           )}
           <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <Divider sx={{ mb: 3 }} />
-
             {/* Filters */}
             <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 2, mb: 3, flexWrap: 'nowrap', flexShrink: 0 }}>
               <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                 <FormControlLabel
-                  control={<Checkbox checked={enableDateFilter} onChange={e => setEnableDateFilter(e.target.checked)} />}
+                  control={
+                    <Checkbox checked={enableDateFilter} onChange={e => setEnableDateFilter(e.target.checked)} />
+                  }
                   label='Date Filter'
                 />
                 <Box sx={{ width: 220 }}>
@@ -385,7 +421,13 @@ const MaterialRequestPageContent = () => {
                 value={requestStatus || null}
                 onChange={(e, val) => setRequestStatus(val || '')}
                 renderInput={params => (
-                  <CustomTextField {...params} size='small' label='Request Status' sx={{ width: 180 }} placeholder='Select status' />
+                  <CustomTextField
+                    {...params}
+                    size='small'
+                    label='Request Status'
+                    sx={{ width: 180 }}
+                    placeholder='Select status'
+                  />
                 )}
               />
               <CustomAutocomplete
@@ -393,7 +435,13 @@ const MaterialRequestPageContent = () => {
                 value={fromLocation || null}
                 onChange={(e, val) => setFromLocation(val || '')}
                 renderInput={params => (
-                  <CustomTextField {...params} size='small' label='From Location' sx={{ width: 180 }} placeholder='From' />
+                  <CustomTextField
+                    {...params}
+                    size='small'
+                    label='From Location'
+                    sx={{ width: 180 }}
+                    placeholder='From'
+                  />
                 )}
               />
               <CustomAutocomplete
@@ -409,7 +457,13 @@ const MaterialRequestPageContent = () => {
                 value={requestedBy || null}
                 onChange={(e, val) => setRequestedBy(val || '')}
                 renderInput={params => (
-                  <CustomTextField {...params} size='small' label='Requested By' sx={{ width: 180 }} placeholder='Employee' />
+                  <CustomTextField
+                    {...params}
+                    size='small'
+                    label='Requested By'
+                    sx={{ width: 180 }}
+                    placeholder='Employee'
+                  />
                 )}
               />
             </Box>
@@ -417,12 +471,24 @@ const MaterialRequestPageContent = () => {
             <Divider sx={{ mb: 3 }} />
 
             {/* Toolbar */}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 3, flexShrink: 0 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 2,
+                mb: 3,
+                flexShrink: 0
+              }}
+            >
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
                 <FormControl size='small' sx={{ width: 120 }}>
                   <Select value={pageSize} onChange={e => table.setPageSize(Number(e.target.value))}>
                     {[10, 25, 50, 100].map(s => (
-                      <MenuItem key={s} value={s}>{s} entries</MenuItem>
+                      <MenuItem key={s} value={s}>
+                        {s} entries
+                      </MenuItem>
                     ))}
                   </Select>
                 </FormControl>
@@ -475,19 +541,33 @@ const MaterialRequestPageContent = () => {
 
             <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
               <StickyTableWrapper rowCount={rows.length}>
-                <table className={styles.table} style={{ width: 'max-content', minWidth: '100%', tableLayout: 'fixed' }}>
+                <table
+                  className={styles.table}
+                  style={{ width: 'max-content', minWidth: '100%', tableLayout: 'fixed' }}
+                >
                   <colgroup>
-                    <col style={{ width: 60 }} /><col style={{ width: 100 }} /><col style={{ width: 150 }} />
-                    <col style={{ width: 150 }} /><col style={{ width: 130 }} /><col style={{ width: 200 }} />
-                    <col style={{ width: 200 }} /><col style={{ width: 140 }} /><col style={{ width: 120 }} />
-                    <col style={{ width: 120 }} /><col style={{ width: 120 }} /><col style={{ width: 200 }} />
+                    <col style={{ width: 60 }} />
+                    <col style={{ width: 100 }} />
+                    <col style={{ width: 150 }} />
+                    <col style={{ width: 150 }} />
+                    <col style={{ width: 130 }} />
+                    <col style={{ width: 200 }} />
+                    <col style={{ width: 200 }} />
+                    <col style={{ width: 140 }} />
+                    <col style={{ width: 120 }} />
+                    <col style={{ width: 120 }} />
+                    <col style={{ width: 120 }} />
+                    <col style={{ width: 200 }} />
                     <col style={{ width: 150 }} />
                   </colgroup>
                   <thead>
                     {table.getHeaderGroups().map(hg => (
                       <tr key={hg.id}>
                         {hg.headers.map(header => (
-                          <th key={header.id} style={{ width: header.getSize(), minWidth: header.getSize(), maxWidth: header.getSize() }}>
+                          <th
+                            key={header.id}
+                            style={{ width: header.getSize(), minWidth: header.getSize(), maxWidth: header.getSize() }}
+                          >
                             <div
                               className={classnames({
                                 'flex items-center': header.column.getIsSorted(),
@@ -496,8 +576,12 @@ const MaterialRequestPageContent = () => {
                               onClick={header.column.getToggleSortingHandler()}
                             >
                               {flexRender(header.column.columnDef.header, header.getContext())}
-                              {header.column.getIsSorted() === 'asc' && <ChevronRight className='-rotate-90' fontSize='small' />}
-                              {header.column.getIsSorted() === 'desc' && <ChevronRight className='rotate-90' fontSize='small' />}
+                              {header.column.getIsSorted() === 'asc' && (
+                                <ChevronRight className='-rotate-90' fontSize='small' />
+                              )}
+                              {header.column.getIsSorted() === 'desc' && (
+                                <ChevronRight className='rotate-90' fontSize='small' />
+                              )}
                             </div>
                           </th>
                         ))}
@@ -506,7 +590,11 @@ const MaterialRequestPageContent = () => {
                   </thead>
                   <tbody>
                     {table.getRowModel().rows.length === 0 ? (
-                      <tr><td colSpan={columns.length} className='text-center py-4'>No data available</td></tr>
+                      <tr>
+                        <td colSpan={columns.length} className='text-center py-4'>
+                          No data available
+                        </td>
+                      </tr>
                     ) : (
                       table.getRowModel().rows.map(row => (
                         <tr key={row.id}>
@@ -524,7 +612,15 @@ const MaterialRequestPageContent = () => {
             </Box>
 
             <Box sx={{ mt: 'auto', flexShrink: 0, pt: 4 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: 2
+                }}
+              >
                 <Typography color='text.disabled'>
                   Showing {(page - 1) * 25 + 1} to {Math.min(page * 25, totalCount)} of {totalCount} entries
                 </Typography>
@@ -579,9 +675,7 @@ const MaterialRequestPageContent = () => {
           </Typography>
         </DialogTitle>
         <DialogContent sx={{ px: 8, pb: 4 }}>
-          <Typography>
-            Are you sure you want to delete this material request? This action cannot be undone.
-          </Typography>
+          <Typography>Are you sure you want to delete this material request? This action cannot be undone.</Typography>
         </DialogContent>
         <DialogActions sx={{ justifyContent: 'center', gap: 3, pb: 10 }}>
           <Button

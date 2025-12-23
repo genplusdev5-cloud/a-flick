@@ -40,7 +40,12 @@ import {
   refreshUserRole
 } from '@/api/userRole'
 
-import { getUserPrivilegeList, getUserPrivilegeDetails, updateUserPrivilege, getUserModuleList } from '@/api/userPrivilege'
+import {
+  getUserPrivilegeList,
+  getUserPrivilegeDetails,
+  updateUserPrivilege,
+  getUserModuleList
+} from '@/api/userPrivilege'
 
 import FileCopyIcon from '@mui/icons-material/FileCopy'
 import CustomTextFieldWrapper from '@/components/common/CustomTextField'
@@ -82,60 +87,7 @@ import ChevronRight from '@menu/svg/ChevronRight'
 import PermissionGuard from '@/components/auth/PermissionGuard'
 import DebugPermissions from '@/components/DebugPermissions'
 import { usePermission } from '@/hooks/usePermission'
-
-// Toast helper
-// ──────────────────────────────────────────────────────────────
-// Toast (Custom Styled, Global, with Icons & Colors)
-// ──────────────────────────────────────────────────────────────
-const showToast = (type, message = '') => {
-  const icons = {
-    success: 'tabler-circle-check',
-    delete: 'tabler-trash',
-    error: 'tabler-alert-triangle',
-    warning: 'tabler-info-circle',
-    info: 'tabler-refresh'
-  }
-
-  toast(
-    <div className='flex items-center gap-2'>
-      <i
-        className={icons[type]}
-        style={{
-          color:
-            type === 'success'
-              ? '#16a34a'
-              : type === 'error'
-                ? '#dc2626'
-                : type === 'delete'
-                  ? '#dc2626'
-                  : type === 'warning'
-                    ? '#f59e0b'
-                    : '#2563eb',
-          fontSize: '22px'
-        }}
-      />
-      <Typography variant='body2' sx={{ fontSize: '0.9rem', color: '#111' }}>
-        {message}
-      </Typography>
-    </div>,
-    {
-      position: 'top-right',
-      autoClose: 2000,
-      hideProgressBar: true,
-      closeOnClick: true,
-      pauseOnHover: false,
-      draggable: false,
-      theme: 'light',
-      style: {
-        borderRadius: '10px',
-        padding: '8px 14px',
-        boxShadow: '0 4px 10px rgba(0,0,0,0.06)',
-        display: 'flex',
-        alignItems: 'center'
-      }
-    }
-  )
-}
+import { showToast } from '@/components/common/Toasts'
 
 // Debounced Input
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
@@ -230,7 +182,6 @@ const UserPrivilegePageContent = () => {
           triggerPrivilegeUpdate()
         }
       }
-
     } catch (err) {
       console.error('❌ Update error:', err)
       showToast('error', 'Failed to update privileges')
@@ -308,8 +259,8 @@ const UserPrivilegePageContent = () => {
       // Format for table
       const formatted = list.map((item, idx) => ({
         sno: idx + 1,
-        module: item.name,          // Assuming 'name' is the module name field from module list API
-        id: null,// No privilege ID yet if we just load pure modules
+        module: item.name, // Assuming 'name' is the module name field from module list API
+        id: null, // No privilege ID yet if we just load pure modules
         module_id: item.id,
         create: false,
         view: false,
@@ -683,7 +634,7 @@ const UserPrivilegePageContent = () => {
   // Render
   // ───────────────────────────────────────────
   return (
-    <PermissionGuard permission="User Privilege">
+    <PermissionGuard permission='User Privilege'>
       <StickyListLayout
         header={
           <Box sx={{ mb: 2 }}>
@@ -759,7 +710,9 @@ const UserPrivilegePageContent = () => {
                         loadModules() // 🟢 Reset to base module list
                       }
                     }}
-                    renderInput={params => <CustomTextField {...params} label='User Role' placeholder='Choose a role...' />}
+                    renderInput={params => (
+                      <CustomTextField {...params} label='User Role' placeholder='Choose a role...' />
+                    )}
                   />
                 </Box>
 
@@ -1054,7 +1007,6 @@ const UserPrivilegePageContent = () => {
           </DialogActions>
         </Dialog>
       </StickyListLayout>
-      <DebugPermissions />
     </PermissionGuard>
   )
 }

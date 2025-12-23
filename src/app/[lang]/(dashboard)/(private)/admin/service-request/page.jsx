@@ -31,6 +31,7 @@ import PermissionGuard from '@/components/auth/PermissionGuard'
 import { usePermission } from '@/hooks/usePermission'
 import StickyListLayout from '@/components/common/StickyListLayout'
 import StickyTableWrapper from '@/components/common/StickyTableWrapper'
+import TablePaginationComponent from '@/components/TablePaginationComponent'
 
 import { getTicketReportList } from '@/api/service_request/report'
 import { getReportDropdowns } from '@/api/service_request/report'
@@ -604,7 +605,6 @@ const ServiceRequestPageContent = () => {
       }
     >
       <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
-
         <CardHeader
           title={
             <Box display='flex' alignItems='center' gap={2}>
@@ -903,37 +903,8 @@ const ServiceRequestPageContent = () => {
               </table>
             </StickyTableWrapper>
           </Box>
-
-          <Box
-            sx={{
-              py: 1.5,
-              borderTop: '1px solid #e0e0e0',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              mt: 'auto',
-              flexShrink: 0
-            }}
-          >
-            <Typography color='text.disabled' variant='body2'>
-              {`Showing ${rowCount === 0 ? 0 : pagination.pageIndex * pagination.pageSize + 1} to ${Math.min(
-                (pagination.pageIndex + 1) * pagination.pageSize,
-                rowCount
-              )} of ${rowCount} entries`}
-            </Typography>
-
-            <Pagination
-              shape='rounded'
-              color='primary'
-              variant='tonal'
-              count={Math.ceil(rowCount / pagination.pageSize) || 1}
-              page={pagination.pageIndex + 1}
-              onChange={(_, page) => setPagination(p => ({ ...p, pageIndex: page - 1 }))}
-              showFirstButton
-              showLastButton
-              size='small'
-            />
+          <Box sx={{ mt: 'auto', pt: 2, flexShrink: 0 }}>
+            <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
           </Box>
         </Box>
       </Card>
@@ -978,7 +949,8 @@ const ServiceRequestPageContent = () => {
 
         <DialogContent sx={{ px: 5, pt: 1 }}>
           <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
-            Are you sure you want to delete <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name || 'this incident'}</strong>?
+            Are you sure you want to delete{' '}
+            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name || 'this incident'}</strong>?
             <br />
             This action cannot be undone.
           </Typography>
@@ -1005,7 +977,6 @@ const ServiceRequestPageContent = () => {
     </StickyListLayout>
   )
 }
-
 
 // Wrapper for RBAC
 export default function ServiceRequestPage() {

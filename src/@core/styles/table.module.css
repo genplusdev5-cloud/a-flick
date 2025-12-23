@@ -89,7 +89,7 @@
   overflow: auto;
   position: relative;
   border-block-start: 1px solid var(--border-color);
-  
+
   /* Scrollbar styles */
   &::-webkit-scrollbar {
     inline-size: 8px;

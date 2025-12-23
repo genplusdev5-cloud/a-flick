@@ -294,109 +294,111 @@ const AttendancePageContent = () => {
             </Link>{' '}
             / <Typography component='span'>Attendance</Typography>
           </Box>
-
-          <CardHeader
-            title={
-              <Box display='flex' alignItems='center' gap={2}>
-                <Typography variant='h5' fontWeight={600}>
-                  Attendance
-                </Typography>
-
-                <GlobalButton
-                  variant='contained'
-                  color='primary'
-                  startIcon={<RefreshIcon />}
-                  onClick={fetchAttendances}
-                  sx={{
-                    textTransform: 'none',
-                    fontWeight: 500,
-                    px: 2.5,
-                    height: 36
-                  }}
-                >
-                  Refresh
-                </GlobalButton>
-              </Box>
-            }
-            action={
-              <Box display='flex' alignItems='center' gap={2}>
-                <GlobalButton
-                  color='secondary'
-                  endIcon={<ArrowDropDownIcon />}
-                  onClick={e => setExportAnchorEl(e.currentTarget)}
-                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-                >
-                  Export
-                </GlobalButton>
-
-                <Menu
-                  anchorEl={exportAnchorEl}
-                  open={Boolean(exportAnchorEl)}
-                  onClose={() => setExportAnchorEl(null)}
-                >
-                  <MenuItem
-                    onClick={() => {
-                      setExportAnchorEl(null)
-                      exportPrint()
-                    }}
-                  >
-                    <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
-                  </MenuItem>
-
-                  <MenuItem
-                    onClick={() => {
-                      setExportAnchorEl(null)
-                      exportCSV()
-                    }}
-                  >
-                    <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
-                  </MenuItem>
-
-                  <MenuItem
-                    onClick={async () => {
-                      setExportAnchorEl(null)
-                      await exportExcel()
-                    }}
-                  >
-                    <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
-                  </MenuItem>
-
-                  <MenuItem
-                    onClick={async () => {
-                      setExportAnchorEl(null)
-                      await exportPDF()
-                    }}
-                  >
-                    <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
-                  </MenuItem>
-
-                  <MenuItem
-                    onClick={() => {
-                      setExportAnchorEl(null)
-                      exportCopy()
-                    }}
-                  >
-                    <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
-                  </MenuItem>
-                </Menu>
-
-                <GlobalButton
-                  variant='contained'
-                  startIcon={<AddIcon />}
-                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-                  onClick={() => router.push('/admin/attendance/attendance/add')}
-                >
-                  Add Attendance
-                </GlobalButton>
-              </Box>
-            }
-          />
         </Box>
       }
     >
       <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
+        <CardHeader
+          title={
+            <Box display='flex' alignItems='center' gap={2}>
+              <Typography variant='h5' fontWeight={600}>
+                Attendance
+              </Typography>
 
+              <GlobalButton
+                variant='contained'
+                color='primary'
+                startIcon={<RefreshIcon />}
+                onClick={fetchAttendances}
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 500,
+                  px: 2.5,
+                  height: 36
+                }}
+              >
+                Refresh
+              </GlobalButton>
+            </Box>
+          }
+          action={
+            <Box display='flex' alignItems='center' gap={2}>
+              <GlobalButton
+                color='secondary'
+                endIcon={<ArrowDropDownIcon />}
+                onClick={e => setExportAnchorEl(e.currentTarget)}
+                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+              >
+                Export
+              </GlobalButton>
 
+              <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportPrint()
+                  }}
+                >
+                  <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
+                </MenuItem>
+
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportCSV()
+                  }}
+                >
+                  <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
+                </MenuItem>
+
+                <MenuItem
+                  onClick={async () => {
+                    setExportAnchorEl(null)
+                    await exportExcel()
+                  }}
+                >
+                  <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
+                </MenuItem>
+
+                <MenuItem
+                  onClick={async () => {
+                    setExportAnchorEl(null)
+                    await exportPDF()
+                  }}
+                >
+                  <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
+                </MenuItem>
+
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportCopy()
+                  }}
+                >
+                  <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
+                </MenuItem>
+              </Menu>
+
+              <GlobalButton
+                variant='contained'
+                startIcon={<AddIcon />}
+                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                onClick={() => router.push('/admin/attendance/attendance/add')}
+              >
+                Add Attendance
+              </GlobalButton>
+            </Box>
+          }
+          sx={{
+            pb: 1.5,
+            pt: 5,
+            px: 10,
+            '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
+            '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
+          }}
+        />
+
+        <Divider />
         <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <Box
             sx={{
@@ -576,11 +578,7 @@ const AttendancePageContent = () => {
                               <i className='tabler-calendar-event' />
                             </IconButton>
 
-                            <IconButton
-                              size='small'
-                              color='error'
-                              onClick={() => setDeleteDialog({ open: true, row })}
-                            >
+                            <IconButton size='small' color='error' onClick={() => setDeleteDialog({ open: true, row })}>
                               <i className='tabler-trash text-red-600 text-lg' />
                             </IconButton>
                           </Box>
@@ -692,7 +690,6 @@ const AttendancePageContent = () => {
     </StickyListLayout>
   )
 }
-
 
 // Wrapper for RBAC
 export default function AttendancePage() {

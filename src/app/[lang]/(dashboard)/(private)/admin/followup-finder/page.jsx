@@ -156,44 +156,45 @@ const FollowupFinderPageContent = () => {
   // ----------------------------
   // Fetch from API
   // ----------------------------
-  const fetchFollowup = async (payload = {}) => {
+  const fetchFollowup = async () => {
     setLoading(true)
+
     try {
-      const res = await getReportFollowupList(payload)
-
-      if (res?.status === 'success') {
-        let list = Array.isArray(res.results) ? res.results : []
-
-        const normalized = list.map((item, index) => ({
-          id: index + 1,
-          sno: index + 1,
-
-          customer: item.name, // ✅ correct
-          address: item.address, // ✅ correct
-
-          serviceDate: item.service_date, // date
-          nextServiceDate: item.next_date || '', // correct key
-          daysDiff: item.days_diff, // correct
-
-          appointmentStatus: item.scheduled, // appointment status = scheduled
-
-          pest: item.pest_code, // correct
-          purpose: item.purpose, // correct
-          degree: item.degree, // correct
-          technician: item.technician_name // correct
-        }))
-
-        setAllRows(normalized)
-        setRowCount(normalized.length)
-        setPagination(prev => ({ ...prev, pageIndex: 0 }))
-      } else {
-        showToast('error', res?.message || 'No data')
-        setAllRows([])
-        setRowCount(0)
+      const params = {
+        page: pagination.pageIndex + 1,
+        page_size: pagination.pageSize
       }
+
+      if (enableDateFilter && fromDate) params.from_date = fromDate
+      if (enableDateFilter && toDate) params.to_date = toDate
+      if (searchText) params.search = searchText
+
+      const res = await getReportFollowupList(params)
+
+      const normalized = (res.results || []).map((item, index) => ({
+        id: item.s_no || index + 1,
+        sno: pagination.pageIndex * pagination.pageSize + index + 1,
+
+        customer: item.customer,
+        address: item.service_address,
+        serviceDate: item.service_date,
+        serviceDateFormatted: formatDate(item.service_date),
+
+        nextServiceDate: item.next_date,
+        nextServiceDateFormatted: formatDate(item.next_date),
+
+        daysDiff: item.days_between || item.days_diff,
+        appointmentStatus: item.scheduled_status || item.schedule_status,
+        pest: item.pest_code,
+        purpose: item.pest_purpose,
+        degree: item.degree,
+        technician: item.technician
+      }))
+
+      setRows(normalized) // ✅ DIRECTLY set rows
+      setRowCount(res.count || 0) // ✅ 2025
     } catch (err) {
-      console.error('fetch error:', err)
-      showToast('error', 'Error fetching follow-up data')
+      showToast('error', 'Failed to load follow-up data')
     } finally {
       setLoading(false)
     }
@@ -201,7 +202,7 @@ const FollowupFinderPageContent = () => {
 
   useEffect(() => {
     fetchFollowup()
-  }, [])
+  }, [pagination.pageIndex, pagination.pageSize])
 
   useEffect(() => {
     if (!allRows.length) {
@@ -220,7 +221,7 @@ const FollowupFinderPageContent = () => {
 
   const columnHelper = createColumnHelper()
   const columns = [
-    columnHelper.accessor('sno', { header: 'ID' }),
+    columnHelper.accessor('sno', { header: 'S.no' }),
     columnHelper.display({
       id: 'actions',
       header: 'Action',
@@ -337,18 +338,17 @@ const FollowupFinderPageContent = () => {
   return (
     <>
       <StickyListLayout
-      header={
-        <Box sx={{ mb: 6 }}>
-          <Breadcrumbs sx={{ mb: 2 }}>
-            <Link href='/'>Dashboard</Link>
-            <Typography>Follow-Up Finder</Typography>
-          </Breadcrumbs>
+        header={
+          <Box sx={{ mb: 2 }}>
+            <Breadcrumbs sx={{ mb: 2 }}>
+              <Link href='/'>Dashboard</Link>
+              <Typography>Follow-Up Finder</Typography>
+            </Breadcrumbs>
+          </Box>
+        }
+      >
+        <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
           <CardHeader
-            sx={{
-              p: 0,
-              '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
-              '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.5rem' }
-            }}
             title={
               <Box display='flex' alignItems='center' gap={2}>
                 <Typography variant='h5' sx={{ fontWeight: 600 }}>
@@ -366,172 +366,174 @@ const FollowupFinderPageContent = () => {
                 </GlobalButton>
               </Box>
             }
-          />
-        </Box>
-      }
-    >
-      <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
-        {loading && (
-          <Box
             sx={{
-              position: 'absolute',
-              inset: 0,
-              bgcolor: 'rgba(255,255,255,0.8)',
-              backdropFilter: 'blur(2px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 10
+              pb: 1.5,
+              pt: 5,
+              px: 10,
+              '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
+              '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
             }}
-          >
-            <ProgressCircularCustomization size={60} thickness={5} />
-          </Box>
-        )}
-        <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          />
 
-          <Divider sx={{ mb: 3 }} />
-
-          {/* Filters */}
-          <Box sx={{ mb: 4, flexShrink: 0 }}>
-            {/* ROW 1 — Date Range ABOVE input */}
-            <Box sx={{ display: 'flex', flexDirection: 'column', width: 260, mb: 3 }}>
-              {/* Checkbox + Label */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                <Checkbox
-                  checked={enableDateFilter}
-                  onChange={e => {
-                    const checked = e.target.checked
-                    setEnableDateFilter(checked)
-
-                    if (!checked) {
-                      setFromDate('')
-                      setToDate('')
-                      fetchFollowup() // reload full list
-                    }
-                  }}
-                  size='small'
-                />
-                <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Date Range</Typography>
-              </Box>
-
-              {/* Single Date Range Picker */}
-              <GlobalDateRange
-                label=''
-                start={fromDate}
-                end={toDate}
-                onSelectRange={({ start, end }) => {
-                  setFromDate(start)
-                  setToDate(end)
-                  fetchFollowup({ from_date: start, to_date: end }) // 🔥 auto filter
-                }}
-                disabled={!enableDateFilter}
-              />
-            </Box>
-            <Divider sx={{ mb: 4 }} />
-
-            {/* ROW 2 — Entries Dropdown + Search Box */}
+          <Divider />
+          {loading && (
             <Box
               sx={{
+                position: 'absolute',
+                inset: 0,
+                bgcolor: 'rgba(255,255,255,0.8)',
+                backdropFilter: 'blur(2px)',
                 display: 'flex',
-                justifyContent: 'space-between',
                 alignItems: 'center',
-                gap: 3
+                justifyContent: 'center',
+                zIndex: 10
               }}
             >
-              {/* Entries Dropdown */}
-              <FormControl size='small' sx={{ width: 120 }}>
-                <Select
-                  value={pagination.pageSize}
-                  onChange={e =>
-                    setPagination(p => ({
-                      ...p,
-                      pageSize: Number(e.target.value),
-                      pageIndex: 0
-                    }))
-                  }
-                >
-                  {[10, 25, 50, 100].map(s => (
-                    <MenuItem key={s} value={s}>
-                      {s} entries
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              {/* Search */}
-              <DebouncedInput
-                value={searchText}
-                onChange={v => setSearchText(String(v))}
-                placeholder='Search customer, address, pest...'
-                sx={{ width: 340 }}
-                variant='outlined'
-                size='small'
-                slotProps={{
-                  input: {
-                    startAdornment: (
-                      <InputAdornment position='start'>
-                        <SearchIcon />
-                      </InputAdornment>
-                    )
-                  }
-                }}
-              />
+              <ProgressCircularCustomization size={60} thickness={5} />
             </Box>
-          </Box>
+          )}
+          <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            {/* Filters */}
+            <Box sx={{ mb: 4, flexShrink: 0 }}>
+              {/* ROW 1 — Date Range ABOVE input */}
+              <Box sx={{ display: 'flex', flexDirection: 'column', width: 260, mb: 3 }}>
+                {/* Checkbox + Label */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                  <Checkbox
+                    checked={enableDateFilter}
+                    onChange={e => {
+                      const checked = e.target.checked
+                      setEnableDateFilter(checked)
 
-          <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-            <StickyTableWrapper rowCount={rows.length}>
-              <table className={styles.table}>
-                <thead>
-                  {table.getHeaderGroups().map(hg => (
-                    <tr key={hg.id}>
-                      {hg.headers.map(h => (
-                        <th key={h.id}>
-                          <div
-                            className={classnames({
-                              'flex items-center': h.column.getIsSorted(),
-                              'cursor-pointer select-none': h.column.getCanSort()
-                            })}
-                            onClick={h.column.getToggleSortingHandler()}
-                          >
-                            {flexRender(h.column.columnDef.header, h.getContext())}
+                      if (!checked) {
+                        setFromDate('')
+                        setToDate('')
+                        fetchFollowup() // reload full list
+                      }
+                    }}
+                    size='small'
+                  />
+                  <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Date Range</Typography>
+                </Box>
 
-                            {{
-                              asc: <ChevronRight className='-rotate-90' />,
-                              desc: <ChevronRight className='rotate-90' />
-                            }[h.column.getIsSorted()] || null}
-                          </div>
-                        </th>
-                      ))}
-                    </tr>
-                  ))}
-                </thead>
+                {/* Single Date Range Picker */}
+                <GlobalDateRange
+                  label=''
+                  start={fromDate}
+                  end={toDate}
+                  onSelectRange={({ start, end }) => {
+                    setFromDate(start)
+                    setToDate(end)
+                    fetchFollowup({ from_date: start, to_date: end }) // 🔥 auto filter
+                  }}
+                  disabled={!enableDateFilter}
+                />
+              </Box>
+              <Divider sx={{ mb: 4 }} />
 
-                <tbody>
-                  {rows.length ? (
-                    table.getRowModel().rows.map(row => (
-                      <tr key={row.id}>
-                        {row.getVisibleCells().map(cell => (
-                          <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+              {/* ROW 2 — Entries Dropdown + Search Box */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 3
+                }}
+              >
+                {/* Entries Dropdown */}
+                <FormControl size='small' sx={{ width: 120 }}>
+                  <Select
+                    value={pagination.pageSize}
+                    onChange={e =>
+                      setPagination(p => ({
+                        ...p,
+                        pageSize: Number(e.target.value),
+                        pageIndex: 0
+                      }))
+                    }
+                  >
+                    {[10, 25, 50, 100].map(s => (
+                      <MenuItem key={s} value={s}>
+                        {s} entries
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                {/* Search */}
+                <DebouncedInput
+                  value={searchText}
+                  onChange={v => setSearchText(String(v))}
+                  placeholder='Search customer, address, pest...'
+                  sx={{ width: 340 }}
+                  variant='outlined'
+                  size='small'
+                  slotProps={{
+                    input: {
+                      startAdornment: (
+                        <InputAdornment position='start'>
+                          <SearchIcon />
+                        </InputAdornment>
+                      )
+                    }
+                  }}
+                />
+              </Box>
+            </Box>
+
+            <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              <StickyTableWrapper rowCount={rows.length}>
+                <table className={styles.table}>
+                  <thead>
+                    {table.getHeaderGroups().map(hg => (
+                      <tr key={hg.id}>
+                        {hg.headers.map(h => (
+                          <th key={h.id}>
+                            <div
+                              className={classnames({
+                                'flex items-center': h.column.getIsSorted(),
+                                'cursor-pointer select-none': h.column.getCanSort()
+                              })}
+                              onClick={h.column.getToggleSortingHandler()}
+                            >
+                              {flexRender(h.column.columnDef.header, h.getContext())}
+
+                              {{
+                                asc: <ChevronRight className='-rotate-90' />,
+                                desc: <ChevronRight className='rotate-90' />
+                              }[h.column.getIsSorted()] || null}
+                            </div>
+                          </th>
                         ))}
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={columns.length} className='text-center py-4'>
-                        No results found
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </StickyTableWrapper>
-          </Box>
+                    ))}
+                  </thead>
 
-          <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
-        </Box>
-      </Card>
-    </StickyListLayout>
+                  <tbody>
+                    {rows.length ? (
+                      table.getRowModel().rows.map(row => (
+                        <tr key={row.id}>
+                          {row.getVisibleCells().map(cell => (
+                            <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                          ))}
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={columns.length} className='text-center py-4'>
+                          No results found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </StickyTableWrapper>
+            </Box>
+
+            <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+          </Box>
+        </Card>
+      </StickyListLayout>
 
       {/* Delete Dialog */}
       <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false })}>
@@ -561,7 +563,7 @@ const FollowupFinderPageContent = () => {
 // Wrapper for RBAC
 export default function FollowupFinderPage() {
   return (
-    <PermissionGuard permission="Followup Finder">
+    <PermissionGuard permission='Followup Finder'>
       <FollowupFinderPageContent />
     </PermissionGuard>
   )

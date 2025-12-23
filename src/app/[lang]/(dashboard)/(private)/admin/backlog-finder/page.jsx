@@ -111,66 +111,64 @@ const BacklogFinderPageContent = () => {
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
   const [enableDateFilter, setEnableDateFilter] = useState(false)
 
-  const fetchBacklog = async () => {
-    setLoading(true)
-    try {
-      const payload = {}
-      if (fromDate) payload.from_date = fromDate
-      if (toDate) payload.to_date = toDate
+ const fetchBacklog = async () => {
+  setLoading(true)
 
-      const res = await getReportBacklogList({
-        ...payload,
-        page: pagination.pageIndex + 1,
-        page_size: pagination.pageSize
-      })
-
-      if (res?.status === 'success') {
-        const list = res.results || []
-
-        const formatted = list.map((item, index) => ({
-          id: item.row_number,
-          sno: pagination.pageIndex * pagination.pageSize + index + 1,
-          serviceDateFormatted: formatDate(item.ticket_date),
-          scheduleDateFormatted: formatDate(item.schedule_date),
-          backlogDays: item.aging,
-          productivity: item.productivity_value,
-          frequency: item.frequency,
-          customer: item.customer,
-          contactPerson: item.contact_person,
-          phone: item.phone,
-          timeIn: item.schedule_start_time,
-          timeOut: item.schedule_end_time,
-          serviceType: item.service_type,
-          contractType: item.contract_type,
-          technician: item.technicians,
-          address: item.service_address,
-          postalCode: item.postal_address,
-          scheduleStatus: item.schedule_status,
-          serviceStatus: item.service_status,
-          remarks: item.remarks,
-          status: item.ticket_status
-        }))
-
-        setRows(formatted)
-        setRowCount(res.count) // backend total count
-      }
-    } finally {
-      setLoading(false)
+  try {
+    const payload = {
+      page: pagination.pageIndex + 1,
+      page_size: pagination.pageSize
     }
+
+    if (enableDateFilter && fromDate) payload.from_date = fromDate
+    if (enableDateFilter && toDate) payload.to_date = toDate
+    if (searchText) payload.search = searchText
+
+    const res = await getReportBacklogList(payload)
+
+    // ✅ 🔥 PASTE YOUR CODE HERE 🔥
+    const list = res?.results || []
+
+    const formatted = list.map((item, index) => ({
+      id: item.DT_RowIndex || index + 1,
+      sno: pagination.pageIndex * pagination.pageSize + index + 1,
+
+      serviceDateFormatted: formatDate(item.ticket_date),
+      scheduleDateFormatted: formatDate(item.schedule_date),
+      backlogDays: item.aging,
+      productivity: item.productivity_value,
+      frequency: item.frequency,
+      customer: item.customer_name,
+      contactPerson: item.contact_person_name,
+      phone: item.phone,
+      timeIn: item.schedule_start_time,
+      timeOut: item.schedule_end_time,
+      serviceType: item.ticket_type,
+      contractType: item.contract_type,
+      technician: item.technician,
+      pestCode: item.pest_code,
+      address: item.service_address,
+      postalCode: item.postal_address,
+      scheduleStatus: item.schedule_status,
+      serviceStatus: item.service_status,
+      remarks: item.remarks,
+      status: item.ticket_status
+    }))
+
+    setRows(formatted)
+    setRowCount(res?.count || 0)
+  } catch (err) {
+    console.error(err)
+    showToast('error', 'Failed to load backlog data')
+  } finally {
+    setLoading(false)
   }
+}
 
-  useEffect(() => {
-    if (fromDate || toDate) fetchBacklog()
-  }, [fromDate, toDate])
+useEffect(() => {
+  fetchBacklog()
+}, [pagination.pageIndex, pagination.pageSize, fromDate, toDate, searchText])
 
-  // fetch once on page load
-  useEffect(() => {
-    fetchBacklog()
-  }, [])
-
-  useEffect(() => {
-    fetchBacklog()
-  }, [pagination.pageIndex, pagination.pageSize, fromDate, toDate])
 
   const handleEdit = id => router.push(`/admin/backlog/${id}/edit`)
   const confirmDelete = () => {
@@ -188,7 +186,7 @@ const BacklogFinderPageContent = () => {
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
             <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original.id)}>
-              <i className='tabler-edit text-blue-600 text-lg' />
+              <i className='tabler-edit ' />
             </IconButton>
             <IconButton
               size='small'
@@ -345,73 +343,77 @@ const BacklogFinderPageContent = () => {
     <>
       <StickyListLayout
         header={
-          <Box sx={{ mb: 6 }}>
+          <Box sx={{ mb: 2 }}>
             <Breadcrumbs sx={{ mb: 2 }}>
               <Link href='/'>Dashboard</Link>
               <Typography>Backlog Finder</Typography>
             </Breadcrumbs>
-            <CardHeader
-              sx={{
-                p: 0,
-                '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
-                '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.5rem' }
-              }}
-              title={
-                <Box display='flex' alignItems='center' gap={2}>
-                  <Typography variant='h5' sx={{ fontWeight: 600 }}>
-                    Backlog Finder
-                  </Typography>
-
-                  {/* 🔥 REFRESH BUTTON */}
-                  <GlobalButton
-                    variant='contained'
-                    color='primary'
-                    startIcon={
-                      <RefreshIcon
-                        sx={{
-                          animation: loading ? 'spin 1s linear infinite' : 'none',
-                          '@keyframes spin': {
-                            '0%': { transform: 'rotate(0deg)' },
-                            '100%': { transform: 'rotate(360deg)' }
-                          }
-                        }}
-                      />
-                    }
-                    disabled={loading}
-                    onClick={() => fetchBacklog()}
-                    sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-                  >
-                    {loading ? 'Refreshing...' : 'Refresh'}
-                  </GlobalButton>
-                </Box>
-              }
-              action={
-                <Box display='flex' alignItems='center' gap={2}>
-                  <GlobalButton
-                    variant='outlined'
-                    color='secondary'
-                    endIcon={<ArrowDropDownIcon />}
-                    onClick={e => setExportAnchorEl(e.currentTarget)}
-                    disabled={!rows.length}
-                  >
-                    Export
-                  </GlobalButton>
-
-                  <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
-                    <MenuItem onClick={exportPrint}>
-                      <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
-                    </MenuItem>
-                    <MenuItem onClick={exportCSV}>
-                      <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
-                    </MenuItem>
-                  </Menu>
-                </Box>
-              }
-            />
           </Box>
         }
       >
         <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
+          <CardHeader
+            title={
+              <Box display='flex' alignItems='center' gap={2}>
+                <Typography variant='h5' sx={{ fontWeight: 600 }}>
+                  Backlog Finder
+                </Typography>
+
+                {/* 🔥 REFRESH BUTTON */}
+                <GlobalButton
+                  variant='contained'
+                  color='primary'
+                  startIcon={
+                    <RefreshIcon
+                      sx={{
+                        animation: loading ? 'spin 1s linear infinite' : 'none',
+                        '@keyframes spin': {
+                          '0%': { transform: 'rotate(0deg)' },
+                          '100%': { transform: 'rotate(360deg)' }
+                        }
+                      }}
+                    />
+                  }
+                  disabled={loading}
+                  onClick={() => fetchBacklog()}
+                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                >
+                  {loading ? 'Refreshing...' : 'Refresh'}
+                </GlobalButton>
+              </Box>
+            }
+            action={
+              <Box display='flex' alignItems='center' gap={2}>
+                <GlobalButton
+                  variant='outlined'
+                  color='secondary'
+                  endIcon={<ArrowDropDownIcon />}
+                  onClick={e => setExportAnchorEl(e.currentTarget)}
+                  disabled={!rows.length}
+                >
+                  Export
+                </GlobalButton>
+
+                <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
+                  <MenuItem onClick={exportPrint}>
+                    <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
+                  </MenuItem>
+                  <MenuItem onClick={exportCSV}>
+                    <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
+                  </MenuItem>
+                </Menu>
+              </Box>
+            }
+            sx={{
+              pb: 1.5,
+              pt: 5,
+              px: 10,
+              '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
+              '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
+            }}
+          />
+
+          <Divider />
           {loading && (
             <Box
               sx={{
@@ -429,155 +431,148 @@ const BacklogFinderPageContent = () => {
             </Box>
           )}
           <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            {/* FILTERS */}
+            <Box sx={{ mb: 4, flexShrink: 0 }}>
+              {/* ROW 1 — Date Range ABOVE input */}
+              <Box sx={{ display: 'flex', flexDirection: 'column', width: 260, mb: 3 }}>
+                {/* Checkbox + Label */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                  <Checkbox
+                    checked={enableDateFilter}
+                    onChange={e => {
+                      const checked = e.target.checked
+                      setEnableDateFilter(checked)
 
-        <Divider sx={{ mb: 4 }} />
+                      if (!checked) {
+                        setFromDate('')
+                        setToDate('')
+                        fetchBacklog() // reload full data when unchecked
+                      }
+                    }}
+                    size='small'
+                  />
 
-        {/* FILTERS */}
+                  <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Date Range</Typography>
+                </Box>
 
-          <Divider sx={{ mb: 3 }} />
+                {/* Single Date Range Picker */}
+                <GlobalDateRange
+                  label=''
+                  start={fromDate}
+                  end={toDate}
+                  onSelectRange={({ start, end }) => {
+                    setFromDate(start)
+                    setToDate(end)
+                  }}
+                  disabled={!enableDateFilter}
+                />
+              </Box>
+              <Divider sx={{ mb: 4 }} />
 
-          {/* FILTERS */}
-          <Box sx={{ mb: 4, flexShrink: 0 }}>
-            {/* ROW 1 — Date Range ABOVE input */}
-            <Box sx={{ display: 'flex', flexDirection: 'column', width: 260, mb: 3 }}>
-              {/* Checkbox + Label */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                <Checkbox
-                  checked={enableDateFilter}
-                  onChange={e => {
-                    const checked = e.target.checked
-                    setEnableDateFilter(checked)
+              {/* ROW 2 — Entries + Search */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 3
+                }}
+              >
+                {/* Entries Dropdown */}
+                <FormControl size='small' sx={{ width: 120 }}>
+                  <Select
+                    value={pagination.pageSize}
+                    onChange={e =>
+                      setPagination(p => ({
+                        ...p,
+                        pageSize: Number(e.target.value),
+                        pageIndex: 0
+                      }))
+                    }
+                  >
+                    {[25, 50, 75, 100].map(s => (
+                      <MenuItem key={s} value={s}>
+                        {s} entries
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
 
-                    if (!checked) {
-                      setFromDate('')
-                      setToDate('')
-                      fetchBacklog() // reload full data when unchecked
+                {/* Search */}
+                <DebouncedInput
+                  value={searchText}
+                  onChange={val => {
+                    setSearchText(val)
+                    setPagination(p => ({ ...p, pageIndex: 0 }))
+                  }}
+                  placeholder='Search customer, address, pest code...'
+                  sx={{ width: 340 }}
+                  size='small'
+                  slotProps={{
+                    input: {
+                      startAdornment: (
+                        <InputAdornment position='start'>
+                          <SearchIcon />
+                        </InputAdornment>
+                      )
                     }
                   }}
-                  size='small'
                 />
-
-                <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Date Range</Typography>
               </Box>
-
-              {/* Single Date Range Picker */}
-              <GlobalDateRange
-                label=''
-                start={fromDate}
-                end={toDate}
-                onSelectRange={({ start, end }) => {
-                  setFromDate(start)
-                  setToDate(end)
-                }}
-                disabled={!enableDateFilter}
-              />
             </Box>
-            <Divider sx={{ mb: 4 }} />
 
-            {/* ROW 2 — Entries + Search */}
-            <Box
-              sx={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: 3
-              }}
-            >
-              {/* Entries Dropdown */}
-              <FormControl size='small' sx={{ width: 120 }}>
-                <Select
-                  value={pagination.pageSize}
-                  onChange={e =>
-                    setPagination(p => ({
-                      ...p,
-                      pageSize: Number(e.target.value),
-                      pageIndex: 0
-                    }))
-                  }
-                >
-                  {[25, 50, 75, 100].map(s => (
-                    <MenuItem key={s} value={s}>
-                      {s} entries
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              {/* Search */}
-              <DebouncedInput
-                value={searchText}
-                onChange={val => {
-                  setSearchText(val)
-                  setPagination(p => ({ ...p, pageIndex: 0 }))
-                }}
-                placeholder='Search customer, address, pest code...'
-                sx={{ width: 340 }}
-                size='small'
-                slotProps={{
-                  input: {
-                    startAdornment: (
-                      <InputAdornment position='start'>
-                        <SearchIcon />
-                      </InputAdornment>
-                    )
-                  }
-                }}
-              />
-            </Box>
-          </Box>
-
-          <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-            <StickyTableWrapper rowCount={rows.length}>
-              <table className={styles.table}>
-                <thead>
-                  {table.getHeaderGroups().map(hg => (
-                    <tr key={hg.id}>
-                      {hg.headers.map(h => (
-                        <th key={h.id}>
-                          <div
-                            className={classnames({
-                              'flex items-center': h.column.getIsSorted(),
-                              'cursor-pointer select-none': h.column.getCanSort()
-                            })}
-                            onClick={h.column.getToggleSortingHandler()}
-                          >
-                            {flexRender(h.column.columnDef.header, h.getContext())}
-                            {{
-                              asc: <ChevronRight className='-rotate-90' />,
-                              desc: <ChevronRight className='rotate-90' />
-                            }[h.column.getIsSorted()] || null}
-                          </div>
-                        </th>
-                      ))}
-                    </tr>
-                  ))}
-                </thead>
-
-                <tbody>
-                  {rows.length ? (
-                    table.getRowModel().rows.map(row => (
-                      <tr key={row.id}>
-                        {row.getVisibleCells().map(cell => (
-                          <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+            <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              <StickyTableWrapper rowCount={rows.length}>
+                <table className={styles.table}>
+                  <thead>
+                    {table.getHeaderGroups().map(hg => (
+                      <tr key={hg.id}>
+                        {hg.headers.map(h => (
+                          <th key={h.id}>
+                            <div
+                              className={classnames({
+                                'flex items-center': h.column.getIsSorted(),
+                                'cursor-pointer select-none': h.column.getCanSort()
+                              })}
+                              onClick={h.column.getToggleSortingHandler()}
+                            >
+                              {flexRender(h.column.columnDef.header, h.getContext())}
+                              {{
+                                asc: <ChevronRight className='-rotate-90' />,
+                                desc: <ChevronRight className='rotate-90' />
+                              }[h.column.getIsSorted()] || null}
+                            </div>
+                          </th>
                         ))}
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={columns.length} className='text-center py-4'>
-                        No results found
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </StickyTableWrapper>
-          </Box>
+                    ))}
+                  </thead>
 
-          <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
-        </Box>
-      </Card>
-    </StickyListLayout>
+                  <tbody>
+                    {rows.length ? (
+                      table.getRowModel().rows.map(row => (
+                        <tr key={row.id}>
+                          {row.getVisibleCells().map(cell => (
+                            <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                          ))}
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={columns.length} className='text-center py-4'>
+                          No results found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </StickyTableWrapper>
+            </Box>
+
+            <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+          </Box>
+        </Card>
+      </StickyListLayout>
 
       {/* DELETE DIALOG */}
       <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false })}>
@@ -607,7 +602,7 @@ const BacklogFinderPageContent = () => {
 // Wrapper for RBAC
 export default function BacklogFinderPage() {
   return (
-    <PermissionGuard permission="Backlog Finder">
+    <PermissionGuard permission='Backlog Finder'>
       <BacklogFinderPageContent />
     </PermissionGuard>
   )

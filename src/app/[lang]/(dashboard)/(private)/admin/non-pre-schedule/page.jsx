@@ -152,7 +152,7 @@ const NonPreScheduleReportPageContent = () => {
       })
 
       if (res?.status === 'success') {
-        const list = res.data?.results || res.data || []
+        const list = res?.data?.data?.data || res?.data?.data || []
 
         const customers = list.map(c => ({
           id: c.id,
@@ -175,40 +175,40 @@ const NonPreScheduleReportPageContent = () => {
     setLoading(true)
 
     try {
-      const res = await getNonPrescheduleList({
-        customer_id: customerFilter || '' // allow empty value also
-      })
+      const params = {
+        page: pagination.pageIndex + 1,
+        page_size: pagination.pageSize
+      }
 
-      // correct data path (backend structure)
-      const list =
-        res?.data?.data?.data || // main array
-        res?.data?.data || // fallback
-        []
+      if (customerFilter) {
+        params.customer_id = customerFilter
+      }
+
+      const res = await getNonPrescheduleList(params)
+
+      const list = res?.data?.results || []
 
       const normalized = list.map((item, index) => ({
-        id: index + 1,
-        sno: index + 1,
-        customerId: item.customer_id, // ⭐ ADD THIS
-        customer: item.customer || '',
-        contractCode: item.contract_code || '',
-        type: item.contract_type || '',
-        serviceAddress: item.service_address || '',
-        postalCode: item.postal_address || '',
-        startDate: item.start_date || '',
-        endDate: item.end_date || '',
-        pests: item.pest_name || '',
-        frequency: item.frequency || '',
-        pestServiceCount: item.pest_service_count || 0,
-        balance: item.balance || 0,
-        contractStatus: item.contract_status || 'Current'
+        id: item.s_no, // internal unique id
+        sno: pagination.pageIndex * pagination.pageSize + index + 1, // ⭐ GLOBAL S.NO
+        customer: item.customer,
+        contractCode: item.contract_code,
+        type: item.contract_type,
+        serviceAddress: item.service_address,
+        postalCode: item.postal_address,
+        startDate: item.start_date,
+        endDate: item.end_date,
+        pests: item.pest_name,
+        frequency: item.frequency,
+        pestServiceCount: item.pest_service_count,
+        balance: item.balance,
+        contractStatus: item.contract_status
       }))
 
-      setAllRows(normalized)
-      setRowCount(normalized.length)
-      setPagination(prev => ({ ...prev, pageIndex: 0 }))
-    } catch (err) {
-      console.error(err)
-      showToast('error', 'Error fetching non-preschedule report')
+      setRows(normalized)
+      setRowCount(res?.data?.count || 0)
+    } catch (e) {
+      console.error(e)
     } finally {
       setLoading(false)
     }
@@ -232,10 +232,9 @@ const NonPreScheduleReportPageContent = () => {
     fetchCustomerList()
   }, [])
 
-  // 2) When customer changes, fetch data
   useEffect(() => {
     fetchNonPreschedule()
-  }, [customerFilter])
+  }, [pagination.pageIndex, pagination.pageSize, customerFilter])
 
   // 3) When data or local filters change, apply local filtering
   useEffect(() => {
@@ -267,7 +266,7 @@ const NonPreScheduleReportPageContent = () => {
   const columnHelper = createColumnHelper()
   const columns = useMemo(
     () => [
-      columnHelper.accessor('sno', { header: 'ID' }),
+      columnHelper.accessor('sno', { header: 'S.No' }),
 
       columnHelper.display({
         id: 'actions',
@@ -453,20 +452,19 @@ const NonPreScheduleReportPageContent = () => {
   return (
     <>
       <StickyListLayout
-      header={
-        <Box sx={{ mb: 6 }}>
-          <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
-            <Link underline='hover' color='inherit' href='/'>
-              Dashboard
-            </Link>
-            <Typography color='text.primary'>Non-Preschedule Report</Typography>
-          </Breadcrumbs>
+        header={
+          <Box sx={{ mb: 2 }}>
+            <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
+              <Link underline='hover' color='inherit' href='/'>
+                Dashboard
+              </Link>
+              <Typography color='text.primary'>Non-Preschedule Report</Typography>
+            </Breadcrumbs>
+          </Box>
+        }
+      >
+        <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
           <CardHeader
-            sx={{
-              p: 0,
-              '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
-              '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.5rem' }
-            }}
             title={
               <Box display='flex' alignItems='center' gap={2}>
                 <Typography variant='h5' sx={{ fontWeight: 600 }}>
@@ -484,257 +482,259 @@ const NonPreScheduleReportPageContent = () => {
                 </GlobalButton>
               </Box>
             }
+            sx={{
+              pb: 1.5,
+              pt: 5,
+              px: 10,
+              '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
+              '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
+            }}
           />
-        </Box>
-      }
-    >
-      <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
-        {loading && (
-          <Box
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              bgcolor: 'rgba(255,255,255,0.8)',
-              backdropFilter: 'blur(2px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 10
-            }}
-          >
-            <ProgressCircularCustomization size={60} thickness={5} />
-          </Box>
-        )}
-        <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-          <Divider sx={{ mb: 2 }} />
+          <Divider />
+          {loading && (
+            <Box
+              sx={{
+                position: 'absolute',
+                inset: 0,
+                bgcolor: 'rgba(255,255,255,0.8)',
+                backdropFilter: 'blur(2px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 10
+              }}
+            >
+              <ProgressCircularCustomization size={60} thickness={5} />
+            </Box>
+          )}
+          <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            {/* ROW 1 — FILTERS */}
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'flex-end',
+                gap: 2,
+                mb: 3,
+                flexShrink: 0
+              }}
+            >
+              {/* DATE RANGE BLOCK LIKE YOUR 2ND IMAGE */}
+              <Box sx={{ display: 'flex', flexDirection: 'column', width: 260 }}>
+                {/* Label + Checkbox ON TOP */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                  <Checkbox checked={checked} onChange={e => setChecked(e.target.checked)} size='small' />
+                  <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Date Range</Typography>
+                </Box>
 
-          {/* ROW 1 — FILTERS */}
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'flex-end',
-              gap: 2,
-              mb: 3,
-              flexShrink: 0
-            }}
-          >
-            {/* DATE RANGE BLOCK LIKE YOUR 2ND IMAGE */}
-            <Box sx={{ display: 'flex', flexDirection: 'column', width: 260 }}>
-              {/* Label + Checkbox ON TOP */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                <Checkbox checked={checked} onChange={e => setChecked(e.target.checked)} size='small' />
-                <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Date Range</Typography>
+                {/* Date Picker BELOW the label */}
+                <GlobalDateRange
+                  label=''
+                  start={dateRange.start}
+                  end={dateRange.end}
+                  onSelectRange={({ start, end }) => setDateRange({ start, end })}
+                  disabled={!checked}
+                />
               </Box>
 
-              {/* Date Picker BELOW the label */}
-              <GlobalDateRange
-                label=''
-                start={dateRange.start}
-                end={dateRange.end}
-                onSelectRange={({ start, end }) => setDateRange({ start, end })}
-                disabled={!checked}
+              {/* Customer Autocomplete */}
+              <GlobalAutocomplete
+                id='customer-filter'
+                options={customerOptions}
+                loading={customerLoading}
+                getOptionLabel={option => option?.name || ''}
+                onInputChange={(e, value) => {
+                  fetchCustomerList(value)
+                }}
+                value={customerOptions.find(c => c.id === customerFilter) || null}
+                onChange={(e, val) => {
+                  const newId = val?.id || null
+                  setCustomerFilter(newId)
+                }}
+                renderInput={params => (
+                  <GlobalTextField {...params} label='Customer' placeholder='Search...' size='small' />
+                )}
+                sx={{ width: 350 }}
               />
             </Box>
 
-            {/* Customer Autocomplete */}
-            <GlobalAutocomplete
-              id='customer-filter'
-              options={customerOptions}
-              loading={customerLoading}
-              getOptionLabel={option => option?.name || ''}
-              onInputChange={(e, value) => {
-                fetchCustomerList(value)
+            <Divider sx={{ mb: 4 }} />
+
+            {/* ROW 2 — ENTRIES + SEARCH */}
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                mb: 3,
+                flexWrap: 'wrap',
+                gap: 2,
+                flexShrink: 0
               }}
-              value={customerOptions.find(c => c.id === customerFilter) || null}
-              onChange={(e, val) => {
-                const newId = val?.id || null
-                setCustomerFilter(newId)
-              }}
-              renderInput={params => (
-                <GlobalTextField {...params} label='Customer' placeholder='Search...' size='small' />
-              )}
-              sx={{ width: 350 }}
-            />
-          </Box>
-
-          <Divider sx={{ mb: 4 }} />
-
-          {/* ROW 2 — ENTRIES + SEARCH */}
-          <Box
-            sx={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              mb: 3,
-              flexWrap: 'wrap',
-              gap: 2,
-              flexShrink: 0
-            }}
-          >
-            {/* Entries Dropdown */}
-            <FormControl size='small' sx={{ width: 150 }}>
-              <Select
-                value={pagination.pageSize}
-                onChange={e =>
-                  setPagination(p => ({
-                    ...p,
-                    pageSize: Number(e.target.value),
-                    pageIndex: 0
-                  }))
-                }
-              >
-                {[10, 25, 50, 100].map(size => (
-                  <MenuItem key={size} value={size}>
-                    {size} entries
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            {/* Search Box */}
-            <DebouncedInput
-              value={searchText}
-              onChange={v => {
-                setSearchText(String(v))
-                setPagination(p => ({ ...p, pageIndex: 0 }))
-              }}
-              placeholder='Search customer, code, address, pests...'
-              sx={{ width: 350 }}
-              variant='outlined'
-              size='small'
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position='start'>
-                      <SearchIcon />
-                    </InputAdornment>
-                  )
-                }
-              }}
-            />
-          </Box>
-
-        {/* ================== END FILTER SECTION ================== */}
-
-          <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-            <StickyTableWrapper rowCount={rows.length}>
-              <table className={styles.table}>
-                <thead>
-                  {table.getHeaderGroups().map(hg => (
-                    <tr key={hg.id}>
-                      {hg.headers.map(h => (
-                        <th key={h.id}>
-                          <div
-                            className={classnames({
-                              'flex items-center': h.column.getIsSorted(),
-                              'cursor-pointer select-none': h.column.getCanSort()
-                            })}
-                            onClick={h.column.getToggleSortingHandler()}
-                          >
-                            {flexRender(h.column.columnDef.header, h.getContext())}
-                            {{
-                              asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
-                              desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
-                            }[h.column.getIsSorted()] ?? null}
-                          </div>
-                        </th>
-                      ))}
-                    </tr>
+            >
+              {/* Entries Dropdown */}
+              <FormControl size='small' sx={{ width: 150 }}>
+                <Select
+                  value={pagination.pageSize}
+                  onChange={e =>
+                    setPagination(p => ({
+                      ...p,
+                      pageSize: Number(e.target.value),
+                      pageIndex: 0
+                    }))
+                  }
+                >
+                  {[10, 25, 50, 100].map(size => (
+                    <MenuItem key={size} value={size}>
+                      {size} entries
+                    </MenuItem>
                   ))}
-                </thead>
-                <tbody>
-                  {rows.length ? (
-                    table.getRowModel().rows.map(row => (
-                      <tr key={row.id}>
-                        {row.getVisibleCells().map(cell => (
-                          <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                </Select>
+              </FormControl>
+
+              {/* Search Box */}
+              <DebouncedInput
+                value={searchText}
+                onChange={v => {
+                  setSearchText(String(v))
+                  setPagination(p => ({ ...p, pageIndex: 0 }))
+                }}
+                placeholder='Search customer, code, address, pests...'
+                sx={{ width: 350 }}
+                variant='outlined'
+                size='small'
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position='start'>
+                        <SearchIcon />
+                      </InputAdornment>
+                    )
+                  }
+                }}
+              />
+            </Box>
+
+            {/* ================== END FILTER SECTION ================== */}
+
+            <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              <StickyTableWrapper rowCount={rows.length}>
+                <table className={styles.table}>
+                  <thead>
+                    {table.getHeaderGroups().map(hg => (
+                      <tr key={hg.id}>
+                        {hg.headers.map(h => (
+                          <th key={h.id}>
+                            <div
+                              className={classnames({
+                                'flex items-center': h.column.getIsSorted(),
+                                'cursor-pointer select-none': h.column.getCanSort()
+                              })}
+                              onClick={h.column.getToggleSortingHandler()}
+                            >
+                              {flexRender(h.column.columnDef.header, h.getContext())}
+                              {{
+                                asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
+                                desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
+                              }[h.column.getIsSorted()] ?? null}
+                            </div>
+                          </th>
                         ))}
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={columns.length} className='text-center py-4'>
-                        {loading ? 'Loading non-preschedule data...' : 'No results found'}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </StickyTableWrapper>
+                    ))}
+                  </thead>
+                  <tbody>
+                    {rows.length ? (
+                      table.getRowModel().rows.map(row => (
+                        <tr key={row.id}>
+                          {row.getVisibleCells().map(cell => (
+                            <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                          ))}
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={columns.length} className='text-center py-4'>
+                          {loading ? 'Loading non-preschedule data...' : 'No results found'}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </StickyTableWrapper>
+            </Box>
+
+            <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
           </Box>
+        </Card>
+      </StickyListLayout>
 
-        <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
-        </Box>
-      </Card>
-    </StickyListLayout>
-
-    {/* DELETE CONFIRM DIALOG */}
-    <Dialog
-      onClose={() => setDeleteDialog({ open: false })}
-      aria-labelledby='customized-dialog-title'
-      open={deleteDialog.open}
-      closeAfterTransition={false}
-      PaperProps={{
-        sx: {
-          overflow: 'visible',
-          width: 420,
-          borderRadius: 1,
-          textAlign: 'center'
-        }
-      }}
-    >
-      <DialogTitle
-        id='customized-dialog-title'
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 1,
-          color: 'error.main',
-          fontWeight: 700,
-          pb: 1,
-          position: 'relative'
+      {/* DELETE CONFIRM DIALOG */}
+      <Dialog
+        onClose={() => setDeleteDialog({ open: false })}
+        aria-labelledby='customized-dialog-title'
+        open={deleteDialog.open}
+        closeAfterTransition={false}
+        PaperProps={{
+          sx: {
+            overflow: 'visible',
+            width: 420,
+            borderRadius: 1,
+            textAlign: 'center'
+          }
         }}
       >
-        <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
-        Confirm Delete
-        <DialogCloseButton
-          onClick={() => setDeleteDialog({ open: false })}
-          disableRipple
-          sx={{ position: 'absolute', right: 1, top: 1 }}
+        <DialogTitle
+          id='customized-dialog-title'
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1,
+            color: 'error.main',
+            fontWeight: 700,
+            pb: 1,
+            position: 'relative'
+          }}
         >
-          <i className='tabler-x' />
-        </DialogCloseButton>
-      </DialogTitle>
+          <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
+          Confirm Delete
+          <DialogCloseButton
+            onClick={() => setDeleteDialog({ open: false })}
+            disableRipple
+            sx={{ position: 'absolute', right: 1, top: 1 }}
+          >
+            <i className='tabler-x' />
+          </DialogCloseButton>
+        </DialogTitle>
 
-      <DialogContent sx={{ px: 5, pt: 1 }}>
-        <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
-          Are you sure you want to delete contract{' '}
-          <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.contractCode || 'this contract'}</strong>?
-          <br />
-          This action is <strong>UI-only</strong> and cannot be undone here.
-        </Typography>
-      </DialogContent>
+        <DialogContent sx={{ px: 5, pt: 1 }}>
+          <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
+            Are you sure you want to delete contract{' '}
+            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.contractCode || 'this contract'}</strong>?
+            <br />
+            This action is <strong>UI-only</strong> and cannot be undone here.
+          </Typography>
+        </DialogContent>
 
-      <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-        <GlobalButton
-          onClick={() => setDeleteDialog({ open: false })}
-          variant='tonal'
-          color='secondary'
-          sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
-        >
-          Cancel
-        </GlobalButton>
-        <GlobalButton
-          onClick={confirmDelete}
-          variant='contained'
-          color='error'
-          sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
-        >
-          Delete
-        </GlobalButton>
-      </DialogActions>
+        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+          <GlobalButton
+            onClick={() => setDeleteDialog({ open: false })}
+            variant='tonal'
+            color='secondary'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+          >
+            Cancel
+          </GlobalButton>
+          <GlobalButton
+            onClick={confirmDelete}
+            variant='contained'
+            color='error'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+          >
+            Delete
+          </GlobalButton>
+        </DialogActions>
       </Dialog>
     </>
   )
@@ -743,7 +743,7 @@ const NonPreScheduleReportPageContent = () => {
 // Wrapper for RBAC
 export default function NonPreScheduleReportPage() {
   return (
-    <PermissionGuard permission="Non Pre-Schedule">
+    <PermissionGuard permission='Non Pre-Schedule'>
       <NonPreScheduleReportPageContent />
     </PermissionGuard>
   )

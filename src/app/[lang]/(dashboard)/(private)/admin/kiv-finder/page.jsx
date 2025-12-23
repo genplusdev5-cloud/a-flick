@@ -106,49 +106,46 @@ const KivFinderPageContent = () => {
   // -----------------------------
   // FETCH DATA FROM API
   // -----------------------------
-  const fetchKVI = async (payload = {}) => {
+  const fetchKVI = async () => {
     setLoading(true)
     try {
-      const res = await getKviFinderList(payload)
-
-      if (res?.status === 'success') {
-        let list = Array.isArray(res.results) ? res.results : []
-
-        const normalized = list.map((item, index) => ({
-          id: index + 1,
-          sno: index + 1,
-
-          customer: item.name, // ✅ correct
-          address: item.address, // ✅ correct
-
-          serviceDate: item.service_date, // original date
-          nextRoutineDate: item.next_date, // correct key from API
-
-          daysDiff: item.days_diff, // correct
-
-          appointment: item.scheduled, // scheduled → appointment
-
-          pest: item.pest_code, // correct
-          technician: item.technician_name, // correct
-
-          degree: item.degree, // correct
-          purpose: item.purpose, // correct
-
-          serviceDateFormatted: formatDate(item.service_date),
-          nextRoutineDateFormatted: formatDate(item.next_date)
-        }))
-
-        setAllRows(normalized)
-        setRowCount(normalized.length)
-        setPagination(prev => ({ ...prev, pageIndex: 0 }))
-      } else {
-        showToast('error', res?.message || 'No data found')
-        setAllRows([])
-        setRowCount(0)
+      const params = {
+        page: pagination.pageIndex + 1,
+        page_size: pagination.pageSize
       }
-    } catch (err) {
-      console.error(err)
-      showToast('error', 'Error loading KVI data')
+
+      if (enableDateFilter && fromDate) params.from_date = fromDate
+      if (enableDateFilter && toDate) params.to_date = toDate
+      if (searchText) params.search = searchText
+
+      const res = await getKviFinderList(params)
+
+      const normalized = (res.results || []).map((item, index) => ({
+        // ✅ S.NO LOGIC (global)
+        sno: pagination.pageIndex * pagination.pageSize + index + 1,
+
+        customer: item.customer,
+        address: item.service_address,
+
+        serviceDate: item.service_date,
+        serviceDateFormatted: formatDate(item.service_date),
+
+        nextRoutineDate: item.next_date,
+        nextRoutineDateFormatted: formatDate(item.next_date),
+
+        daysDiff: item.days_between,
+        appointment: item.scheduled_status,
+
+        pest: item.pest_code,
+        technician: item.technician,
+        degree: item.degree,
+        purpose: item.pest_purpose
+      }))
+
+      setRows(normalized)
+      setRowCount(res.count)
+    } catch (e) {
+      showToast('error', 'Failed to load KVI list')
     } finally {
       setLoading(false)
     }
@@ -156,7 +153,7 @@ const KivFinderPageContent = () => {
 
   useEffect(() => {
     fetchKVI()
-  }, [])
+  }, [pagination.pageIndex, pagination.pageSize])
 
   // -----------------------------
   // FILTER + PAGINATION
@@ -207,6 +204,10 @@ const KivFinderPageContent = () => {
 
   const columns = useMemo(
     () => [
+      columnHelper.accessor('sno', {
+        header: 'S.No',
+        cell: info => info.getValue()
+      }),
       columnHelper.display({
         id: 'actions',
         header: 'Action',
@@ -264,66 +265,85 @@ const KivFinderPageContent = () => {
     getSortedRowModel: getSortedRowModel()
   })
 
-  // -----------------------------
-  // EXPORT CSV + PRINT
-  // -----------------------------
-  const exportCSV = () => {
-    const headers = columns.map(c => c.header).join(',')
-    const csv = [
-      headers,
-      ...rows.map(r =>
-        [
-          r.customer,
-          r.address,
-          r.serviceDateFormatted,
-          r.nextRoutineDateFormatted,
-          r.daysDiff,
-          r.appointment,
-          r.pest,
-          r.technician,
-          r.degree,
-          r.purpose
-        ].join(',')
-      )
-    ].join('\n')
-
-    const link = document.createElement('a')
-    link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
-    link.download = 'kvi_finder.csv'
-    link.click()
-    setExportAnchorEl(null)
-  }
+  // Export
+  const exportOpen = Boolean(exportAnchorEl)
 
   const exportPrint = () => {
     const w = window.open('', '_blank')
     const html = `
-      <html><body>
-      <h2>KVI Finder Report</h2>
-      <table border="1" style="width:100%;border-collapse:collapse;">
-      <tr>${columns.map(c => `<th>${c.header}</th>`).join('')}</tr>
+        <html><head><title>Tax List</title><style>
+          body{font-family:Arial;padding:24px;}
+          table{width:100%;border-collapse:collapse;}
+          th,td{border:1px solid #ccc;padding:8px;text-align:left;}
+          th{background:#f4f4f4;}
+        </style></head><body>
+        <h2>Tax List</h2>
+        <table><thead><tr>
+          <th>S.No</th><th>Tax Name</th><th>Tax (%)</th><th>Status</th>
+        </tr></thead><tbody>
+        ${rows
+          .map(
+            r =>
+              `<tr><td>${r.sno}</td><td>${r.name}</td><td>${r.tax}</td><td>${
+                r.is_active === 1 ? 'Active' : 'Inactive'
+              }</td></tr>`
+          )
+          .join('')}
+        </tbody></table></body></html>`
+    w?.document.write(html)
+    w?.document.close()
+    w?.print()
+  }
 
-      ${rows
-        .map(
-          r => `<tr>
-        <td>${r.customer}</td>
-        <td>${r.address}</td>
-        <td>${r.serviceDateFormatted}</td>
-        <td>${r.nextRoutineDateFormatted}</td>
-        <td>${r.daysDiff}</td>
-        <td>${r.appointment}</td>
-        <td>${r.pest}</td>
-        <td>${r.technician}</td>
-        <td>${r.degree}</td>
-        <td>${r.purpose}</td>
-      </tr>`
-        )
-        .join('')}
-      </table></body></html>`
+  const exportCSV = () => {
+    const headers = ['S.No', 'Tax Name', 'Tax (%)', 'Status']
+    const csv = [
+      headers.join(','),
+      ...rows.map(r => [r.sno, r.name, r.tax, r.is_active === 1 ? 'Active' : 'Inactive'].join(','))
+    ].join('\n')
+    const link = document.createElement('a')
+    link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
+    link.download = 'Tax_List.csv'
+    link.click()
+    showToast('success', 'CSV downloaded')
+  }
 
-    w.document.write(html)
-    w.document.close()
-    w.print()
-    setExportAnchorEl(null)
+  const exportExcel = async () => {
+    const XLSX = await import('xlsx')
+    const ws = XLSX.utils.json_to_sheet(
+      rows.map(r => ({
+        'S.No': r.sno,
+        'Tax Name': r.name,
+        'Tax (%)': r.tax,
+        Status: r.is_active === 1 ? 'Active' : 'Inactive'
+      }))
+    )
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Taxes')
+    XLSX.writeFile(wb, 'Tax_List.xlsx')
+    showToast('success', 'Excel downloaded')
+  }
+
+  const exportPDF = async () => {
+    const { jsPDF } = await import('jspdf')
+    const autoTable = (await import('jspdf-autotable')).default
+    const doc = new jsPDF()
+    doc.text('Tax List', 14, 15)
+    autoTable(doc, {
+      startY: 25,
+      head: [['S.No', 'Tax Name', 'Tax (%)', 'Status']],
+      body: rows.map(r => [r.sno, r.name, r.tax, r.is_active === 1 ? 'Active' : 'Inactive'])
+    })
+    doc.save('Tax_List.pdf')
+    showToast('success', 'PDF exported')
+  }
+
+  const exportCopy = () => {
+    const text = rows
+      .map(r => `${r.sno}. ${r.name} | ${r.tax}% | ${r.is_active === 1 ? 'Active' : 'Inactive'}`)
+      .join('\n')
+    navigator.clipboard.writeText(text)
+    showToast('info', 'Copied to clipboard')
   }
 
   // -----------------------------
@@ -331,19 +351,18 @@ const KivFinderPageContent = () => {
   // -----------------------------
   return (
     <Box>
-    <StickyListLayout
-      header={
-        <Box sx={{ mb: 6 }}>
-          <Breadcrumbs sx={{ mb: 2 }}>
-            <Link href='/'>Dashboard</Link>
-            <Typography>KVI Finder</Typography>
-          </Breadcrumbs>
+      <StickyListLayout
+        header={
+          <Box sx={{ mb: 2 }}>
+            <Breadcrumbs sx={{ mb: 2 }}>
+              <Link href='/'>Dashboard</Link>
+              <Typography>KVI Finder</Typography>
+            </Breadcrumbs>
+          </Box>
+        }
+      >
+        <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
           <CardHeader
-            sx={{
-              p: 0,
-              '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
-              '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.5rem' }
-            }}
             title={
               <Box display='flex' alignItems='center' gap={2}>
                 <Typography variant='h5' sx={{ fontWeight: 600 }}>
@@ -394,174 +413,176 @@ const KivFinderPageContent = () => {
                 </Menu>
               </Box>
             }
-          />
-        </Box>
-      }
-    >
-      <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
-        {loading && (
-          <Box
             sx={{
-              position: 'absolute',
-              inset: 0,
-              bgcolor: 'rgba(255,255,255,0.8)',
-              backdropFilter: 'blur(2px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 10
+              pb: 1.5,
+              pt: 5,
+              px: 10,
+              '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
+              '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
             }}
-          >
-            <ProgressCircularCustomization size={60} thickness={5} />
-          </Box>
-        )}
-        <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          />
 
-          <Divider sx={{ mb: 3 }} />
-
-          {/* FILTERS */}
-          <Box sx={{ mb: 4, flexShrink: 0 }}>
-            {/* DATE RANGE BLOCK */}
-            <Box sx={{ display: 'flex', flexDirection: 'column', width: 260, mb: 3 }}>
-              {/* Checkbox + Label */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                <Checkbox
-                  checked={enableDateFilter}
-                  onChange={e => {
-                    const checked = e.target.checked
-                    setEnableDateFilter(checked)
-
-                    if (!checked) {
-                      setFromDate('')
-                      setToDate('')
-                      fetchKVI() // reload full list
-                    }
-                  }}
-                  size='small'
-                />
-
-                <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Date Range</Typography>
-              </Box>
-
-              {/* Date Range Picker */}
-              <GlobalDateRange
-                label=''
-                start={fromDate}
-                end={toDate}
-                onSelectRange={({ start, end }) => {
-                  setFromDate(start)
-                  setToDate(end)
-                  fetchKVI({ from_date: start, to_date: end }) // 🔥 call API on date change
-                }}
-                disabled={!enableDateFilter}
-              />
-            </Box>
-
-            <Divider sx={{ mb: 4 }} />
-
-            {/* ENTRIES + SEARCH ROW */}
+          <Divider />
+          {loading && (
             <Box
               sx={{
+                position: 'absolute',
+                inset: 0,
+                bgcolor: 'rgba(255,255,255,0.8)',
+                backdropFilter: 'blur(2px)',
                 display: 'flex',
-                justifyContent: 'space-between',
                 alignItems: 'center',
-                gap: 3
+                justifyContent: 'center',
+                zIndex: 10
               }}
             >
-              {/* Entries Dropdown */}
-              <FormControl size='small' sx={{ width: 120 }}>
-                <Select
-                  value={pagination.pageSize}
-                  onChange={e =>
-                    setPagination(p => ({
-                      ...p,
-                      pageSize: Number(e.target.value),
-                      pageIndex: 0
-                    }))
-                  }
-                >
-                  {[10, 25, 50, 100].map(n => (
-                    <MenuItem key={n} value={n}>
-                      {n} entries
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              {/* Search Box */}
-              <DebouncedInput
-                value={searchText}
-                onChange={v => setSearchText(String(v))}
-                placeholder='Search customer, address, pest...'
-                sx={{ width: 340 }}
-                size='small'
-                variant='outlined'
-                slotProps={{
-                  input: {
-                    startAdornment: (
-                      <InputAdornment position='start'>
-                        <SearchIcon />
-                      </InputAdornment>
-                    )
-                  }
-                }}
-              />
+              <ProgressCircularCustomization size={60} thickness={5} />
             </Box>
-          </Box>
+          )}
+          <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            {/* FILTERS */}
+            <Box sx={{ mb: 4, flexShrink: 0 }}>
+              {/* DATE RANGE BLOCK */}
+              <Box sx={{ display: 'flex', flexDirection: 'column', width: 260, mb: 3 }}>
+                {/* Checkbox + Label */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                  <Checkbox
+                    checked={enableDateFilter}
+                    onChange={e => {
+                      const checked = e.target.checked
+                      setEnableDateFilter(checked)
 
-          <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-            <StickyTableWrapper rowCount={rows.length}>
-              <table className={styles.table}>
-                <thead>
-                  {table.getHeaderGroups().map(hg => (
-                    <tr key={hg.id}>
-                      {hg.headers.map(h => (
-                        <th key={h.id}>
-                          <div
-                            className={classnames({
-                              'flex items-center': h.column.getIsSorted(),
-                              'cursor-pointer select-none': h.column.getCanSort()
-                            })}
-                            onClick={h.column.getToggleSortingHandler()}
-                          >
-                            {flexRender(h.column.columnDef.header, h.getContext())}
+                      if (!checked) {
+                        setFromDate('')
+                        setToDate('')
+                        fetchKVI() // reload full list
+                      }
+                    }}
+                    size='small'
+                  />
 
-                            {{
-                              asc: <ChevronRight className='-rotate-90' />,
-                              desc: <ChevronRight className='rotate-90' />
-                            }[h.column.getIsSorted()] ?? null}
-                          </div>
-                        </th>
-                      ))}
-                    </tr>
-                  ))}
-                </thead>
+                  <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Date Range</Typography>
+                </Box>
 
-                <tbody>
-                  {rows.length ? (
-                    table.getRowModel().rows.map(row => (
-                      <tr key={row.id}>
-                        {row.getVisibleCells().map(cell => (
-                          <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                {/* Date Range Picker */}
+                <GlobalDateRange
+                  label=''
+                  start={fromDate}
+                  end={toDate}
+                  onSelectRange={({ start, end }) => {
+                    setFromDate(start)
+                    setToDate(end)
+                    fetchKVI({ from_date: start, to_date: end }) // 🔥 call API on date change
+                  }}
+                  disabled={!enableDateFilter}
+                />
+              </Box>
+
+              <Divider sx={{ mb: 4 }} />
+
+              {/* ENTRIES + SEARCH ROW */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 3
+                }}
+              >
+                {/* Entries Dropdown */}
+                <FormControl size='small' sx={{ width: 120 }}>
+                  <Select
+                    value={pagination.pageSize}
+                    onChange={e =>
+                      setPagination(p => ({
+                        ...p,
+                        pageSize: Number(e.target.value),
+                        pageIndex: 0
+                      }))
+                    }
+                  >
+                    {[10, 25, 50, 100].map(n => (
+                      <MenuItem key={n} value={n}>
+                        {n} entries
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                {/* Search Box */}
+                <DebouncedInput
+                  value={searchText}
+                  onChange={v => setSearchText(String(v))}
+                  placeholder='Search customer, address, pest...'
+                  sx={{ width: 340 }}
+                  size='small'
+                  variant='outlined'
+                  slotProps={{
+                    input: {
+                      startAdornment: (
+                        <InputAdornment position='start'>
+                          <SearchIcon />
+                        </InputAdornment>
+                      )
+                    }
+                  }}
+                />
+              </Box>
+            </Box>
+
+            <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              <StickyTableWrapper rowCount={rows.length}>
+                <table className={styles.table}>
+                  <thead>
+                    {table.getHeaderGroups().map(hg => (
+                      <tr key={hg.id}>
+                        {hg.headers.map(h => (
+                          <th key={h.id}>
+                            <div
+                              className={classnames({
+                                'flex items-center': h.column.getIsSorted(),
+                                'cursor-pointer select-none': h.column.getCanSort()
+                              })}
+                              onClick={h.column.getToggleSortingHandler()}
+                            >
+                              {flexRender(h.column.columnDef.header, h.getContext())}
+
+                              {{
+                                asc: <ChevronRight className='-rotate-90' />,
+                                desc: <ChevronRight className='rotate-90' />
+                              }[h.column.getIsSorted()] ?? null}
+                            </div>
+                          </th>
                         ))}
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={columns.length} className='text-center py-4'>
-                        No results found
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </StickyTableWrapper>
-          </Box>
+                    ))}
+                  </thead>
 
-          <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
-        </Box>
-      </Card>
-    </StickyListLayout>
+                  <tbody>
+                    {rows.length ? (
+                      table.getRowModel().rows.map(row => (
+                        <tr key={row.id}>
+                          {row.getVisibleCells().map(cell => (
+                            <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                          ))}
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={columns.length} className='text-center py-4'>
+                          No results found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </StickyTableWrapper>
+            </Box>
+
+            <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+          </Box>
+        </Card>
+      </StickyListLayout>
 
       {/* DELETE DIALOG */}
       <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false })}>
@@ -591,7 +612,7 @@ const KivFinderPageContent = () => {
 // Wrapper for RBAC
 export default function KivFinderPage() {
   return (
-    <PermissionGuard permission="KIV Finder">
+    <PermissionGuard permission='KIV Finder'>
       <KivFinderPageContent />
     </PermissionGuard>
   )

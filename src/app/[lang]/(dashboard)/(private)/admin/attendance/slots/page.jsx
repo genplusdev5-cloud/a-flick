@@ -303,123 +303,130 @@ const SlotsPageContent = () => {
     <>
       <StickyListLayout
         header={
-          <Box sx={{ mb: 6 }}>
+          <Box sx={{ mb: 2 }}>
             <Box sx={{ mb: 2 }}>
               <Link href='/admin/dashboards' className='text-primary'>
                 Dashboard
               </Link>{' '}
               / <Typography component='span'>Slots</Typography>
             </Box>
-
-            <CardHeader
-              sx={{
-                p: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.5rem' }
-              }}
-              title={
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Typography sx={{ fontWeight: 600, fontSize: '1.5rem' }}>Slots</Typography>
-
-                  <GlobalButton
-                    variant='contained'
-                    color='primary'
-                    startIcon={<RefreshIcon />}
-                    onClick={handleRefresh}
-                    sx={{
-                      textTransform: 'none',
-                      fontWeight: 500,
-                      px: 2.5,
-                      height: 36
-                    }}
-                  >
-                    Refresh
-                  </GlobalButton>
-                </Box>
-              }
-              action={
-                <Box display='flex' alignItems='center' gap={2}>
-                  <GlobalButton
-                    color='secondary'
-                    endIcon={<ArrowDropDownIcon />}
-                    onClick={e => setExportAnchorEl(e.currentTarget)}
-                    sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-                  >
-                    Export
-                  </GlobalButton>
-                  <Menu
-                    anchorEl={exportAnchorEl}
-                    open={Boolean(exportAnchorEl)}
-                    onClose={() => setExportAnchorEl(null)}
-                  >
-                    <MenuItem
-                      onClick={() => {
-                        setExportAnchorEl(null)
-                        exportPrint()
-                      }}
-                    >
-                      <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
-                    </MenuItem>
-
-                    <MenuItem
-                      onClick={() => {
-                        setExportAnchorEl(null)
-                        exportCSV()
-                      }}
-                    >
-                      <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
-                    </MenuItem>
-
-                    <MenuItem
-                      onClick={async () => {
-                        setExportAnchorEl(null)
-                        await exportExcel()
-                      }}
-                    >
-                      <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
-                    </MenuItem>
-
-                    <MenuItem
-                      onClick={async () => {
-                        setExportAnchorEl(null)
-                        await exportPDF()
-                      }}
-                    >
-                      <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
-                    </MenuItem>
-
-                    <MenuItem
-                      onClick={() => {
-                        setExportAnchorEl(null)
-                        exportCopy()
-                      }}
-                    >
-                      <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
-                    </MenuItem>
-                  </Menu>
-
-                  <GlobalButton
-                    variant='contained'
-                    startIcon={<AddIcon />}
-                    onClick={handleAdd}
-                    sx={{
-                      textTransform: 'none',
-                      fontWeight: 500,
-                      px: 2.5,
-                      height: 36
-                    }}
-                  >
-                    Add Slots
-                  </GlobalButton>
-                </Box>
-              }
-            />
           </Box>
         }
       >
         <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
+          <CardHeader
+            title={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Typography variant='h5' sx={{ fontWeight: 600 }}>
+                  Slots
+                </Typography>
+
+                <GlobalButton
+                  startIcon={
+                    <RefreshIcon
+                      sx={{
+                        animation: loading ? 'spin 1s linear infinite' : 'none',
+                        '@keyframes spin': {
+                          '0%': { transform: 'rotate(0deg)' },
+                          '100%': { transform: 'rotate(360deg)' }
+                        }
+                      }}
+                    />
+                  }
+                  disabled={loading}
+                  onClick={async () => {
+                    setLoading(true)
+                    setPagination({ pageIndex: 0, pageSize: 25 })
+                    await fetchSlots() // ✅ FIX HERE
+                    setTimeout(() => setLoading(false), 800)
+                  }}
+                >
+                  {loading ? 'Refreshing...' : 'Refresh'}
+                </GlobalButton>
+              </Box>
+            }
+            action={
+              <Box display='flex' alignItems='center' gap={2}>
+                <GlobalButton
+                  color='secondary'
+                  endIcon={<ArrowDropDownIcon />}
+                  onClick={e => setExportAnchorEl(e.currentTarget)}
+                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                >
+                  Export
+                </GlobalButton>
+                <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
+                  <MenuItem
+                    onClick={() => {
+                      setExportAnchorEl(null)
+                      exportPrint()
+                    }}
+                  >
+                    <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
+                  </MenuItem>
+
+                  <MenuItem
+                    onClick={() => {
+                      setExportAnchorEl(null)
+                      exportCSV()
+                    }}
+                  >
+                    <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
+                  </MenuItem>
+
+                  <MenuItem
+                    onClick={async () => {
+                      setExportAnchorEl(null)
+                      await exportExcel()
+                    }}
+                  >
+                    <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
+                  </MenuItem>
+
+                  <MenuItem
+                    onClick={async () => {
+                      setExportAnchorEl(null)
+                      await exportPDF()
+                    }}
+                  >
+                    <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
+                  </MenuItem>
+
+                  <MenuItem
+                    onClick={() => {
+                      setExportAnchorEl(null)
+                      exportCopy()
+                    }}
+                  >
+                    <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
+                  </MenuItem>
+                </Menu>
+
+                <GlobalButton
+                  variant='contained'
+                  startIcon={<AddIcon />}
+                  onClick={handleAdd}
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 500,
+                    px: 2.5,
+                    height: 36
+                  }}
+                >
+                  Add Slots
+                </GlobalButton>
+              </Box>
+            }
+            sx={{
+              pb: 1.5,
+              pt: 5,
+              px: 10,
+              '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
+              '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
+            }}
+          />
+
+          <Divider />
           {loading && (
             <Box
               sx={{

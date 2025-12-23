@@ -308,7 +308,7 @@ const ContractStatusPageContent = () => {
       columnHelper.accessor('sno', {
         header: 'S.No',
         meta: { width: '60px', align: 'center' },
-         enableSorting: true
+        enableSorting: true
       }),
       columnHelper.display({
         id: 'actions_column',
@@ -537,78 +537,81 @@ const ContractStatusPageContent = () => {
             </Link>
             <Typography color='text.primary'>View Contract Status</Typography>
           </Breadcrumbs>
-
-          <CardHeader
-            title={
-              <Box
-                sx={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  gap: 2
-                }}
-              >
-                {/* LEFT — Title + Refresh */}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Typography variant='h5' sx={{ fontWeight: 600 }}>
-                    View Contract Status
-                  </Typography>
-
-                  <Button
-                    variant='contained'
-                    color='primary'
-                    startIcon={
-                      <RefreshIcon
-                        sx={{
-                          animation: loading ? 'spin 1s linear infinite' : 'none',
-                          '@keyframes spin': {
-                            '0%': { transform: 'rotate(0deg)' },
-                            '100%': { transform: 'rotate(360deg)' }
-                          }
-                        }}
-                      />
-                    }
-                    disabled={loading}
-                    onClick={async () => {
-                      setLoading(true)
-                      await loadData(true)
-                      setTimeout(() => setLoading(false), 600)
-                    }}
-                    sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-                  >
-                    {loading ? 'Refreshing...' : 'Refresh'}
-                  </Button>
-                </Box>
-
-                {/* RIGHT — ADD CONTRACT */}
-                {canAccess('Contracts', 'create') && (
-                  <Button
-                    variant='contained'
-                    color='primary'
-                    startIcon={<AddIcon />}
-                    onClick={() => router.push('/admin/contracts/add')}
-                    sx={{
-                      textTransform: 'none',
-                      fontWeight: 500,
-                      px: 3,
-                      height: 36
-                    }}
-                  >
-                    Add Contract
-                  </Button>
-                )}
-              </Box>
-            }
-            sx={{
-              p: 0,
-              '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.5rem' }
-            }}
-          />
         </Box>
       }
     >
       <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
+        <CardHeader
+          title={
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 2
+              }}
+            >
+              {/* LEFT — Title + Refresh */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Typography variant='h5' sx={{ fontWeight: 600 }}>
+                  View Contract Status
+                </Typography>
+
+                <Button
+                  variant='contained'
+                  color='primary'
+                  startIcon={
+                    <RefreshIcon
+                      sx={{
+                        animation: loading ? 'spin 1s linear infinite' : 'none',
+                        '@keyframes spin': {
+                          '0%': { transform: 'rotate(0deg)' },
+                          '100%': { transform: 'rotate(360deg)' }
+                        }
+                      }}
+                    />
+                  }
+                  disabled={loading}
+                  onClick={async () => {
+                    setLoading(true)
+                    await loadData(true)
+                    setTimeout(() => setLoading(false), 600)
+                  }}
+                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                >
+                  {loading ? 'Refreshing...' : 'Refresh'}
+                </Button>
+              </Box>
+
+              {/* RIGHT — ADD CONTRACT */}
+              {canAccess('Contracts', 'create') && (
+                <Button
+                  variant='contained'
+                  color='primary'
+                  startIcon={<AddIcon />}
+                  onClick={() => router.push('/admin/contracts/add')}
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 500,
+                    px: 3,
+                    height: 36
+                  }}
+                >
+                  Add Contract
+                </Button>
+              )}
+            </Box>
+          }
+          sx={{
+            pb: 1.5,
+            pt: 5,
+            px: 10,
+            '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
+            '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
+          }}
+        />
+        <Divider />
         {loading && (
           <Box
             sx={{
@@ -628,302 +631,275 @@ const ContractStatusPageContent = () => {
         <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
           {/* 1. FIXED: Filters & Toolbar */}
           <Box sx={{ p: 4, pb: 2, flexShrink: 0, overflow: 'visible' }}>
+            {/* SINGLE ROW FILTER BAR */}
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'flex-end',
+                gap: 3,
+                flexWrap: 'wrap',
+                mb: 4,
+                flexShrink: 0
+              }}
+            >
+              {/* Date Filter */}
+              <Box sx={{ position: 'relative', zIndex: 30 }}>
+                {' '}
+                {/* 👈 FIX is here */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                  <Checkbox
+                    checked={filterByDate}
+                    onChange={e => {
+                      const checked = e.target.checked
+                      setFilterByDate(checked)
 
-          <Divider sx={{ mb: 3 }} />
+                      if (checked) {
+                        const today = new Date()
+                        const onlyDate = new Date(today.getFullYear(), today.getMonth(), today.getDate())
 
-          {/* SINGLE ROW FILTER BAR */}
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'flex-end',
-              gap: 3,
-              flexWrap: 'wrap',
-              mb: 4,
-              flexShrink: 0
-            }}
-          >
-          {/* Date Filter */}
-          <Box sx={{ position: 'relative', zIndex: 30 }}>
-            {' '}
-            {/* 👈 FIX is here */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-              <Checkbox
-                checked={filterByDate}
-                onChange={e => {
-                  const checked = e.target.checked
-                  setFilterByDate(checked)
+                        const updatedRange = {
+                          start: onlyDate,
+                          end: onlyDate
+                        }
 
-                  if (checked) {
-                    const today = new Date()
-                    const onlyDate = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+                        setDateFilter(updatedRange)
 
-                    const updatedRange = {
-                      start: onlyDate,
-                      end: onlyDate
-                    }
+                        // 👇 THIS IS MISSING EARLIER → Force API call
+                        setTimeout(() => {
+                          loadData()
+                        }, 0)
+                      } else {
+                        setDateFilter({ start: null, end: null })
+                        setTimeout(() => {
+                          loadData()
+                        }, 0)
+                      }
+                    }}
+                    size='small'
+                  />
 
-                    setDateFilter(updatedRange)
+                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 500 }}>Date Range</Typography>
+                </Box>
+                <AppReactDatepicker
+                  selectsRange
+                  startDate={dateFilter?.start || null}
+                  endDate={dateFilter?.end || null}
+                  onChange={dates => {
+                    const [start, end] = dates
+                    setDateFilter({ start, end })
+                  }}
+                  shouldCloseOnSelect={false}
+                  disabled={!filterByDate}
+                  popperProps={{ strategy: 'fixed' }}
+                  popperPlacement='bottom-start'
+                  customInput={
+                    <TextField
+                      fullWidth
+                      size='small'
+                      disabled={!filterByDate}
+                      sx={{ width: 220, bgcolor: '#fff' }}
+                      placeholder='Select Date Range'
+                    />
+                  }
+                />
+              </Box>
 
-                    // 👇 THIS IS MISSING EARLIER → Force API call
-                    setTimeout(() => {
-                      loadData()
-                    }, 0)
-                  } else {
-                    setDateFilter({ start: null, end: null })
-                    setTimeout(() => {
-                      loadData()
-                    }, 0)
+              {/* Origin */}
+              <GlobalAutocomplete
+                label='Origin'
+                options={originOptions}
+                value={originFilter}
+                onChange={v => setOriginFilter(v)}
+                sx={{ width: 200 }}
+              />
+
+              {/* Customer */}
+              <GlobalAutocomplete
+                label='Customer'
+                options={customerOptions}
+                value={customerFilter}
+                onChange={v => setCustomerFilter(v)}
+                sx={{ width: 200 }}
+              />
+
+              {/* Contract Type */}
+              <GlobalAutocomplete
+                label='Contract Type'
+                options={contractTypeOptions}
+                value={contractTypeFilter}
+                onChange={v => setContractTypeFilter(v)}
+                sx={{ width: 200 }}
+              />
+
+              {/* Invoice Frequency */}
+              <GlobalAutocomplete
+                label='Invoice Frequency'
+                options={invoiceOptions}
+                value={invoiceFrequencyFilter}
+                onChange={v => setInvoiceFrequencyFilter(v)}
+                sx={{ width: 200 }}
+              />
+
+              {/* Contract Status */}
+              <GlobalAutocomplete
+                label='Contract Status'
+                options={contractStatusOptions}
+                value={contractStatusFilter}
+                onChange={v => setContractStatusFilter(v)}
+                sx={{ width: 200 }}
+              />
+
+              {/* New / Renewed */}
+              <GlobalAutocomplete
+                label='New / Renewed'
+                options={renewalOptions}
+                value={renewalFilter}
+                onChange={v => setRenewalFilter(v)}
+                sx={{ width: 200 }}
+              />
+            </Box>
+
+            <Divider sx={{ mb: 3 }} />
+
+            {/* TOOLBAR: Entries + Export + Search */}
+            <Box
+              sx={{
+                mb: 3,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 2,
+                flexWrap: 'wrap',
+                flexShrink: 0
+              }}
+            >
+              {/* LEFT SIDE — Entries + Export */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                {/* Entries Dropdown */}
+                <FormControl size='small' sx={{ width: 140 }}>
+                  <Select
+                    value={pagination.pageSize}
+                    onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
+                  >
+                    {[25, 50, 75, 100].map(s => (
+                      <MenuItem key={s} value={s}>
+                        {s} entries
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                {/* Export Buttons next to Entries */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {['Copy', 'CSV', 'Excel', 'PDF', 'Print'].map(btn => (
+                    <GlobalButton
+                      key={btn}
+                      variant='contained'
+                      size='small'
+                      onClick={
+                        btn === 'CSV'
+                          ? exportCSV
+                          : btn === 'Print'
+                            ? exportPrint
+                            : () => showToast('info', `${btn} coming soon`)
+                      }
+                      sx={{
+                        bgcolor: '#6c757d',
+                        color: '#fff',
+                        textTransform: 'none',
+                        borderRadius: '8px',
+                        px: 2,
+                        py: 1,
+                        minWidth: 60,
+                        '&:hover': { bgcolor: '#5a6268' }
+                      }}
+                    >
+                      {btn}
+                    </GlobalButton>
+                  ))}
+                </Box>
+              </Box>
+
+              {/* RIGHT SIDE — Search */}
+              <DebouncedInput
+                value={searchText}
+                onChange={v => {
+                  setSearchText(String(v))
+                  setPagination(p => ({ ...p, pageIndex: 0 }))
+                }}
+                placeholder='Search any field...'
+                sx={{ width: 350 }}
+                size='small'
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position='start'>
+                        <SearchIcon />
+                      </InputAdornment>
+                    )
                   }
                 }}
-                size='small'
               />
-
-            <Typography sx={{ fontSize: '0.85rem', fontWeight: 500 }}>Date Range</Typography>
-          </Box>
-          <AppReactDatepicker
-            selectsRange
-            startDate={dateFilter?.start || null}
-            endDate={dateFilter?.end || null}
-            onChange={dates => {
-              const [start, end] = dates
-              setDateFilter({ start, end })
-            }}
-            shouldCloseOnSelect={false}
-            disabled={!filterByDate}
-            popperProps={{ strategy: 'fixed' }}
-            popperPlacement='bottom-start'
-            customInput={
-              <TextField
-                fullWidth
-                size='small'
-                disabled={!filterByDate}
-                sx={{ width: 220, bgcolor: '#fff' }}
-                placeholder='Select Date Range'
-              />
-            }
-          />
-        </Box>
-
-          {/* Origin */}
-          <GlobalAutocomplete
-            label='Origin'
-            options={originOptions}
-            value={originFilter}
-            onChange={v => setOriginFilter(v)}
-            sx={{ width: 200 }}
-          />
-
-          {/* Customer */}
-          <GlobalAutocomplete
-            label='Customer'
-            options={customerOptions}
-            value={customerFilter}
-            onChange={v => setCustomerFilter(v)}
-            sx={{ width: 200 }}
-          />
-
-          {/* Contract Type */}
-          <GlobalAutocomplete
-            label='Contract Type'
-            options={contractTypeOptions}
-            value={contractTypeFilter}
-            onChange={v => setContractTypeFilter(v)}
-            sx={{ width: 200 }}
-          />
-
-          {/* Invoice Frequency */}
-          <GlobalAutocomplete
-            label='Invoice Frequency'
-            options={invoiceOptions}
-            value={invoiceFrequencyFilter}
-            onChange={v => setInvoiceFrequencyFilter(v)}
-            sx={{ width: 200 }}
-          />
-
-          {/* Contract Status */}
-          <GlobalAutocomplete
-            label='Contract Status'
-            options={contractStatusOptions}
-            value={contractStatusFilter}
-            onChange={v => setContractStatusFilter(v)}
-            sx={{ width: 200 }}
-          />
-
-          {/* New / Renewed */}
-          <GlobalAutocomplete
-            label='New / Renewed'
-            options={renewalOptions}
-            value={renewalFilter}
-            onChange={v => setRenewalFilter(v)}
-            sx={{ width: 200 }}
-          />
-        </Box>
-
-          <Divider sx={{ mb: 3 }} />
-
-          {/* TOOLBAR: Entries + Export + Search */}
-          <Box
-            sx={{
-              mb: 3,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 2,
-              flexWrap: 'wrap',
-              flexShrink: 0
-            }}
-          >
-          {/* LEFT SIDE — Entries + Export */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            {/* Entries Dropdown */}
-            <FormControl size='small' sx={{ width: 140 }}>
-              <Select
-                value={pagination.pageSize}
-                onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
-              >
-                {[25, 50, 75, 100].map(s => (
-                  <MenuItem key={s} value={s}>
-                    {s} entries
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            {/* Export Buttons next to Entries */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              {['Copy', 'CSV', 'Excel', 'PDF', 'Print'].map(btn => (
-                <GlobalButton
-                  key={btn}
-                  variant='contained'
-                  size='small'
-                  onClick={
-                    btn === 'CSV'
-                      ? exportCSV
-                      : btn === 'Print'
-                        ? exportPrint
-                        : () => showToast('info', `${btn} coming soon`)
-                  }
-                  sx={{
-                    bgcolor: '#6c757d',
-                    color: '#fff',
-                    textTransform: 'none',
-                    borderRadius: '8px',
-                    px: 2,
-                    py: 1,
-                    minWidth: 60,
-                    '&:hover': { bgcolor: '#5a6268' }
-                  }}
-                >
-                  {btn}
-                </GlobalButton>
-              ))}
             </Box>
           </Box>
-
-          {/* RIGHT SIDE — Search */}
-          <DebouncedInput
-            value={searchText}
-            onChange={v => {
-              setSearchText(String(v))
-              setPagination(p => ({ ...p, pageIndex: 0 }))
-            }}
-            placeholder='Search any field...'
-            sx={{ width: 350 }}
-            size='small'
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position='start'>
-                    <SearchIcon />
-                  </InputAdornment>
-                )
-              }
-            }}
-          />
-          </Box>
-        </Box>
-          <Divider sx={{ mb: 0 }} />
+          <Divider sx={{ mb: -3 }} />
 
           {/* 2. FLEXIBLE: Scrollable Table */}
           <Box sx={{ p: 3, flexGrow: 1, minHeight: 0, overflow: 'hidden', position: 'relative' }}>
             <Box sx={{ height: '100%', overflowY: 'auto' }}>
-
-        {/* Scrollable Table */}
-            <StickyTableWrapper rowCount={rows.length}>
-              <table className={styles.table}>
-                <thead>
-                  {table.getHeaderGroups().map(hg => (
-                    <tr key={hg.id}>
-                      {hg.headers.map((h, idx) => (
-                        <th
-                          key={h.id}
-                          style={{
-                            width: h.column.columnDef.meta?.width,
-                            position: 'sticky',
-                            top: 0,
-                            left: idx === 0 ? 0 : idx === 1 ? '60px' : 'auto',
-                            background: '#fff',
-                            zIndex: idx < 2 ? 11 : 10,
-                            boxShadow: '0 2px 5px rgba(0,0,0,0.05)'
-                          }}
-                        >
-                          <div
-                            className={classnames({
-                              'flex items-center': h.column.getIsSorted(),
-                              'cursor-pointer select-none': h.column.getCanSort()
-                            })}
-                            onClick={h.column.getToggleSortingHandler()}
-                          >
-                            {flexRender(h.column.columnDef.header, h.getContext())}
-                            {{
-                              asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
-                              desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
-                            }[h.column.getIsSorted()] ?? null}
-                          </div>
-                        </th>
-                      ))}
-                    </tr>
-                  ))}
-                </thead>
-                <tbody>
-                  {rows.length === 0 ? (
-                    <tr>
-                      <td colSpan={columns.length} className='text-center py-4'>
-                        {loading ? 'Loading...' : 'No contracts found'}
-                      </td>
-                    </tr>
-                  ) : (
-                    table.getRowModel().rows.map(row => (
-                      <tr key={row.id}>
-                        {row.getVisibleCells().map((cell, idx) => (
-                          <td
-                            key={cell.id}
-                            style={{
-                              textAlign: cell.column.columnDef.meta?.align || 'left',
-                              position: idx < 2 ? 'sticky' : 'relative',
-                              left: idx === 0 ? 0 : idx === 1 ? '60px' : 'auto',
-                              background: '#fff',
-                              zIndex: idx < 2 ? 9 : 1,
-                              boxShadow: idx === 1 ? '2px 0 4px -2px rgba(0,0,0,0.1)' : 'none'
-                            }}
-                          >
-                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                          </td>
+              {/* Scrollable Table */}
+              <StickyTableWrapper rowCount={rows.length}>
+                <table className={styles.table}>
+                  <thead>
+                    {table.getHeaderGroups().map(hg => (
+                      <tr key={hg.id}>
+                        {hg.headers.map((h, idx) => (
+                          <th key={h.id}>
+                            <div
+                              className={classnames({
+                                'flex items-center': h.column.getIsSorted(),
+                                'cursor-pointer select-none': h.column.getCanSort()
+                              })}
+                              onClick={h.column.getToggleSortingHandler()}
+                            >
+                              {flexRender(h.column.columnDef.header, h.getContext())}
+                              {{
+                                asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
+                                desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
+                              }[h.column.getIsSorted()] ?? null}
+                            </div>
+                          </th>
                         ))}
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </StickyTableWrapper>
+                    ))}
+                  </thead>
+                  <tbody>
+                    {rows.length === 0 ? (
+                      <tr>
+                        <td colSpan={columns.length} className='text-center py-4'>
+                          {loading ? 'Loading...' : 'No contracts found'}
+                        </td>
+                      </tr>
+                    ) : (
+                      table.getRowModel().rows.map(row => (
+                        <tr key={row.id}>
+                          {row.getVisibleCells().map((cell, idx) => (
+                            <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                          ))}
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </StickyTableWrapper>
+            </Box>
+          </Box>
+
+          {/* 3. FIXED: Pagination */}
+          <Box sx={{ p: 2, borderTop: '1px solid #eee', flexShrink: 0 }}>
+            <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
           </Box>
         </Box>
-
-        {/* 3. FIXED: Pagination */}
-        <Box sx={{ p: 2, borderTop: '1px solid #eee', flexShrink: 0 }}>
-          <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
-        </Box>
-      </Box>
       </Card>
     </StickyListLayout>
   )
@@ -932,7 +908,7 @@ const ContractStatusPageContent = () => {
 // Wrapper for RBAC
 export default function ContractStatusPage() {
   return (
-    <PermissionGuard permission="Contract Status">
+    <PermissionGuard permission='Contract Status'>
       <ContractStatusPageContent />
     </PermissionGuard>
   )

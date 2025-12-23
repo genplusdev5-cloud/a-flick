@@ -15,6 +15,7 @@ import {
   Checkbox,
   Menu,
   FormControlLabel,
+  Breadcrumbs,
   TextField,
   InputAdornment,
   IconButton
@@ -27,7 +28,7 @@ import GlobalButton from '@/components/common/GlobalButton'
 import GlobalDateRange from '@/components/common/GlobalDateRange'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
 import { getAttendanceDropdowns } from '@/api/attendance/dropdowns'
-
+import RefreshIcon from '@mui/icons-material/Refresh'
 import PrintIcon from '@mui/icons-material/Print'
 import TableChartIcon from '@mui/icons-material/TableChart'
 import StickyTableWrapper from '@/components/common/StickyTableWrapper'
@@ -119,6 +120,87 @@ const AttendanceSchedulePageContent = () => {
         value={`${startDateFormatted}${endDateFormatted}`}
       />
     )
+  }
+
+  // Export
+  const exportOpen = Boolean(exportAnchorEl)
+
+  const exportPrint = () => {
+    const w = window.open('', '_blank')
+    const html = `
+        <html><head><title>Tax List</title><style>
+          body{font-family:Arial;padding:24px;}
+          table{width:100%;border-collapse:collapse;}
+          th,td{border:1px solid #ccc;padding:8px;text-align:left;}
+          th{background:#f4f4f4;}
+        </style></head><body>
+        <h2>Tax List</h2>
+        <table><thead><tr>
+          <th>S.No</th><th>Tax Name</th><th>Tax (%)</th><th>Status</th>
+        </tr></thead><tbody>
+        ${rows
+          .map(
+            r =>
+              `<tr><td>${r.sno}</td><td>${r.name}</td><td>${r.tax}</td><td>${
+                r.is_active === 1 ? 'Active' : 'Inactive'
+              }</td></tr>`
+          )
+          .join('')}
+        </tbody></table></body></html>`
+    w?.document.write(html)
+    w?.document.close()
+    w?.print()
+  }
+
+  const exportCSV = () => {
+    const headers = ['S.No', 'Tax Name', 'Tax (%)', 'Status']
+    const csv = [
+      headers.join(','),
+      ...rows.map(r => [r.sno, r.name, r.tax, r.is_active === 1 ? 'Active' : 'Inactive'].join(','))
+    ].join('\n')
+    const link = document.createElement('a')
+    link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
+    link.download = 'Tax_List.csv'
+    link.click()
+    showToast('success', 'CSV downloaded')
+  }
+
+  const exportExcel = async () => {
+    const XLSX = await import('xlsx')
+    const ws = XLSX.utils.json_to_sheet(
+      rows.map(r => ({
+        'S.No': r.sno,
+        'Tax Name': r.name,
+        'Tax (%)': r.tax,
+        Status: r.is_active === 1 ? 'Active' : 'Inactive'
+      }))
+    )
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Taxes')
+    XLSX.writeFile(wb, 'Tax_List.xlsx')
+    showToast('success', 'Excel downloaded')
+  }
+
+  const exportPDF = async () => {
+    const { jsPDF } = await import('jspdf')
+    const autoTable = (await import('jspdf-autotable')).default
+    const doc = new jsPDF()
+    doc.text('Tax List', 14, 15)
+    autoTable(doc, {
+      startY: 25,
+      head: [['S.No', 'Tax Name', 'Tax (%)', 'Status']],
+      body: rows.map(r => [r.sno, r.name, r.tax, r.is_active === 1 ? 'Active' : 'Inactive'])
+    })
+    doc.save('Tax_List.pdf')
+    showToast('success', 'PDF exported')
+  }
+
+  const exportCopy = () => {
+    const text = rows
+      .map(r => `${r.sno}. ${r.name} | ${r.tax}% | ${r.is_active === 1 ? 'Active' : 'Inactive'}`)
+      .join('\n')
+    navigator.clipboard.writeText(text)
+    showToast('info', 'Copied to clipboard')
   }
 
   const handleEdit = async id => {
@@ -288,17 +370,12 @@ const AttendanceSchedulePageContent = () => {
     <>
       <StickyListLayout
         header={
-          <Box sx={{ mb: 6 }}>
-            <Box sx={{ mb: 2 }}>
-              <Link href='/en/admin/dashboards' className='text-primary'>
-                Dashboard
-              </Link>{' '}
-              / <Typography component='span'>Attendance Schedule</Typography>
-            </Box>
-            <Typography variant='h5' sx={{ fontWeight: 600 }}>
-              Attendance Schedule
-            </Typography>
-          </Box>
+          <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
+            <Link href='/en/admin/dashboards' className='text-primary'>
+              Dashboard
+            </Link>{' '}
+            / <Typography component='span'>Attendance Schedule</Typography>
+          </Breadcrumbs>
         }
       >
         <Card
@@ -310,6 +387,76 @@ const AttendanceSchedulePageContent = () => {
             position: 'relative'
           }}
         >
+          <CardHeader
+            title={
+              <Box display='flex' alignItems='center' gap={2}>
+                <Typography variant='h5' sx={{ fontWeight: 600 }}>
+                  Attendance Schedule
+                </Typography>
+
+                <GlobalButton
+                  startIcon={
+                    <RefreshIcon
+                      sx={{
+                        animation: loading ? 'spin 1s linear infinite' : 'none',
+                        '@keyframes spin': {
+                          '0%': { transform: 'rotate(0deg)' },
+                          '100%': { transform: 'rotate(360deg)' }
+                        }
+                      }}
+                    />
+                  }
+                  disabled={loading}
+                  onClick={async () => {
+                    setLoading(true)
+                    setPagination({ pageIndex: 0, pageSize: 25 })
+                    await loadScheduleList()
+                    setTimeout(() => setLoading(false), 800)
+                  }}
+                >
+                  {loading ? 'Refreshing...' : 'Refresh'}
+                </GlobalButton>
+              </Box>
+            }
+            action={
+              <Box display='flex' alignItems='center' gap={2}>
+                <GlobalButton
+                  color='secondary'
+                  endIcon={<ArrowDropDownIcon />}
+                  onClick={e => setExportAnchorEl(e.currentTarget)}
+                >
+                  Export
+                </GlobalButton>
+
+                <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
+                  <MenuItem onClick={exportPrint}>
+                    <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
+                  </MenuItem>
+                  <MenuItem onClick={exportCSV}>
+                    <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
+                  </MenuItem>
+                  <MenuItem onClick={exportExcel}>
+                    <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
+                  </MenuItem>
+                  <MenuItem onClick={exportPDF}>
+                    <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
+                  </MenuItem>
+                  <MenuItem onClick={exportCopy}>
+                    <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
+                  </MenuItem>
+                </Menu>
+              </Box>
+            }
+            sx={{
+              pb: 1.5,
+              pt: 5,
+              px: 10,
+              '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
+              '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
+            }}
+          />
+          <Divider />
+
           {loading && (
             <Box
               sx={{
@@ -327,7 +474,6 @@ const AttendanceSchedulePageContent = () => {
             </Box>
           )}
           <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <Divider sx={{ mb: 3 }} />
             <Box sx={{ mb: 3, flexShrink: 0 }}>
               {/* ---------- ROW 1 ---------- */}
               <Box
@@ -461,7 +607,16 @@ const AttendanceSchedulePageContent = () => {
             <Divider sx={{ mb: 3 }} />
 
             {/* EXPORT + ENTRIES + SEARCH ROW */}
-            <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 2, flexShrink: 0 }}>
+            <Box
+              sx={{
+                mb: 3,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-end',
+                gap: 2,
+                flexShrink: 0
+              }}
+            >
               <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 2 }}>
                 <GlobalButton
                   color='secondary'
@@ -472,19 +627,44 @@ const AttendanceSchedulePageContent = () => {
                   Export
                 </GlobalButton>
                 <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
-                  <MenuItem onClick={() => { setExportAnchorEl(null); exportPrint(); }}>
+                  <MenuItem
+                    onClick={() => {
+                      setExportAnchorEl(null)
+                      exportPrint()
+                    }}
+                  >
                     <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
                   </MenuItem>
-                  <MenuItem onClick={() => { setExportAnchorEl(null); exportCSV(); }}>
+                  <MenuItem
+                    onClick={() => {
+                      setExportAnchorEl(null)
+                      exportCSV()
+                    }}
+                  >
                     <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
                   </MenuItem>
-                  <MenuItem onClick={async () => { setExportAnchorEl(null); exportExcel(); }}>
+                  <MenuItem
+                    onClick={async () => {
+                      setExportAnchorEl(null)
+                      exportExcel()
+                    }}
+                  >
                     <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
                   </MenuItem>
-                  <MenuItem onClick={async () => { setExportAnchorEl(null); exportPDF(); }}>
+                  <MenuItem
+                    onClick={async () => {
+                      setExportAnchorEl(null)
+                      exportPDF()
+                    }}
+                  >
                     <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
                   </MenuItem>
-                  <MenuItem onClick={() => { setExportAnchorEl(null); exportCopy(); }}>
+                  <MenuItem
+                    onClick={() => {
+                      setExportAnchorEl(null)
+                      exportCopy()
+                    }}
+                  >
                     <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
                   </MenuItem>
                 </Menu>
