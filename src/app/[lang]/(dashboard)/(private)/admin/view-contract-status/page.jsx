@@ -58,6 +58,8 @@ import {
 } from '@tanstack/react-table'
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
+import StickyTableWrapper from '@/components/common/StickyTableWrapper'
+import StickyListLayout from '@/components/common/StickyListLayout'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import { getAllDropdowns } from '@/api/contract/dropdowns'
 
@@ -526,114 +528,120 @@ const ContractStatusPageContent = () => {
   // Render
   // ───────────────────────────────────────────
   return (
-    <Box>
-      {loading && (
-        <Box
-          sx={{
-            position: 'fixed',
-            inset: 0,
-            bgcolor: 'rgba(255,255,255,0.8)',
-            backdropFilter: 'blur(2px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999
-          }}
-        >
-          <ProgressCircularCustomization size={60} thickness={5} />
-        </Box>
-      )}
+    <StickyListLayout
+      header={
+        <Box sx={{ mb: 2 }}>
+          <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
+            <Link underline='hover' color='inherit' href='/admin/dashboard'>
+              Dashboard
+            </Link>
+            <Typography color='text.primary'>View Contract Status</Typography>
+          </Breadcrumbs>
 
-      <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
-        <Link underline='hover' color='inherit' href='/admin/dashboard'>
-          Dashboard
-        </Link>
-        <Typography color='text.primary'>View Contract Status</Typography>
-      </Breadcrumbs>
+          <CardHeader
+            title={
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: 2
+                }}
+              >
+                {/* LEFT — Title + Refresh */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Typography variant='h5' sx={{ fontWeight: 600 }}>
+                    View Contract Status
+                  </Typography>
 
-      {/* Table */}
-      <Card sx={{ p: 4 }}>
-        <CardHeader
-          title={
-            <Box
-              sx={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                flexWrap: 'wrap',
-                gap: 2
-              }}
-            >
-              {/* LEFT — Title + Refresh */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Typography variant='h5' sx={{ fontWeight: 600 }}>
-                  View Contract Status
-                </Typography>
+                  <Button
+                    variant='contained'
+                    color='primary'
+                    startIcon={
+                      <RefreshIcon
+                        sx={{
+                          animation: loading ? 'spin 1s linear infinite' : 'none',
+                          '@keyframes spin': {
+                            '0%': { transform: 'rotate(0deg)' },
+                            '100%': { transform: 'rotate(360deg)' }
+                          }
+                        }}
+                      />
+                    }
+                    disabled={loading}
+                    onClick={async () => {
+                      setLoading(true)
+                      await loadData(true)
+                      setTimeout(() => setLoading(false), 600)
+                    }}
+                    sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                  >
+                    {loading ? 'Refreshing...' : 'Refresh'}
+                  </Button>
+                </Box>
 
-                <Button
-                  variant='contained'
-                  color='primary'
-                  startIcon={
-                    <RefreshIcon
-                      sx={{
-                        animation: loading ? 'spin 1s linear infinite' : 'none',
-                        '@keyframes spin': {
-                          '0%': { transform: 'rotate(0deg)' },
-                          '100%': { transform: 'rotate(360deg)' }
-                        }
-                      }}
-                    />
-                  }
-                  disabled={loading}
-                  onClick={async () => {
-                    setLoading(true)
-                    await loadData(true)
-                    setTimeout(() => setLoading(false), 600)
-                  }}
-                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-                >
-                  {loading ? 'Refreshing...' : 'Refresh'}
-                </Button>
+                {/* RIGHT — ADD CONTRACT */}
+                {canAccess('Contracts', 'create') && (
+                  <Button
+                    variant='contained'
+                    color='primary'
+                    startIcon={<AddIcon />}
+                    onClick={() => router.push('/admin/contracts/add')}
+                    sx={{
+                      textTransform: 'none',
+                      fontWeight: 500,
+                      px: 3,
+                      height: 36
+                    }}
+                  >
+                    Add Contract
+                  </Button>
+                )}
               </Box>
+            }
+            sx={{
+              p: 0,
+              '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.5rem' }
+            }}
+          />
+        </Box>
+      }
+    >
+      <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
+        {loading && (
+          <Box
+            sx={{
+              position: 'absolute',
+              inset: 0,
+              bgcolor: 'rgba(255,255,255,0.8)',
+              backdropFilter: 'blur(2px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 10
+            }}
+          >
+            <ProgressCircularCustomization size={60} thickness={5} />
+          </Box>
+        )}
+        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+          {/* 1. FIXED: Filters & Toolbar */}
+          <Box sx={{ p: 4, pb: 2, flexShrink: 0, overflow: 'visible' }}>
 
-              {/* RIGHT — ADD CONTRACT */}
-              {canAccess('Contracts', 'create') && (
-                <Button
-                  variant='contained'
-                  color='primary'
-                  startIcon={<AddIcon />}
-                  onClick={() => router.push('/admin/contracts/add')}
-                  sx={{
-                    textTransform: 'none',
-                    fontWeight: 500,
-                    px: 3,
-                    height: 36
-                  }}
-                >
-                  Add Contract
-                </Button>
-              )}
-            </Box>
-          }
-          sx={{
-            pb: 1.5,
-            pt: 1.5,
-            '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
-          }}
-        />
+          <Divider sx={{ mb: 3 }} />
 
-        <Divider sx={{ mb: 2 }} />
-
-        {/* SINGLE ROW FILTER BAR */}
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'flex-end',
-            gap: 3,
-            flexWrap: 'wrap',
-            mb: 4
-          }}
-        >
+          {/* SINGLE ROW FILTER BAR */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'flex-end',
+              gap: 3,
+              flexWrap: 'wrap',
+              mb: 4,
+              flexShrink: 0
+            }}
+          >
           {/* Date Filter */}
           <Box sx={{ position: 'relative', zIndex: 30 }}>
             {' '}
@@ -670,31 +678,31 @@ const ContractStatusPageContent = () => {
                 size='small'
               />
 
-              <Typography sx={{ fontSize: '0.85rem', fontWeight: 500 }}>Date Range</Typography>
-            </Box>
-            <AppReactDatepicker
-              selectsRange
-              startDate={dateFilter?.start || null}
-              endDate={dateFilter?.end || null}
-              onChange={dates => {
-                const [start, end] = dates
-                setDateFilter({ start, end })
-              }}
-              shouldCloseOnSelect={false}
-              disabled={!filterByDate}
-              popperProps={{ strategy: 'fixed' }}
-              popperPlacement='bottom-start'
-              customInput={
-                <TextField
-                  fullWidth
-                  size='small'
-                  disabled={!filterByDate}
-                  sx={{ width: 220, bgcolor: '#fff' }}
-                  placeholder='Select Date Range'
-                />
-              }
-            />
+            <Typography sx={{ fontSize: '0.85rem', fontWeight: 500 }}>Date Range</Typography>
           </Box>
+          <AppReactDatepicker
+            selectsRange
+            startDate={dateFilter?.start || null}
+            endDate={dateFilter?.end || null}
+            onChange={dates => {
+              const [start, end] = dates
+              setDateFilter({ start, end })
+            }}
+            shouldCloseOnSelect={false}
+            disabled={!filterByDate}
+            popperProps={{ strategy: 'fixed' }}
+            popperPlacement='bottom-start'
+            customInput={
+              <TextField
+                fullWidth
+                size='small'
+                disabled={!filterByDate}
+                sx={{ width: 220, bgcolor: '#fff' }}
+                placeholder='Select Date Range'
+              />
+            }
+          />
+        </Box>
 
           {/* Origin */}
           <GlobalAutocomplete
@@ -751,19 +759,20 @@ const ContractStatusPageContent = () => {
           />
         </Box>
 
-        <Divider sx={{ mb: 2 }} />
+          <Divider sx={{ mb: 3 }} />
 
-        {/* TOOLBAR: Entries + Export + Search */}
-        <Box
-          sx={{
-            mb: 3,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 2,
-            flexWrap: 'wrap'
-          }}
-        >
+          {/* TOOLBAR: Entries + Export + Search */}
+          <Box
+            sx={{
+              mb: 3,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 2,
+              flexWrap: 'wrap',
+              flexShrink: 0
+            }}
+          >
           {/* LEFT SIDE — Entries + Export */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             {/* Entries Dropdown */}
@@ -831,81 +840,92 @@ const ContractStatusPageContent = () => {
               }
             }}
           />
+          </Box>
         </Box>
+          <Divider sx={{ mb: 0 }} />
+
+          {/* 2. FLEXIBLE: Scrollable Table */}
+          <Box sx={{ p: 3, flexGrow: 1, minHeight: 0, overflow: 'hidden', position: 'relative' }}>
+            <Box sx={{ height: '100%', overflowY: 'auto' }}>
 
         {/* Scrollable Table */}
-        <div className='overflow-x-auto'>
-          <div style={{ minWidth: '4200px' }}>
-            <table className={styles.table}>
-              <thead>
-                {table.getHeaderGroups().map(hg => (
-                  <tr key={hg.id}>
-                    {hg.headers.map((h, idx) => (
-                      <th
-                        key={h.id}
-                        style={{
-                          width: h.column.columnDef.meta?.width,
-                          position: idx < 2 ? 'sticky' : 'relative',
-                          left: idx === 0 ? 0 : idx === 1 ? '60px' : 'auto',
-                          background: '#fff',
-                          zIndex: idx < 2 ? 10 : 1,
-                          boxShadow: idx === 1 ? '2px 0 4px -2px rgba(0,0,0,0.1)' : 'none'
-                        }}
-                      >
-                        <div
-                          className={classnames({
-                            'flex items-center': h.column.getIsSorted(),
-                            'cursor-pointer select-none': h.column.getCanSort()
-                          })}
-                          onClick={h.column.getToggleSortingHandler()}
-                        >
-                          {flexRender(h.column.columnDef.header, h.getContext())}
-                          {{
-                            asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
-                            desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
-                          }[h.column.getIsSorted()] ?? null}
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                ))}
-              </thead>
-              <tbody>
-                {rows.length === 0 ? (
-                  <tr>
-                    <td colSpan={columns.length} className='text-center py-4'>
-                      {loading ? 'Loading...' : 'No contracts found'}
-                    </td>
-                  </tr>
-                ) : (
-                  table.getRowModel().rows.map(row => (
-                    <tr key={row.id}>
-                      {row.getVisibleCells().map((cell, idx) => (
-                        <td
-                          key={cell.id}
+            <StickyTableWrapper rowCount={rows.length}>
+              <table className={styles.table}>
+                <thead>
+                  {table.getHeaderGroups().map(hg => (
+                    <tr key={hg.id}>
+                      {hg.headers.map((h, idx) => (
+                        <th
+                          key={h.id}
                           style={{
-                            textAlign: cell.column.columnDef.meta?.align || 'left',
-                            position: idx < 2 ? 'sticky' : 'relative',
+                            width: h.column.columnDef.meta?.width,
+                            position: 'sticky',
+                            top: 0,
                             left: idx === 0 ? 0 : idx === 1 ? '60px' : 'auto',
                             background: '#fff',
-                            zIndex: idx < 2 ? 9 : 1,
-                            boxShadow: idx === 1 ? '2px 0 4px -2px rgba(0,0,0,0.1)' : 'none'
+                            zIndex: idx < 2 ? 11 : 10,
+                            boxShadow: '0 2px 5px rgba(0,0,0,0.05)'
                           }}
                         >
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </td>
+                          <div
+                            className={classnames({
+                              'flex items-center': h.column.getIsSorted(),
+                              'cursor-pointer select-none': h.column.getCanSort()
+                            })}
+                            onClick={h.column.getToggleSortingHandler()}
+                          >
+                            {flexRender(h.column.columnDef.header, h.getContext())}
+                            {{
+                              asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
+                              desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
+                            }[h.column.getIsSorted()] ?? null}
+                          </div>
+                        </th>
                       ))}
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                  ))}
+                </thead>
+                <tbody>
+                  {rows.length === 0 ? (
+                    <tr>
+                      <td colSpan={columns.length} className='text-center py-4'>
+                        {loading ? 'Loading...' : 'No contracts found'}
+                      </td>
+                    </tr>
+                  ) : (
+                    table.getRowModel().rows.map(row => (
+                      <tr key={row.id}>
+                        {row.getVisibleCells().map((cell, idx) => (
+                          <td
+                            key={cell.id}
+                            style={{
+                              textAlign: cell.column.columnDef.meta?.align || 'left',
+                              position: idx < 2 ? 'sticky' : 'relative',
+                              left: idx === 0 ? 0 : idx === 1 ? '60px' : 'auto',
+                              background: '#fff',
+                              zIndex: idx < 2 ? 9 : 1,
+                              boxShadow: idx === 1 ? '2px 0 4px -2px rgba(0,0,0,0.1)' : 'none'
+                            }}
+                          >
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </StickyTableWrapper>
+          </Box>
+        </Box>
 
-        <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+        {/* 3. FIXED: Pagination */}
+        <Box sx={{ p: 2, borderTop: '1px solid #eee', flexShrink: 0 }}>
+          <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+        </Box>
+      </Box>
       </Card>
-    </Box>
+    </StickyListLayout>
   )
 }
 

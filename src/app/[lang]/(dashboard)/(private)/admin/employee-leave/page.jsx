@@ -91,6 +91,9 @@ import {
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
 
+import StickyTableWrapper from '@/components/common/StickyTableWrapper'
+import StickyListLayout from '@/components/common/StickyListLayout'
+
 // Temporary static list — replace later with API list if needed
 const employeeOptions = [
   { id: 1, name: 'Admin' },
@@ -606,18 +609,24 @@ const EmployeeLeavePageContent = () => {
   // Render
   // ───────────────────────────────────────────
   return (
-    <Box>
-      <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
-        <Link underline='hover' color='inherit' href='/'>
-          Home
-        </Link>
-        <Typography color='text.primary'>Leaves</Typography>
-      </Breadcrumbs>
-      <Card sx={{ p: 3 }}>
+    <StickyListLayout
+      header={
+        <Box sx={{ mb: 2 }}>
+          <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
+            <Link underline='hover' color='inherit' href='/'>
+              Home
+            </Link>
+            <Typography color='text.primary'>Leaves</Typography>
+          </Breadcrumbs>
+        </Box>
+      }
+    >
+      <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
         <CardHeader
           sx={{
             pb: 1.5,
-            pt: 1.5,
+            pt: 5,
+            px: 10,
             '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
             '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
           }}
@@ -739,42 +748,53 @@ const EmployeeLeavePageContent = () => {
           </Box>
         )}
 
-        <Divider sx={{ mb: 2 }} />
-        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-          <FormControl size='small' sx={{ width: 140 }}>
-            <Select
-              value={pagination.pageSize}
-              onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
-            >
-              {[5, 10, 25, 50].map(s => (
-                <MenuItem key={s} value={s}>
-                  {s} entries
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <DebouncedInput
-            value={searchText}
-            onChange={v => {
-              setSearchText(String(v))
-              setPagination(p => ({ ...p, pageIndex: 0 }))
+        <Divider />
+        <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <Box
+            sx={{
+              mb: 3,
+              display: 'flex',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 2,
+              flexShrink: 0
             }}
-            placeholder='Search employee, supervisor...'
-            sx={{ width: 360 }}
-            variant='outlined'
-            size='small'
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position='start'>
-                    <SearchIcon />
-                  </InputAdornment>
-                )
-              }
-            }}
-          />
-        </Box>
-        <div className='overflow-x-auto'>
+          >
+            <FormControl size='small' sx={{ width: 140 }}>
+              <Select
+                value={pagination.pageSize}
+                onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
+              >
+                {[5, 10, 25, 50].map(s => (
+                  <MenuItem key={s} value={s}>
+                    {s} entries
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <DebouncedInput
+              value={searchText}
+              onChange={v => {
+                setSearchText(String(v))
+                setPagination(p => ({ ...p, pageIndex: 0 }))
+              }}
+              placeholder='Search employee, supervisor...'
+              sx={{ width: 360 }}
+              variant='outlined'
+              size='small'
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position='start'>
+                      <SearchIcon />
+                    </InputAdornment>
+                  )
+                }
+              }}
+            />
+          </Box>
+          <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            <StickyTableWrapper rowCount={rows.length}>
           <table className={styles.table}>
             <thead>
               {table.getHeaderGroups().map(hg => (
@@ -819,8 +839,12 @@ const EmployeeLeavePageContent = () => {
               )}
             </tbody>
           </table>
-        </div>
-        <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+            </StickyTableWrapper>
+          </Box>
+          <Box sx={{ mt: 'auto', flexShrink: 0 }}>
+             <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+          </Box>
+        </Box>
       </Card>
 
       {/* Drawer */}
@@ -828,12 +852,11 @@ const EmployeeLeavePageContent = () => {
         anchor='right'
         open={drawerOpen}
         onClose={handleDrawerClose}
-        PaperProps={{ sx: { width: 460, boxShadow: '0px 0px 15px rgba(0,0,0,0.08)' } }}
+        PaperProps={{ sx: { width: 420, boxShadow: '0px 0px 15px rgba(0,0,0,0.08)' } }}
       >
         <Box sx={{ p: 5, display: 'flex', flexDirection: 'column', height: '100%' }}>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
             <Typography variant='h5' fontWeight={600}>
-              {isEdit ? 'Edit Leave Request' : 'Add Leave Request'}
             </Typography>
             <IconButton onClick={() => setDrawerOpen(false)} size='small'>
               <CloseIcon />
@@ -1083,7 +1106,7 @@ const EmployeeLeavePageContent = () => {
           </GlobalButton>
         </DialogActions>
       </Dialog>
-    </Box>
+    </StickyListLayout>
   )
 }
 

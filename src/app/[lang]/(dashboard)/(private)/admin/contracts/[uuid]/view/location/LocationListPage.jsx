@@ -16,12 +16,12 @@ import {
   FormControl
 } from '@mui/material'
 
+import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 import {
   listContractLocations,
   addContractLocation,
   updateContractLocation,
-  deleteContractLocation,
-  getContractLocationDetails
+  deleteContractLocation
 } from '@/api/contract/details/location'
 
 import { useParams } from 'next/navigation'
@@ -29,7 +29,6 @@ import { useParams } from 'next/navigation'
 import SearchIcon from '@mui/icons-material/Search'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
-import VisibilityIcon from '@mui/icons-material/Visibility'
 import AddIcon from '@mui/icons-material/Add'
 import PrintIcon from '@mui/icons-material/Print'
 import RefreshIcon from '@mui/icons-material/Refresh'
@@ -38,7 +37,6 @@ import CloseIcon from '@mui/icons-material/Close'
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalTextField from '@/components/common/GlobalTextField'
 import GlobalTextarea from '@/components/common/GlobalTextarea'
-import GlobalSelect from '@/components/common/GlobalSelect'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
 import { showToast } from '@/components/common/Toasts'
 
@@ -55,21 +53,21 @@ export default function LocationListPage() {
   const [editId, setEditId] = useState(null)
 
   const params = useParams()
-  const contractId = params.id
+  const contractId = params.uuid || params.id
 
   const loadLocations = async () => {
     try {
       const res = await listContractLocations(contractId)
       const data = res?.data?.data?.results || []
 
-      const formatted = data.map((item, index) => ({
+      const formatted = data.map(item => ({
         id: item.id,
         pest: item.pest_id,
-        name: item.name, // FIXED
-        stationNo: item.station_no, // OK
-        pestUnit: item.equipment_id, // FIXED
-        rentalType: item.rental_type, // OK
-        description: item.description // OK
+        name: item.name,
+        stationNo: item.station_no,
+        pestUnit: item.equipment_id,
+        rentalType: item.rental_type,
+        description: item.description
       }))
 
       setRows(formatted)
@@ -89,10 +87,9 @@ export default function LocationListPage() {
   })
 
   useEffect(() => {
-    loadLocations()
-  }, [])
+    if (contractId) loadLocations()
+  }, [contractId])
 
-  // ---------------- ADD BUTTON ----------------
   const handleAdd = () => {
     setIsEdit(false)
     setFormData({
@@ -106,7 +103,6 @@ export default function LocationListPage() {
     setDrawerOpen(true)
   }
 
-  // ---------------- EDIT BUTTON ----------------
   const handleEdit = row => {
     setIsEdit(true)
     setEditId(row.id)
@@ -121,7 +117,6 @@ export default function LocationListPage() {
     setDrawerOpen(true)
   }
 
-  // ---------------- SAVE / UPDATE ----------------
   const handleSubmit = async () => {
     if (!formData.name) {
       showToast('warning', 'Please enter location name')
@@ -155,7 +150,6 @@ export default function LocationListPage() {
     }
   }
 
-  // ---------------- DELETE ----------------
   const handleDelete = async id => {
     try {
       await deleteContractLocation(id)
@@ -166,7 +160,6 @@ export default function LocationListPage() {
     }
   }
 
-  // ---------------- FILTER & PAGINATION ----------------
   const filtered = rows.filter(r => JSON.stringify(r).toLowerCase().includes(searchText.toLowerCase()))
 
   const paginated = filtered.slice(
@@ -176,14 +169,24 @@ export default function LocationListPage() {
 
   return (
     <Box className='mt-2'>
-      <Card sx={{ p: 3 }}>
+      <Card
+        sx={{
+          p: 3,
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          minHeight: 0,
+          position: 'relative'
+        }}
+      >
         {/* ---------------------- TOP HEADER ---------------------- */}
         <Box
           sx={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            mb: 3
+            mb: 3,
+            flexShrink: 0
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -217,7 +220,8 @@ export default function LocationListPage() {
             alignItems: 'center',
             mb: 3,
             flexWrap: 'wrap',
-            gap: 2
+            gap: 2,
+            flexShrink: 0
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -260,52 +264,60 @@ export default function LocationListPage() {
         </Box>
 
         {/* ---------------------- TABLE ---------------------- */}
-        <div className='overflow-x-auto'>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                {['ID', 'Actions', 'Pest', 'Name', 'Station No', 'Pest Unit', 'Rental Type'].map(h => (
-                  <th key={h}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-
-            <tbody>
-              {paginated.length ? (
-                paginated.map(row => (
-                  <tr key={row.id}>
-                    <td>{row.id}</td>
-
-                    <td>
-                      <Box sx={{ display: 'flex', gap: 1 }}>
-                        <IconButton size='small' color='primary' onClick={() => handleEdit(row)}>
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton size='small' color='error' onClick={() => handleDelete(row.id)}>
-                          <DeleteIcon />
-                        </IconButton>
-                      </Box>
-                    </td>
-
-                    <td>{row.pest}</td>
-                    <td>{row.name}</td>
-                    <td>{row.stationNo}</td>
-                    <td>{row.pestUnit}</td>
-                    <td>{row.rentalType}</td>
-                  </tr>
-                ))
-              ) : (
+        <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          <StickyTableWrapper rowCount={rows.length}>
+            <table className={styles.table}>
+              <thead>
                 <tr>
-                  <td colSpan={7} className='text-center py-4'>
-                    No results found
-                  </td>
+                  {['ID', 'Actions', 'Pest', 'Name', 'Station No', 'Pest Unit', 'Rental Type'].map(h => (
+                    <th key={h}>{h}</th>
+                  ))}
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
 
-        <TablePaginationComponent totalCount={filtered.length} pagination={pagination} setPagination={setPagination} />
+              <tbody>
+                {paginated.length ? (
+                  paginated.map(row => (
+                    <tr key={row.id}>
+                      <td>{row.id}</td>
+
+                      <td>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <IconButton size='small' color='primary' onClick={() => handleEdit(row)}>
+                            <EditIcon />
+                          </IconButton>
+                          <IconButton size='small' color='error' onClick={() => handleDelete(row.id)}>
+                            <DeleteIcon />
+                          </IconButton>
+                        </Box>
+                      </td>
+
+                      <td>{row.pest}</td>
+                      <td>{row.name}</td>
+                      <td>{row.stationNo}</td>
+                      <td>{row.pestUnit}</td>
+                      <td>{row.rentalType}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={7} className='text-center py-4'>
+                      No results found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </StickyTableWrapper>
+        </Box>
+
+        <Box sx={{ mt: 'auto', flexShrink: 0, pt: 4 }}>
+          <TablePaginationComponent
+            totalCount={filtered.length}
+            pagination={pagination}
+            setPagination={setPagination}
+          />
+        </Box>
       </Card>
 
       {/* ---------------------- DRAWER ---------------------- */}

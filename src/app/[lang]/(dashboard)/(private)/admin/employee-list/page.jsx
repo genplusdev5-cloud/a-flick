@@ -67,7 +67,7 @@ import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
 import { loadRowOrder, saveRowOrder } from '@/utils/tableUtils'
 import StickyListLayout from '@/components/common/StickyListLayout'
-import { useDragAndDrop } from '@formkit/drag-and-drop/react'
+import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 
 const getEmployees = async () => {
   const db = await openDBInstance()
@@ -111,24 +111,6 @@ const EmployeePageContent = () => {
   const [loading, setLoading] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
-
-  // Sync pagination state to URL search params
-  useEffect(() => {
-    const currentUrlPageIndex = searchParams.get('pageIndex')
-    const currentUrlPageSize = searchParams.get('pageSize')
-
-    if (
-      currentUrlPageIndex === pagination.pageIndex.toString() &&
-      currentUrlPageSize === pagination.pageSize.toString()
-    ) {
-      return
-    }
-
-    const params = new URLSearchParams(searchParams.toString())
-    params.set('pageIndex', pagination.pageIndex.toString())
-    params.set('pageSize', pagination.pageSize.toString())
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
-  }, [pagination.pageIndex, pagination.pageSize, pathname, router])
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -259,15 +241,6 @@ const EmployeePageContent = () => {
   const columnHelper = createColumnHelper()
   const columns = useMemo(
     () => [
-      columnHelper.display({
-        id: 'drag-handle',
-        header: '',
-        cell: () => (
-          <Box className='drag-handle' sx={{ cursor: 'grab', display: 'flex', alignItems: 'center' }}>
-            <i className='tabler-grip-vertical text-gray-400' />
-          </Box>
-        )
-      }),
       columnHelper.accessor('sno', { header: 'S.No' }),
       columnHelper.display({
         id: 'actions',
@@ -494,15 +467,6 @@ const EmployeePageContent = () => {
     getSortedRowModel: getSortedRowModel()
   })
 
-  // DND implementation
-  const [parent, employeeRows] = useDragAndDrop(rows, {
-    handle: '.drag-handle',
-    onSort: newRows => {
-      setRows(newRows)
-      saveRowOrder('employee-list', newRows.map(r => r.id))
-    }
-  })
-
   // --- Export ---
   const exportOpen = Boolean(exportAnchorEl)
   const exportCSV = () => {
@@ -557,19 +521,24 @@ const EmployeePageContent = () => {
   // Render
   // ───────────────────────────────────────────
   return (
-    <Box>
-      <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
-        <Link underline='hover' color='inherit' href='/admin/dashboards'>
-          Dashboard
-        </Link>
-        <Typography color='text.primary'>Employee</Typography>
-      </Breadcrumbs>
-
-      <Card>
+    <StickyListLayout
+      header={
+        <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
+          <Link underline='hover' color='inherit' href='/admin/dashboards'>
+            Dashboard
+          </Link>
+          <Typography color='text.primary'>Employee</Typography>
+        </Breadcrumbs>
+      }
+    >
+      <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
         <CardHeader
-          title='Employee List'
-          action={
+          title={
             <Box display='flex' alignItems='center' gap={2}>
+              <Typography variant='h5' fontWeight={600}>
+                Employee List
+              </Typography>
+
               <GlobalButton
                 variant='contained'
                 color='primary'
@@ -593,7 +562,10 @@ const EmployeePageContent = () => {
               >
                 {loading ? 'Refreshing...' : 'Refresh'}
               </GlobalButton>
-
+            </Box>
+          }
+          action={
+            <Box display='flex' alignItems='center' gap={2}>
               <GlobalButton
                 color='secondary'
                 endIcon={<ArrowDropDownIcon />}
@@ -603,6 +575,7 @@ const EmployeePageContent = () => {
               >
                 Export
               </GlobalButton>
+
               <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
                 <MenuItem
                   onClick={() => {
@@ -666,8 +639,8 @@ const EmployeePageContent = () => {
 
         <Divider />
 
-        <Box sx={{ p: 4 }}>
-          <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+        <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, flexShrink: 0 }}>
             <FormControl size='small' sx={{ width: 140 }}>
               <Select
                 value={pagination.pageSize}
@@ -703,7 +676,7 @@ const EmployeePageContent = () => {
             />
           </Box>
 
-          <Box sx={{ position: 'relative' }}>
+          <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
             {loading && (
               <Box
                 sx={{
@@ -714,14 +687,14 @@ const EmployeePageContent = () => {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  zIndex: 10
+                  zIndex: 20
                 }}
               >
                 <ProgressCircularCustomization size={60} thickness={5} />
               </Box>
             )}
 
-            <div className='overflow-x-auto'>
+            <StickyTableWrapper rowCount={rows.length}>
               <table className={styles.table}>
                 <thead>
                   {table.getHeaderGroups().map(hg => (
@@ -746,7 +719,7 @@ const EmployeePageContent = () => {
                     </tr>
                   ))}
                 </thead>
-                <tbody ref={parent}>
+                <tbody>
                   {rows.length ? (
                     table.getRowModel().rows.map(row => (
                       <tr key={row.id}>
@@ -764,17 +737,15 @@ const EmployeePageContent = () => {
                   )}
                 </tbody>
               </table>
-            </div>
+            </StickyTableWrapper>
           </Box>
 
-          <TablePaginationComponent
-            totalCount={rowCount}
-            pagination={pagination}
-            setPagination={setPagination}
-          />
+          <Box sx={{ flexShrink: 0, mt: 'auto' }}>
+            <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+          </Box>
         </Box>
       </Card>
-
+      
       {/* Delete Confirmation Dialog */}
       <Dialog
         open={deleteDialog.open}
@@ -829,14 +800,15 @@ const EmployeePageContent = () => {
           </GlobalButton>
         </DialogActions>
       </Dialog>
-    </Box>
+    </StickyListLayout>
   )
 }
+
 
 // Wrapper for RBAC
 export default function EmployeePage() {
   return (
-    <PermissionGuard permission="Employee List">
+    <PermissionGuard permission='Employee List'>
       <EmployeePageContent />
     </PermissionGuard>
   )

@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { format } from 'date-fns'
+import StickyTableWrapper from '@/components/common/StickyTableWrapper'
+import StickyListLayout from '@/components/common/StickyListLayout'
 import {
   Box,
   Card,
@@ -15,10 +17,17 @@ import {
   CircularProgress,
   Pagination,
   InputAdornment,
-  FormControl, // ← Required
+  FormControl,
   Select,
-  Button
+  Button,
+  Menu
 } from '@mui/material'
+import FileDownloadIcon from '@mui/icons-material/FileDownload'
+import PrintIcon from '@mui/icons-material/Print'
+import TableChartIcon from '@mui/icons-material/TableChart'
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
+import FileCopyIcon from '@mui/icons-material/FileCopy'
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 
 import PermissionGuard from '@/components/auth/PermissionGuard'
 
@@ -88,9 +97,6 @@ const dummyData = [
 ]
 
 // Toast helper
-// ──────────────────────────────────────────────────────────────
-// Toast (Custom Styled, Global, with Icons & Colors)
-// ──────────────────────────────────────────────────────────────
 const showToast = (type, message = '') => {
   const icons = {
     success: 'tabler-circle-check',
@@ -141,7 +147,6 @@ const showToast = (type, message = '') => {
   )
 }
 
-// ──────────────────────────────────────────────────────────────
 const StockReportPageContent = () => {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(false)
@@ -151,7 +156,6 @@ const StockReportPageContent = () => {
   const [supplierFilter, setSupplierFilter] = useState('')
   const [chemicalFilter, setChemicalFilter] = useState('')
   const [searchText, setSearchText] = useState('')
-  const [employeeFilter, setEmployeeFilter] = useState('')
   const [customerFilter, setCustomerFilter] = useState('')
 
   const columnHelper = createColumnHelper()
@@ -164,9 +168,6 @@ const StockReportPageContent = () => {
       columnHelper.accessor('totalReceived', { header: 'Total Received', size: 160 }),
       columnHelper.accessor('totalSupplied', { header: 'Total Supplied', size: 160 }),
       columnHelper.accessor('totalConsumed', { header: 'Total Consumed', size: 160 }),
-      columnHelper.accessor('received', { header: 'Received', size: 140 }),
-      columnHelper.accessor('supplied', { header: 'Supplied', size: 140 }),
-      columnHelper.accessor('consumed', { header: 'Consumed', size: 140 }),
       columnHelper.accessor('available', { header: 'Available Stock', size: 160 })
     ],
     []
@@ -192,7 +193,7 @@ const StockReportPageContent = () => {
         return matchSearch && matchDate && matchSupplier && matchChemical
       })
 
-      const withSno = filtered.map((r, i) => ({ ...r, sno: i + 1 }))
+      const withSno = filtered.map((r, i) => ({ ...r, sano: i + 1 }))
       setRows(withSno)
 
       if (showToastMsg) showToast('info', 'Stock report refreshed')
@@ -222,381 +223,294 @@ const StockReportPageContent = () => {
   const pageIndex = table.getState().pagination.pageIndex || 0
 
   return (
-    <Box>
-      {/* Breadcrumb */}
-      <Box role='presentation' sx={{ mb: 2 }}>
-        <Breadcrumbs aria-label='breadcrumb'>
-          <Link underline='hover' color='inherit' href='/'>
-            Home
-          </Link>
-          <Typography color='text.primary'>Stock Report</Typography>
-        </Breadcrumbs>
-      </Box>
-
-      {/* Main Card */}
-      <Card sx={{ p: 3, mt: 2 }}>
-        {/* Header with Refresh + Export */}
-        <CardHeader
-          sx={{
-            pb: 1.5,
-            pt: 1.5,
-            '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
-          }}
-          title={
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              {/* Title */}
-              <Typography variant='h5' sx={{ fontWeight: 600 }}>
-                Stock Report
-              </Typography>
-
-              {/* Refresh Button */}
-              <Button
-                variant='contained'
-                color='primary'
-                startIcon={
-                  <RefreshIcon
-                    sx={{
-                      animation: loading ? 'spin 1s linear infinite' : 'none',
-                      '@keyframes spin': {
-                        '0%': { transform: 'rotate(0deg)' },
-                        '100%': { transform: 'rotate(360deg)' }
-                      }
-                    }}
-                  />
-                }
-                disabled={loading}
-                onClick={async () => {
-                  setLoading(true)
-                  await loadData(true)
-                  setTimeout(() => setLoading(false), 600)
-                }}
-                sx={{
-                  textTransform: 'none',
-                  fontWeight: 500,
-                  px: 2.5,
-                  height: 36
-                }}
-              >
-                {loading ? 'Refreshing...' : 'Refresh'}
-              </Button>
-            </Box>
-          }
-          action={null}
-        />
-
-        {/* Loader */}
+    <StickyListLayout
+      header={
+        <Box sx={{ mb: 6 }}>
+          <Box sx={{ mb: 2 }}>
+            <Link href='/admin/dashboards' className='text-primary'>
+              Dashboard
+            </Link>{' '}
+            / <Typography component='span'>Stock Report</Typography>
+          </Box>
+          <Typography variant='h5' sx={{ fontWeight: 600 }}>
+            Stock Report
+          </Typography>
+        </Box>
+      }
+    >
+      <Card
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          minHeight: 0,
+          position: 'relative'
+        }}
+      >
         {loading && (
           <Box
             sx={{
-              position: 'fixed',
+              position: 'absolute',
               inset: 0,
-              bgcolor: 'rgba(255,255,255,0.65)',
-              backdropFilter: 'blur(3px)',
+              bgcolor: 'rgba(255,255,255,0.8)',
+              backdropFilter: 'blur(2px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              flexDirection: 'column',
-              zIndex: 2000,
-              animation: 'fadeIn 0.3s ease-in-out',
-              '@keyframes fadeIn': {
-                from: { opacity: 0 },
-                to: { opacity: 1 }
-              }
+              zIndex: 10
             }}
           >
-            <ProgressCircularCustomization size={70} thickness={5} />
-            <Typography
-              mt={2}
-              sx={{
-                color: 'primary.main',
-                fontWeight: 600,
-                fontSize: '1.05rem',
-                letterSpacing: 0.3
-              }}
-            >
-              Loading Stock Report...
-            </Typography>
+            <ProgressCircularCustomization size={60} thickness={5} />
           </Box>
         )}
+        <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <Divider sx={{ mb: 3 }} />
 
-        <Divider sx={{ mb: 2 }} />
+          {/* Filters – SINGLE ROW LAYOUT */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
+              mb: 3,
+              flexWrap: 'nowrap',
+              flexShrink: 0
+            }}
+          >
+            {/* Date Range + Checkbox */}
+            <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                <Typography variant='body2' sx={{ fontWeight: 500 }}>
+                  Date Range
+                </Typography>
 
-        {/* Filters – SINGLE ROW LAYOUT */}
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 3,
-            mb: 3,
-            flexWrap: 'nowrap'
-          }}
-        >
-          {/* Date Range + Checkbox */}
-          <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-              <Typography variant='body2' sx={{ fontWeight: 500 }}>
-                Date Range
-              </Typography>
+                <Checkbox
+                  size='small'
+                  checked={enableDateFilter}
+                  onChange={e => setEnableDateFilter(e.target.checked)}
+                  sx={{ p: 0 }}
+                />
+              </Box>
 
-              <Checkbox
-                size='small'
-                checked={enableDateFilter}
-                onChange={e => setEnableDateFilter(e.target.checked)}
-                sx={{ p: 0 }}
+              <AppReactDatepicker
+                selectsRange
+                startDate={startDate}
+                endDate={endDate}
+                onChange={dates => {
+                  if (enableDateFilter && dates) {
+                    setStartDate(dates[0])
+                    setEndDate(dates[1])
+                  }
+                }}
+                disabled={!enableDateFilter}
+                readOnly={!enableDateFilter}
+                customInput={
+                  <CustomTextField
+                    size='small'
+                    sx={{
+                      width: 260,
+                      backgroundColor: 'white',
+                      '& .MuiInputBase-root': { height: 40 }
+                    }}
+                    value={`${format(startDate, 'dd/MM/yyyy')} - ${format(endDate, 'dd/MM/yyyy')}`}
+                  />
+                }
               />
             </Box>
 
-            <AppReactDatepicker
-              selectsRange
-              startDate={startDate}
-              endDate={endDate}
-              onChange={dates => {
-                if (enableDateFilter && dates) {
-                  setStartDate(dates[0])
-                  setEndDate(dates[1])
-                }
-              }}
-              disabled={!enableDateFilter}
-              readOnly={!enableDateFilter}
-              customInput={
-                <CustomTextField
-                  size='small'
-                  sx={{
-                    width: 260,
-                    backgroundColor: 'white',
-                    '& .MuiInputBase-root': { height: 40 }
-                  }}
-                  value={`${format(startDate, 'dd/MM/yyyy')} - ${format(endDate, 'dd/MM/yyyy')}`}
-                />
-              }
-            />
-          </Box>
+            {/* Supplier */}
+            <Box>
+              <Typography variant='body2' sx={{ fontWeight: 500, mb: 0.5 }}>
+                Supplier
+              </Typography>
+              <CustomAutocomplete
+                options={['Stock-TECH STOCK 1', 'Supplier-ABC']}
+                value={supplierFilter || null}
+                onChange={(e, val) => setSupplierFilter(val || '')}
+                renderInput={p => (
+                  <CustomTextField {...p} size='small' sx={{ width: 220, '& .MuiInputBase-root': { height: 40 } }} />
+                )}
+              />
+            </Box>
 
-          {/* Supplier */}
-          <Box>
-            <Typography variant='body2' sx={{ fontWeight: 500, mb: 0.5 }}>
-              Supplier
-            </Typography>
-            <CustomAutocomplete
-              options={['Stock-TECH STOCK 1', 'Supplier-ABC']}
-              value={supplierFilter || null}
-              onChange={(e, val) => setSupplierFilter(val || '')}
-              renderInput={p => (
-                <CustomTextField {...p} size='small' sx={{ width: 220, '& .MuiInputBase-root': { height: 40 } }} />
-              )}
-            />
-          </Box>
-
-          {/* Customer */}
-          <Box>
-            <Typography variant='body2' sx={{ fontWeight: 500, mb: 0.5 }}>
-              Customer
-            </Typography>
-            <CustomAutocomplete
-              options={['Customer-A', 'Customer-B', 'Customer-C']}
-              value={customerFilter || null}
-              onChange={(e, val) => setCustomerFilter(val || '')}
-              renderInput={p => (
-                <CustomTextField {...p} size='small' sx={{ width: 220, '& .MuiInputBase-root': { height: 40 } }} />
-              )}
-            />
-          </Box>
-        </Box>
-
-        <Divider sx={{ mb: 4 }} />
-
-        {/* Search + Page Size */}
-        {/* Toolbar Row */}
-        <Box
-          sx={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: 2,
-            mb: 2
-          }}
-        >
-          {/* LEFT: Entries + Export Buttons */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-            {/* Page Size */}
-            <FormControl size='small' sx={{ width: 140 }}>
-              <Select value={pageSize} onChange={e => table.setPageSize(Number(e.target.value))}>
-                {[10, 25, 50, 100].map(s => (
-                  <MenuItem key={s} value={s}>
-                    {s} entries
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            {/* Export Buttons */}
-            <Box sx={{ display: 'flex', gap: 1.5 }}>
-              {['Copy', 'CSV', 'Excel', 'PDF', 'Print'].map(label => (
-                <Button
-                  key={label}
-                  variant='contained'
-                  sx={{
-                    backgroundColor: '#5A5A5A',
-                    color: 'white',
-                    textTransform: 'none',
-                    fontWeight: 500,
-                    fontSize: '0.8rem',
-                    px: 2,
-                    py: 0.7,
-                    borderRadius: 2,
-                    minWidth: 68,
-                    boxShadow: 'none',
-                    '&:hover': { backgroundColor: '#4b4b4b' }
-                  }}
-                  onClick={() => showToast('info', `${label} export coming soon`)}
-                >
-                  {label}
-                </Button>
-              ))}
+            {/* Customer */}
+            <Box>
+              <Typography variant='body2' sx={{ fontWeight: 500, mb: 0.5 }}>
+                Customer
+              </Typography>
+              <CustomAutocomplete
+                options={['Customer-A', 'Customer-B', 'Customer-C']}
+                value={customerFilter || null}
+                onChange={(e, val) => setCustomerFilter(val || '')}
+                renderInput={p => (
+                  <CustomTextField {...p} size='small' sx={{ width: 220, '& .MuiInputBase-root': { height: 40 } }} />
+                )}
+              />
             </Box>
           </Box>
 
-          {/* RIGHT: Search */}
-          <CustomTextField
-            size='small'
-            placeholder='Search supplier or chemical...'
-            value={searchText}
-            onChange={e => setSearchText(e.target.value)}
-            sx={{ width: 360 }}
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position='start'>
-                    <SearchIcon />
-                  </InputAdornment>
-                )
-              }
-            }}
-          />
-        </Box>
+          <Divider sx={{ mb: 3 }} />
 
-        {/* Table */}
-        <Box sx={{ overflowX: 'auto' }}>
-          <table
-            className={styles.table}
-            style={{
-              width: 'max-content',
-              minWidth: '100%',
-              tableLayout: 'fixed' // Ensures column sizes are respected
+          {/* Toolbar Row */}
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 2,
+              mb: 3,
+              flexShrink: 0
             }}
           >
-            <colgroup>
-              <col style={{ width: 80 }} />
-              <col style={{ width: 200 }} />
-              <col style={{ width: 200 }} />
-              <col style={{ width: 160 }} />
-              <col style={{ width: 160 }} />
-              <col style={{ width: 160 }} />
-              <col style={{ width: 160 }} />
-              <col style={{ width: 140 }} />
-              <col style={{ width: 140 }} />
-              <col style={{ width: 140 }} />
-              <col style={{ width: 160 }} />
-            </colgroup>
-            <thead>
-              {table.getHeaderGroups().map(hg => (
-                <tr key={hg.id}>
-                  {hg.headers.map(header => (
-                    <th
-                      key={header.id}
-                      style={{
-                        width: header.getSize(),
-                        minWidth: header.getSize(),
-                        maxWidth: header.getSize()
-                      }}
-                    >
-                      <div
-                        className={classnames({
-                          'flex items-center': header.column.getIsSorted(),
-                          'cursor-pointer select-none': header.column.getCanSort()
-                        })}
-                        onClick={header.column.getToggleSortingHandler()}
-                      >
-                        {flexRender(header.column.columnDef.header, header.getContext())}
-                        {header.column.getIsSorted() === 'asc' && (
-                          <ChevronRight className='-rotate-90' fontSize='small' />
-                        )}
-                        {header.column.getIsSorted() === 'desc' && (
-                          <ChevronRight className='rotate-90' fontSize='small' />
-                        )}
-                      </div>
-                    </th>
+            {/* LEFT: Entries + Export Buttons */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+              <FormControl size='small' sx={{ width: 140 }}>
+                <Select value={pageSize} onChange={e => table.setPageSize(Number(e.target.value))}>
+                  {[10, 25, 50, 100].map(s => (
+                    <MenuItem key={s} value={s}>
+                      {s} entries
+                    </MenuItem>
                   ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody>
-              {table.getRowModel().rows.length === 0 ? (
-                <tr>
-                  <td colSpan={columns.length} className='text-center'>
-                    No data available
-                  </td>
-                </tr>
-              ) : (
-                table.getRowModel().rows.map(row => (
-                  <tr key={row.id}>
-                    {row.getVisibleCells().map(cell => (
-                      <td key={cell.id} style={{ width: cell.column.getSize() }}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </Select>
+              </FormControl>
+
+              <Box sx={{ display: 'flex', gap: 1.5 }}>
+                {['Copy', 'CSV', 'Excel', 'PDF', 'Print'].map(label => (
+                  <Button
+                    key={label}
+                    variant='contained'
+                    sx={{
+                      backgroundColor: '#5A5A5A',
+                      color: 'white',
+                      textTransform: 'none',
+                      fontWeight: 500,
+                      fontSize: '0.8rem',
+                      px: 2,
+                      py: 0.7,
+                      borderRadius: 2,
+                      minWidth: 68,
+                      boxShadow: 'none',
+                      '&:hover': { backgroundColor: '#4b4b4b' }
+                    }}
+                    onClick={() => showToast('info', `${label} export coming soon`)}
+                  >
+                    {label}
+                  </Button>
+                ))}
+              </Box>
+            </Box>
+
+            {/* RIGHT: Search */}
+            <CustomTextField
+              size='small'
+              placeholder='Search supplier or chemical...'
+              value={searchText}
+              onChange={e => setSearchText(e.target.value)}
+              sx={{ width: 360 }}
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position='start'>
+                      <SearchIcon />
+                    </InputAdornment>
+                  )
+                }
+              }}
+            />
+          </Box>
+
+          <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            <StickyTableWrapper rowCount={rows.length}>
+              <table className={styles.table}>
+                <thead>
+                  {table.getHeaderGroups().map(hg => (
+                    <tr key={hg.id}>
+                      {hg.headers.map(header => (
+                        <th key={header.id}>
+                          <div
+                            className={classnames({
+                              'flex items-center': header.column.getIsSorted(),
+                              'cursor-pointer select-none': header.column.getCanSort()
+                            })}
+                            onClick={header.column.getToggleSortingHandler()}
+                          >
+                            {flexRender(header.column.columnDef.header, header.getContext())}
+                            {header.column.getIsSorted() === 'asc' && (
+                              <ChevronRight className='-rotate-90' fontSize='small' />
+                            )}
+                            {header.column.getIsSorted() === 'desc' && (
+                              <ChevronRight className='rotate-90' fontSize='small' />
+                            )}
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  ))}
+                </thead>
+                <tbody>
+                  {table.getRowModel().rows.length === 0 ? (
+                    <tr>
+                      <td colSpan={columns.length} className='text-center'>
+                        No data available
                       </td>
-                    ))}
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </Box>
+                    </tr>
+                  ) : (
+                    table.getRowModel().rows.map(row => (
+                      <tr key={row.id}>
+                        {row.getVisibleCells().map(cell => (
+                          <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                        ))}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </StickyTableWrapper>
+          </Box>
 
-        <Box
-          sx={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            borderTop: '1px solid #e0e0e0',
-            px: 3,
-            py: 1.5,
-            mt: 1,
-            gap: 2
-          }}
-        >
-          <Typography color='text.disabled'>
-            {`Showing ${total === 0 ? 0 : pageIndex * pageSize + 1} to ${Math.min(
-              (pageIndex + 1) * pageSize,
-              total
-            )} of ${total} entries`}
-          </Typography>
+          <Box sx={{ mt: 'auto', flexShrink: 0, pt: 4 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 2
+              }}
+            >
+              <Typography color='text.disabled'>
+                {`Showing ${total === 0 ? 0 : pageIndex * pageSize + 1} to ${Math.min(
+                  (pageIndex + 1) * pageSize,
+                  total
+                )} of ${total} entries`}
+              </Typography>
 
-          <Pagination
-            shape='rounded'
-            color='primary'
-            variant='tonal'
-            count={Math.ceil(total / pageSize) || 1}
-            page={pageIndex + 1}
-            onChange={(_, page) => {
-              table.setPageIndex(page - 1)
-            }}
-            showFirstButton
-            showLastButton
-          />
+              <Pagination
+                shape='rounded'
+                color='primary'
+                variant='tonal'
+                count={Math.ceil(total / pageSize) || 1}
+                page={pageIndex + 1}
+                onChange={(_, page) => {
+                  table.setPageIndex(page - 1)
+                }}
+                showFirstButton
+                showLastButton
+              />
+            </Box>
+          </Box>
         </Box>
       </Card>
-
       <ToastContainer />
-    </Box>
+    </StickyListLayout>
   )
 }
 
 // Wrapper for RBAC
 export default function StockReportPage() {
   return (
-    <PermissionGuard permission="Stock Report">
+    <PermissionGuard permission='Stock Report'>
       <StockReportPageContent />
     </PermissionGuard>
   )

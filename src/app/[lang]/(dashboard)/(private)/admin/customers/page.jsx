@@ -1,4 +1,3 @@
-
 'use client'
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
@@ -74,6 +73,7 @@ import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
 import { dateSortingFn } from '@/utils/tableUtils'
 import StickyListLayout from '@/components/common/StickyListLayout'
+import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 
 // Debounced Input
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
@@ -116,24 +116,6 @@ const CustomersPageContent = () => {
 
   // Sync pagination state to URL search params
   const isFirstRender = useRef(true)
-  useEffect(() => {
-    // Avoid double update on mount if URL already matches
-    const currentUrlPageIndex = searchParams.get('pageIndex')
-    const currentUrlPageSize = searchParams.get('pageSize')
-
-    if (
-      currentUrlPageIndex === pagination.pageIndex.toString() &&
-      currentUrlPageSize === pagination.pageSize.toString()
-    ) {
-      return
-    }
-
-    const params = new URLSearchParams(searchParams.toString())
-    params.set('pageIndex', pagination.pageIndex.toString())
-    params.set('pageSize', pagination.pageSize.toString())
-
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
-  }, [pagination.pageIndex, pagination.pageSize, pathname, router]) // Removed searchParams to break loop
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -329,7 +311,6 @@ const CustomersPageContent = () => {
         header: 'ABSS Customer Name'
       }),
 
-
       columnHelper.accessor('email', { header: 'Contact Email' }),
       columnHelper.accessor('phone', { header: 'Contact Phone' }),
       columnHelper.accessor('address', { header: 'Billing Address' }),
@@ -463,101 +444,109 @@ const CustomersPageContent = () => {
   // Render
   // ───────────────────────────────────────────
   return (
-    <Box>
-      <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
-        <Link underline='hover' color='inherit' href='/'>
-          Dashboard
-        </Link>
-        <Typography color='text.primary'>Customer List</Typography>
-      </Breadcrumbs>
+    <StickyListLayout
+      header={
+        <>
+          <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
+            <Link underline='hover' color='inherit' href='/'>
+              Dashboard
+            </Link>
+            <Typography color='text.primary'>Customer List</Typography>
+          </Breadcrumbs>
 
-      {/* Stats Cards */}
-      <Card
-        sx={{
-          p: 3,
-          mb: 4,
-          borderRadius: 1,
-          boxShadow: 'none',
-          border: '1px solid #e0e0e0'
-        }}
-      >
-        <Typography variant='h6' fontWeight={600} mb={2}>
-          Customer Summary
-        </Typography>
+          {/* Stats Cards */}
+          <Card
+            sx={{
+              p: 3,
+              mb: 4,
+              borderRadius: 1,
+              boxShadow: 'none',
+              border: '1px solid #e0e0e0',
+              flexShrink: 0
+            }}
+          >
+            <Typography variant='h6' fontWeight={600} mb={2}>
+              Customer Summary
+            </Typography>
 
-        <Grid
-          container
-          spacing={4}
-          justifyContent='center' // ⭐ Center horizontally
-          alignItems='center' // ⭐ Center vertically
-        >
-          {/* Total Customers */}
-          <Grid item xs={12} md={3}>
-            <Box display='flex' alignItems='center' gap={2} justifyContent='center'>
-              <GroupIcon sx={{ fontSize: 40, color: '#1976D2' }} />
-              <Box textAlign='center'>
-                <Typography variant='subtitle2' color='text.secondary'>
-                  Total Customers
-                </Typography>
-                <Typography variant='h5' fontWeight={700}>
-                  {summary.total_customers}
-                </Typography>
-              </Box>
-            </Box>
-          </Grid>
+            <Grid
+              container
+              spacing={4}
+              justifyContent='center' // ⭐ Center horizontally
+              alignItems='center' // ⭐ Center vertically
+            >
+              {/* Total Customers */}
+              <Grid item xs={12} md={3}>
+                <Box display='flex' alignItems='center' gap={2} justifyContent='center'>
+                  <GroupIcon sx={{ fontSize: 40, color: '#1976D2' }} />
+                  <Box textAlign='center'>
+                    <Typography variant='subtitle2' color='text.secondary'>
+                      Total Customers
+                    </Typography>
+                    <Typography variant='h5' fontWeight={700}>
+                      {summary.total_customers}
+                    </Typography>
+                  </Box>
+                </Box>
+              </Grid>
 
-          {/* MYOB Exported */}
-          <Grid item xs={12} md={3}>
-            <Box display='flex' alignItems='center' gap={2} justifyContent='center'>
-              <BarChartIcon sx={{ fontSize: 40, color: '#6A4FBF' }} />
-              <Box textAlign='center'>
-                <Typography variant='subtitle2' color='text.secondary'>
-                  MYOB Exported
-                </Typography>
-                <Typography variant='h5' fontWeight={700}>
-                  {summary.total_myob}
-                </Typography>
-              </Box>
-            </Box>
-          </Grid>
+              {/* MYOB Exported */}
+              <Grid item xs={12} md={3}>
+                <Box display='flex' alignItems='center' gap={2} justifyContent='center'>
+                  <BarChartIcon sx={{ fontSize: 40, color: '#6A4FBF' }} />
+                  <Box textAlign='center'>
+                    <Typography variant='subtitle2' color='text.secondary'>
+                      MYOB Exported
+                    </Typography>
+                    <Typography variant='h5' fontWeight={700}>
+                      {summary.total_myob}
+                    </Typography>
+                  </Box>
+                </Box>
+              </Grid>
 
-          {/* Active */}
-          <Grid item xs={12} md={3}>
-            <Box display='flex' alignItems='center' gap={1} justifyContent='center'>
-              <CheckCircleIcon sx={{ fontSize: 32, color: 'success.main' }} />
-              <Box textAlign='center'>
-                <Typography variant='subtitle2' color='text.secondary'>
-                  Active
-                </Typography>
-                <Typography variant='h5' fontWeight={700} color='success.main'>
-                  {summary.total_active}
-                </Typography>
-              </Box>
-            </Box>
-          </Grid>
+              {/* Active */}
+              <Grid item xs={12} md={3}>
+                <Box display='flex' alignItems='center' gap={1} justifyContent='center'>
+                  <CheckCircleIcon sx={{ fontSize: 32, color: 'success.main' }} />
+                  <Box textAlign='center'>
+                    <Typography variant='subtitle2' color='text.secondary'>
+                      Active
+                    </Typography>
+                    <Typography variant='h5' fontWeight={700} color='success.main'>
+                      {summary.total_active}
+                    </Typography>
+                  </Box>
+                </Box>
+              </Grid>
 
-          {/* Inactive */}
-          <Grid item xs={12} md={3}>
-            <Box display='flex' alignItems='center' gap={1} justifyContent='center'>
-              <CancelIcon sx={{ fontSize: 32, color: 'error.main' }} />
-              <Box textAlign='center'>
-                <Typography variant='subtitle2' color='text.secondary'>
-                  Inactive
-                </Typography>
-                <Typography variant='h5' fontWeight={700} color='error.main'>
-                  {summary.total_inactive}
-                </Typography>
-              </Box>
-            </Box>
-          </Grid>
-        </Grid>
-      </Card>
-
-      <Card>
+              {/* Inactive */}
+              <Grid item xs={12} md={3}>
+                <Box display='flex' alignItems='center' gap={1} justifyContent='center'>
+                  <CancelIcon sx={{ fontSize: 32, color: 'error.main' }} />
+                  <Box textAlign='center'>
+                    <Typography variant='subtitle2' color='text.secondary'>
+                      Inactive
+                    </Typography>
+                    <Typography variant='h5' fontWeight={700} color='error.main'>
+                      {summary.total_inactive}
+                    </Typography>
+                  </Box>
+                </Box>
+              </Grid>
+            </Grid>
+          </Card>
+        </>
+      }
+    >
+      <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
         <CardHeader
-          title='Customer List'
-          action={
+          title={
             <Box display='flex' alignItems='center' gap={2}>
+              <Typography variant='h5' fontWeight={600}>
+                Customer List
+              </Typography>
+
               <GlobalButton
                 variant='contained'
                 color='primary'
@@ -582,7 +571,10 @@ const CustomersPageContent = () => {
               >
                 {loading ? 'Refreshing...' : 'Refresh'}
               </GlobalButton>
-
+            </Box>
+          }
+          action={
+            <Box display='flex' alignItems='center' gap={2}>
               <GlobalButton
                 color='secondary'
                 endIcon={<ArrowDropDownIcon />}
@@ -591,6 +583,7 @@ const CustomersPageContent = () => {
               >
                 Export
               </GlobalButton>
+
               <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
                 <MenuItem
                   onClick={() => {
@@ -654,7 +647,24 @@ const CustomersPageContent = () => {
 
         <Divider />
 
-        <Box sx={{ p: 4 }}>
+        <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {loading && (
+            <Box
+              sx={{
+                position: 'absolute',
+                inset: 0,
+                bgcolor: 'rgba(255,255,255,0.8)',
+                backdropFilter: 'blur(2px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 20
+              }}
+            >
+              <ProgressCircularCustomization size={60} thickness={5} />
+            </Box>
+          )}
+
           <Box
             sx={{
               mb: 3,
@@ -662,7 +672,8 @@ const CustomersPageContent = () => {
               justifyContent: 'space-between',
               alignItems: 'center',
               flexWrap: 'nowrap',
-              gap: 2
+              gap: 2,
+              flexShrink: 0
             }}
           >
             {/* LEFT SIDE FILTERS */}
@@ -744,25 +755,8 @@ const CustomersPageContent = () => {
             />
           </Box>
 
-          <Box sx={{ position: 'relative' }}>
-            {loading && (
-              <Box
-                sx={{
-                  position: 'absolute',
-                  inset: 0,
-                  bgcolor: 'rgba(255,255,255,0.8)',
-                  backdropFilter: 'blur(2px)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 10
-                }}
-              >
-                <ProgressCircularCustomization size={60} thickness={5} />
-              </Box>
-            )}
-
-            <div className='overflow-x-auto'>
+          <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            <StickyTableWrapper rowCount={rows.length}>
               <table className={styles.table}>
                 <thead>
                   {table.getHeaderGroups().map(hg => (
@@ -805,16 +799,15 @@ const CustomersPageContent = () => {
                   )}
                 </tbody>
               </table>
-            </div>
+            </StickyTableWrapper>
           </Box>
 
-          <TablePaginationComponent
-            totalCount={rowCount}
-            pagination={pagination}
-            setPagination={setPagination}
-          />
+          <Box sx={{ flexShrink: 0, mt: 'auto' }}>
+            <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+          </Box>
         </Box>
       </Card>
+
 
       {/* Delete Confirmation Dialog */}
       <Dialog
@@ -881,14 +874,15 @@ const CustomersPageContent = () => {
           </GlobalButton>
         </DialogActions>
       </Dialog>
-    </Box>
+    </StickyListLayout>
   )
 }
+
 
 // Wrapper for RBAC
 export default function CustomersPage() {
   return (
-    <PermissionGuard permission="Customers">
+    <PermissionGuard permission='Customers'>
       <CustomersPageContent />
     </PermissionGuard>
   )

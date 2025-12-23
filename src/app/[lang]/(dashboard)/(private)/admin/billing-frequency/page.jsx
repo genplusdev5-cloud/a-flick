@@ -76,6 +76,8 @@ import {
   createColumnHelper
 } from '@tanstack/react-table'
 import styles from '@core/styles/table.module.css'
+import StickyTableWrapper from '@/components/common/StickyTableWrapper'
+import StickyListLayout from '@/components/common/StickyListLayout'
 import ChevronRight from '@menu/svg/ChevronRight'
 
 // Debounced Input
@@ -432,21 +434,20 @@ const BillingFrequencyPageContent = () => {
   // Render
   // ───────────────────────────────────────────
   return (
-    <Box>
-      <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
-        <Link underline='hover' color='inherit' href='/'>
-          Home
-        </Link>
-        <Typography color='text.primary'>Billing Frequency</Typography>
-      </Breadcrumbs>
-      <Card sx={{ p: 3 }}>
+    <StickyListLayout
+      header={
+        <Box sx={{ mb: 2 }}>
+          <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
+            <Link underline='hover' color='inherit' href='/'>
+              Home
+            </Link>
+            <Typography color='text.primary'>Billing Frequency</Typography>
+          </Breadcrumbs>
+        </Box>
+      }
+    >
+      <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
         <CardHeader
-          sx={{
-            pb: 1.5,
-            pt: 1.5,
-            '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
-            '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
-          }}
           title={
             <Box display='flex' alignItems='center' gap={2}>
               <Typography variant='h5' sx={{ fontWeight: 600 }}>
@@ -546,95 +547,120 @@ const BillingFrequencyPageContent = () => {
               )}
             </Box>
           }
+          sx={{
+            pb: 1.5,
+            pt: 5,
+            px: 10,
+            '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
+            '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
+          }}
         />
+        <Divider />
+
         {loading && (
           <Box
             sx={{
-              position: 'fixed',
+              position: 'absolute',
               inset: 0,
               bgcolor: 'rgba(255,255,255,0.8)',
               backdropFilter: 'blur(2px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              zIndex: 9999
+              zIndex: 10
             }}
           >
             <ProgressCircularCustomization size={60} thickness={5} />
           </Box>
         )}
 
-        <Divider sx={{ mb: 2 }} />
-        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-          <FormControl size='small' sx={{ width: 140 }}>
-            <Select
-              value={pagination.pageSize}
-              onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
-            >
-              {[25, 50, 75, 100].map(s => (
-                <MenuItem key={s} value={s}>
-                  {s} entries
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <DebouncedInput
-            value={searchText}
-            onChange={v => {
-              setSearchText(String(v))
-              setPagination(p => ({ ...p, pageIndex: 0 }))
+        <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <Box
+            sx={{
+              mb: 3,
+              display: 'flex',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 2,
+              flexShrink: 0
             }}
-            placeholder='Search display frequency, code, description...'
-            sx={{ width: 360 }}
-            variant='outlined'
-            size='small'
-          />
-        </Box>
-        <div className='overflow-x-auto'>
-          <table className={styles.table}>
-            <thead>
-              {table.getHeaderGroups().map(hg => (
-                <tr key={hg.id}>
-                  {hg.headers.map(h => (
-                    <th key={h.id}>
-                      <div
-                        className={classnames({
-                          'flex items-center': h.column.getIsSorted(),
-                          'cursor-pointer select-none': h.column.getCanSort()
-                        })}
-                        onClick={h.column.getToggleSortingHandler()}
-                      >
-                        {flexRender(h.column.columnDef.header, h.getContext())}
-                        {{
-                          asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
-                          desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
-                        }[h.column.getIsSorted()] ?? null}
-                      </div>
-                    </th>
+          >
+            <FormControl size='small' sx={{ width: 140 }}>
+              <Select
+                value={pagination.pageSize}
+                onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
+              >
+                {[25, 50, 75, 100].map(s => (
+                  <MenuItem key={s} value={s}>
+                    {s} entries
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <DebouncedInput
+              value={searchText}
+              onChange={v => {
+                setSearchText(String(v))
+                setPagination(p => ({ ...p, pageIndex: 0 }))
+              }}
+              placeholder='Search display frequency, code, description...'
+              sx={{ width: 360 }}
+              variant='outlined'
+              size='small'
+            />
+          </Box>
+
+          <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            <StickyTableWrapper rowCount={rows.length}>
+              <table className={styles.table}>
+                <thead>
+                  {table.getHeaderGroups().map(hg => (
+                    <tr key={hg.id}>
+                      {hg.headers.map(h => (
+                        <th key={h.id}>
+                          <div
+                            className={classnames({
+                              'flex items-center': h.column.getIsSorted(),
+                              'cursor-pointer select-none': h.column.getCanSort()
+                            })}
+                            onClick={h.column.getToggleSortingHandler()}
+                          >
+                            {flexRender(h.column.columnDef.header, h.getContext())}
+                            {{
+                              asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
+                              desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
+                            }[h.column.getIsSorted()] ?? null}
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
                   ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody>
-              {rows.length ? (
-                table.getRowModel().rows.map(row => (
-                  <tr key={row.id}>
-                    {row.getVisibleCells().map(cell => (
-                      <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
-                    ))}
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={columns.length} className='text-center py-4'>
-                    No data available
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+                </thead>
+                <tbody>
+                  {rows.length ? (
+                    table.getRowModel().rows.map(row => (
+                      <tr key={row.id}>
+                        {row.getVisibleCells().map(cell => (
+                          <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                        ))}
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={columns.length} className='text-center py-4'>
+                        No data available
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </StickyTableWrapper>
+          </Box>
+
+          <Box sx={{ mt: 'auto', flexShrink: 0 }}>
+            <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+          </Box>
+        </Box>
       </Card>
 
       {/* Drawer */}
@@ -887,14 +913,14 @@ const BillingFrequencyPageContent = () => {
           </GlobalButton>
         </DialogActions>
       </Dialog>
-    </Box>
+    </StickyListLayout>
   )
 }
 
 // Wrapper for RBAC
 export default function BillingFrequencyPage() {
   return (
-    <PermissionGuard permission="Billing Frequency">
+    <PermissionGuard permission='Billing Frequency'>
       <BillingFrequencyPageContent />
     </PermissionGuard>
   )

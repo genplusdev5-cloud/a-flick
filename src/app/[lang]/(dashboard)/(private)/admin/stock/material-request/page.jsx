@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { openDB } from 'idb'
 import {
   Box,
   Button,
@@ -13,26 +12,27 @@ import {
   Divider,
   Breadcrumbs,
   Checkbox,
-  CircularProgress,
   Pagination,
   InputAdornment,
-  Chip,
   IconButton,
-  Grid,
   FormControl,
   Select,
   MenuItem,
-  FormControlLabel
+  FormControlLabel,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material'
 
+import StickyTableWrapper from '@/components/common/StickyTableWrapper'
+import StickyListLayout from '@/components/common/StickyListLayout'
 import PermissionGuard from '@/components/auth/PermissionGuard'
-
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
 import AddIcon from '@mui/icons-material/Add'
-import DeleteIcon from '@mui/icons-material/Delete'
-import EditIcon from '@mui/icons-material/Edit'
+import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import StatusChip from '@/components/common/StatusChip'
 
 import { getTmMaterialRequestList } from '@/api/materialRequest/list'
@@ -40,12 +40,7 @@ import { deleteTmMaterialRequest } from '@/api/materialRequest/delete'
 
 import CustomTextField from '@core/components/mui/TextField'
 import CustomAutocomplete from '@core/components/mui/Autocomplete'
-import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import GlobalDateRange from '@/components/common/GlobalDateRange'
-
-import DialogCloseButton from '@components/dialogs/DialogCloseButton'
-import { Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material'
-import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 
 import { toast, ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
@@ -66,18 +61,12 @@ import ChevronRight from '@menu/svg/ChevronRight'
 import { format } from 'date-fns'
 import { showToast } from '@/components/common/Toasts'
 
-// ───────────────────────────────────────
-// Main Component
-// ───────────────────────────────────────
-// ───────────────────────────────────────
 const MaterialRequestPageContent = () => {
   const router = useRouter()
-  const PAGE_SIZE = 25 // ✅ ADD THIS LINE
+  const PAGE_SIZE = 25
 
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(false)
-
-  // 🔴 ADD THESE TWO LINES (YOU MISSED THIS)
   const [page, setPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
 
@@ -93,16 +82,12 @@ const MaterialRequestPageContent = () => {
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [sorting, setSorting] = useState([])
 
-  // ✅ Confirm delete (properly scoped)
   const confirmDelete = async () => {
     try {
       setLoading(true)
-
       const row = deleteDialog.row
       if (!row) return
-
       await deleteTmMaterialRequest(row.id)
-
       showToast('delete', `Request ${row.requestNo || `REQ-${row.id}`} deleted`)
       await loadData()
     } catch (err) {
@@ -114,78 +99,48 @@ const MaterialRequestPageContent = () => {
     }
   }
 
-  const statusRef = useRef(null)
-  const fromRef = useRef(null)
-  const toRef = useRef(null)
-  const byRef = useRef(null)
-
-  // Load + Filter
   const loadData = async (showToastMsg = false) => {
     setLoading(true)
     try {
       const response = await getTmMaterialRequestList(page)
-
       setTotalCount(response.count || 0)
-
-      // 🔥 CORRECT PATH
       const data = response.data?.results || []
 
-      // 1️⃣ MAP API → UI FIELDS (camelCase)
-      const mapped = data.map(r => {
-        const reqNo = r.request_no || `REQ-${r.id}`
+      const mapped = data.map(r => ({
+        id: r.id,
+        requestType: r.request_type || 'Material',
+        requestNo: r.request_no || `REQ-${r.id}`,
+        requestDate: r.request_date,
+        fromLocation: r.from_location || r.from_location_supplier || '',
+        toLocation: r.to_location || r.to_location_supplier || '',
+        requestedBy: r.requested_by_name || r.employee_name || (r.employee_id ? `EMP-${r.employee_id}` : ''),
+        approvedStatus: r.is_approved === 1 ? 'Yes' : 'N/A',
+        issuedStatus: r.is_issued === 1 ? 'Yes' : 'N/A',
+        completedStatus: r.is_completed === 1 ? 'Yes' : 'No',
+        remarks: r.remarks || '',
+        status: r.request_status || 'Waiting'
+      }))
 
-        return {
-          id: r.id,
-
-          // table columns
-          requestType: r.request_type || 'Material',
-          requestNo: reqNo,
-          requestDate: r.request_date, // "2025-11-04"
-
-          fromLocation: r.from_location || r.from_location_supplier || '',
-          toLocation: r.to_location || r.to_location_supplier || '',
-
-          requestedBy: r.requested_by_name || r.employee_name || (r.employee_id ? `EMP-${r.employee_id}` : ''),
-
-          approvedStatus: r.is_approved === 1 ? 'Yes' : 'N/A',
-          issuedStatus: r.is_issued === 1 ? 'Yes' : 'N/A', // if API doesn’t have, stays N/A
-          completedStatus: r.is_completed === 1 ? 'Yes' : 'No',
-
-          remarks: r.remarks || '',
-          status: r.request_status || 'Waiting'
-        }
-      })
-
-      // 2️⃣ APPLY FILTERS ON MAPPED DATA
       const filtered = mapped.filter(row => {
         const text = searchText.trim().toLowerCase()
-
         const matchesSearch = !text || Object.values(row).join(' ').toLowerCase().includes(text)
-
         const matchesDate = !enableDateFilter
           ? true
           : row.requestDate && new Date(row.requestDate) >= startDate && new Date(row.requestDate) <= endDate
-
         const matchesStatus = !requestStatus || row.status === requestStatus
         const matchesFrom = !fromLocation || row.fromLocation === fromLocation
         const matchesTo = !toLocation || row.toLocation === toLocation
         const matchesBy = !requestedBy || row.requestedBy === requestedBy
-
         return matchesSearch && matchesDate && matchesStatus && matchesFrom && matchesTo && matchesBy
       })
 
-      // 3️⃣ ADD S.NO
       const withSno = filtered.map((row, i) => ({
         ...row,
         sno: (page - 1) * PAGE_SIZE + i + 1
       }))
 
       setRows(withSno)
-
-      // toast only from Refresh button
-      if (showToastMsg) {
-        showToast('info', 'Material requests refreshed')
-      }
+      if (showToastMsg) showToast('info', 'Material requests refreshed')
     } catch (err) {
       console.error(err)
       showToast('error', 'Failed to load requests')
@@ -198,37 +153,18 @@ const MaterialRequestPageContent = () => {
     loadData(false)
   }, [page, searchText, enableDateFilter, startDate, endDate, requestStatus, fromLocation, toLocation, requestedBy])
 
-  // Actions
-  const handleDelete = async row => {
-    await deleteTmMaterialRequest(row.id)
-
-    showToast('delete', 'Request deleted')
-    loadData()
-  }
-
-  const handleEdit = row => {
-    router.push(`/admin/stock/material-request/${encodeURIComponent(row.id)}/edit`)
-  }
-
   const getStatusColor = status => {
     switch (status) {
-      case 'Completed':
-        return '#4caf50'
-      case 'Pending':
-        return '#ff9800'
-      case 'Issued':
-        return '#2196f3'
-      case 'Approved':
-        return '#8bc34a'
+      case 'Completed': return '#4caf50'
+      case 'Pending': return '#ff9800'
+      case 'Issued': return '#2196f3'
+      case 'Approved': return '#8bc34a'
       case 'Declined':
-      case 'Rejected':
-        return '#f44336'
-      default:
-        return '#9e9e9e'
+      case 'Rejected': return '#f44336'
+      default: return '#9e9e9e'
     }
   }
 
-  // Export
   const exportCSV = () => {
     const headers = columns.map(c => c.header).filter(Boolean)
     const csv = [
@@ -259,49 +195,34 @@ const MaterialRequestPageContent = () => {
       <table><thead><tr>
       ${columns.map(c => `<th>${c.header}</th>`).join('')}
       </tr></thead><tbody>
-      ${rows
-        .map(
-          r =>
-            `<tr>${columns
-              .map(col => {
-                const raw = r[col.accessorKey ?? col.id] ?? ''
-                let val = raw
-                if (col.accessorKey?.includes('Date') && raw) val = new Date(raw).toLocaleDateString('en-GB')
-                else if (col.id === 'status')
-                  val = `<span class="pill" style="background:${getStatusColor(raw)}">${raw}</span>`
-                return `<td>${val}</td>`
-              })
-              .join('')}</tr>`
-        )
-        .join('')}
+      ${rows.map(r => `<tr>${columns.map(col => {
+        const raw = r[col.accessorKey ?? col.id] ?? ''
+        let val = raw
+        if (col.accessorKey?.includes('Date') && raw) val = new Date(raw).toLocaleDateString('en-GB')
+        else if (col.id === 'status') val = `<span class="pill" style="background:${getStatusColor(raw)}">${raw}</span>`
+        return `<td>${val}</td>`
+      }).join('')}</tr>`).join('')}
       </tbody></table></body></html>`
     w?.document.write(html)
     w?.document.close()
     w?.print()
   }
 
-  // Columns
   const columnHelper = createColumnHelper()
   const columns = useMemo(
     () => [
-      columnHelper.accessor('sno', { header: 'S.No' }),
-
+      columnHelper.accessor('sno', { header: 'S.No', size: 60 }),
       columnHelper.display({
         id: 'actions',
         header: 'Actions',
+        size: 100,
         cell: ({ row }) => {
           const encodedId = btoa(String(row.original.id))
-
           return (
             <Box sx={{ display: 'flex', gap: 1 }}>
-              <IconButton
-                size='small'
-                color='primary'
-                onClick={() => router.push(`/admin/stock/material-request/${encodedId}/edit`)}
-              >
+              <IconButton size='small' color='primary' onClick={() => router.push(`/admin/stock/material-request/${encodedId}/edit`)}>
                 <i className='tabler-edit' />
               </IconButton>
-
               <IconButton size='small' color='error' onClick={() => setDeleteDialog({ open: true, row: row.original })}>
                 <i className='tabler-trash text-red-600 text-lg' />
               </IconButton>
@@ -309,19 +230,8 @@ const MaterialRequestPageContent = () => {
           )
         }
       }),
-      // ✔ Comes from mapped.requestType
-      columnHelper.accessor('requestType', {
-        header: 'Request Type',
-        size: 150
-      }),
-
-      // ✔ Comes from mapped.requestNo
-      columnHelper.accessor('requestNo', {
-        header: 'Request No',
-        size: 150
-      }),
-
-      // ✔ Comes from mapped.requestDate
+      columnHelper.accessor('requestType', { header: 'Request Type', size: 150 }),
+      columnHelper.accessor('requestNo', { header: 'Request No', size: 150 }),
       columnHelper.accessor('requestDate', {
         header: 'Request Date',
         size: 130,
@@ -330,58 +240,28 @@ const MaterialRequestPageContent = () => {
           return d ? format(new Date(d), 'dd/MM/yyyy') : ''
         }
       }),
-
-      // ✔ Comes from mapped.fromLocation
-      columnHelper.accessor('fromLocation', {
-        header: 'From Location/Supplier',
-        size: 200
-      }),
-
-      // ✔ Comes from mapped.toLocation
-      columnHelper.accessor('toLocation', {
-        header: 'To Location/Supplier',
-        size: 200
-      }),
-
-      // ✔ Comes from mapped.requestedBy
-      columnHelper.accessor('requestedBy', {
-        header: 'Requested By',
-        size: 140
-      }),
-
-      // ------- STATUS COLUMNS -------
-
+      columnHelper.accessor('fromLocation', { header: 'From Location/Supplier', size: 200 }),
+      columnHelper.accessor('toLocation', { header: 'To Location/Supplier', size: 200 }),
+      columnHelper.accessor('requestedBy', { header: 'Requested By', size: 140 }),
       columnHelper.display({
         id: 'isApproved',
         header: 'Is Approved',
         size: 120,
-        enableSorting: false,
         cell: ({ row }) => <StatusChip status={row.original.approvedStatus} />
       }),
-
       columnHelper.display({
         id: 'isIssued',
         header: 'Is Issued',
         size: 120,
-        enableSorting: false,
         cell: ({ row }) => <StatusChip status={row.original.issuedStatus} />
       }),
-
       columnHelper.display({
         id: 'isCompleted',
         header: 'Is Completed',
         size: 120,
-        enableSorting: false,
         cell: ({ row }) => <StatusChip status={row.original.completedStatus} />
       }),
-
-      // ✔ Comes from mapped.remarks
-      columnHelper.accessor('remarks', {
-        header: 'Remarks',
-        size: 200
-      }),
-
-      // ✔ Comes from mapped.status
+      columnHelper.accessor('remarks', { header: 'Remarks', size: 200 }),
       columnHelper.accessor('status', {
         header: 'Request Status',
         size: 150,
@@ -394,9 +274,7 @@ const MaterialRequestPageContent = () => {
   const table = useReactTable({
     data: rows,
     columns,
-    state: {
-      sorting
-    },
+    state: { sorting },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -404,387 +282,268 @@ const MaterialRequestPageContent = () => {
     getPaginationRowModel: getPaginationRowModel()
   })
 
-  const filteredRows = table.getFilteredRowModel().rows
-  const total = filteredRows.length
-  const pageSize = table.getState().pagination.pageSize || 10
   const pageIndex = table.getState().pagination.pageIndex || 0
+  const pageSize = table.getState().pagination.pageSize || 10
+  const total = table.getFilteredRowModel().rows.length
 
   return (
-    <Box>
-      {/* Breadcrumb */}
-      <Box role='presentation' sx={{ mb: 2 }}>
-        <Breadcrumbs aria-label='breadcrumb'>
-          <Link underline='hover' color='inherit' href='/'>
-            Home
-          </Link>
-          <Typography color='text.primary'>Material Request</Typography>
-        </Breadcrumbs>
-      </Box>
-
-      {/* Main Card */}
-      <Card sx={{ p: 3, mt: 2 }}>
-        {/* Header */}
-        <CardHeader
-          sx={{
-            pb: 1.5,
-            pt: 1.5,
-            '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' },
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between' // ⭐ this aligns Refresh & Add Request right
-          }}
-          title={
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              {/* Title */}
-              <Typography variant='h5' sx={{ fontWeight: 600 }}>
-                Material Request List
-              </Typography>
-
-              {/* Refresh Button */}
+    <>
+      <StickyListLayout
+        header={
+          <Box sx={{ mb: 6 }}>
+            <Box sx={{ mb: 2 }}>
+              <Link href='/admin/dashboards' className='text-primary'>
+                Dashboard
+              </Link>{' '}
+              / <Typography component='span'>Material Request</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Typography variant='h5' sx={{ fontWeight: 600 }}>
+                  Material Request List
+                </Typography>
+                <Button
+                  variant='contained'
+                  color='primary'
+                  startIcon={
+                    <RefreshIcon
+                      sx={{
+                        animation: loading ? 'spin 1s linear infinite' : 'none',
+                        '@keyframes spin': { '0%': { transform: 'rotate(0deg)' }, '100%': { transform: 'rotate(360deg)' } }
+                      }}
+                    />
+                  }
+                  disabled={loading}
+                  onClick={() => loadData(true)}
+                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                >
+                  {loading ? 'Refreshing...' : 'Refresh'}
+                </Button>
+              </Box>
               <Button
                 variant='contained'
                 color='primary'
-                startIcon={
-                  <RefreshIcon
-                    sx={{
-                      animation: loading ? 'spin 1s linear infinite' : 'none',
-                      '@keyframes spin': {
-                        '0%': { transform: 'rotate(0deg)' },
-                        '100%': { transform: 'rotate(360deg)' }
-                      }
-                    }}
-                  />
-                }
-                disabled={loading}
-                onClick={() => {
-                  setLoading(true)
-                  setTimeout(async () => {
-                    await loadData(true)
-                    setLoading(false)
-                  }, 50)
-                }}
+                startIcon={<AddIcon />}
+                onClick={() => router.push('/admin/stock/material-request/add')}
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
-                {loading ? 'Refreshing...' : 'Refresh'}
+                Add Request
               </Button>
             </Box>
-          }
-          action={
-            <Button
-              variant='contained'
-              color='primary'
-              startIcon={<AddIcon />}
-              onClick={() => router.push('/admin/stock/material-request/add')}
+          </Box>
+        }
+      >
+        <Card
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100%',
+            minHeight: 0,
+            position: 'relative'
+          }}
+        >
+          {loading && (
+            <Box
               sx={{
-                textTransform: 'none',
-                fontWeight: 500,
-                px: 2.5,
-                height: 36
+                position: 'absolute',
+                inset: 0,
+                bgcolor: 'rgba(255,255,255,0.8)',
+                backdropFilter: 'blur(2px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 10
               }}
             >
-              Add Request
-            </Button>
-          }
-        />
+              <ProgressCircularCustomization size={60} thickness={5} />
+            </Box>
+          )}
+          <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <Divider sx={{ mb: 3 }} />
 
-        {/* Loader */}
-        {loading && (
-          <Box
-            sx={{
-              position: 'fixed',
-              inset: 0,
-              bgcolor: 'rgba(255,255,255,0.8)',
-              backdropFilter: 'blur(2px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 9999
-            }}
-          >
-            <ProgressCircularCustomization size={60} thickness={5} />
-          </Box>
-        )}
-
-        <Divider sx={{ mb: 2 }} />
-
-        {/* ---------- FILTER ROW ---------- */}
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'flex-end', // ⭐ FIX: Align bottom of all fields
-            gap: 2,
-            mb: 3,
-            flexWrap: 'nowrap'
-          }}
-        >
-          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-            <FormControlLabel
-              control={<Checkbox checked={enableDateFilter} onChange={e => setEnableDateFilter(e.target.checked)} />}
-              label='Date Filter'
-            />
-            <Box sx={{ width: 220 }}>
-              <GlobalDateRange
-                start={startDate}
-                end={endDate}
-                onSelectRange={({ start, end }) => {
-                  setStartDate(start)
-                  setEndDate(end)
-                }}
-                disabled={!enableDateFilter}
+            {/* Filters */}
+            <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 2, mb: 3, flexWrap: 'nowrap', flexShrink: 0 }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                <FormControlLabel
+                  control={<Checkbox checked={enableDateFilter} onChange={e => setEnableDateFilter(e.target.checked)} />}
+                  label='Date Filter'
+                />
+                <Box sx={{ width: 220 }}>
+                  <GlobalDateRange
+                    start={startDate}
+                    end={endDate}
+                    onSelectRange={({ start, end }) => {
+                      setStartDate(start)
+                      setEndDate(end)
+                    }}
+                    disabled={!enableDateFilter}
+                  />
+                </Box>
+              </Box>
+              <CustomAutocomplete
+                options={['Waiting', 'Pending', 'Rejected', 'Approved', 'Issued', 'Completed', 'Declined']}
+                value={requestStatus || null}
+                onChange={(e, val) => setRequestStatus(val || '')}
+                renderInput={params => (
+                  <CustomTextField {...params} size='small' label='Request Status' sx={{ width: 180 }} placeholder='Select status' />
+                )}
+              />
+              <CustomAutocomplete
+                options={['Stock-TECH STOCK 1', 'Supplier-ABC']}
+                value={fromLocation || null}
+                onChange={(e, val) => setFromLocation(val || '')}
+                renderInput={params => (
+                  <CustomTextField {...params} size='small' label='From Location' sx={{ width: 180 }} placeholder='From' />
+                )}
+              />
+              <CustomAutocomplete
+                options={['Stock-TECH STOCK 1', 'Site-A', 'Site-B']}
+                value={toLocation || null}
+                onChange={(e, val) => setToLocation(val || '')}
+                renderInput={params => (
+                  <CustomTextField {...params} size='small' label='To Location' sx={{ width: 180 }} placeholder='To' />
+                )}
+              />
+              <CustomAutocomplete
+                options={['Admin', 'Tech', 'John Doe']}
+                value={requestedBy || null}
+                onChange={(e, val) => setRequestedBy(val || '')}
+                renderInput={params => (
+                  <CustomTextField {...params} size='small' label='Requested By' sx={{ width: 180 }} placeholder='Employee' />
+                )}
               />
             </Box>
-          </Box>
-          {/* Request Status */}
-          <CustomAutocomplete
-            options={['Waiting', 'Pending', 'Rejected', 'Approved', 'Issued', 'Completed', 'Declined']}
-            value={requestStatus || null}
-            onChange={(e, val) => setRequestStatus(val || '')}
-            renderInput={params => (
-              <CustomTextField
-                {...params}
-                size='small'
-                label='Request Status'
-                sx={{ width: 220 }}
-                placeholder='Select status'
-              />
-            )}
-          />
 
-          {/* From Location */}
-          <CustomAutocomplete
-            options={['Stock-TECH STOCK 1', 'Supplier-ABC']}
-            value={fromLocation || null}
-            onChange={(e, val) => setFromLocation(val || '')}
-            renderInput={params => (
-              <CustomTextField
-                {...params}
-                size='small'
-                label='From Location / Supplier'
-                sx={{ width: 220 }}
-                placeholder='Select from location'
-              />
-            )}
-          />
+            <Divider sx={{ mb: 3 }} />
 
-          {/* To Location */}
-          <CustomAutocomplete
-            options={['Stock-TECH STOCK 1', 'Stock-TECH STOCK 2', 'Site-A', 'Site-B', 'Site-C']}
-            value={toLocation || null}
-            onChange={(e, val) => setToLocation(val || '')}
-            renderInput={params => (
-              <CustomTextField
-                {...params}
-                size='small'
-                label='To Location / Supplier'
-                sx={{ width: 220 }}
-                placeholder='Select to location'
-              />
-            )}
-          />
-
-          {/* Requested By */}
-          <CustomAutocomplete
-            options={['Admin', 'Tech', 'John Doe', 'Jane Smith']}
-            value={requestedBy || null}
-            onChange={(e, val) => setRequestedBy(val || '')}
-            renderInput={params => (
-              <CustomTextField
-                {...params}
-                size='small'
-                label='Requested By'
-                sx={{ width: 220 }}
-                placeholder='Select employee'
-              />
-            )}
-          />
-        </Box>
-
-        <Divider sx={{ mb: 4 }} />
-
-        {/* Search + Page Size */}
-        {/* Toolbar Row */}
-        <Box
-          sx={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: 2,
-            mb: 2
-          }}
-        >
-          {/* LEFT SIDE: Entries + Export Buttons */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-            {/* Entries */}
-            <FormControl size='small' sx={{ width: 120 }}>
-              <Select value={pageSize} onChange={e => table.setPageSize(Number(e.target.value))}>
-                {[10, 25, 50, 100].map(s => (
-                  <MenuItem key={s} value={s}>
-                    {s} entries
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            {/* Export Buttons */}
-            <Box sx={{ display: 'flex', gap: 1.5 }}>
-              {['Copy', 'CSV', 'Excel', 'PDF', 'Print'].map(label => (
-                <Button
-                  key={label}
-                  variant='contained'
-                  sx={{
-                    backgroundColor: '#5A5A5A',
-                    color: 'white',
-                    textTransform: 'none',
-                    fontWeight: 500,
-                    fontSize: '0.8rem',
-                    px: 2,
-                    py: 0.7,
-                    borderRadius: 2,
-                    minWidth: 68,
-                    boxShadow: 'none',
-                    '&:hover': { backgroundColor: '#4b4b4b' }
-                  }}
-                  onClick={() => {
-                    if (label === 'CSV') exportCSV()
-                    else if (label === 'Print') exportPrint()
-                    else showToast('info', `${label} export coming soon`)
-                  }}
-                >
-                  {label}
-                </Button>
-              ))}
-            </Box>
-          </Box>
-
-          {/* RIGHT SIDE: Search */}
-          <CustomTextField
-            size='small'
-            placeholder='Search any field...'
-            value={searchText}
-            onChange={e => setSearchText(e.target.value)}
-            sx={{ width: 350 }}
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position='start'>
-                    <SearchIcon />
-                  </InputAdornment>
-                )
-              }
-            }}
-          />
-        </Box>
-
-        {/* Table */}
-        <Box sx={{ overflowX: 'auto' }}>
-          <table
-            className={styles.table}
-            style={{
-              width: 'max-content',
-              minWidth: '100%',
-              tableLayout: 'fixed'
-            }}
-          >
-            <colgroup>
-              <col style={{ width: 60 }} />
-              <col style={{ width: 100 }} />
-              <col style={{ width: 150 }} />
-              <col style={{ width: 150 }} />
-              <col style={{ width: 130 }} />
-              <col style={{ width: 200 }} />
-              <col style={{ width: 200 }} />
-              <col style={{ width: 140 }} />
-              <col style={{ width: 120 }} />
-              <col style={{ width: 120 }} />
-              <col style={{ width: 120 }} />
-              <col style={{ width: 200 }} />
-              <col style={{ width: 150 }} />
-            </colgroup>
-            <thead>
-              {table.getHeaderGroups().map(hg => (
-                <tr key={hg.id}>
-                  {hg.headers.map(header => (
-                    <th
-                      key={header.id}
-                      style={{
-                        width: header.getSize(),
-                        minWidth: header.getSize(),
-                        maxWidth: header.getSize()
+            {/* Toolbar */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 3, flexShrink: 0 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                <FormControl size='small' sx={{ width: 120 }}>
+                  <Select value={pageSize} onChange={e => table.setPageSize(Number(e.target.value))}>
+                    {[10, 25, 50, 100].map(s => (
+                      <MenuItem key={s} value={s}>{s} entries</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <Box sx={{ display: 'flex', gap: 1.5 }}>
+                  {['Copy', 'CSV', 'Excel', 'PDF', 'Print'].map(label => (
+                    <Button
+                      key={label}
+                      variant='contained'
+                      sx={{
+                        backgroundColor: '#5A5A5A',
+                        color: 'white',
+                        textTransform: 'none',
+                        fontWeight: 500,
+                        fontSize: '0.8rem',
+                        px: 2,
+                        py: 0.7,
+                        borderRadius: 2,
+                        minWidth: 68,
+                        boxShadow: 'none',
+                        '&:hover': { backgroundColor: '#4b4b4b' }
+                      }}
+                      onClick={() => {
+                        if (label === 'CSV') exportCSV()
+                        else if (label === 'Print') exportPrint()
+                        else showToast('info', `${label} export coming soon`)
                       }}
                     >
-                      <div
-                        className={classnames({
-                          'flex items-center': header.column.getIsSorted(),
-                          'cursor-pointer select-none': header.column.getCanSort()
-                        })}
-                        onClick={header.column.getToggleSortingHandler()}
-                      >
-                        {flexRender(header.column.columnDef.header, header.getContext())}
-                        {header.column.getIsSorted() === 'asc' && (
-                          <ChevronRight className='-rotate-90' fontSize='small' />
-                        )}
-                        {header.column.getIsSorted() === 'desc' && (
-                          <ChevronRight className='rotate-90' fontSize='small' />
-                        )}
-                      </div>
-                    </th>
+                      {label}
+                    </Button>
                   ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody>
-              {table.getRowModel().rows.length === 0 ? (
-                <tr>
-                  <td colSpan={columns.length} className='text-center py-4'>
-                    No data available
-                  </td>
-                </tr>
-              ) : (
-                table.getRowModel().rows.map(row => (
-                  <tr key={row.id}>
-                    {row.getVisibleCells().map(cell => (
-                      <td key={cell.id} style={{ width: cell.column.getSize() }}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
+                </Box>
+              </Box>
+              <CustomTextField
+                size='small'
+                placeholder='Search any field...'
+                value={searchText}
+                onChange={e => setSearchText(e.target.value)}
+                sx={{ width: 350 }}
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position='start'>
+                        <SearchIcon />
+                      </InputAdornment>
+                    )
+                  }
+                }}
+              />
+            </Box>
+
+            <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              <StickyTableWrapper rowCount={rows.length}>
+                <table className={styles.table} style={{ width: 'max-content', minWidth: '100%', tableLayout: 'fixed' }}>
+                  <colgroup>
+                    <col style={{ width: 60 }} /><col style={{ width: 100 }} /><col style={{ width: 150 }} />
+                    <col style={{ width: 150 }} /><col style={{ width: 130 }} /><col style={{ width: 200 }} />
+                    <col style={{ width: 200 }} /><col style={{ width: 140 }} /><col style={{ width: 120 }} />
+                    <col style={{ width: 120 }} /><col style={{ width: 120 }} /><col style={{ width: 200 }} />
+                    <col style={{ width: 150 }} />
+                  </colgroup>
+                  <thead>
+                    {table.getHeaderGroups().map(hg => (
+                      <tr key={hg.id}>
+                        {hg.headers.map(header => (
+                          <th key={header.id} style={{ width: header.getSize(), minWidth: header.getSize(), maxWidth: header.getSize() }}>
+                            <div
+                              className={classnames({
+                                'flex items-center': header.column.getIsSorted(),
+                                'cursor-pointer select-none': header.column.getCanSort()
+                              })}
+                              onClick={header.column.getToggleSortingHandler()}
+                            >
+                              {flexRender(header.column.columnDef.header, header.getContext())}
+                              {header.column.getIsSorted() === 'asc' && <ChevronRight className='-rotate-90' fontSize='small' />}
+                              {header.column.getIsSorted() === 'desc' && <ChevronRight className='rotate-90' fontSize='small' />}
+                            </div>
+                          </th>
+                        ))}
+                      </tr>
                     ))}
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </Box>
+                  </thead>
+                  <tbody>
+                    {table.getRowModel().rows.length === 0 ? (
+                      <tr><td colSpan={columns.length} className='text-center py-4'>No data available</td></tr>
+                    ) : (
+                      table.getRowModel().rows.map(row => (
+                        <tr key={row.id}>
+                          {row.getVisibleCells().map(cell => (
+                            <td key={cell.id} style={{ width: cell.column.getSize() }}>
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                            </td>
+                          ))}
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </StickyTableWrapper>
+            </Box>
 
-        {/* Pagination */}
-        <Box
-          sx={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            borderTop: '1px solid #e0e0e0',
-            px: 3,
-            py: 1.5,
-            mt: 1,
-            gap: 2
-          }}
-        >
-          <Typography color='text.disabled'>
-            Showing {(page - 1) * 25 + 1} to {Math.min(page * 25, totalCount)} of {totalCount} entries
-          </Typography>
-
-          <Pagination
-            shape='rounded'
-            color='primary'
-            variant='tonal'
-            count={Math.ceil(totalCount / 25) || 1}
-            page={page}
-            onChange={(_, p) => setPage(p)}
-            showFirstButton
-            showLastButton
-          />
-        </Box>
-      </Card>
+            <Box sx={{ mt: 'auto', flexShrink: 0, pt: 4 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+                <Typography color='text.disabled'>
+                  Showing {(page - 1) * 25 + 1} to {Math.min(page * 25, totalCount)} of {totalCount} entries
+                </Typography>
+                <Pagination
+                  shape='rounded'
+                  color='primary'
+                  variant='tonal'
+                  count={Math.ceil(totalCount / 25) || 1}
+                  page={page}
+                  onChange={(_, p) => setPage(p)}
+                  showFirstButton
+                  showLastButton
+                />
+              </Box>
+            </Box>
+          </Box>
+        </Card>
+        <ToastContainer />
+      </StickyListLayout>
 
       {/* Delete Confirmation Dialog */}
       <Dialog
@@ -792,56 +551,39 @@ const MaterialRequestPageContent = () => {
         aria-labelledby='delete-request-dialog'
         open={deleteDialog.open}
         closeAfterTransition={false}
-        PaperProps={{
-          sx: {
-            overflow: 'visible',
-            width: 420,
-            borderRadius: 1,
-            textAlign: 'center'
-          }
-        }}
+        PaperProps={{ sx: { overflow: 'visible', width: 420, borderRadius: 1, textAlign: 'center' } }}
       >
-        {/* 🔴 Header with Close Button */}
-        <DialogTitle
-          id='delete-request-dialog'
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 1,
-            color: 'error.main',
-            fontWeight: 700,
-            pb: 1,
-            position: 'relative'
-          }}
-        >
-          <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
-          Confirm Delete
-          {/* ❌ Close Button */}
-          <DialogCloseButton
-            onClick={() => setDeleteDialog({ open: false, row: null })}
-            disableRipple
-            sx={{ position: 'absolute', right: 1, top: 1 }}
+        <DialogTitle sx={{ pt: 12 }}>
+          <Box
+            sx={{
+              position: 'absolute',
+              top: -40,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              bgcolor: 'error.main',
+              color: 'white',
+              width: 80,
+              height: 80,
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '4px solid white',
+              boxShadow: 3
+            }}
           >
-            <i className='tabler-x' />
-          </DialogCloseButton>
+            <WarningAmberIcon sx={{ fontSize: 40 }} />
+          </Box>
+          <Typography variant='h5' sx={{ fontWeight: 600 }}>
+            Confirm Deletion
+          </Typography>
         </DialogTitle>
-
-        {/* 🧾 Message */}
-        <DialogContent sx={{ px: 5, pt: 1 }}>
-          <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
-            Are you sure you want to delete material request{' '}
-            <strong style={{ color: '#d32f2f' }}>
-              {deleteDialog.row?.requestNo || `REQ-${deleteDialog.row?.id || ''}`}
-            </strong>
-            ?
-            <br />
-            This action cannot be undone.
+        <DialogContent sx={{ px: 8, pb: 4 }}>
+          <Typography>
+            Are you sure you want to delete this material request? This action cannot be undone.
           </Typography>
         </DialogContent>
-
-        {/* ⚙️ Buttons */}
-        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+        <DialogActions sx={{ justifyContent: 'center', gap: 3, pb: 10 }}>
           <Button
             onClick={() => setDeleteDialog({ open: false, row: null })}
             variant='tonal'
@@ -860,13 +602,10 @@ const MaterialRequestPageContent = () => {
           </Button>
         </DialogActions>
       </Dialog>
-
-      <ToastContainer />
-    </Box>
+    </>
   )
 }
 
-// Wrapper for RBAC
 export default function MaterialRequestPage() {
   return (
     <PermissionGuard permission='Material Request'>

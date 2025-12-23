@@ -80,6 +80,82 @@
   }
 }
 
+/* ================================
+   LIST PAGE – REUSABLE TABLE SCROLL
+   ================================ */
+
+.table_wrapper {
+  inline-size: 100%;
+  overflow: auto;
+  position: relative;
+  border-block-start: 1px solid var(--border-color);
+  
+  /* Scrollbar styles */
+  &::-webkit-scrollbar {
+    inline-size: 8px;
+    block-size: 8px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: var(--mui-palette-divider);
+    border-radius: 10px;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background: var(--mui-palette-action-disabledBackground);
+  }
+}
+
+/* 10-row vertical scroll rule */
+/* header height (56px) + 10 rows (10 * 50px) = 556px */
+.table_scroll_10 {
+  max-block-size: 556px;
+}
+
+/* Sticky Header */
+.table thead th {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 10;
+  background-color: var(--mui-palette-background-paper) !important;
+  border-block-end: 1px solid var(--border-color);
+}
+
+/* Sticky Columns Logic */
+/* 1️⃣ Sticky S.No Column */
+.table th:first-child,
+.table td:first-child {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 5;
+  background-color: var(--mui-palette-background-paper) !important;
+  box-shadow: inset -1px 0 0 var(--border-color);
+}
+
+/* 2️⃣ Sticky Actions Column */
+.table th:nth-child(2),
+.table td:nth-child(2) {
+  position: sticky;
+  inset-inline-start: 70px; /* Offset by S.No column width */
+  z-index: 5;
+  background-color: var(--mui-palette-background-paper) !important;
+  box-shadow: inset -1px 0 0 var(--border-color);
+}
+
+/* Corner Overlap (Sticky header + Sticky column) */
+.table thead th:first-child {
+  z-index: 12;
+}
+.table thead th:nth-child(2) {
+  z-index: 12;
+}
+
+/* Fix for table rows box-shadow overlap */
+.table tbody tr {
+  background-color: var(--mui-palette-background-paper);
+}
+
 .cellWithInput input {
   inline-size: 100%;
   background-color: transparent;
@@ -95,42 +171,18 @@
   }
 }
 
-/* ===========================
-   Sticky First Two Columns
-   =========================== */
-
-/* 1️⃣ Sticky S.No Column */
-.table thead th:first-child,
-.table tbody td:first-child {
-  position: sticky;
-  inset-inline-start: 0; /* RTL Safe */
-  z-index: 5;
-  background: #fff;
-  box-shadow: 2px 0 3px rgba(0, 0, 0, 0.05);
+/* ============================
+   REMOVE ROW HANDLE (⋮⋮)
+   CUSTOMER PAGE ONLY
+   ============================ */
+.customer-table .table tbody td:first-child {
+  background-image: none !important;
+  padding-inline-start: 1rem !important;
 }
 
-/* 2️⃣ Sticky Actions Column */
-.table thead th:nth-child(2),
-.table tbody td:nth-child(2) {
-  position: sticky;
-  inset-inline-start: 70px; /* Matches width of S.No column */
-  z-index: 5;
-  background: #fff;
-  box-shadow: 2px 0 3px rgba(0, 0, 0, 0.05);
+.customer-table .table tbody td:first-child::before,
+.customer-table .table tbody td:first-child::after {
+  content: none !important;
+  display: none !important;
 }
-
-/* Keep header above body elements */
-.table thead th {
-  z-index: 10;
-}
-
-/* .table {
-  inline-size: 100%;
-  border-collapse: collapse;
-  font-size: 0.8125rem;
-  white-space: nowrap;
-
-  table-layout: fixed;
-} */
-
 

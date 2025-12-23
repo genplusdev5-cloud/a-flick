@@ -11,6 +11,7 @@ import CustomTextField from '@core/components/mui/TextField'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalDateRange from '@/components/common/GlobalDateRange'
+import StickyListLayout from '@/components/common/StickyListLayout'
 
 import { getReportDropdown, generateServiceSummary } from '@/api/serviceSummary'
 import { showToast } from '@/components/common/Toasts'
@@ -115,14 +116,21 @@ const ServiceSummaryReportPageContent = () => {
   }
 
   return (
-    <Box>
-      <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
-        <Link href='/' style={{ textDecoration: 'none' }}>
-          Dashboard
-        </Link>
-        <Typography color='text.primary'>Service Request Summary</Typography>
-      </Breadcrumbs>
-
+    <StickyListLayout
+      header={
+        <Box sx={{ mb: 6 }}>
+          <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
+            <Link href='/' style={{ textDecoration: 'none' }}>
+              Dashboard
+            </Link>
+            <Typography color='text.primary'>Service Request Summary</Typography>
+          </Breadcrumbs>
+          <Typography variant='h5' sx={{ fontWeight: 600 }}>
+            Service Request Summary
+          </Typography>
+        </Box>
+      }
+    >
       <Card
         sx={{
           p: 4,
@@ -130,7 +138,9 @@ const ServiceSummaryReportPageContent = () => {
           boxShadow: '0px 4px 20px rgba(0,0,0,0.08)',
           minHeight: 170,
           display: 'flex',
-          alignItems: 'center'
+          alignItems: 'center',
+          height: '100%',
+          minHeight: 0
         }}
       >
         <Grid container spacing={3} alignItems='center'>
@@ -286,7 +296,7 @@ const ServiceSummaryReportPageContent = () => {
           </Grid>
         </Grid>
       </Card>
-    </Box>
+    </StickyListLayout>
   )
 }
 

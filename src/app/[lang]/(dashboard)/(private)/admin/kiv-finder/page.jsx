@@ -60,6 +60,8 @@ import {
 
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
+import StickyTableWrapper from '@/components/common/StickyTableWrapper'
+import StickyListLayout from '@/components/common/StickyListLayout'
 
 // Debounced Input
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
@@ -328,248 +330,237 @@ const KivFinderPageContent = () => {
   // RENDER
   // -----------------------------
   return (
-    <Box>
-      {loading && (
-        <Box
-          sx={{
-            position: 'fixed',
-            inset: 0,
-            bgcolor: 'rgba(255,255,255,0.65)',
-            backdropFilter: 'blur(3px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexDirection: 'column',
-            zIndex: 2000,
-            animation: 'fadeIn 0.3s ease-in-out',
-            '@keyframes fadeIn': {
-              from: { opacity: 0 },
-              to: { opacity: 1 }
-            }
-          }}
-        >
-          <ProgressCircularCustomization size={70} thickness={5} />
-          <Typography
-            mt={2}
+    <StickyListLayout
+      header={
+        <Box sx={{ mb: 6 }}>
+          <Breadcrumbs sx={{ mb: 2 }}>
+            <Link href='/'>Dashboard</Link>
+            <Typography>KVI Finder</Typography>
+          </Breadcrumbs>
+          <CardHeader
             sx={{
-              color: 'primary.main',
-              fontWeight: 600,
-              fontSize: '1.05rem',
-              letterSpacing: 0.3
+              p: 0,
+              '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
+              '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.5rem' }
             }}
-          >
-            Loading KIV Reports...
-          </Typography>
-        </Box>
-      )}
-      <Breadcrumbs sx={{ mb: 2 }}>
-        <Link href='/'>Dashboard</Link>
-        <Typography>KVI Finder</Typography>
-      </Breadcrumbs>
+            title={
+              <Box display='flex' alignItems='center' gap={2}>
+                <Typography variant='h5' sx={{ fontWeight: 600 }}>
+                  KVI Finder
+                </Typography>
 
-      <Card sx={{ p: 3 }}>
-        <CardHeader
-          sx={{
-            pb: 1.5,
-            pt: 1.5,
-            '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
-            '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
-          }}
-          title={
-            <Box display='flex' alignItems='center' gap={2}>
-              <Typography variant='h5' sx={{ fontWeight: 600 }}>
-                KVI Finder
-              </Typography>
-
-              <GlobalButton
-                variant='contained'
-                color='primary'
-                startIcon={
-                  <RefreshIcon
-                    sx={{
-                      animation: loading ? 'spin 1s linear infinite' : 'none',
-                      '@keyframes spin': {
-                        '0%': { transform: 'rotate(0deg)' },
-                        '100%': { transform: 'rotate(360deg)' }
-                      }
-                    }}
-                  />
-                }
-                disabled={loading}
-                onClick={() => fetchKVI()}
-                sx={{ textTransform: 'none', height: 36 }}
-              >
-                {loading ? 'Refreshing...' : 'Refresh'}
-              </GlobalButton>
-            </Box>
-          }
-          action={
-            <Box display='flex' alignItems='center' gap={2}>
-              <GlobalButton
-                variant='outlined'
-                color='secondary'
-                endIcon={<ArrowDropDownIcon />}
-                onClick={e => setExportAnchorEl(e.currentTarget)}
-                disabled={!rows.length}
-              >
-                Export
-              </GlobalButton>
-
-              <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
-                <MenuItem onClick={exportPrint}>
-                  <PrintIcon sx={{ mr: 1 }} /> Print
-                </MenuItem>
-                <MenuItem onClick={exportCSV}>
-                  <FileDownloadIcon sx={{ mr: 1 }} /> CSV
-                </MenuItem>
-              </Menu>
-            </Box>
-          }
-        />
-
-        <Divider sx={{ mb: 4 }} />
-
-        {/* FILTERS */}
-        {/* FILTERS (Same Style as Other Pages) */}
-        <Box sx={{ mb: 4 }}>
-          {/* DATE RANGE BLOCK */}
-          <Box sx={{ display: 'flex', flexDirection: 'column', width: 260, mb: 3 }}>
-            {/* Checkbox + Label */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-              <Checkbox
-                checked={enableDateFilter}
-                onChange={e => {
-                  const checked = e.target.checked
-                  setEnableDateFilter(checked)
-
-                  if (!checked) {
-                    setFromDate('')
-                    setToDate('')
-                    fetchKVI() // reload full list
+                <GlobalButton
+                  variant='contained'
+                  color='primary'
+                  startIcon={
+                    <RefreshIcon
+                      sx={{
+                        animation: loading ? 'spin 1s linear infinite' : 'none',
+                        '@keyframes spin': {
+                          '0%': { transform: 'rotate(0deg)' },
+                          '100%': { transform: 'rotate(360deg)' }
+                        }
+                      }}
+                    />
                   }
-                }}
-                size='small'
-              />
+                  disabled={loading}
+                  onClick={() => fetchKVI()}
+                  sx={{ textTransform: 'none', height: 36 }}
+                >
+                  {loading ? 'Refreshing...' : 'Refresh'}
+                </GlobalButton>
+              </Box>
+            }
+            action={
+              <Box display='flex' alignItems='center' gap={2}>
+                <GlobalButton
+                  variant='outlined'
+                  color='secondary'
+                  endIcon={<ArrowDropDownIcon />}
+                  onClick={e => setExportAnchorEl(e.currentTarget)}
+                  disabled={!rows.length}
+                >
+                  Export
+                </GlobalButton>
 
-              <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Date Range</Typography>
-            </Box>
-
-            {/* Date Range Picker */}
-            <GlobalDateRange
-              label=''
-              start={fromDate}
-              end={toDate}
-              onSelectRange={({ start, end }) => {
-                setFromDate(start)
-                setToDate(end)
-                fetchKVI({ from_date: start, to_date: end }) // 🔥 call API on date change
-              }}
-              disabled={!enableDateFilter}
-            />
-          </Box>
-
-          <Divider sx={{ mb: 4 }} />
-
-          {/* ENTRIES + SEARCH ROW */}
+                <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
+                  <MenuItem onClick={exportPrint}>
+                    <PrintIcon sx={{ mr: 1 }} /> Print
+                  </MenuItem>
+                  <MenuItem onClick={exportCSV}>
+                    <FileDownloadIcon sx={{ mr: 1 }} /> CSV
+                  </MenuItem>
+                </Menu>
+              </Box>
+            }
+          />
+        </Box>
+      }
+    >
+      <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
+        {loading && (
           <Box
             sx={{
+              position: 'absolute',
+              inset: 0,
+              bgcolor: 'rgba(255,255,255,0.8)',
+              backdropFilter: 'blur(2px)',
               display: 'flex',
-              justifyContent: 'space-between',
               alignItems: 'center',
-              gap: 3
+              justifyContent: 'center',
+              zIndex: 10
             }}
           >
-            {/* Entries Dropdown */}
-            <FormControl size='small' sx={{ width: 120 }}>
-              <Select
-                value={pagination.pageSize}
-                onChange={e =>
-                  setPagination(p => ({
-                    ...p,
-                    pageSize: Number(e.target.value),
-                    pageIndex: 0
-                  }))
-                }
-              >
-                {[10, 25, 50, 100].map(n => (
-                  <MenuItem key={n} value={n}>
-                    {n} entries
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            {/* Search Box */}
-            <DebouncedInput
-              value={searchText}
-              onChange={v => setSearchText(String(v))}
-              placeholder='Search customer, address, pest...'
-              sx={{ width: 340 }}
-              size='small'
-              variant='outlined'
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position='start'>
-                      <SearchIcon />
-                    </InputAdornment>
-                  )
-                }
-              }}
-            />
+            <ProgressCircularCustomization size={60} thickness={5} />
           </Box>
-        </Box>
+        )}
+        <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-        {/* TABLE */}
-        <div className='overflow-x-auto'>
-          <table className={styles.table}>
-            <thead>
-              {table.getHeaderGroups().map(hg => (
-                <tr key={hg.id}>
-                  {hg.headers.map(h => (
-                    <th key={h.id}>
-                      <div
-                        className={classnames({
-                          'flex items-center': h.column.getIsSorted(),
-                          'cursor-pointer select-none': h.column.getCanSort()
-                        })}
-                        onClick={h.column.getToggleSortingHandler()}
-                      >
-                        {flexRender(h.column.columnDef.header, h.getContext())}
+          <Divider sx={{ mb: 3 }} />
 
-                        {{
-                          asc: <ChevronRight className='-rotate-90' />,
-                          desc: <ChevronRight className='rotate-90' />
-                        }[h.column.getIsSorted()] ?? null}
-                      </div>
-                    </th>
+          {/* FILTERS */}
+          <Box sx={{ mb: 4, flexShrink: 0 }}>
+            {/* DATE RANGE BLOCK */}
+            <Box sx={{ display: 'flex', flexDirection: 'column', width: 260, mb: 3 }}>
+              {/* Checkbox + Label */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                <Checkbox
+                  checked={enableDateFilter}
+                  onChange={e => {
+                    const checked = e.target.checked
+                    setEnableDateFilter(checked)
+
+                    if (!checked) {
+                      setFromDate('')
+                      setToDate('')
+                      fetchKVI() // reload full list
+                    }
+                  }}
+                  size='small'
+                />
+
+                <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Date Range</Typography>
+              </Box>
+
+              {/* Date Range Picker */}
+              <GlobalDateRange
+                label=''
+                start={fromDate}
+                end={toDate}
+                onSelectRange={({ start, end }) => {
+                  setFromDate(start)
+                  setToDate(end)
+                  fetchKVI({ from_date: start, to_date: end }) // 🔥 call API on date change
+                }}
+                disabled={!enableDateFilter}
+              />
+            </Box>
+
+            <Divider sx={{ mb: 4 }} />
+
+            {/* ENTRIES + SEARCH ROW */}
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 3
+              }}
+            >
+              {/* Entries Dropdown */}
+              <FormControl size='small' sx={{ width: 120 }}>
+                <Select
+                  value={pagination.pageSize}
+                  onChange={e =>
+                    setPagination(p => ({
+                      ...p,
+                      pageSize: Number(e.target.value),
+                      pageIndex: 0
+                    }))
+                  }
+                >
+                  {[10, 25, 50, 100].map(n => (
+                    <MenuItem key={n} value={n}>
+                      {n} entries
+                    </MenuItem>
                   ))}
-                </tr>
-              ))}
-            </thead>
+                </Select>
+              </FormControl>
 
-            <tbody>
-              {rows.length ? (
-                table.getRowModel().rows.map(row => (
-                  <tr key={row.id}>
-                    {row.getVisibleCells().map(cell => (
-                      <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
-                    ))}
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={columns.length} className='text-center py-4'>
-                    No results found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              {/* Search Box */}
+              <DebouncedInput
+                value={searchText}
+                onChange={v => setSearchText(String(v))}
+                placeholder='Search customer, address, pest...'
+                sx={{ width: 340 }}
+                size='small'
+                variant='outlined'
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position='start'>
+                        <SearchIcon />
+                      </InputAdornment>
+                    )
+                  }
+                }}
+              />
+            </Box>
+          </Box>
 
-        <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+          <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            <StickyTableWrapper rowCount={rows.length}>
+              <table className={styles.table}>
+                <thead>
+                  {table.getHeaderGroups().map(hg => (
+                    <tr key={hg.id}>
+                      {hg.headers.map(h => (
+                        <th key={h.id}>
+                          <div
+                            className={classnames({
+                              'flex items-center': h.column.getIsSorted(),
+                              'cursor-pointer select-none': h.column.getCanSort()
+                            })}
+                            onClick={h.column.getToggleSortingHandler()}
+                          >
+                            {flexRender(h.column.columnDef.header, h.getContext())}
+
+                            {{
+                              asc: <ChevronRight className='-rotate-90' />,
+                              desc: <ChevronRight className='rotate-90' />
+                            }[h.column.getIsSorted()] ?? null}
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  ))}
+                </thead>
+
+                <tbody>
+                  {rows.length ? (
+                    table.getRowModel().rows.map(row => (
+                      <tr key={row.id}>
+                        {row.getVisibleCells().map(cell => (
+                          <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                        ))}
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={columns.length} className='text-center py-4'>
+                        No results found
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </StickyTableWrapper>
+          </Box>
+
+          <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+        </Box>
       </Card>
+    </StickyListLayout>
 
       {/* DELETE DIALOG */}
       <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false })}>

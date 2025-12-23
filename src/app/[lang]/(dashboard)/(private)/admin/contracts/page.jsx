@@ -80,6 +80,7 @@ import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
 import { dateSortingFn } from '@/utils/tableUtils'
 import StickyListLayout from '@/components/common/StickyListLayout'
+import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 // Debounced Input
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
   const [value, setValue] = useState(initialValue)
@@ -621,117 +622,100 @@ const ContractsPageContent = () => {
   // Render
   // ───────────────────────────────────────────
   return (
-    <Box>
-      <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
-        <Link underline='hover' color='inherit' href='/'>
-          Dashboard
-        </Link>
-        <Typography color='text.primary'>Contracts</Typography>
-      </Breadcrumbs>
+    <StickyListLayout
+      header={
+        <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
+          <Link underline='hover' color='inherit' href='/'>
+            Dashboard
+          </Link>
+          <Typography color='text.primary'>Contracts</Typography>
+        </Breadcrumbs>
+      }
+    >
+      <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+       <CardHeader
+  title={
+    <Box display='flex' alignItems='center' gap={2}>
+      <Typography variant='h5' fontWeight={600}>
+        Contracts List
+      </Typography>
 
-      <Card>
-        <CardHeader
-          title='Contracts List'
-          subheader='Manage contracts'
-          action={
-            <Box display='flex' alignItems='center' gap={2}>
-              <GlobalButton
-                variant='contained'
-                color='primary'
-                startIcon={
-                  <RefreshIcon
-                    sx={{
-                      animation: loading ? 'spin 1s linear infinite' : 'none',
-                      '@keyframes spin': {
-                        '0%': { transform: 'rotate(0deg)' },
-                        '100%': { transform: 'rotate(360deg)' }
-                      }
-                    }}
-                  />
-                }
-                disabled={loading}
-                onClick={async () => {
-                  setLoading(true)
-                  await loadData()
-                  setTimeout(() => setLoading(false), 600)
-                }}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-              >
-                {loading ? 'Refreshing...' : 'Refresh'}
-              </GlobalButton>
+      <GlobalButton
+        variant='contained'
+        color='primary'
+        startIcon={
+          <RefreshIcon
+            sx={{
+              animation: loading ? 'spin 1s linear infinite' : 'none',
+              '@keyframes spin': {
+                '0%': { transform: 'rotate(0deg)' },
+                '100%': { transform: 'rotate(360deg)' }
+              }
+            }}
+          />
+        }
+        disabled={loading}
+        onClick={async () => {
+          setLoading(true)
+          await loadData()
+          setTimeout(() => setLoading(false), 600)
+        }}
+        sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+      >
+        {loading ? 'Refreshing...' : 'Refresh'}
+      </GlobalButton>
+    </Box>
+  }
+  action={
+    <Box display='flex' alignItems='center' gap={2}>
+      <GlobalButton
+        color='secondary'
+        endIcon={<ArrowDropDownIcon />}
+        onClick={e => setExportAnchorEl(e.currentTarget)}
+        sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+      >
+        Export
+      </GlobalButton>
 
-              <GlobalButton
-                color='secondary'
-                endIcon={<ArrowDropDownIcon />}
-                onClick={e => setExportAnchorEl(e.currentTarget)}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-              >
-                Export
-              </GlobalButton>
-              <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
-                <MenuItem
-                  onClick={() => {
-                    setExportAnchorEl(null)
-                    exportPrint()
-                  }}
-                >
-                  <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
-                </MenuItem>
+      <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
+        <MenuItem onClick={() => { setExportAnchorEl(null); exportPrint() }}>
+          <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
+        </MenuItem>
 
-                <MenuItem
-                  onClick={() => {
-                    setExportAnchorEl(null)
-                    exportCSV()
-                  }}
-                >
-                  <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
-                </MenuItem>
+        <MenuItem onClick={() => { setExportAnchorEl(null); exportCSV() }}>
+          <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
+        </MenuItem>
 
-                <MenuItem
-                  onClick={async () => {
-                    setExportAnchorEl(null)
-                    await exportExcel()
-                  }}
-                >
-                  <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
-                </MenuItem>
+        <MenuItem onClick={async () => { setExportAnchorEl(null); await exportExcel() }}>
+          <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
+        </MenuItem>
 
-                <MenuItem
-                  onClick={async () => {
-                    setExportAnchorEl(null)
-                    await exportPDF()
-                  }}
-                >
-                  <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
-                </MenuItem>
+        <MenuItem onClick={async () => { setExportAnchorEl(null); await exportPDF() }}>
+          <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
+        </MenuItem>
 
-                <MenuItem
-                  onClick={() => {
-                    setExportAnchorEl(null)
-                    exportCopy()
-                  }}
-                >
-                  <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
-                </MenuItem>
-              </Menu>
+        <MenuItem onClick={() => { setExportAnchorEl(null); exportCopy() }}>
+          <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
+        </MenuItem>
+      </Menu>
 
-              {canAccess('Contracts', 'create') && (
-                <GlobalButton
-                  variant='contained'
-                  startIcon={<AddIcon />}
-                  onClick={() => router.push('/admin/contracts/add')}
-                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-                >
-                  Add Contract
-                </GlobalButton>
-              )}
-            </Box>
-          }
-        />
+      {canAccess('Contracts', 'create') && (
+        <GlobalButton
+          variant='contained'
+          startIcon={<AddIcon />}
+          onClick={() => router.push('/admin/contracts/add')}
+          sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+        >
+          Add Contract
+        </GlobalButton>
+      )}
+    </Box>
+  }
+/>
 
         <Divider />
 
-        <Box sx={{ p: 4 }}>
+        <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <Box
             sx={{
               display: 'flex',
@@ -739,7 +723,8 @@ const ContractsPageContent = () => {
               alignItems: 'center',
               mb: 3,
               gap: 2,
-              flexWrap: 'nowrap'
+              flexWrap: 'nowrap',
+              flexShrink: 0
             }}
           >
             {/* LEFT SIDE FILTERS */}
@@ -845,7 +830,7 @@ const ContractsPageContent = () => {
             />
           </Box>
 
-          <Box sx={{ position: 'relative' }}>
+          <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
             {loading && (
               <Box
                 sx={{
@@ -856,14 +841,14 @@ const ContractsPageContent = () => {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  zIndex: 10
+                  zIndex: 20
                 }}
               >
                 <ProgressCircularCustomization size={60} thickness={5} />
               </Box>
             )}
 
-            <div className='overflow-x-auto'>
+            <StickyTableWrapper rowCount={rows.length}>
               <table className={styles.table}>
                 <thead>
                   {table.getHeaderGroups().map(hg => (
@@ -906,11 +891,14 @@ const ContractsPageContent = () => {
                   )}
                 </tbody>
               </table>
-            </div>
+            </StickyTableWrapper>
           </Box>
 
-          <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+          <Box sx={{ flexShrink: 0, mt: 'auto' }}>
+            <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+          </Box>
         </Box>
+
       </Card>
 
       <Dialog
@@ -983,9 +971,10 @@ const ContractsPageContent = () => {
         contract={planDrawer.contract}
         pestOptions={planDrawer.pestOptions}
       />
-    </Box>
+    </StickyListLayout>
   )
 }
+
 
 // Wrapper for RBAC
 export default function ContractsPage() {

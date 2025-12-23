@@ -76,6 +76,8 @@ import {
   createColumnHelper
 } from '@tanstack/react-table'
 import styles from '@core/styles/table.module.css'
+import StickyTableWrapper from '@/components/common/StickyTableWrapper'
+import StickyListLayout from '@/components/common/StickyListLayout'
 import ChevronRight from '@menu/svg/ChevronRight'
 import PermissionGuard from '@/components/auth/PermissionGuard'
 import DebugPermissions from '@/components/DebugPermissions'
@@ -682,234 +684,252 @@ const UserPrivilegePageContent = () => {
   // ───────────────────────────────────────────
   return (
     <PermissionGuard permission="User Privilege">
-      <Box>
-        {loading && (
-          <Box
-            sx={{
-              position: 'fixed',
-              inset: 0,
-              bgcolor: 'rgba(255,255,255,0.8)',
-              backdropFilter: 'blur(2px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 9999
-            }}
-          >
-            <ProgressCircularCustomization size={60} thickness={5} />
+      <StickyListLayout
+        header={
+          <Box sx={{ mb: 2 }}>
+            {loading && (
+              <Box
+                sx={{
+                  position: 'fixed',
+                  inset: 0,
+                  bgcolor: 'rgba(255,255,255,0.8)',
+                  backdropFilter: 'blur(2px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 9999
+                }}
+              >
+                <ProgressCircularCustomization size={60} thickness={5} />
+              </Box>
+            )}
+
+            <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
+              <Link underline='hover' color='inherit' href='/'>
+                Home
+              </Link>
+              <Typography color='text.primary'>User Privilege</Typography>
+            </Breadcrumbs>
           </Box>
-        )}
+        }
+      >
+        <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
+          <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <Box display='flex' alignItems='center' gap={2} mb={4}>
+              <Typography variant='h5' sx={{ fontWeight: 600 }}>
+                User Privilege Management
+              </Typography>
+            </Box>
 
-        <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
-          <Link underline='hover' color='inherit' href='/'>
-            Home
-          </Link>
-          <Typography color='text.primary'>User Privilege</Typography>
-        </Breadcrumbs>
-        <Card sx={{ p: 3 }}>
-          {/* 🔹 Page Header Title */}
+            <Divider sx={{ mb: 4 }} />
 
-          <Box display='flex' alignItems='center' gap={2} mb={7}>
-            <Typography variant='h5' sx={{ fontWeight: 600 }}>
-              User Privilege Management
-            </Typography>
-          </Box>
-
-          <Divider sx={{ mb: 5 }} />
-
-          {/* 🔹 Role Dropdown + Action Buttons */}
-          <Box
-            sx={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'flex-end', // ⭐ FIX: Align by bottom (input line)
-              mb: 4,
-              gap: 2,
-              flexWrap: 'nowrap'
-            }}
-          >
             <Box
               sx={{
                 display: 'flex',
-                alignItems: 'flex-end', // ⭐ FIX: Align bottom of all fields
+                justifyContent: 'space-between',
+                alignItems: 'flex-end',
+                mb: 4,
                 gap: 2,
-                flexWrap: 'nowrap'
+                flexWrap: 'nowrap',
+                flexShrink: 0
               }}
             >
-              {/* User Role Dropdown */}
-              <Box sx={{ minWidth: 250 }}>
-                <CustomAutocomplete
-                  fullWidth
-                  options={roles}
-                  value={roles.find(r => r.id === selectedRole) || null}
-                  getOptionLabel={option => option.name || ''}
-                  onChange={(e, newValue) => {
-                    if (newValue) {
-                      setSelectedRole(newValue.id)
-                      fetchPrivileges(newValue.id) // This fetches actual privileges
-                    } else {
-                      setSelectedRole('')
-                      setPrivileges([]) // clear privileges
-                      loadModules()     // 🟢 Reset to base module list
-                    }
-                  }}
-                  renderInput={params => <CustomTextField {...params} label='User Role' placeholder='Choose a role...' />}
-                />
-              </Box>
-
-              {/* Buttons inline with dropdown */}
-              {canAccess('User Privilege', 'create') && (
-                <Button variant='contained' startIcon={<AddIcon />} onClick={handleAdd}>
-                  Add
-                </Button>
-              )}
-
-              <Button
-                variant='outlined'
-                startIcon={<EditIcon />}
-                disabled={!selectedRole}
-                onClick={async () => {
-                  const res = await getUserRoleDetails(selectedRole)
-                  setIsEdit(true)
-                  setFormData({
-                    id: res?.data?.id,
-                    module: res?.data?.name,
-                    description: res?.data?.description || ''
-                  })
-                  setDrawerOpen(true)
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'flex-end',
+                  gap: 2,
+                  flexWrap: 'nowrap'
                 }}
               >
-                Edit
-              </Button>
+                {/* User Role Dropdown */}
+                <Box sx={{ minWidth: 250 }}>
+                  <CustomAutocomplete
+                    fullWidth
+                    options={roles}
+                    value={roles.find(r => r.id === selectedRole) || null}
+                    getOptionLabel={option => option.name || ''}
+                    onChange={(e, newValue) => {
+                      if (newValue) {
+                        setSelectedRole(newValue.id)
+                        fetchPrivileges(newValue.id) // This fetches actual privileges
+                      } else {
+                        setSelectedRole('')
+                        setPrivileges([]) // clear privileges
+                        loadModules() // 🟢 Reset to base module list
+                      }
+                    }}
+                    renderInput={params => <CustomTextField {...params} label='User Role' placeholder='Choose a role...' />}
+                  />
+                </Box>
+
+                {/* Buttons inline with dropdown */}
+                {canAccess('User Privilege', 'create') && (
+                  <Button variant='contained' startIcon={<AddIcon />} onClick={handleAdd}>
+                    Add
+                  </Button>
+                )}
+
+                <Button
+                  variant='outlined'
+                  startIcon={<EditIcon />}
+                  disabled={!selectedRole}
+                  onClick={async () => {
+                    const res = await getUserRoleDetails(selectedRole)
+                    setIsEdit(true)
+                    setFormData({
+                      id: res?.data?.id,
+                      module: res?.data?.name,
+                      description: res?.data?.description || ''
+                    })
+                    setDrawerOpen(true)
+                  }}
+                >
+                  Edit
+                </Button>
+
+                <Button
+                  variant='outlined'
+                  color='error'
+                  startIcon={<DeleteIcon />}
+                  disabled={!selectedRole}
+                  onClick={() => handleDeleteRole(selectedRole)}
+                >
+                  Delete
+                </Button>
+
+                <Button
+                  variant='outlined'
+                  color='secondary'
+                  startIcon={<FileCopyIcon />}
+                  disabled={!selectedRole}
+                  onClick={() => handleDuplicateRole(selectedRole)}
+                >
+                  Duplicate
+                </Button>
+
+                <Button
+                  variant='outlined'
+                  color='info'
+                  startIcon={<RefreshIcon />}
+                  disabled={!selectedRole}
+                  onClick={() => loadPrivileges(selectedRole)}
+                >
+                  Refresh
+                </Button>
+              </Box>
 
               <Button
-                variant='outlined'
-                color='error'
-                startIcon={<DeleteIcon />}
-                disabled={!selectedRole}
-                onClick={() => handleDeleteRole(selectedRole)}
+                variant='contained'
+                color='success'
+                startIcon={<DoneIcon />}
+                onClick={handleUpdatePrivileges}
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  px: 3,
+                  whiteSpace: 'nowrap'
+                }}
               >
-                Delete
-              </Button>
-
-              <Button
-                variant='outlined'
-                color='secondary'
-                startIcon={<FileCopyIcon />}
-                disabled={!selectedRole}
-                onClick={() => handleDuplicateRole(selectedRole)}
-              >
-                Duplicate
-              </Button>
-
-              <Button
-                variant='outlined'
-                color='info'
-                startIcon={<RefreshIcon />}
-                disabled={!selectedRole}
-                onClick={() => loadPrivileges(selectedRole)}
-              >
-                Refresh
+                Update Privileges
               </Button>
             </Box>
 
-            {/* 🔹 Right Section - Update Privileges */}
-            <Button
-              variant='contained'
-              color='success'
-              startIcon={<DoneIcon />}
-              onClick={handleUpdatePrivileges}
+            <Divider sx={{ mb: 2 }} />
+            <Box
               sx={{
-                textTransform: 'none',
-                fontWeight: 600,
-                px: 3,
-                whiteSpace: 'nowrap'
+                mb: 3,
+                display: 'flex',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: 2,
+                flexShrink: 0
               }}
             >
-              Update Privileges
-            </Button>
-          </Box>
-
-          <Divider sx={{ mb: 2 }} />
-          <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-            <FormControl size='small' sx={{ width: 140 }}>
-              <Select
-                value={pagination.pageSize}
-                onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
-              >
-                {[5, 10, 25, 50].map(s => (
-                  <MenuItem key={s} value={s}>
-                    {s} entries
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <DebouncedInput
-              value={searchText}
-              onChange={v => {
-                setSearchText(String(v))
-                setPagination(p => ({ ...p, pageIndex: 0 }))
-              }}
-              placeholder='Search module...'
-              sx={{ width: 360 }}
-              variant='outlined'
-              size='small'
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position='start'>
-                      <SearchIcon />
-                    </InputAdornment>
-                  )
-                }
-              }}
-            />
-          </Box>
-          <div className='overflow-x-auto'>
-            <table className={styles.table}>
-              <thead>
-                {table.getHeaderGroups().map(hg => (
-                  <tr key={hg.id}>
-                    {hg.headers.map(h => (
-                      <th key={h.id}>
-                        <div
-                          className={classnames({
-                            'flex items-center': h.column.getIsSorted(),
-                            'cursor-pointer select-none': h.column.getCanSort()
-                          })}
-                          onClick={h.column.getToggleSortingHandler()}
-                        >
-                          {flexRender(h.column.columnDef.header, h.getContext())}
-                          {{
-                            asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
-                            desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
-                          }[h.column.getIsSorted()] ?? null}
-                        </div>
-                      </th>
+              <FormControl size='small' sx={{ width: 140 }}>
+                <Select
+                  value={pagination.pageSize}
+                  onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
+                >
+                  {[5, 10, 25, 50].map(s => (
+                    <MenuItem key={s} value={s}>
+                      {s} entries
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <DebouncedInput
+                value={searchText}
+                onChange={v => {
+                  setSearchText(String(v))
+                  setPagination(p => ({ ...p, pageIndex: 0 }))
+                }}
+                placeholder='Search module...'
+                sx={{ width: 360 }}
+                variant='outlined'
+                size='small'
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position='start'>
+                        <SearchIcon />
+                      </InputAdornment>
+                    )
+                  }
+                }}
+              />
+            </Box>
+            <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              <StickyTableWrapper rowCount={rows.length}>
+                <table className={styles.table}>
+                  <thead>
+                    {table.getHeaderGroups().map(hg => (
+                      <tr key={hg.id}>
+                        {hg.headers.map(h => (
+                          <th key={h.id}>
+                            <div
+                              className={classnames({
+                                'flex items-center': h.column.getIsSorted(),
+                                'cursor-pointer select-none': h.column.getCanSort()
+                              })}
+                              onClick={h.column.getToggleSortingHandler()}
+                            >
+                              {flexRender(h.column.columnDef.header, h.getContext())}
+                              {{
+                                asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
+                                desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
+                              }[h.column.getIsSorted()] ?? null}
+                            </div>
+                          </th>
+                        ))}
+                      </tr>
                     ))}
-                  </tr>
-                ))}
-              </thead>
-              <tbody>
-                {rows.length ? (
-                  table.getRowModel().rows.map(row => (
-                    <tr key={row.id}>
-                      {row.getVisibleCells().map(cell => (
-                        <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
-                      ))}
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={columns.length} className='text-center py-4'>
-                      No results found
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+                  </thead>
+                  <tbody>
+                    {rows.length ? (
+                      table.getRowModel().rows.map(row => (
+                        <tr key={row.id}>
+                          {row.getVisibleCells().map(cell => (
+                            <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                          ))}
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={columns.length} className='text-center py-4'>
+                          No results found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </StickyTableWrapper>
+            </Box>
+
+            <Box sx={{ mt: 'auto', flexShrink: 0 }}>
+              <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+            </Box>
+          </Box>
         </Card>
 
         {/* Drawer */}
@@ -1033,7 +1053,7 @@ const UserPrivilegePageContent = () => {
             </Button>
           </DialogActions>
         </Dialog>
-      </Box>
+      </StickyListLayout>
       <DebugPermissions />
     </PermissionGuard>
   )

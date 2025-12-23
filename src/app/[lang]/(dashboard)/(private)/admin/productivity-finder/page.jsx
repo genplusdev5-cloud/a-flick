@@ -32,6 +32,8 @@ import ProgressCircularCustomization from '@/components/common/ProgressCircularC
 import { showToast } from '@/components/common/Toasts'
 
 import styles from '@core/styles/table.module.css'
+import StickyTableWrapper from '@/components/common/StickyTableWrapper'
+import StickyListLayout from '@/components/common/StickyListLayout'
 import { getProductivityList } from '@/api/productivity/list'
 
 // Debounce
@@ -260,192 +262,226 @@ const ProductivityReportPageContent = () => {
   // RENDER UI
   // -------------------------
   return (
-    <Box>
-      <Breadcrumbs sx={{ mb: 2 }}>
-        <Link href='/'>Dashboard</Link>
-        <Typography>Productivity Report</Typography>
-      </Breadcrumbs>
+    <StickyListLayout
+      header={
+        <Box sx={{ mb: 6 }}>
+          <Breadcrumbs sx={{ mb: 2 }}>
+            <Link href='/'>Dashboard</Link>
+            <Typography>Productivity Report</Typography>
+          </Breadcrumbs>
+          <CardHeader
+            sx={{
+              p: 0,
+              '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.5rem' }
+            }}
+            title='Productivity Summary'
+            action={
+              <GlobalButton
+                variant='contained'
+                color='primary'
+                startIcon={
+                  <RefreshIcon
+                    sx={{
+                      animation: loading ? 'spin 1s linear infinite' : 'none'
+                    }}
+                  />
+                }
+                onClick={() => fetchProductivity()}
+                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+              >
+                {loading ? 'Refreshing...' : 'Refresh'}
+              </GlobalButton>
+            }
+          />
+        </Box>
+      }
+    >
+      <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
 
-      <Card sx={{ p: 3 }}>
-        <CardHeader
-          title='Productivity Summary'
-          action={
-            <GlobalButton
-              variant='contained'
-              color='primary'
-              startIcon={
-                <RefreshIcon
-                  sx={{
-                    animation: loading ? 'spin 1s linear infinite' : 'none'
-                  }}
-                />
-              }
-              onClick={() => fetchProductivity()}
+        <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {loading && (
+            <Box
+              sx={{
+                position: 'absolute',
+                inset: 0,
+                bgcolor: 'rgba(255,255,255,0.8)',
+                backdropFilter: 'blur(2px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 10
+              }}
             >
-              {loading ? 'Refreshing...' : 'Refresh'}
-            </GlobalButton>
-          }
-        />
+              <ProgressCircularCustomization size={60} thickness={5} />
+            </Box>
+          )}
 
-        <Divider sx={{ mb: 3 }} />
+          <Divider sx={{ mb: 3 }} />
 
-        {/* Top Filters */}
-        <Box
-          sx={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-end', // ⭐ FIX: Align by bottom (input line)
-            mb: 4,
-            gap: 2,
-            flexWrap: 'nowrap'
-          }}
-        >
+          {/* Top Filters */}
           <Box
             sx={{
               display: 'flex',
-              alignItems: 'flex-end', // ⭐ FIX: Align bottom of all fields
+              justifyContent: 'space-between',
+              alignItems: 'flex-end',
+              mb: 4,
               gap: 2,
-              flexWrap: 'nowrap'
+              flexShrink: 0
             }}
           >
-            <FormControl size='small' sx={{ width: 120 }}>
-              <Select
-                value={pagination.pageSize}
-                onChange={e =>
-                  setPagination({
-                    pageIndex: 0,
-                    pageSize: Number(e.target.value)
-                  })
-                }
-              >
-                {[10, 25, 50, 100].map(n => (
-                  <MenuItem key={n} value={n}>
-                    {n} entries
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <DebouncedInput
-              value={searchText}
-              onChange={v => setSearchText(v)}
-              placeholder='Search employee...'
-              size='small'
-              sx={{ width: 300 }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position='start'>
-                    <SearchIcon />
-                  </InputAdornment>
-                )
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'flex-end',
+                gap: 2,
+                flexWrap: 'nowrap'
               }}
-            />
+            >
+              <FormControl size='small' sx={{ width: 120 }}>
+                <Select
+                  value={pagination.pageSize}
+                  onChange={e =>
+                    setPagination({
+                      pageIndex: 0,
+                      pageSize: Number(e.target.value)
+                    })
+                  }
+                >
+                  {[10, 25, 50, 100].map(n => (
+                    <MenuItem key={n} value={n}>
+                      {n} entries
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <DebouncedInput
+                value={searchText}
+                onChange={v => setSearchText(v)}
+                placeholder='Search employee...'
+                size='small'
+                sx={{ width: 300 }}
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position='start'>
+                        <SearchIcon />
+                      </InputAdornment>
+                    )
+                  }
+                }}
+              />
+            </Box>
+
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <GlobalButton
+                variant='outlined'
+                color='secondary'
+                endIcon={<ArrowDropDownIcon />}
+                onClick={e => setExportAnchorEl(e.currentTarget)}
+                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+              >
+                Export
+              </GlobalButton>
+
+              <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
+                <MenuItem onClick={exportPrint}>
+                  <PrintIcon sx={{ mr: 1 }} /> Print
+                </MenuItem>
+                <MenuItem onClick={exportCSV}>
+                  <FileDownloadIcon sx={{ mr: 1 }} /> CSV
+                </MenuItem>
+              </Menu>
+            </Box>
           </Box>
 
-          <GlobalButton
-            variant='outlined'
-            color='secondary'
-            endIcon={<ArrowDropDownIcon />}
-            onClick={e => setExportAnchorEl(e.currentTarget)}
-          >
-            Export
-          </GlobalButton>
-
-          <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
-            <MenuItem onClick={exportPrint}>
-              <PrintIcon sx={{ mr: 1 }} /> Print
-            </MenuItem>
-            <MenuItem onClick={exportCSV}>
-              <FileDownloadIcon sx={{ mr: 1 }} /> CSV
-            </MenuItem>
-          </Menu>
-        </Box>
-
-        {/* TABLE */}
-        <div className='overflow-x-auto'>
-          <table className={styles.table} style={{ minWidth: 1100 }}>
-            <thead>
-              <tr>
-                <th rowSpan={2}>Employee</th>
-                <th colSpan={4} style={{ background: '#9edc9e' }}>
-                  COMPLETED
-                </th>
-                <th colSpan={4} style={{ background: '#ffe85c' }}>
-                  PENDING
-                </th>
-                <th rowSpan={2} style={{ background: '#1031ff', color: '#fff' }}>
-                  TOTAL
-                </th>
-              </tr>
-
-              <tr>
-                <th>MORN</th>
-                <th>DAY</th>
-                <th>NIGHT</th>
-                <th>SUBTOTAL</th>
-                <th>MORN</th>
-                <th>DAY</th>
-                <th>NIGHT</th>
-                <th>SUBTOTAL</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {rows.length ? (
-                rows.map(r => (
-                  <tr key={r.id}>
-                    <td>{r.employee}</td>
-
-                    <td style={{ textAlign: 'right' }}>{fmt(r.comp_morn)}</td>
-                    <td style={{ textAlign: 'right' }}>{fmt(r.comp_day)}</td>
-                    <td style={{ textAlign: 'right' }}>{fmt(r.comp_night)}</td>
-                    <td style={{ textAlign: 'right', fontWeight: 600 }}>{fmt(r.comp_sub)}</td>
-
-                    <td style={{ textAlign: 'right' }}>{fmt(r.pend_morn)}</td>
-                    <td style={{ textAlign: 'right' }}>{fmt(r.pend_day)}</td>
-                    <td style={{ textAlign: 'right' }}>{fmt(r.pend_night)}</td>
-                    <td style={{ textAlign: 'right', fontWeight: 600 }}>{fmt(r.pend_sub)}</td>
-
-                    <td style={{ textAlign: 'right', background: '#1031ff', color: '#fff' }}>{fmt(r.total)}</td>
+          <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            <StickyTableWrapper rowCount={rows.length}>
+              <table className={styles.table} style={{ minWidth: 1100 }}>
+                <thead>
+                  <tr>
+                    <th rowSpan={2}>Employee</th>
+                    <th colSpan={4} style={{ background: '#9edc9e' }}>
+                      COMPLETED
+                    </th>
+                    <th colSpan={4} style={{ background: '#ffe85c' }}>
+                      PENDING
+                    </th>
+                    <th rowSpan={2} style={{ background: '#1031ff', color: '#fff' }}>
+                      TOTAL
+                    </th>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={10} style={{ textAlign: 'center', padding: 20 }}>
-                    {loading ? <ProgressCircularCustomization /> : 'No results found'}
-                  </td>
-                </tr>
-              )}
-            </tbody>
 
-            {/* TOTAL ROW */}
-            <tfoot>
-              <tr>
-                <td style={{ fontWeight: 700 }}>TOTAL</td>
+                  <tr>
+                    <th>MORN</th>
+                    <th>DAY</th>
+                    <th>NIGHT</th>
+                    <th>SUBTOTAL</th>
+                    <th>MORN</th>
+                    <th>DAY</th>
+                    <th>NIGHT</th>
+                    <th>SUBTOTAL</th>
+                  </tr>
+                </thead>
 
-                <td style={{ textAlign: 'right' }}>{fmt(totals.comp_morn)}</td>
-                <td style={{ textAlign: 'right' }}>{fmt(totals.comp_day)}</td>
-                <td style={{ textAlign: 'right' }}>{fmt(totals.comp_night)}</td>
-                <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmt(totals.comp_sub)}</td>
+                <tbody>
+                  {rows.length ? (
+                    rows.map(r => (
+                      <tr key={r.id}>
+                        <td>{r.employee}</td>
 
-                <td style={{ textAlign: 'right' }}>{fmt(totals.pend_morn)}</td>
-                <td style={{ textAlign: 'right' }}>{fmt(totals.pend_day)}</td>
-                <td style={{ textAlign: 'right' }}>{fmt(totals.pend_night)}</td>
-                <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmt(totals.pend_sub)}</td>
+                        <td style={{ textAlign: 'right' }}>{fmt(r.comp_morn)}</td>
+                        <td style={{ textAlign: 'right' }}>{fmt(r.comp_day)}</td>
+                        <td style={{ textAlign: 'right' }}>{fmt(r.comp_night)}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 600 }}>{fmt(r.comp_sub)}</td>
 
-                <td style={{ textAlign: 'right', background: '#1031ff', color: '#fff', fontWeight: 700 }}>
-                  {fmt(totals.total)}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+                        <td style={{ textAlign: 'right' }}>{fmt(r.pend_morn)}</td>
+                        <td style={{ textAlign: 'right' }}>{fmt(r.pend_day)}</td>
+                        <td style={{ textAlign: 'right' }}>{fmt(r.pend_night)}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 600 }}>{fmt(r.pend_sub)}</td>
 
-        <Box sx={{ mt: 3 }}>
-          <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+                        <td style={{ textAlign: 'right', background: '#1031ff', color: '#fff' }}>{fmt(r.total)}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={10} style={{ textAlign: 'center', padding: 20 }}>
+                        {loading && !rows.length ? <ProgressCircularCustomization /> : 'No results found'}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+
+                {/* TOTAL ROW */}
+                <tfoot>
+                  <tr>
+                    <td style={{ fontWeight: 700 }}>TOTAL</td>
+
+                    <td style={{ textAlign: 'right' }}>{fmt(totals.comp_morn)}</td>
+                    <td style={{ textAlign: 'right' }}>{fmt(totals.comp_day)}</td>
+                    <td style={{ textAlign: 'right' }}>{fmt(totals.comp_night)}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmt(totals.comp_sub)}</td>
+
+                    <td style={{ textAlign: 'right' }}>{fmt(totals.pend_morn)}</td>
+                    <td style={{ textAlign: 'right' }}>{fmt(totals.pend_day)}</td>
+                    <td style={{ textAlign: 'right' }}>{fmt(totals.pend_night)}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmt(totals.pend_sub)}</td>
+
+                    <td style={{ textAlign: 'right', background: '#1031ff', color: '#fff', fontWeight: 700 }}>
+                      {fmt(totals.total)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </StickyTableWrapper>
+          </Box>
+
+          <Box sx={{ mt: 'auto', flexShrink: 0 }}>
+            <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+          </Box>
         </Box>
       </Card>
-    </Box>
+    </StickyListLayout>
   )
 }
 

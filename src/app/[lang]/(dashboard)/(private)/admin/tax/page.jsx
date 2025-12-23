@@ -73,6 +73,8 @@ import ChevronRight from '@menu/svg/ChevronRight'
 import { toast } from 'react-toastify'
 import { showToast } from '@/components/common/Toasts'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
+import StickyListLayout from '@/components/common/StickyListLayout'
+import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 
 // ✅ Paste your API imports here 👇
 import { addTax, getTaxList, updateTax, deleteTax } from '@/api/tax'
@@ -228,14 +230,7 @@ const TaxPageContent = () => {
   }
 
   const handleDelete = async row => {
-    try {
-      const db = await initDB()
-      await db.delete(STORE_NAME, row.id)
-      showToast('delete', `${row.name} deleted`)
-      await loadTaxes()
-    } catch {
-      showToast('error', 'Failed to delete')
-    }
+    setDeleteDialog({ open: true, row })
   }
 
   const confirmDelete = async () => {
@@ -472,17 +467,17 @@ const TaxPageContent = () => {
 
   return (
     <PermissionGuard permission='Tax'>
-      <Box>
-        <Box sx={{ mb: 2 }}>
-          <Breadcrumbs aria-label='breadcrumb'>
+      <StickyListLayout
+        header={
+          <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
             <Link underline='hover' color='inherit' href='/'>
               Home
             </Link>
             <Typography color='text.primary'>Tax</Typography>
           </Breadcrumbs>
-        </Box>
-
-        <Card sx={{ p: 3 }}>
+        }
+      >
+        <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
           <CardHeader
             title={
               <Box display='flex' alignItems='center' gap={2}>
@@ -575,121 +570,127 @@ const TaxPageContent = () => {
             }
             sx={{
               pb: 1.5,
-              pt: 1.5,
+              pt: 5,
+              px: 10,
               '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
               '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
             }}
           />
 
-          {loading && (
+          <Divider />
+
+          <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            {loading && (
+              <Box
+                sx={{
+                  position: 'absolute',
+                  inset: 0,
+                  bgcolor: 'rgba(255,255,255,0.7)',
+                  backdropFilter: 'blur(2px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 20
+                }}
+              >
+                <ProgressCircularCustomization size={60} thickness={5} />
+              </Box>
+            )}
+
             <Box
               sx={{
-                position: 'fixed',
-                inset: 0,
-                bgcolor: 'rgba(255,255,255,0.7)',
-                backdropFilter: 'blur(2px)',
+                mb: 3,
                 display: 'flex',
+                justifyContent: 'space-between',
                 alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 2000
+                flexWrap: 'wrap',
+                gap: 2,
+                flexShrink: 0
               }}
             >
-              <ProgressCircularCustomization size={60} thickness={5} />
-            </Box>
-          )}
-
-          <Divider sx={{ mb: 2 }} />
-
-          <Box
-            sx={{
-              mb: 3,
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: 2
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography variant='body2' color='text.secondary'>
-                Show
-              </Typography>
-              <FormControl size='small' sx={{ width: 140 }}>
-                <Select
-                  value={pagination.pageSize}
-                  onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value) }))}
-                >
-                  {[5, 10, 25, 50, 100].map(s => (
-                    <MenuItem key={s} value={s}>
-                      {s} entries
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Box>
-
-            <DebouncedInput
-              value={searchText}
-              onChange={v => setSearchText(String(v))}
-              placeholder='Search tax name or value...'
-              sx={{ width: 360 }}
-              variant='outlined'
-              size='small'
-            />
-          </Box>
-
-          <div className='table-scroll-wrapper'>
-            <table className={styles.table}>
-              <thead>
-                {table.getHeaderGroups().map(hg => (
-                  <tr key={hg.id}>
-                    {hg.headers.map(h => (
-                      <th key={h.id}>
-                        <div
-                          className={classnames({
-                            'flex items-center': h.column.getIsSorted(),
-                            'cursor-pointer select-none': h.column.getCanSort()
-                          })}
-                          onClick={h.column.getToggleSortingHandler()}
-                        >
-                          {flexRender(h.column.columnDef.header, h.getContext())}
-                          {{
-                            asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
-                            desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
-                          }[h.column.getIsSorted()] ?? null}
-                        </div>
-                      </th>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant='body2' color='text.secondary'>
+                  Show
+                </Typography>
+                <FormControl size='small' sx={{ width: 140 }}>
+                  <Select
+                    value={pagination.pageSize}
+                    onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value) }))}
+                  >
+                    {[5, 10, 25, 50, 100].map(s => (
+                      <MenuItem key={s} value={s}>
+                        {s} entries
+                      </MenuItem>
                     ))}
-                  </tr>
-                ))}
-              </thead>
-              {paginatedRows.length === 0 ? (
-                <tbody>
-                  <tr>
-                    <td colSpan={columns.length} className='text-center py-4'>
-                      No data available
-                    </td>
-                  </tr>
-                </tbody>
-              ) : (
-                <tbody>
-                  {table.getRowModel().rows.map(row => (
-                    <tr key={row.id}>
-                      {row.getVisibleCells().map(cell => (
-                        <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              )}
-            </table>
-          </div>
+                  </Select>
+                </FormControl>
+              </Box>
 
-          <TablePaginationComponent
-            totalCount={filteredRows.length}
-            pagination={pagination}
-            setPagination={setPagination}
-          />
+              <DebouncedInput
+                value={searchText}
+                onChange={v => setSearchText(String(v))}
+                placeholder='Search tax name or value...'
+                sx={{ width: 360 }}
+                variant='outlined'
+                size='small'
+              />
+            </Box>
+
+            <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              <StickyTableWrapper rowCount={rows.length}>
+                <table className={styles.table}>
+                  <thead>
+                    {table.getHeaderGroups().map(hg => (
+                      <tr key={hg.id}>
+                        {hg.headers.map(h => (
+                          <th key={h.id}>
+                            <div
+                              className={classnames({
+                                'flex items-center': h.column.getIsSorted(),
+                                'cursor-pointer select-none': h.column.getCanSort()
+                              })}
+                              onClick={h.column.getToggleSortingHandler()}
+                            >
+                              {flexRender(h.column.columnDef.header, h.getContext())}
+                              {{
+                                asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
+                                desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
+                              }[h.column.getIsSorted()] ?? null}
+                            </div>
+                          </th>
+                        ))}
+                      </tr>
+                    ))}
+                  </thead>
+                  <tbody>
+                    {paginatedRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={columns.length} className='text-center py-4'>
+                          {loading ? 'Loading taxes...' : 'No results found'}
+                        </td>
+                      </tr>
+                    ) : (
+                      table.getRowModel().rows.map(row => (
+                        <tr key={row.id}>
+                          {row.getVisibleCells().map(cell => (
+                            <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                          ))}
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </StickyTableWrapper>
+            </Box>
+
+            <Box sx={{ mt: 'auto', pt: 2 }}>
+              <TablePaginationComponent
+                totalCount={filteredRows.length}
+                pagination={pagination}
+                setPagination={setPagination}
+              />
+            </Box>
+          </Box>
         </Card>
 
         <Drawer
@@ -844,7 +845,7 @@ const TaxPageContent = () => {
             </GlobalButton>
           </DialogActions>
         </Dialog>
-      </Box>
+      </StickyListLayout>
     </PermissionGuard>
   )
 }

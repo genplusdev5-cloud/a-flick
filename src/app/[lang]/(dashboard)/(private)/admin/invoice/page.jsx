@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { format } from 'date-fns'
+import classnames from 'classnames'
+import ChevronRight from '@menu/svg/ChevronRight'
 
 // MUI
 import {
@@ -47,6 +49,7 @@ import tableStyles from '@core/styles/table.module.css'
 import InvoicePDF from '@/components/invoice/InvoicePDF'
 import { dateSortingFn } from '@/utils/tableUtils'
 import StickyListLayout from '@/components/common/StickyListLayout'
+import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 
 // API
 import { getInvoiceSummary, getInvoiceDropdowns } from '@/api/invoice' // adjust path if needed
@@ -78,6 +81,7 @@ const InvoiceListPageFullContent = () => {
   const [contractLevelFilter, setContractLevelFilter] = useState('')
   const [invoiceTypeFilter, setInvoiceTypeFilter] = useState('')
   const [salesPersonFilter, setSalesPersonFilter] = useState('')
+  const [sorting, setSorting] = useState([])
 
   const encodedCustomer = searchParams.get('customer')
   const encodedContract = searchParams.get('contract')
@@ -323,7 +327,13 @@ const InvoiceListPageFullContent = () => {
       }
       setDropdownData(processedDropdowns)
 
-      setData(results.map(inv => mapInvoice(inv, processedDropdowns)))
+      setData(
+        results.map((inv, index) => ({
+          sno: index + 1 + pagination.pageIndex * pagination.pageSize,
+          ...mapInvoice(inv, processedDropdowns)
+        }))
+      )
+
       setTotalCount(count)
 
       // Calculate summary stats
@@ -549,11 +559,8 @@ const InvoiceListPageFullContent = () => {
   // ── Columns (exactly same as before) ─────────────────────
   const columns = useMemo(
     () => [
-      columnHelper.display({
-        id: 'sno',
-        header: 'S.No',
-        enableSorting: false,
-        cell: ({ row }) => row.index + 1 + pagination.pageIndex * pagination.pageSize
+      columnHelper.accessor('sno', {
+        header: 'S.No'
       }),
 
       columnHelper.display({
@@ -676,16 +683,19 @@ const InvoiceListPageFullContent = () => {
   const table = useReactTable({
     data,
     columns,
+
+    // 🔥 REQUIRED FOR SORTING
+    state: {
+      pagination,
+      sorting
+    },
+    onSortingChange: setSorting,
+
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
 
-    // CORRECT — manual pagination
     manualPagination: true,
-    pageCount: Math.ceil(totalCount / pagination.pageSize),
-    state: {
-      pagination
-    },
-    onPaginationChange: setPagination
+    pageCount: Math.ceil(totalCount / pagination.pageSize)
   })
 
   useEffect(() => {
@@ -705,41 +715,23 @@ const InvoiceListPageFullContent = () => {
   }, [pageCount, pageIndex])
 
   return (
-    <Box>
-      {loading && (
-        <Box
-          sx={{
-            position: 'fixed',
-            inset: 0,
-            bgcolor: 'rgba(255,255,255,0.65)',
-            backdropFilter: 'blur(3px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexDirection: 'column',
-            zIndex: 2000,
-            animation: 'fadeIn 0.3s ease-in-out',
-            '@keyframes fadeIn': {
-              from: { opacity: 0 },
-              to: { opacity: 1 }
-            }
-          }}
-        >
-          <ProgressCircularCustomization size={70} thickness={5} />
-          <Typography
-            mt={2}
-            sx={{
-              color: 'primary.main',
-              fontWeight: 600,
-              fontSize: '1.05rem',
-              letterSpacing: 0.3
-            }}
-          >
-            Loading Invoices...
-          </Typography>
-        </Box>
-      )}
+    <StickyListLayout
+      header={
+        <Box sx={{ mb: loading ? 0 : 2 }}>
+          {/* BREADCRUMB */}
+          <Box role='presentation' sx={{ mb: 2 }}>
+            <Breadcrumbs aria-label='breadcrumb'>
+              <Link underline='hover' color='inherit' href='/'>
+                Home
+              </Link>
+              <Typography color='text.primary'>Invoice List</Typography>
+            </Breadcrumbs>
+          </Box>
 
+          {summaryData.length > 0 && <SummaryCards data={summaryData} />}
+        </Box>
+      }
+    >
       {/* Hidden Invoice Preview for PDF Generation */}
       <div
         id='invoice-preview'
@@ -755,19 +747,8 @@ const InvoiceListPageFullContent = () => {
         {selectedInvoiceData && <InvoicePDF invoiceData={selectedInvoiceData} />}
       </div>
 
-      {/* BREADCRUMB */}
-      <Box role='presentation' sx={{ mb: 2 }}>
-        <Breadcrumbs aria-label='breadcrumb'>
-          <Link underline='hover' color='inherit' href='/'>
-            Home
-          </Link>
-          <Typography color='text.primary'>Invoice List</Typography>
-        </Breadcrumbs>
-      </Box>
+      <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
 
-      {summaryData.length > 0 && <SummaryCards data={summaryData} />}
-
-      <Card sx={{ p: 4 }}>
         <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Typography variant='h5' sx={{ fontWeight: 600 }}>
@@ -800,246 +781,301 @@ const InvoiceListPageFullContent = () => {
         <Divider sx={{ mb: 2 }} />
 
         {/* FILTERS */}
-        <Box pb={2}>
-          <Grid container spacing={3}>
-            {/* Row 1 */}
-            <Grid item xs={12} sm={6} md={3}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Checkbox
-                  checked={dateFilter}
-                  onChange={e => {
-                    setDateFilter(e.target.checked)
-                    if (!e.target.checked) {
-                      setDateRange([null, null])
-                    } else {
-                      const today = new Date()
-                      setDateRange([today, today])
-                    }
-                  }}
-                  size='small'
-                />
-                <Typography sx={{ mb: 0.5, fontWeight: 500 }}>Date Filter</Typography>
-              </Box>
-
-              <GlobalDateRange
-                start={dateRange[0]}
-                end={dateRange[1]}
-                onSelectRange={({ start, end }) => setDateRange([start, end])}
-                disabled={!dateFilter}
-                size='small'
-              />
-            </Grid>
-
-            <Grid item xs={12} sm={6} md={3}>
-              <CustomAutocomplete
-                options={originOptions}
-                value={originFilter || null}
-                onChange={(_, v) => setOriginFilter(v || null)}
-                getOptionLabel={opt => opt?.label || ''}
-                renderInput={p => <CustomTextField {...p} label='Origin' size='small' />}
-              />
-            </Grid>
-
-            <Grid item xs={12} sm={6} md={3}>
-              <CustomAutocomplete
-                options={contractTypeOptions}
-                value={contractTypeFilter || null}
-                onChange={(_, v) => setContractTypeFilter(v || null)}
-                getOptionLabel={opt => opt?.label || ''}
-                renderInput={p => <CustomTextField {...p} label='Contract Type' size='small' />}
-              />
-            </Grid>
-
-            <Grid item xs={12} sm={6} md={3}>
-              <CustomAutocomplete
-                options={invoiceStatusOptions}
-                value={invoiceStatusFilter || null}
-                onChange={(_, v) => setInvoiceStatusFilter(v || null)}
-                getOptionLabel={opt => opt?.label || ''}
-                renderInput={p => <CustomTextField {...p} label='Invoice Status' size='small' />}
-              />
-            </Grid>
-
-            {/* Row 2 */}
-            <Grid item xs={12} sm={6} md={3}>
-              <CustomAutocomplete
-                options={serviceFreqOptions}
-                value={serviceFreqFilter || null}
-                onChange={(_, v) => setServiceFreqFilter(v || null)}
-                getOptionLabel={opt => opt?.label || ''}
-                renderInput={p => <CustomTextField {...p} label='Service Frequency' size='small' />}
-              />
-            </Grid>
-
-            <Grid item xs={12} sm={6} md={3}>
-              <CustomAutocomplete
-                options={billingFreqOptions}
-                value={billingFreqFilter || null}
-                onChange={(_, v) => setBillingFreqFilter(v || null)}
-                getOptionLabel={opt => opt?.label || ''}
-                renderInput={p => <CustomTextField {...p} label='Billing Frequency' size='small' />}
-              />
-            </Grid>
-
-            <Grid item xs={12} sm={6} md={3}>
-              <CustomAutocomplete
-                options={contractLevelOptions}
-                value={contractLevelFilter || null}
-                onChange={(_, v) => setContractLevelFilter(v || null)}
-                getOptionLabel={opt => opt?.label || ''}
-                renderInput={p => <CustomTextField {...p} label='Contract Level' size='small' />}
-              />
-            </Grid>
-
-            <Grid item xs={12} sm={6} md={3}>
-              <CustomAutocomplete
-                options={invoiceTypeOptions}
-                value={invoiceTypeFilter || null}
-                onChange={(_, v) => setInvoiceTypeFilter(v || null)}
-                getOptionLabel={opt => opt?.label || ''}
-                renderInput={p => <CustomTextField {...p} label='Invoice Type' size='small' />}
-              />
-            </Grid>
-
-            {/* Row 3 */}
-            <Grid item xs={12} sm={6} md={3}>
-              <CustomAutocomplete
-                options={salesPersonOptions}
-                value={salesPersonFilter || null}
-                onChange={(_, v) => setSalesPersonFilter(v || null)}
-                getOptionLabel={opt => opt?.label || ''}
-                renderInput={p => <CustomTextField {...p} label='Sales Person' size='small' />}
-              />
-            </Grid>
-
-            <Grid item xs={12} sm={6} md={3}>
-              <CustomAutocomplete
-                options={customerOptions}
-                value={customerFilter || null}
-                getOptionLabel={option => option?.label || ''}
-                isOptionEqualToValue={(option, value) => option?.id === value?.id}
-                onChange={(_, v) => {
-                  setCustomerFilter(v || null)
-                  setContractFilter(null)
-
-                  if (v?.id) {
-                    getInvoiceDropdowns({ customer_id: v.id })
-                      .then(res => {
-                        const dd = res?.data?.data || {}
-                        const contracts = dedupeById(dd.contract_list?.label || [])
-                        setCustomerSpecificContracts(contracts)
-                        setDropdownData(prev => ({ ...prev, contracts }))
-                      })
-                      .catch(() => {
-                        showToast('error', 'Failed to load contracts')
-                        setCustomerSpecificContracts([])
-                        setDropdownData(prev => ({ ...prev, contracts: [] }))
-                      })
-                  } else {
-                    setCustomerSpecificContracts(null)
-                  }
-                }}
-                renderOption={(props, option) => (
-                  <li {...props} key={option.id}>
-                    {option.label}
-                  </li>
-                )}
-                renderInput={params => <CustomTextField {...params} label='Customer' size='small' />}
-              />
-            </Grid>
-
-            <Grid item xs={12} sm={6} md={3} mb={2}>
-              <CustomAutocomplete
-                options={contractOptions}
-                value={contractFilter || null}
-                getOptionLabel={opt => opt?.label || ''}
-                isOptionEqualToValue={(a, b) => a?.id === b?.id}
-                onChange={(_, v) => setContractFilter(v || null)}
-                renderOption={(props, option) => (
-                  <li {...props} key={option.id}>
-                    {option.label}
-                  </li>
-                )}
-                renderInput={params => <CustomTextField {...params} label='Contract' size='small' />}
-              />
-            </Grid>
-          </Grid>
-
-          <Divider sx={{ mb: 2 }} />
-
-          {/* SEARCH + ENTRIES */}
-          <Box display='flex' justifyContent='space-between' alignItems='center' gap={2} mb={4}>
-            <Select
-              size='small'
-              value={pageSize}
-              onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
-              sx={{ width: 130 }}
-            >
-              {[25, 50, 75, 100].map(s => (
-                <MenuItem key={s} value={s}>
-                  {s} entries
-                </MenuItem>
-              ))}
-            </Select>
-
-            <CustomTextField
-              size='small'
-              placeholder='Search invoice, contract, customer...'
-              value={searchText}
-              onChange={e => {
-                setSearchText(e.target.value)
-                setPagination(p => ({ ...p, pageIndex: 0 }))
-              }}
-              sx={{ width: 360 }}
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position='start'>
-                      <SearchIcon />
-                    </InputAdornment>
-                  )
+        <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {loading && (
+            <Box
+              sx={{
+                position: 'absolute',
+                inset: 0,
+                bgcolor: 'rgba(255,255,255,0.7)',
+                backdropFilter: 'blur(3px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                zIndex: 200,
+                animation: 'fadeIn 0.3s ease-in-out',
+                '@keyframes fadeIn': {
+                  from: { opacity: 0 },
+                  to: { opacity: 1 }
                 }
               }}
-            />
+            >
+              <ProgressCircularCustomization size={70} thickness={5} />
+              <Typography
+                mt={2}
+                sx={{
+                  color: 'primary.main',
+                  fontWeight: 600,
+                  fontSize: '1.05rem',
+                  letterSpacing: 0.3
+                }}
+              >
+                Loading Invoices...
+              </Typography>
+            </Box>
+          )}
+
+          {/* FILTERS */}
+          <Box sx={{ pb: 3, flexShrink: 0 }}>
+            <Grid container spacing={3}>
+              {/* Row 1 */}
+              <Grid item xs={12} sm={6} md={3}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Checkbox
+                    checked={dateFilter}
+                    onChange={e => {
+                      setDateFilter(e.target.checked)
+                      if (!e.target.checked) {
+                        setDateRange([null, null])
+                      } else {
+                        const today = new Date()
+                        setDateRange([today, today])
+                      }
+                    }}
+                    size='small'
+                  />
+                  <Typography sx={{ mb: 0.5, fontWeight: 500 }}>Date Filter</Typography>
+                </Box>
+
+                <GlobalDateRange
+                  start={dateRange[0]}
+                  end={dateRange[1]}
+                  onSelectRange={({ start, end }) => setDateRange([start, end])}
+                  disabled={!dateFilter}
+                  size='small'
+                />
+              </Grid>
+
+              <Grid item xs={12} sm={6} md={3}>
+                <CustomAutocomplete
+                  options={originOptions}
+                  value={originFilter || null}
+                  onChange={(_, v) => setOriginFilter(v || null)}
+                  getOptionLabel={opt => opt?.label || ''}
+                  renderInput={p => <CustomTextField {...p} label='Origin' size='small' />}
+                />
+              </Grid>
+
+              <Grid item xs={12} sm={6} md={3}>
+                <CustomAutocomplete
+                  options={contractTypeOptions}
+                  value={contractTypeFilter || null}
+                  onChange={(_, v) => setContractTypeFilter(v || null)}
+                  getOptionLabel={opt => opt?.label || ''}
+                  renderInput={p => <CustomTextField {...p} label='Contract Type' size='small' />}
+                />
+              </Grid>
+
+              <Grid item xs={12} sm={6} md={3}>
+                <CustomAutocomplete
+                  options={invoiceStatusOptions}
+                  value={invoiceStatusFilter || null}
+                  onChange={(_, v) => setInvoiceStatusFilter(v || null)}
+                  getOptionLabel={opt => opt?.label || ''}
+                  renderInput={p => <CustomTextField {...p} label='Invoice Status' size='small' />}
+                />
+              </Grid>
+
+              {/* Row 2 */}
+              <Grid item xs={12} sm={6} md={3}>
+                <CustomAutocomplete
+                  options={serviceFreqOptions}
+                  value={serviceFreqFilter || null}
+                  onChange={(_, v) => setServiceFreqFilter(v || null)}
+                  getOptionLabel={opt => opt?.label || ''}
+                  renderInput={p => <CustomTextField {...p} label='Service Frequency' size='small' />}
+                />
+              </Grid>
+
+              <Grid item xs={12} sm={6} md={3}>
+                <CustomAutocomplete
+                  options={billingFreqOptions}
+                  value={billingFreqFilter || null}
+                  onChange={(_, v) => setBillingFreqFilter(v || null)}
+                  getOptionLabel={opt => opt?.label || ''}
+                  renderInput={p => <CustomTextField {...p} label='Billing Frequency' size='small' />}
+                />
+              </Grid>
+
+              <Grid item xs={12} sm={6} md={3}>
+                <CustomAutocomplete
+                  options={contractLevelOptions}
+                  value={contractLevelFilter || null}
+                  onChange={(_, v) => setContractLevelFilter(v || null)}
+                  getOptionLabel={opt => opt?.label || ''}
+                  renderInput={p => <CustomTextField {...p} label='Contract Level' size='small' />}
+                />
+              </Grid>
+
+              <Grid item xs={12} sm={6} md={3}>
+                <CustomAutocomplete
+                  options={invoiceTypeOptions}
+                  value={invoiceTypeFilter || null}
+                  onChange={(_, v) => setInvoiceTypeFilter(v || null)}
+                  getOptionLabel={opt => opt?.label || ''}
+                  renderInput={p => <CustomTextField {...p} label='Invoice Type' size='small' />}
+                />
+              </Grid>
+
+              {/* Row 3 */}
+              <Grid item xs={12} sm={6} md={3}>
+                <CustomAutocomplete
+                  options={salesPersonOptions}
+                  value={salesPersonFilter || null}
+                  onChange={(_, v) => setSalesPersonFilter(v || null)}
+                  getOptionLabel={opt => opt?.label || ''}
+                  renderInput={p => <CustomTextField {...p} label='Sales Person' size='small' />}
+                />
+              </Grid>
+
+              <Grid item xs={12} sm={6} md={3}>
+                <CustomAutocomplete
+                  options={customerOptions}
+                  value={customerFilter || null}
+                  getOptionLabel={option => option?.label || ''}
+                  isOptionEqualToValue={(option, value) => option?.id === value?.id}
+                  onChange={(_, v) => {
+                    setCustomerFilter(v || null)
+                    setContractFilter(null)
+
+                    if (v?.id) {
+                      getInvoiceDropdowns({ customer_id: v.id })
+                        .then(res => {
+                          const dd = res?.data?.data || {}
+                          const contracts = dedupeById(dd.contract_list?.label || [])
+                          setCustomerSpecificContracts(contracts)
+                          setDropdownData(prev => ({ ...prev, contracts }))
+                        })
+                        .catch(() => {
+                          showToast('error', 'Failed to load contracts')
+                          setCustomerSpecificContracts([])
+                          setDropdownData(prev => ({ ...prev, contracts: [] }))
+                        })
+                    } else {
+                      setCustomerSpecificContracts(null)
+                    }
+                  }}
+                  renderOption={(props, option) => (
+                    <li {...props} key={option.id}>
+                      {option.label}
+                    </li>
+                  )}
+                  renderInput={params => <CustomTextField {...params} label='Customer' size='small' />}
+                />
+              </Grid>
+
+              <Grid item xs={12} sm={6} md={3} mb={2}>
+                <CustomAutocomplete
+                  options={contractOptions}
+                  value={contractFilter || null}
+                  getOptionLabel={opt => opt?.label || ''}
+                  isOptionEqualToValue={(a, b) => a?.id === b?.id}
+                  onChange={(_, v) => setContractFilter(v || null)}
+                  renderOption={(props, option) => (
+                    <li {...props} key={option.id}>
+                      {option.label}
+                    </li>
+                  )}
+                  renderInput={params => <CustomTextField {...params} label='Contract' size='small' />}
+                />
+              </Grid>
+            </Grid>
+
+            {/* SEARCH + ENTRIES */}
+            <Box display='flex' justifyContent='space-between' alignItems='center' gap={2} mt={4}>
+              <Select
+                size='small'
+                value={pageSize}
+                onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
+                sx={{ width: 130 }}
+              >
+                {[25, 50, 75, 100].map(s => (
+                  <MenuItem key={s} value={s}>
+                    {s} entries
+                  </MenuItem>
+                ))}
+              </Select>
+
+              <CustomTextField
+                size='small'
+                placeholder='Search invoice, contract, customer...'
+                value={searchText}
+                onChange={e => {
+                  setSearchText(e.target.value)
+                  setPagination(p => ({ ...p, pageIndex: 0 }))
+                }}
+                sx={{ width: 360 }}
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position='start'>
+                        <SearchIcon />
+                      </InputAdornment>
+                    )
+                  }
+                }}
+              />
+            </Box>
           </Box>
 
-          <div className='overflow-x-auto'>
-            <table className={tableStyles.table}>
-              <thead>
-                {table.getHeaderGroups().map(hg => (
-                  <tr key={hg.id}>
-                    {hg.headers.map(h => (
-                      <th key={h.id}>{flexRender(h.column.columnDef.header, h.getContext())}</th>
-                    ))}
-                  </tr>
-                ))}
-              </thead>
-              <tbody>
-                {data.length > 0 ? (
-                  table.getRowModel().rows.map(row => (
-                    <tr key={row.id}>
-                      {row.getVisibleCells().map(cell => (
-                        <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+          <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            <StickyTableWrapper rowCount={data.length}>
+              <table className={tableStyles.table}>
+                <thead>
+                  {table.getHeaderGroups().map(hg => (
+                    <tr key={hg.id}>
+                      {hg.headers.map(h => (
+                        <th key={h.id}>
+                          <div
+                            className={classnames({
+                              'flex items-center gap-1': true,
+                              'cursor-pointer select-none': h.column.getCanSort()
+                            })}
+                            onClick={h.column.getToggleSortingHandler()}
+                          >
+                            {flexRender(h.column.columnDef.header, h.getContext())}
+
+                            {{
+                              asc: <ChevronRight fontSize='1.1rem' className='-rotate-90' />,
+                              desc: <ChevronRight fontSize='1.1rem' className='rotate-90' />
+                            }[h.column.getIsSorted()] ?? null}
+                          </div>
+                        </th>
                       ))}
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={columns.length} className='text-center py-6'>
-                      {loading ? 'Loading...' : 'No results found'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ))}
+                </thead>
+
+                <tbody>
+                  {data.length > 0 ? (
+                    table.getRowModel().rows.map(row => (
+                      <tr key={row.id}>
+                        {row.getVisibleCells().map(cell => (
+                          <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                        ))}
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={columns.length} className='text-center py-6'>
+                        {loading ? 'Loading...' : 'No results found'}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </StickyTableWrapper>
+          </Box>
 
           <Box
             sx={{
               py: 2,
               display: 'flex',
               justifyContent: 'space-between',
-              alignItems: 'center'
+              alignItems: 'center',
+              flexShrink: 0,
+              mt: 'auto'
             }}
           >
             <Typography color='text.disabled'>
@@ -1061,9 +1097,10 @@ const InvoiceListPageFullContent = () => {
           </Box>
         </Box>
       </Card>
-    </Box>
+    </StickyListLayout>
   )
 }
+
 
 // Wrapper for RBAC
 export default function InvoiceListPageFull() {

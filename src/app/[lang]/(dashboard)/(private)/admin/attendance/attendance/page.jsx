@@ -64,6 +64,7 @@ import AttendanceScheduleDrawer from './service-plan/AttendanceScheduleDrawer'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 import styles from '@core/styles/table.module.css'
 import StickyListLayout from '@/components/common/StickyListLayout'
+import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 import CustomTextField from '@core/components/mui/TextField'
 import { format } from 'date-fns'
 import { showToast } from '@/components/common/Toasts' // ← Idhu add pannu (exact path unakku theriyum)
@@ -284,104 +285,119 @@ const AttendancePageContent = () => {
   ]
 
   return (
-    <Box>
-      <Box sx={{ mb: 2 }}>
-        <Link href='/admin/dashboards' className='text-primary'>
-          Dashboard
-        </Link>{' '}
-        / <Typography component='span'>Attendance</Typography>
-      </Box>
+    <StickyListLayout
+      header={
+        <Box sx={{ mb: 2 }}>
+          <Box sx={{ mb: 2 }}>
+            <Link href='/admin/dashboards' className='text-primary'>
+              Dashboard
+            </Link>{' '}
+            / <Typography component='span'>Attendance</Typography>
+          </Box>
 
-      <Card>
-        <CardHeader
-          title='Attendance'
-          action={
-            <Box display='flex' alignItems='center' gap={2}>
-              <GlobalButton
-                variant='contained'
-                color='primary'
-                startIcon={<RefreshIcon />}
-                onClick={fetchAttendances}
-                sx={{
-                  textTransform: 'none',
-                  fontWeight: 500,
-                  px: 2.5,
-                  height: 36
-                }}
-              >
-                Refresh
-              </GlobalButton>
+          <CardHeader
+            title={
+              <Box display='flex' alignItems='center' gap={2}>
+                <Typography variant='h5' fontWeight={600}>
+                  Attendance
+                </Typography>
 
-              <GlobalButton
-                color='secondary'
-                endIcon={<ArrowDropDownIcon />}
-                onClick={e => setExportAnchorEl(e.currentTarget)}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-              >
-                Export
-              </GlobalButton>
-              <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
-                <MenuItem
-                  onClick={() => {
-                    setExportAnchorEl(null)
-                    exportPrint()
+                <GlobalButton
+                  variant='contained'
+                  color='primary'
+                  startIcon={<RefreshIcon />}
+                  onClick={fetchAttendances}
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 500,
+                    px: 2.5,
+                    height: 36
                   }}
                 >
-                  <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
-                </MenuItem>
-
-                <MenuItem
-                  onClick={() => {
-                    setExportAnchorEl(null)
-                    exportCSV()
-                  }}
+                  Refresh
+                </GlobalButton>
+              </Box>
+            }
+            action={
+              <Box display='flex' alignItems='center' gap={2}>
+                <GlobalButton
+                  color='secondary'
+                  endIcon={<ArrowDropDownIcon />}
+                  onClick={e => setExportAnchorEl(e.currentTarget)}
+                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
                 >
-                  <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
-                </MenuItem>
+                  Export
+                </GlobalButton>
 
-                <MenuItem
-                  onClick={async () => {
-                    setExportAnchorEl(null)
-                    await exportExcel()
-                  }}
+                <Menu
+                  anchorEl={exportAnchorEl}
+                  open={Boolean(exportAnchorEl)}
+                  onClose={() => setExportAnchorEl(null)}
                 >
-                  <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
-                </MenuItem>
+                  <MenuItem
+                    onClick={() => {
+                      setExportAnchorEl(null)
+                      exportPrint()
+                    }}
+                  >
+                    <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
+                  </MenuItem>
 
-                <MenuItem
-                  onClick={async () => {
-                    setExportAnchorEl(null)
-                    await exportPDF()
-                  }}
+                  <MenuItem
+                    onClick={() => {
+                      setExportAnchorEl(null)
+                      exportCSV()
+                    }}
+                  >
+                    <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
+                  </MenuItem>
+
+                  <MenuItem
+                    onClick={async () => {
+                      setExportAnchorEl(null)
+                      await exportExcel()
+                    }}
+                  >
+                    <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
+                  </MenuItem>
+
+                  <MenuItem
+                    onClick={async () => {
+                      setExportAnchorEl(null)
+                      await exportPDF()
+                    }}
+                  >
+                    <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
+                  </MenuItem>
+
+                  <MenuItem
+                    onClick={() => {
+                      setExportAnchorEl(null)
+                      exportCopy()
+                    }}
+                  >
+                    <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
+                  </MenuItem>
+                </Menu>
+
+                <GlobalButton
+                  variant='contained'
+                  startIcon={<AddIcon />}
+                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                  onClick={() => router.push('/admin/attendance/attendance/add')}
                 >
-                  <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
-                </MenuItem>
+                  Add Attendance
+                </GlobalButton>
+              </Box>
+            }
+          />
+        </Box>
+      }
+    >
+      <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
 
-                <MenuItem
-                  onClick={() => {
-                    setExportAnchorEl(null)
-                    exportCopy()
-                  }}
-                >
-                  <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
-                </MenuItem>
-              </Menu>
 
-              <GlobalButton
-                variant='contained'
-                startIcon={<AddIcon />}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-                onClick={() => router.push('/admin/attendance/attendance/add')}
-              >
-                Add Attendance
-              </GlobalButton>
-            </Box>
-          }
-        />
-
-        <Divider />
-
-        <Box sx={{ p: 4 }}>
+        <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <Box
             sx={{
               display: 'flex',
@@ -389,7 +405,8 @@ const AttendancePageContent = () => {
               justifyContent: 'space-between',
               gap: 3,
               flexWrap: 'wrap',
-              mb: 3
+              mb: 3,
+              flexShrink: 0
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 2, flexWrap: 'wrap' }}>
@@ -503,7 +520,7 @@ const AttendancePageContent = () => {
             />
           </Box>
 
-          <Box sx={{ position: 'relative' }}>
+          <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
             {loading && (
               <Box
                 sx={{
@@ -521,7 +538,7 @@ const AttendancePageContent = () => {
               </Box>
             )}
 
-            <div className='overflow-x-auto'>
+            <StickyTableWrapper rowCount={rows.length}>
               <table className={styles.table}>
                 <thead>
                   <tr>
@@ -559,7 +576,11 @@ const AttendancePageContent = () => {
                               <i className='tabler-calendar-event' />
                             </IconButton>
 
-                            <IconButton size='small' color='error' onClick={() => setDeleteDialog({ open: true, row })}>
+                            <IconButton
+                              size='small'
+                              color='error'
+                              onClick={() => setDeleteDialog({ open: true, row })}
+                            >
                               <i className='tabler-trash text-red-600 text-lg' />
                             </IconButton>
                           </Box>
@@ -567,7 +588,11 @@ const AttendancePageContent = () => {
                         <td>{row.customer_id}</td>
                         <td>{row.service_type || row.service_name || 'General Pest Control'}</td>
                         <td>
-                          {row.supervisor_name ? row.supervisor_name : row.supervisor_id ? `ID: ${row.supervisor_id}` : '-'}
+                          {row.supervisor_name
+                            ? row.supervisor_name
+                            : row.supervisor_id
+                              ? `ID: ${row.supervisor_id}`
+                              : '-'}
                         </td>
                         <td>{row.service_address || '-'}</td>
                         <td>{row.postal_code || '-'}</td>
@@ -588,13 +613,14 @@ const AttendancePageContent = () => {
                   )}
                 </tbody>
               </table>
-            </div>
+            </StickyTableWrapper>
           </Box>
 
-          <TablePaginationComponent totalCount={rows.length} pagination={pagination} setPagination={setPagination} />
+          <Box sx={{ flexShrink: 0, mt: 'auto' }}>
+            <TablePaginationComponent totalCount={rows.length} pagination={pagination} setPagination={setPagination} />
+          </Box>
         </Box>
       </Card>
-
       <Dialog
         onClose={() => setDeleteDialog({ open: false, row: null })}
         aria-labelledby='customized-dialog-title'
@@ -663,9 +689,10 @@ const AttendancePageContent = () => {
         technicians={dropdowns.technicians}
         slots={dropdowns.slots}
       />
-    </Box>
+    </StickyListLayout>
   )
 }
+
 
 // Wrapper for RBAC
 export default function AttendancePage() {

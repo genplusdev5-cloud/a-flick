@@ -30,6 +30,7 @@ import {
 import PermissionGuard from '@/components/auth/PermissionGuard'
 import { usePermission } from '@/hooks/usePermission'
 import StickyListLayout from '@/components/common/StickyListLayout'
+import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 
 import { getTicketReportList } from '@/api/service_request/report'
 import { getReportDropdowns } from '@/api/service_request/report'
@@ -193,7 +194,6 @@ const ServiceRequestPageContent = () => {
   useEffect(() => {
     loadReportDropdownData()
   }, [])
-
 
   const confirmDelete = async () => {
     try {
@@ -587,23 +587,31 @@ const ServiceRequestPageContent = () => {
 
   // UI render
   return (
-    <Box>
-      <Box role='presentation' sx={{ mb: 2 }}>
-        <Breadcrumbs aria-label='breadcrumb'>
-          <Link underline='hover' color='inherit' href='/'>
-            Home
-          </Link>
-          <Typography color='text.primary'>Service Request</Typography>
-        </Breadcrumbs>
-      </Box>
+    <StickyListLayout
+      header={
+        <Box sx={{ mb: 2 }}>
+          <Box role='presentation' sx={{ mb: 2 }}>
+            <Breadcrumbs aria-label='breadcrumb'>
+              <Link underline='hover' color='inherit' href='/'>
+                Home
+              </Link>
+              <Typography color='text.primary'>Service Request</Typography>
+            </Breadcrumbs>
+          </Box>
 
-      {summaryData.length > 0 && <SummaryCards data={summaryData} />}
+          {summaryData.length > 0 && <SummaryCards data={summaryData} />}
+        </Box>
+      }
+    >
+      <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
 
-      <Card sx={{ mt: 2 }}>
         <CardHeader
-          title='Service Request'
-          action={
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          title={
+            <Box display='flex' alignItems='center' gap={2}>
+              <Typography variant='h5' fontWeight={600}>
+                Service Request
+              </Typography>
+
               <Button
                 variant='contained'
                 startIcon={<RefreshIcon />}
@@ -615,7 +623,10 @@ const ServiceRequestPageContent = () => {
               >
                 Refresh
               </Button>
-
+            </Box>
+          }
+          action={
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               {canAccess('Service Request', 'create') && (
                 <Button variant='contained' startIcon={<AddIcon />} sx={{ textTransform: 'none' }}>
                   Global Change
@@ -627,14 +638,15 @@ const ServiceRequestPageContent = () => {
 
         <Divider />
 
-        <Box sx={{ p: 4 }}>
+        <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <Box
             sx={{
               display: 'flex',
               alignItems: 'center',
               gap: 2,
               mb: 3,
-              flexWrap: 'wrap'
+              flexWrap: 'wrap',
+              flexShrink: 0
             }}
           >
             <Box sx={{ display: 'flex', flexDirection: 'column' }}>
@@ -770,7 +782,8 @@ const ServiceRequestPageContent = () => {
               alignItems: 'center',
               gap: 2,
               mb: 2,
-              flexWrap: 'wrap'
+              flexWrap: 'wrap',
+              flexShrink: 0
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -794,7 +807,11 @@ const ServiceRequestPageContent = () => {
                     variant='contained'
                     size='small'
                     onClick={
-                      b === 'CSV' ? exportCSV : b === 'Print' ? exportPrint : () => showToast('info', `${b} coming soon`)
+                      b === 'CSV'
+                        ? exportCSV
+                        : b === 'Print'
+                          ? exportPrint
+                          : () => showToast('info', `${b} coming soon`)
                     }
                     sx={{ bgcolor: '#6c757d', color: '#fff', textTransform: 'none' }}
                   >
@@ -823,7 +840,7 @@ const ServiceRequestPageContent = () => {
             />
           </Box>
 
-          <Box sx={{ position: 'relative' }}>
+          <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
             {loading && (
               <Box
                 sx={{
@@ -841,7 +858,7 @@ const ServiceRequestPageContent = () => {
               </Box>
             )}
 
-            <div className='overflow-x-auto'>
+            <StickyTableWrapper rowCount={rows.length}>
               <table className={styles.table}>
                 <thead>
                   {table.getHeaderGroups().map(hg => (
@@ -856,23 +873,18 @@ const ServiceRequestPageContent = () => {
                             onClick={h.column.getToggleSortingHandler()}
                           >
                             {flexRender(h.column.columnDef.header, h.getContext())}
-                            {h.column.getIsSorted() === 'asc' && <ChevronRight className='-rotate-90' fontSize='small' />}
-                            {h.column.getIsSorted() === 'desc' && <ChevronRight className='rotate-90' fontSize='small' />}
+                            {{
+                              asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
+                              desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
+                            }[h.column.getIsSorted()] ?? null}
                           </div>
                         </th>
                       ))}
                     </tr>
                   ))}
                 </thead>
-
                 <tbody>
-                  {rows.length === 0 ? (
-                    <tr>
-                      <td colSpan={columns.length} className='text-center py-4'>
-                        {loading ? 'Loading...' : 'No data available'}
-                      </td>
-                    </tr>
-                  ) : (
+                  {rows.length > 0 ? (
                     table.getRowModel().rows.map(row => (
                       <tr key={row.id}>
                         {row.getVisibleCells().map(cell => (
@@ -880,10 +892,16 @@ const ServiceRequestPageContent = () => {
                         ))}
                       </tr>
                     ))
+                  ) : (
+                    <tr>
+                      <td colSpan={columns.length} className='text-center py-6'>
+                        {loading ? 'Fetching report list...' : 'No results found'}
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>
-            </div>
+            </StickyTableWrapper>
           </Box>
 
           <Box
@@ -894,7 +912,8 @@ const ServiceRequestPageContent = () => {
               justifyContent: 'space-between',
               alignItems: 'center',
               flexWrap: 'wrap',
-              mt: 4
+              mt: 'auto',
+              flexShrink: 0
             }}
           >
             <Typography color='text.disabled' variant='body2'>
@@ -959,8 +978,7 @@ const ServiceRequestPageContent = () => {
 
         <DialogContent sx={{ px: 5, pt: 1 }}>
           <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
-            Are you sure you want to delete{' '}
-            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name || 'this incident'}</strong>?
+            Are you sure you want to delete <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name || 'this incident'}</strong>?
             <br />
             This action cannot be undone.
           </Typography>
@@ -984,9 +1002,10 @@ const ServiceRequestPageContent = () => {
           </GlobalButton>
         </DialogActions>
       </Dialog>
-    </Box>
+    </StickyListLayout>
   )
 }
+
 
 // Wrapper for RBAC
 export default function ServiceRequestPage() {

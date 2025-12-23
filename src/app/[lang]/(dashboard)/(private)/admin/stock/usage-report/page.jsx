@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { format } from 'date-fns'
 
 // MUI
+import StickyTableWrapper from '@/components/common/StickyTableWrapper'
+import StickyListLayout from '@/components/common/StickyListLayout'
 import {
   Box,
   Card,
@@ -17,7 +19,7 @@ import {
   CircularProgress,
   Pagination,
   InputAdornment,
-  Button // ✅ Added here
+  Button
 } from '@mui/material'
 
 import PermissionGuard from '@/components/auth/PermissionGuard'
@@ -51,9 +53,7 @@ import classnames from 'classnames'
 import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
 
-// ─────────────────────────────────────────────
 // Dummy Data
-// ─────────────────────────────────────────────
 const dummyData = [
   {
     id: 1,
@@ -87,15 +87,7 @@ const dummyData = [
   }
 ]
 
-// ─────────────────────────────────────────────
 // Toast Helper
-// ─────────────────────────────────────────────
-// ─────────────────────────────────────────────
-// Toast Helper (Fixed)
-// ─────────────────────────────────────────────
-// ──────────────────────────────────────────────────────────────
-// Toast (Custom Styled, Global, with Icons & Colors)
-// ──────────────────────────────────────────────────────────────
 const showToast = (type, message = '') => {
   const icons = {
     success: 'tabler-circle-check',
@@ -146,10 +138,6 @@ const showToast = (type, message = '') => {
   )
 }
 
-// ─────────────────────────────────────────────
-// Component
-// ─────────────────────────────────────────────
-// ─────────────────────────────────────────────
 const UsageReportPageContent = () => {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(false)
@@ -208,7 +196,6 @@ const UsageReportPageContent = () => {
       const withSno = filtered.map((r, i) => ({ ...r, sno: i + 1 }))
       setRows(withSno)
 
-      // ✅ only show toast if manually triggered
       if (showToastMsg) {
         showToast('info', 'Usage report refreshed')
       }
@@ -219,12 +206,10 @@ const UsageReportPageContent = () => {
     }
   }
 
-  // ✅ Correct useEffect — no stray characters
   useEffect(() => {
-    loadData(false) // no toast
+    loadData(false)
   }, [searchText, enableDateFilter, startDate, endDate, employeeFilter, customerFilter, supplierFilter, chemicalFilter])
 
-  // ===== React Table =====
   const table = useReactTable({
     data: rows,
     columns,
@@ -240,387 +225,334 @@ const UsageReportPageContent = () => {
   const pageIndex = table.getState().pagination.pageIndex || 0
 
   return (
-    <Box>
-      {/* Breadcrumb */}
-      <Box role='presentation' sx={{ mb: 2 }}>
-        {' '}
-        <Breadcrumbs aria-label='breadcrumb'>
-          {' '}
-          <Link underline='hover' color='inherit' href='/'>
-            Home{' '}
-          </Link>{' '}
-          <Typography color='text.primary'>Usage Report</Typography>{' '}
-        </Breadcrumbs>{' '}
-      </Box>
-      <Card sx={{ p: 3, mt: 2 }}>
-        {/* Header */}
-        <CardHeader
-          sx={{
-            pb: 1.5,
-            pt: 1.5,
-            '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
-          }}
-          title={
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Typography variant='h5' sx={{ fontWeight: 600 }}>
-                Usage Report
-              </Typography>
-
-              <Button
-                variant='contained'
-                color='primary'
-                startIcon={
-                  <RefreshIcon
-                    sx={{
-                      animation: loading ? 'spin 1s linear infinite' : 'none',
-                      '@keyframes spin': {
-                        '0%': { transform: 'rotate(0deg)' },
-                        '100%': { transform: 'rotate(360deg)' }
-                      }
-                    }}
-                  />
-                }
-                disabled={loading}
-                onClick={async () => {
-                  setLoading(true)
-                  await loadData(true)
-                  setTimeout(() => setLoading(false), 600)
-                }}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-              >
-                {loading ? 'Refreshing...' : 'Refresh'}
-              </Button>
-            </Box>
-          }
-          action={null}
-        />
-
-        {/* Full-screen Loader */}
+    <StickyListLayout
+      header={
+        <Box sx={{ mb: 6 }}>
+          <Box sx={{ mb: 2 }}>
+            <Link href='/admin/dashboards' className='text-primary'>
+              Dashboard
+            </Link>{' '}
+            / <Typography component='span'>Usage Report</Typography>
+          </Box>
+          <Typography variant='h5' sx={{ fontWeight: 600 }}>
+            Usage Report
+          </Typography>
+        </Box>
+      }
+    >
+      <Card
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          minHeight: 0,
+          position: 'relative'
+        }}
+      >
         {loading && (
           <Box
             sx={{
-              position: 'fixed',
+              position: 'absolute',
               inset: 0,
-              bgcolor: 'rgba(255,255,255,0.65)',
-              backdropFilter: 'blur(3px)',
+              bgcolor: 'rgba(255,255,255,0.8)',
+              backdropFilter: 'blur(2px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              flexDirection: 'column',
-              zIndex: 2000,
-              animation: 'fadeIn 0.3s ease-in-out',
-              '@keyframes fadeIn': {
-                from: { opacity: 0 },
-                to: { opacity: 1 }
-              }
+              zIndex: 10
             }}
           >
-            <ProgressCircularCustomization size={70} thickness={5} />
-            <Typography
-              mt={2}
-              sx={{
-                color: 'primary.main',
-                fontWeight: 600,
-                fontSize: '1.05rem',
-                letterSpacing: 0.3
-              }}
-            >
-              Loading Usage Report...
-            </Typography>
+            <ProgressCircularCustomization size={60} thickness={5} />
           </Box>
         )}
+        <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <Divider sx={{ mb: 3 }} />
 
-        <Divider sx={{ mb: 2 }} />
+          {/* FILTERS — SINGLE ROW */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
+              mb: 3,
+              flexWrap: 'nowrap',
+              flexShrink: 0
+            }}
+          >
+            {/* Date Range */}
+            <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                <Typography variant='body2' sx={{ fontWeight: 500 }}>
+                  Date Range
+                </Typography>
+                <Checkbox
+                  size='small'
+                  checked={enableDateFilter}
+                  onChange={e => setEnableDateFilter(e.target.checked)}
+                  sx={{ p: 0 }}
+                />
+              </Box>
 
-        {/* Filters */}
-        {/* FILTERS — SINGLE ROW */}
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 3,
-            mb: 3,
-            flexWrap: 'nowrap'
-          }}
-        >
-          {/* Date Range */}
-          <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-              <Typography variant='body2' sx={{ fontWeight: 500 }}>
-                Date Range
-              </Typography>
-              <Checkbox
-                size='small'
-                checked={enableDateFilter}
-                onChange={e => setEnableDateFilter(e.target.checked)}
-                sx={{ p: 0 }}
+              <AppReactDatepicker
+                selectsRange
+                startDate={startDate}
+                endDate={endDate}
+                onChange={dates => {
+                  if (enableDateFilter && dates) {
+                    setStartDate(dates[0])
+                    setEndDate(dates[1])
+                  }
+                }}
+                disabled={!enableDateFilter}
+                readOnly={!enableDateFilter}
+                customInput={
+                  <CustomTextField
+                    size='small'
+                    sx={{
+                      width: 260,
+                      backgroundColor: 'white',
+                      '& .MuiInputBase-root': { height: 40 }
+                    }}
+                    value={`${format(startDate, 'dd/MM/yyyy')} - ${format(endDate, 'dd/MM/yyyy')}`}
+                  />
+                }
               />
             </Box>
 
-            <AppReactDatepicker
-              selectsRange
-              startDate={startDate}
-              endDate={endDate}
-              onChange={dates => {
-                if (enableDateFilter && dates) {
-                  setStartDate(dates[0])
-                  setEndDate(dates[1])
-                }
-              }}
-              disabled={!enableDateFilter}
-              readOnly={!enableDateFilter}
-              customInput={
-                <CustomTextField
-                  size='small'
-                  sx={{
-                    width: 260,
-                    backgroundColor: 'white',
-                    '& .MuiInputBase-root': { height: 40 }
-                  }}
-                  value={`${format(startDate, 'dd/MM/yyyy')} - ${format(endDate, 'dd/MM/yyyy')}`}
-                />
-              }
-            />
-          </Box>
+            {/* Employee */}
+            <Box>
+              <Typography variant='body2' sx={{ fontWeight: 500, mb: 0.5 }}>
+                Employee
+              </Typography>
+              <CustomAutocomplete
+                options={['Admin', 'Tech', 'User A']}
+                value={employeeFilter || null}
+                onChange={(e, val) => setEmployeeFilter(val || '')}
+                renderInput={p => (
+                  <CustomTextField {...p} size='small' sx={{ width: 220, '& .MuiInputBase-root': { height: 40 } }} />
+                )}
+              />
+            </Box>
 
-          {/* Employee */}
-          <Box>
-            <Typography variant='body2' sx={{ fontWeight: 500, mb: 0.5 }}>
-              Employee
-            </Typography>
-            <CustomAutocomplete
-              options={['Admin', 'Tech', 'User A']}
-              value={employeeFilter || null}
-              onChange={(e, val) => setEmployeeFilter(val || '')}
-              renderInput={p => (
-                <CustomTextField {...p} size='small' sx={{ width: 220, '& .MuiInputBase-root': { height: 40 } }} />
-              )}
-            />
-          </Box>
+            {/* Customer */}
+            <Box>
+              <Typography variant='body2' sx={{ fontWeight: 500, mb: 0.5 }}>
+                Customer
+              </Typography>
+              <CustomAutocomplete
+                options={['GP Industries Pvt Ltd', 'ABC Pvt Ltd', 'Tech Solutions']}
+                value={customerFilter || null}
+                onChange={(e, val) => setCustomerFilter(val || '')}
+                renderInput={p => (
+                  <CustomTextField {...p} size='small' sx={{ width: 220, '& .MuiInputBase-root': { height: 40 } }} />
+                )}
+              />
+            </Box>
 
-          {/* Customer */}
-          <Box>
-            <Typography variant='body2' sx={{ fontWeight: 500, mb: 0.5 }}>
-              Customer
-            </Typography>
-            <CustomAutocomplete
-              options={['GP Industries Pvt Ltd', 'ABC Pvt Ltd', 'Tech Solutions']}
-              value={customerFilter || null}
-              onChange={(e, val) => setCustomerFilter(val || '')}
-              renderInput={p => (
-                <CustomTextField {...p} size='small' sx={{ width: 220, '& .MuiInputBase-root': { height: 40 } }} />
-              )}
-            />
-          </Box>
+            {/* Supplier */}
+            <Box>
+              <Typography variant='body2' sx={{ fontWeight: 500, mb: 0.5 }}>
+                Supplier
+              </Typography>
+              <CustomAutocomplete
+                options={['Stock-TECH STOCK 1', 'Supplier-B']}
+                value={supplierFilter || null}
+                onChange={(e, val) => setSupplierFilter(val || '')}
+                renderInput={p => (
+                  <CustomTextField {...p} size='small' sx={{ width: 220, '& .MuiInputBase-root': { height: 40 } }} />
+                )}
+              />
+            </Box>
 
-          {/* Supplier */}
-          <Box>
-            <Typography variant='body2' sx={{ fontWeight: 500, mb: 0.5 }}>
-              Supplier
-            </Typography>
-            <CustomAutocomplete
-              options={['Stock-TECH STOCK 1', 'Supplier-B']}
-              value={supplierFilter || null}
-              onChange={(e, val) => setSupplierFilter(val || '')}
-              renderInput={p => (
-                <CustomTextField {...p} size='small' sx={{ width: 220, '& .MuiInputBase-root': { height: 40 } }} />
-              )}
-            />
-          </Box>
-
-          {/* Chemical */}
-          <Box>
-            <Typography variant='body2' sx={{ fontWeight: 500, mb: 0.5 }}>
-              Chemical
-            </Typography>
-            <CustomAutocomplete
-              options={['Abate', 'Advion Ant Gel', 'Aquabac']}
-              value={chemicalFilter || null}
-              onChange={(e, val) => setChemicalFilter(val || '')}
-              renderInput={p => (
-                <CustomTextField {...p} size='small' sx={{ width: 220, '& .MuiInputBase-root': { height: 40 } }} />
-              )}
-            />
-          </Box>
-        </Box>
-
-        <Divider sx={{ mb: 4 }} />
-
-        {/* Search + Entries control */}
-        {/* Toolbar */}
-        <Box
-          sx={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: 2,
-            mb: 2,
-            px: 1
-          }}
-        >
-          {/* LEFT: Entries + Export Buttons */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-            {/* Entries */}
-            <CustomTextField
-              select
-              size='small'
-              sx={{ width: 140 }}
-              value={table.getState().pagination.pageSize}
-              onChange={e => {
-                table.setPageSize(Number(e.target.value))
-                table.setPageIndex(0)
-              }}
-            >
-              {[10, 25, 50, 100].map(size => (
-                <MenuItem key={size} value={size}>
-                  {size} entries
-                </MenuItem>
-              ))}
-            </CustomTextField>
-
-            {/* Export */}
-            <Box sx={{ display: 'flex', gap: 1.5 }}>
-              {['Copy', 'CSV', 'Excel', 'PDF', 'Print'].map(label => (
-                <Button
-                  key={label}
-                  variant='contained'
-                  sx={{
-                    backgroundColor: '#5A5A5A',
-                    color: 'white',
-                    textTransform: 'none',
-                    fontWeight: 500,
-                    fontSize: '0.8rem',
-                    px: 2,
-                    py: 0.7,
-                    borderRadius: 2,
-                    minWidth: 68,
-                    '&:hover': { backgroundColor: '#4b4b4b' }
-                  }}
-                >
-                  {label}
-                </Button>
-              ))}
+            {/* Chemical */}
+            <Box>
+              <Typography variant='body2' sx={{ fontWeight: 500, mb: 0.5 }}>
+                Chemical
+              </Typography>
+              <CustomAutocomplete
+                options={['Abate', 'Advion Ant Gel', 'Aquabac']}
+                value={chemicalFilter || null}
+                onChange={(e, val) => setChemicalFilter(val || '')}
+                renderInput={p => (
+                  <CustomTextField {...p} size='small' sx={{ width: 220, '& .MuiInputBase-root': { height: 40 } }} />
+                )}
+              />
             </Box>
           </Box>
 
-          {/* RIGHT: Search */}
-          <CustomTextField
-            size='small'
-            placeholder='Search by employee, customer, or chemical...'
-            value={searchText}
-            onChange={e => setSearchText(e.target.value)}
-            sx={{ width: 360 }}
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position='start'>
-                    <SearchIcon />
-                  </InputAdornment>
-                )
-              }
-            }}
-          />
-        </Box>
+          <Divider sx={{ mb: 3 }} />
 
-        {/* Table */}
-        <Box sx={{ overflowX: 'auto' }}>
-          <table className={styles.table}>
-            <thead>
-              {table.getHeaderGroups().map(hg => (
-                <tr key={hg.id}>
-                  {hg.headers.map(header => (
-                    <th key={header.id}>
-                      <div
-                        className={classnames({
-                          'flex items-center': header.column.getIsSorted(),
-                          'cursor-pointer select-none': header.column.getCanSort()
-                        })}
-                        onClick={header.column.getToggleSortingHandler()}
-                      >
-                        {flexRender(header.column.columnDef.header, header.getContext())}
-                        {header.column.getIsSorted() === 'asc' && (
-                          <ChevronRight className='-rotate-90' fontSize='small' />
-                        )}
-                        {header.column.getIsSorted() === 'desc' && (
-                          <ChevronRight className='rotate-90' fontSize='small' />
-                        )}
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={columns.length} className='text-center'>
-                    Loading...
-                  </td>
-                </tr>
-              ) : table.getRowModel().rows.length === 0 ? (
-                <tr>
-                  <td colSpan={columns.length} className='text-center'>
-                    No data available
-                  </td>
-                </tr>
-              ) : (
-                table.getRowModel().rows.map(row => (
-                  <tr key={row.id}>
-                    {row.getVisibleCells().map(cell => (
-                      <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
-                    ))}
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-
-          {/* Pagination Footer */}
+          {/* Toolbar Row */}
           <Box
             sx={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
               flexWrap: 'wrap',
-              borderTop: '1px solid #e0e0e0',
-              px: 3,
-              py: 1.5,
-              mt: 1,
-              gap: 2
+              gap: 2,
+              mb: 3,
+              flexShrink: 0
             }}
           >
-            <Typography color='text.disabled'>
-              {`Showing ${total === 0 ? 0 : pageIndex * pageSize + 1} to ${Math.min(
-                (pageIndex + 1) * pageSize,
-                total
-              )} of ${total} entries`}
-            </Typography>
+            {/* LEFT: Entries + Export Buttons */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+              <CustomTextField
+                select
+                size='small'
+                sx={{ width: 140 }}
+                value={pageSize}
+                onChange={e => {
+                  table.setPageSize(Number(e.target.value))
+                  table.setPageIndex(0)
+                }}
+              >
+                {[10, 25, 50, 100].map(size => (
+                  <MenuItem key={size} value={size}>
+                    {size} entries
+                  </MenuItem>
+                ))}
+              </CustomTextField>
 
-            <Pagination
-              shape='rounded'
-              color='primary'
-              variant='tonal'
-              count={Math.ceil(total / pageSize) || 1}
-              page={pageIndex + 1}
-              onChange={(_, page) => {
-                table.setPageIndex(page - 1)
+              <Box sx={{ display: 'flex', gap: 1.5 }}>
+                {['Copy', 'CSV', 'Excel', 'PDF', 'Print'].map(label => (
+                  <Button
+                    key={label}
+                    variant='contained'
+                    sx={{
+                      backgroundColor: '#5A5A5A',
+                      color: 'white',
+                      textTransform: 'none',
+                      fontWeight: 500,
+                      fontSize: '0.8rem',
+                      px: 2,
+                      py: 0.7,
+                      borderRadius: 2,
+                      minWidth: 68,
+                      '&:hover': { backgroundColor: '#4b4b4b' }
+                    }}
+                  >
+                    {label}
+                  </Button>
+                ))}
+              </Box>
+            </Box>
+
+            {/* RIGHT: Search */}
+            <CustomTextField
+              size='small'
+              placeholder='Search by employee, customer, or chemical...'
+              value={searchText}
+              onChange={e => setSearchText(e.target.value)}
+              sx={{ width: 360 }}
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position='start'>
+                      <SearchIcon />
+                    </InputAdornment>
+                  )
+                }
               }}
-              showFirstButton
-              showLastButton
             />
+          </Box>
+
+          <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            <StickyTableWrapper rowCount={rows.length}>
+              <table className={styles.table}>
+                <thead>
+                  {table.getHeaderGroups().map(hg => (
+                    <tr key={hg.id}>
+                      {hg.headers.map(header => (
+                        <th key={header.id}>
+                          <div
+                            className={classnames({
+                              'flex items-center': header.column.getIsSorted(),
+                              'cursor-pointer select-none': header.column.getCanSort()
+                            })}
+                            onClick={header.column.getToggleSortingHandler()}
+                          >
+                            {flexRender(header.column.columnDef.header, header.getContext())}
+                            {header.column.getIsSorted() === 'asc' && (
+                              <ChevronRight className='-rotate-90' fontSize='small' />
+                            )}
+                            {header.column.getIsSorted() === 'desc' && (
+                              <ChevronRight className='rotate-90' fontSize='small' />
+                            )}
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  ))}
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr>
+                      <td colSpan={columns.length} className='text-center'>
+                        Loading...
+                      </td>
+                    </tr>
+                  ) : table.getRowModel().rows.length === 0 ? (
+                    <tr>
+                      <td colSpan={columns.length} className='text-center'>
+                        No data available
+                      </td>
+                    </tr>
+                  ) : (
+                    table.getRowModel().rows.map(row => (
+                      <tr key={row.id}>
+                        {row.getVisibleCells().map(cell => (
+                          <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                        ))}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </StickyTableWrapper>
+          </Box>
+
+          <Box sx={{ mt: 'auto', flexShrink: 0, pt: 4 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 2
+              }}
+            >
+              <Typography color='text.disabled'>
+                {`Showing ${total === 0 ? 0 : pageIndex * pageSize + 1} to ${Math.min(
+                  (pageIndex + 1) * pageSize,
+                  total
+                )} of ${total} entries`}
+              </Typography>
+
+              <Pagination
+                shape='rounded'
+                color='primary'
+                variant='tonal'
+                count={Math.ceil(total / pageSize) || 1}
+                page={pageIndex + 1}
+                onChange={(_, page) => {
+                  table.setPageIndex(page - 1)
+                }}
+                showFirstButton
+                showLastButton
+              />
+            </Box>
           </Box>
         </Box>
       </Card>
       <ToastContainer />
-    </Box>
+    </StickyListLayout>
   )
 }
 
 // Wrapper for RBAC
 export default function UsageReportPage() {
   return (
-    <PermissionGuard permission="Usage Report">
+    <PermissionGuard permission='Usage Report'>
       <UsageReportPageContent />
     </PermissionGuard>
   )

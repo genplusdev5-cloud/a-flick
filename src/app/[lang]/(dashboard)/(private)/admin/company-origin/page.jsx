@@ -51,6 +51,8 @@ import {
   createColumnHelper
 } from '@tanstack/react-table'
 
+import StickyTableWrapper from '@/components/common/StickyTableWrapper'
+import StickyListLayout from '@/components/common/StickyListLayout'
 import ChevronRight from '@menu/svg/ChevronRight'
 import { getCompanyList, deleteCompany } from '@/api/company'
 import styles from '@core/styles/table.module.css'
@@ -241,17 +243,20 @@ const CompanyOriginListContent = () => {
   })
 
   return (
-    <Box>
-      {/* Breadcrumb */}
-      <Box sx={{ mb: 2 }}>
-        <Breadcrumbs>
-          <Link href='/admin/dashboard'>Home</Link>
-          <Typography color='text.primary'>Company Origin</Typography>
-        </Breadcrumbs>
-      </Box>
-
-      <Card sx={{ p: 3, position: 'relative' }}>
-        {/* Header with Refresh & Export & Add */}
+    <StickyListLayout
+      header={
+        <Box sx={{ mb: 2 }}>
+          {/* Breadcrumb */}
+          <Box sx={{ mb: 2 }}>
+            <Breadcrumbs>
+              <Link href='/admin/dashboard'>Home</Link>
+              <Typography color='text.primary'>Company Origin</Typography>
+            </Breadcrumbs>
+          </Box>
+        </Box>
+      }
+    >
+      <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
         <CardHeader
           title={
             <Box display='flex' alignItems='center' gap={2}>
@@ -326,110 +331,130 @@ const CompanyOriginListContent = () => {
               )}
             </Box>
           }
-          sx={{ pb: 1.5, pt: 1.5, '& .MuiCardHeader-action': { m: 0 } }}
+           sx={{
+              pb: 1.5,
+              pt: 5,
+              px: 10,
+              '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
+              '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
+            }}
         />
+         <Divider />
 
         {/* Loading Overlay */}
         {loading && (
           <Box
             sx={{
-              position: 'fixed',
+              position: 'absolute',
               inset: 0,
               bgcolor: 'rgba(255,255,255,0.8)',
               backdropFilter: 'blur(2px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              zIndex: 9999
+              zIndex: 10
             }}
           >
             <ProgressCircularCustomization size={60} thickness={5} />
           </Box>
         )}
 
-        <Divider sx={{ my: 2 }} />
+        <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {/* Show Entries + Search */}
+          <Box
+            sx={{
+              mb: 3,
+              display: 'flex',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 2,
+              flexShrink: 0
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant='body2' color='text.secondary'>
+                Show
+              </Typography>
+              <FormControl size='small' sx={{ width: 140 }}>
+                <Select
+                  value={pagination.pageSize}
+                  onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
+                >
+                  {[10, 25, 50, 100].map(s => (
+                    <MuiMenuItem key={s} value={s}>
+                      {s} entries
+                    </MuiMenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
 
-        {/* Show Entries + Search */}
-        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant='body2' color='text.secondary'>
-              Show
-            </Typography>
-            <FormControl size='small' sx={{ width: 140 }}>
-              <Select
-                value={pagination.pageSize}
-                onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
-              >
-                {[10, 25, 50, 100].map(s => (
-                  <MuiMenuItem key={s} value={s}>
-                    {s} entries
-                  </MuiMenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <DebouncedInput
+              placeholder='Search company...'
+              value={searchText}
+              onChange={val => setSearchText(val)}
+              size='small'
+              variant='outlined'
+              sx={{ width: 360 }}
+            />
           </Box>
 
-          <DebouncedInput
-            placeholder='Search company...'
-            value={searchText}
-            onChange={val => setSearchText(val)}
-            size='small'
-            variant='outlined'
-            sx={{ width: 360 }}
-          />
-        </Box>
-
-        {/* Table */}
-        <div className='overflow-x-auto -mx-3'>
-          <table className={styles.table}>
-            <thead>
-              {table.getHeaderGroups().map(hg => (
-                <tr key={hg.id}>
-                  {hg.headers.map(header => (
-                    <th key={header.id}>
-                      <div
-                        className={classnames({
-                          'flex items-center gap-1': true,
-                          'cursor-pointer select-none': header.column.getCanSort()
-                        })}
-                        onClick={header.column.getToggleSortingHandler()}
-                      >
-                        {flexRender(header.column.columnDef.header, header.getContext())}
-                        {{
-                          asc: <ChevronRight className='-rotate-90' />,
-                          desc: <ChevronRight className='rotate-90' />
-                        }[header.column.getIsSorted()] ?? null}
-                      </div>
-                    </th>
+          {/* Table */}
+          <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            <StickyTableWrapper rowCount={rows.length}>
+              <table className={styles.table}>
+                <thead>
+                  {table.getHeaderGroups().map(hg => (
+                    <tr key={hg.id}>
+                      {hg.headers.map(header => (
+                        <th key={header.id}>
+                          <div
+                            className={classnames({
+                              'flex items-center gap-1': true,
+                              'cursor-pointer select-none': header.column.getCanSort()
+                            })}
+                            onClick={header.column.getToggleSortingHandler()}
+                          >
+                            {flexRender(header.column.columnDef.header, header.getContext())}
+                            {{
+                              asc: <ChevronRight className='-rotate-90' />,
+                              desc: <ChevronRight className='rotate-90' />
+                            }[header.column.getIsSorted()] ?? null}
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
                   ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody>
-              {paginatedRows.length === 0 ? (
-                <tr>
-                  <td colSpan={columns.length} className='text-center py-8 text-gray-500'>
-                    No companies found
-                  </td>
-                </tr>
-              ) : (
-                table.getRowModel().rows.map(row => (
-                  <tr key={row.id}>
-                    {row.getVisibleCells().map(cell => (
-                      <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
-                    ))}
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody>
+                  {paginatedRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={columns.length} className='text-center py-8 text-gray-500'>
+                        No companies found
+                      </td>
+                    </tr>
+                  ) : (
+                    table.getRowModel().rows.map(row => (
+                      <tr key={row.id}>
+                        {row.getVisibleCells().map(cell => (
+                          <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                        ))}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </StickyTableWrapper>
+          </Box>
 
-        <TablePaginationComponent
-          totalCount={filteredRows.length}
-          pagination={pagination}
-          setPagination={setPagination}
-        />
+          <Box sx={{ mt: 'auto', flexShrink: 0 }}>
+            <TablePaginationComponent
+              totalCount={filteredRows.length}
+              pagination={pagination}
+              setPagination={setPagination}
+            />
+          </Box>
+        </Box>
       </Card>
 
       {/* DELETE CONFIRMATION DIALOG */}
@@ -468,14 +493,14 @@ const CompanyOriginListContent = () => {
           </GlobalButton>
         </DialogActions>
       </Dialog>
-    </Box>
+    </StickyListLayout>
   )
 }
 
 // Wrapper for RBAC
 export default function CompanyOriginListPage() {
   return (
-    <PermissionGuard permission="Company Origin">
+    <PermissionGuard permission='Company Origin'>
       <CompanyOriginListContent />
     </PermissionGuard>
   )
