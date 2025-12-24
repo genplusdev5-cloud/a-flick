@@ -87,19 +87,21 @@ export default function ProductivityReportPage() {
 
     const csv = [
       headers.join(','),
-      ...allRows.map((r, i) => [
-        i + 1,
-        r.employee,
-        r.comp_morn,
-        r.comp_day,
-        r.comp_night,
-        r.comp_sub,
-        r.pend_morn,
-        r.pend_day,
-        r.pend_night,
-        r.pend_sub,
-        r.total
-      ].join(','))
+      ...allRows.map((r, i) =>
+        [
+          i + 1,
+          r.employee,
+          r.comp_morn,
+          r.comp_day,
+          r.comp_night,
+          r.comp_sub,
+          r.pend_morn,
+          r.pend_day,
+          r.pend_night,
+          r.pend_sub,
+          r.total
+        ].join(',')
+      )
     ].join('\n')
 
     const link = document.createElement('a')
@@ -125,7 +127,10 @@ export default function ProductivityReportPage() {
       <th>Pend Morn</th><th>Pend Day</th><th>Pend Night</th><th>Pend Subtotal</th><th>Total</th>
       </tr></thead><tbody>
       ${allRows
-        .map((r, i) => `<tr><td>${i + 1}</td><td>${r.employee}</td><td>${fmt(r.comp_morn)}</td><td>${fmt(r.comp_day)}</td><td>${fmt(r.comp_night)}</td><td>${fmt(r.comp_sub)}</td><td>${fmt(r.pend_morn)}</td><td>${fmt(r.pend_day)}</td><td>${fmt(r.pend_night)}</td><td>${fmt(r.pend_sub)}</td><td>${fmt(r.total)}</td></tr>`)
+        .map(
+          (r, i) =>
+            `<tr><td>${i + 1}</td><td>${r.employee}</td><td>${fmt(r.comp_morn)}</td><td>${fmt(r.comp_day)}</td><td>${fmt(r.comp_night)}</td><td>${fmt(r.comp_sub)}</td><td>${fmt(r.pend_morn)}</td><td>${fmt(r.pend_day)}</td><td>${fmt(r.pend_night)}</td><td>${fmt(r.pend_sub)}</td><td>${fmt(r.total)}</td></tr>`
+        )
         .join('')}
       </tbody></table></body></html>`
     w.document.write(html)
@@ -134,19 +139,21 @@ export default function ProductivityReportPage() {
   }
 
   const exportExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(allRows.map((r, i) => ({
-      'S.No': i + 1,
-      'Employee': r.employee,
-      'Completed Morn': r.comp_morn,
-      'Completed Day': r.comp_day,
-      'Completed Night': r.comp_night,
-      'Completed Subtotal': r.comp_sub,
-      'Pending Morn': r.pend_morn,
-      'Pending Day': r.pend_day,
-      'Pending Night': r.pend_night,
-      'Pending Subtotal': r.pend_sub,
-      'Total': r.total
-    })))
+    const ws = XLSX.utils.json_to_sheet(
+      allRows.map((r, i) => ({
+        'S.No': i + 1,
+        Employee: r.employee,
+        'Completed Morn': r.comp_morn,
+        'Completed Day': r.comp_day,
+        'Completed Night': r.comp_night,
+        'Completed Subtotal': r.comp_sub,
+        'Pending Morn': r.pend_morn,
+        'Pending Day': r.pend_day,
+        'Pending Night': r.pend_night,
+        'Pending Subtotal': r.pend_sub,
+        Total: r.total
+      }))
+    )
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Productivity')
     XLSX.writeFile(wb, 'ProductivityReport.xlsx')
@@ -158,19 +165,21 @@ export default function ProductivityReportPage() {
     doc.text('Productivity Report', 14, 20)
     doc.autoTable({
       startY: 30,
-      head: [[
-        'S.No',
-        'Employee',
-        'Comp Morn',
-        'Comp Day',
-        'Comp Night',
-        'Comp Sub',
-        'Pend Morn',
-        'Pend Day',
-        'Pend Night',
-        'Pend Sub',
-        'Total'
-      ]],
+      head: [
+        [
+          'S.No',
+          'Employee',
+          'Comp Morn',
+          'Comp Day',
+          'Comp Night',
+          'Comp Sub',
+          'Pend Morn',
+          'Pend Day',
+          'Pend Night',
+          'Pend Sub',
+          'Total'
+        ]
+      ],
       body: allRows.map((r, i) => [
         i + 1,
         r.employee,
@@ -206,27 +215,32 @@ export default function ProductivityReportPage() {
 
     const tsv = [
       headers.join('\t'),
-      ...allRows.map((r, i) => [
-        i + 1,
-        r.employee,
-        r.comp_morn,
-        r.comp_day,
-        r.comp_night,
-        r.comp_sub,
-        r.pend_morn,
-        r.pend_day,
-        r.pend_night,
-        r.pend_sub,
-        r.total
-      ].join('\t'))
+      ...allRows.map((r, i) =>
+        [
+          i + 1,
+          r.employee,
+          r.comp_morn,
+          r.comp_day,
+          r.comp_night,
+          r.comp_sub,
+          r.pend_morn,
+          r.pend_day,
+          r.pend_night,
+          r.pend_sub,
+          r.total
+        ].join('\t')
+      )
     ].join('\n')
 
-    navigator.clipboard.writeText(tsv).then(() => {
-      showToast('success', 'Copied to clipboard')
-    }).catch(err => {
-      console.error('Failed to copy: ', err)
-      showToast('error', 'Failed to copy')
-    })
+    navigator.clipboard
+      .writeText(tsv)
+      .then(() => {
+        showToast('success', 'Copied to clipboard')
+      })
+      .catch(err => {
+        console.error('Failed to copy: ', err)
+        showToast('error', 'Failed to copy')
+      })
   }
 
   // Fetch data
@@ -433,55 +447,54 @@ export default function ProductivityReportPage() {
           )}
 
           {/* Filters */}
-         <Box
-  sx={{
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    mb: 4,
-    gap: 2,
-    flexShrink: 0
-  }}
->
-  {/* LEFT SIDE — ENTRIES */}
-  <FormControl size='small' sx={{ width: 150 }}>
-    <Select
-      value={pagination.pageSize}
-      onChange={e =>
-        setPagination({
-          pageIndex: 0,
-          pageSize: Number(e.target.value)
-        })
-      }
-    >
-      {[10, 25, 50, 100].map(n => (
-        <MenuItem key={n} value={n}>
-          {n} entries
-        </MenuItem>
-      ))}
-    </Select>
-  </FormControl>
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              mb: 4,
+              gap: 2,
+              flexShrink: 0
+            }}
+          >
+            {/* LEFT SIDE — ENTRIES */}
+            <FormControl size='small' sx={{ width: 150 }}>
+              <Select
+                value={pagination.pageSize}
+                onChange={e =>
+                  setPagination({
+                    pageIndex: 0,
+                    pageSize: Number(e.target.value)
+                  })
+                }
+              >
+                {[10, 25, 50, 100].map(n => (
+                  <MenuItem key={n} value={n}>
+                    {n} entries
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
 
-  {/* RIGHT SIDE — SEARCH */}
-  <DebouncedInput
-    value={searchText}
-    onChange={v => {
-      setSearchText(v)
-      setPagination(p => ({ ...p, pageIndex: 0 }))
-    }}
-    placeholder='Search employee...'
-    size='small'
-    sx={{ width: 350 }}
-    InputProps={{
-      startAdornment: (
-        <InputAdornment position='start'>
-          <SearchIcon />
-        </InputAdornment>
-      )
-    }}
-  />
-</Box>
-
+            {/* RIGHT SIDE — SEARCH */}
+            <DebouncedInput
+              value={searchText}
+              onChange={v => {
+                setSearchText(v)
+                setPagination(p => ({ ...p, pageIndex: 0 }))
+              }}
+              placeholder='Search employee...'
+              size='small'
+              sx={{ width: 350 }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position='start'>
+                    <SearchIcon />
+                  </InputAdornment>
+                )
+              }}
+            />
+          </Box>
 
           {/* Table with Sticky Top Header + Sticky Bottom Total */}
           <Box sx={{ flexGrow: 1, overflow: 'auto', position: 'relative', maxHeight: 'calc(100vh - 280px)' }}>

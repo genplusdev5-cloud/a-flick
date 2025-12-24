@@ -32,6 +32,7 @@ import axios from 'axios'
 
 import { getDashboardList } from '@/api/dashboard'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
+import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 import {
   useReactTable,
   getCoreRowModel,
@@ -63,7 +64,10 @@ export default function DashboardList() {
   // CUSTOMER COLUMNS
   // ----------------------------
   const customerColumns = [
-    columnHelper.accessor('id', { header: 'ID' }),
+    columnHelper.accessor('sno', {
+      header: 'S.No',
+      enableSorting: false
+    }),
     columnHelper.display({
       id: 'actions',
       header: 'Action',
@@ -100,7 +104,10 @@ export default function DashboardList() {
   // CONTRACT COLUMNS
   // ----------------------------
   const contractColumns = [
-    columnHelper.accessor('id', { header: 'ID' }),
+    columnHelper.accessor('sno', {
+      header: 'S.No',
+      enableSorting: false
+    }),
     columnHelper.display({
       id: 'actions',
       header: 'Action',
@@ -165,7 +172,8 @@ export default function DashboardList() {
 
         if (filterType === 'Customer') {
           formatted = res.table.map((item, idx) => ({
-            id: item.id || idx + 1,
+            sno: idx + 1 + pagination.pageIndex * pagination.pageSize,
+            id: item.id,
             origin: item.origin || '-',
             customer_code: item.customer_code || '-',
             commence_date: item.commence_date || '-',
@@ -180,7 +188,8 @@ export default function DashboardList() {
           }))
         } else {
           formatted = res.table.map((item, idx) => ({
-            id: item.id || idx + 1,
+            sno: idx + 1 + pagination.pageIndex * pagination.pageSize, // 🔥 IMPORTANT
+            id: item.id,
             customer: item.business_name || item.billing_name || '-',
             contractCode: item.contract_code || '-',
             type: item.type || '-',
@@ -373,7 +382,7 @@ export default function DashboardList() {
         </RadioGroup>
 
         {/* TABLE */}
-        <div className='overflow-x-auto'>
+        <StickyTableWrapper rowCount={rows.length}>
           <table className={styles.table}>
             <thead>
               {table.getHeaderGroups().map(hg => (
@@ -418,7 +427,7 @@ export default function DashboardList() {
               )}
             </tbody>
           </table>
-        </div>
+        </StickyTableWrapper>
 
         {/* PAGINATION */}
         <TablePaginationComponent totalCount={count} pagination={pagination} setPagination={setPagination} />
