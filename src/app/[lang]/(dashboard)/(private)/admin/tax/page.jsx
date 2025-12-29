@@ -256,11 +256,11 @@ const TaxPageContent = () => {
 
   const handleSubmit = async data => {
     const duplicate = rows.find(
-      r => r.name.trim().toLowerCase() === data.name.trim().toLowerCase() && Number(r.tax) === Number(data.tax_value)
+      r => r.name.trim().toLowerCase() === data.name.trim().toLowerCase() && r.id !== editId // 👈 current edit row skip
     )
 
-    if (!isEdit && duplicate) {
-      showToast('warning', 'This tax already exists')
+    if (duplicate) {
+      showToast('warning', 'Tax name already exists')
       return
     }
 
