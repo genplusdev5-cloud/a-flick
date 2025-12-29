@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Box, Card, Grid, Typography, Checkbox } from '@mui/material'
+import { Box, Card, Grid, Typography, Checkbox, CardHeader , Divider } from '@mui/material'
 import Breadcrumbs from '@mui/material/Breadcrumbs'
 import Link from 'next/link'
 import { format } from 'date-fns'
@@ -80,215 +80,163 @@ const RicFollowUpReportPageContent = () => {
       {/* FILTER CARD – SAME UI AS SERVICE SUMMARY PAGE */}
       <Card
         sx={{
-          p: 4,
           borderRadius: 2,
-          boxShadow: '0px 4px 20px rgba(0,0,0,0.08)',
-          minHeight: 180,
-          display: 'flex',
-          alignItems: 'center'
+          boxShadow: '0px 4px 20px rgba(0,0,0,0.08)'
         }}
       >
-        <Grid
-          container
-          spacing={3}
-          alignItems='center'
-          sx={{
-            '& .MuiInputBase-root': {
-              height: 40,
-              fontSize: 15
-            }
-          }}
-        >
-          {/* DATE RANGE */}
-          <Grid item xs={12} md={3}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Checkbox
-                  checked={enableDateFilter}
-                  onChange={e => {
-                    const checked = e.target.checked
-                    setEnableDateFilter(checked)
+        {/* 🔥 CARD HEADER – SAME AS SERVICE SUMMARY */}
+        <CardHeader
+          sx={{ px: 4, pb: 2 }}
+          title={
+            <Typography variant='h5' fontWeight={600}>
+              RIC Follow-up Report
+            </Typography>
+          }
+        />
 
-                    if (!checked) {
-                      setFromDate('')
-                      setToDate('')
-                    }
+        <Divider />
+
+        {/* 🔥 CARD CONTENT */}
+        <Box sx={{ p: 4 }}>
+          <Grid
+            container
+            spacing={3}
+            alignItems='flex-start'
+            sx={{
+              '& .MuiInputBase-root': {
+                height: 40,
+                fontSize: 15
+              }
+            }}
+          >
+            {/* DATE RANGE */}
+            <Grid item xs={12} md={3}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                  <Checkbox
+                    checked={enableDateFilter}
+                    onChange={e => {
+                      const checked = e.target.checked
+                      setEnableDateFilter(checked)
+
+                      if (!checked) {
+                        setFromDate('')
+                        setToDate('')
+                      }
+                    }}
+                    size='small'
+                  />
+                  <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Date Range</Typography>
+                </Box>
+
+                <GlobalDateRange
+                  start={fromDate}
+                  end={toDate}
+                  onSelectRange={({ start, end }) => {
+                    setFromDate(start ? format(new Date(start), 'yyyy-MM-dd') : '')
+                    setToDate(end ? format(new Date(end), 'yyyy-MM-dd') : '')
                   }}
-                  size='small'
+                  disabled={!enableDateFilter}
                 />
-                <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Date Range</Typography>
               </Box>
+            </Grid>
 
-              <GlobalDateRange
-                label=''
-                start={fromDate}
-                end={toDate}
-                onSelectRange={({ start, end }) => {
-                  setFromDate(start ? format(new Date(start), 'yyyy-MM-dd') : '')
-                  setToDate(end ? format(new Date(end), 'yyyy-MM-dd') : '')
+            {/* CUSTOMER */}
+            <Grid item xs={12} md={3}>
+              <GlobalAutocomplete
+                label='Customer'
+                placeholder='Select Customer'
+                fullWidth
+                options={(dropdown?.customer?.name || []).map(item => ({
+                  label: item.name,
+                  value: item.id
+                }))}
+                onChange={async v => {
+                  const customerId = v?.value || ''
+                  setFilters(prev => ({ ...prev, customer_id: customerId }))
+
+                  const res = await getRICDropdowns({ customer_id: customerId })
+                  if (res.status === 'success') {
+                    setDropdown(prev => ({
+                      ...prev,
+                      contract_list: res.data.data.contract_list || {},
+                      group_code: res.data.data.group_code || {}
+                    }))
+                  }
                 }}
-                disabled={!enableDateFilter}
               />
-            </Box>
+            </Grid>
+
+            {/* CONTRACT */}
+            <Grid item xs={12} md={3}>
+              <GlobalAutocomplete
+                label='Contract'
+                placeholder='Select Contract'
+                fullWidth
+                options={(dropdown?.contract_list?.label || []).map(item => ({
+                  label: item.label,
+                  value: item.id
+                }))}
+                onChange={v => setFilters(prev => ({ ...prev, contract_id: v?.value || '' }))}
+              />
+            </Grid>
+
+            {/* GROUP CODE */}
+            <Grid item xs={12} md={3}>
+              <GlobalAutocomplete
+                label='Group Code'
+                placeholder='Select Group Code'
+                fullWidth
+                options={(dropdown?.group_code?.category || []).map(item => ({
+                  label: item.category ?? 'No Category',
+                  value: item.id
+                }))}
+                onChange={v => setFilters(prev => ({ ...prev, group_code: v?.value || '' }))}
+              />
+            </Grid>
+
+            {/* PURPOSE */}
+            <Grid item xs={12} md={3}>
+              <GlobalAutocomplete
+                label='Purpose'
+                placeholder='Select Purpose'
+                fullWidth
+                options={(dropdown?.purpose?.name || []).map(item => ({
+                  label: item.name,
+                  value: item.id
+                }))}
+                onChange={v => setFilters(prev => ({ ...prev, purpose: v?.value || '' }))}
+              />
+            </Grid>
+
+            {/* TECHNICIAN */}
+            <Grid item xs={12} md={3}>
+              <GlobalAutocomplete
+                label='Technician'
+                placeholder='Select Technician'
+                fullWidth
+                options={(dropdown?.technician?.name || []).map(item => ({
+                  label: item.name,
+                  value: item.id
+                }))}
+                onChange={v => setFilters(prev => ({ ...prev, technician: v?.value || '' }))}
+              />
+            </Grid>
+
+            {/* GENERATE BUTTON */}
+            <Grid item xs={12} md={1.4} alignSelf='flex-end'>
+              <GlobalButton
+                variant='contained'
+                color='primary'
+                fullWidth
+                sx={{ height: 45, fontWeight: 700 }}
+                onClick={handleGenerate}
+              >
+                GENERATE
+              </GlobalButton>
+            </Grid>
           </Grid>
-
-          {/* CUSTOMER */}
-          <Grid item xs={12} md={3}>
-            <GlobalAutocomplete
-              label='Customer'
-              placeholder='Select Customer'
-              fullWidth
-              value={
-                filters.customer_id
-                  ? {
-                      label: dropdown?.customer?.name?.find(c => c.id === filters.customer_id)?.name || '',
-                      value: filters.customer_id
-                    }
-                  : null
-              }
-              options={
-                Array.isArray(dropdown?.customer?.name)
-                  ? dropdown.customer.name.map(item => ({
-                      label: item.name,
-                      value: item.id
-                    }))
-                  : []
-              }
-              onChange={async v => {
-                const customerId = v?.value || ''
-
-                setFilters(prev => ({ ...prev, customer_id: customerId }))
-
-                // load dependent lists
-                const res = await getRICDropdowns({ customer_id: customerId })
-                if (res.status === 'success') {
-                  const dependent = res.data.data
-
-                  setDropdown(prev => ({
-                    ...prev,
-                    contract_list: dependent.contract_list || {},
-                    group_code: dependent.group_code || []
-                  }))
-                }
-              }}
-            />
-          </Grid>
-
-          {/* CONTRACT */}
-          <Grid item xs={12} md={3}>
-            <GlobalAutocomplete
-              label='Contract'
-              placeholder='Select Contract'
-              fullWidth
-              value={
-                filters.contract_id
-                  ? {
-                      label: dropdown?.contract_list?.label?.find(c => c.id === filters.contract_id)?.label || '',
-                      value: filters.contract_id
-                    }
-                  : null
-              }
-              options={
-                Array.isArray(dropdown?.contract_list?.label)
-                  ? dropdown.contract_list.label.map(item => ({
-                      label: item.label,
-                      value: item.id
-                    }))
-                  : []
-              }
-              onChange={v =>
-                setFilters(prev => ({
-                  ...prev,
-                  contract_id: v?.value || ''
-                }))
-              }
-            />
-          </Grid>
-
-          {/* GROUP CODE */}
-          <Grid item xs={12} md={3}>
-            <GlobalAutocomplete
-              label='Group Code'
-              placeholder='Select Group Code'
-              fullWidth
-              value={
-                filters.group_code
-                  ? {
-                      label:
-                        dropdown?.group_code?.category?.find(g => g.id === filters.group_code)?.category ||
-                        'No Category',
-                      value: filters.group_code
-                    }
-                  : null
-              }
-              options={
-                Array.isArray(dropdown?.group_code?.category)
-                  ? dropdown.group_code.category.map(item => ({
-                      label: item.category ?? 'No Category',
-                      value: item.id
-                    }))
-                  : []
-              }
-              onChange={v =>
-                setFilters(prev => ({
-                  ...prev,
-                  group_code: v?.value || ''
-                }))
-              }
-            />
-          </Grid>
-
-          {/* PURPOSE */}
-          <Grid item xs={12} md={3}>
-            <GlobalAutocomplete
-              label='Purpose'
-              placeholder='Select Purpose'
-              fullWidth
-              options={(dropdown?.purpose?.name || []).map(item => ({
-                label: item.name,
-                value: item.id
-              }))}
-              onChange={v =>
-                setFilters(prev => ({
-                  ...prev,
-                  purpose: v?.value || ''
-                }))
-              }
-            />
-          </Grid>
-
-          {/* TECHNICIAN */}
-          <Grid item xs={12} md={3}>
-            <GlobalAutocomplete
-              label='Technician'
-              placeholder='Select Technician'
-              fullWidth
-              options={(dropdown?.technician?.name || []).map(item => ({
-                label: item.name,
-                value: item.id
-              }))}
-              onChange={v =>
-                setFilters(prev => ({
-                  ...prev,
-                  technician: v?.value || ''
-                }))
-              }
-            />
-          </Grid>
-
-          {/* GENERATE BUTTON */}
-          <Grid item xs={12} md={1.4}>
-            <GlobalButton
-              variant='contained'
-              color='primary'
-              fullWidth
-              sx={{ height: 40, fontWeight: 700 }}
-              onClick={handleGenerate}
-            >
-              GENERATE
-            </GlobalButton>
-          </Grid>
-        </Grid>
+        </Box>
       </Card>
 
       <Box sx={{ mt: 6 }}></Box>
@@ -299,7 +247,7 @@ const RicFollowUpReportPageContent = () => {
 // Wrapper for RBAC
 export default function RicFollowUpReportPage() {
   return (
-    <PermissionGuard permission="RIC Followup Report">
+    <PermissionGuard permission='RIC Followup Report'>
       <RicFollowUpReportPageContent />
     </PermissionGuard>
   )

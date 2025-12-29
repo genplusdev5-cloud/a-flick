@@ -33,25 +33,32 @@ const PermissionGroup = ({ modules = [], children }) => {
 // Module Groups for Sidebar Visibility
 // ───────────────────────────────────────────
 const MASTER_MODULES = [
-  'Tax', 'Company Origin', 'Service Frequency', 'Billing Frequency',
-  'Unit Of Measurement', 'Call Type', 'Chemicals', 'Industry', 'Holidays',
-  'Incident', 'Todo Items', 'Site Risk', 'Equipments'
+  'Tax',
+  'Company Origin',
+  'Service Frequency',
+  'Billing Frequency',
+  'Unit Of Measurement',
+  'Call Type',
+  'Chemicals',
+  'Industry',
+  'Holidays',
+  'Incident',
+  'Todo Items',
+  'Site Risk',
+  'Equipments'
 ]
 
-const EMPLOYEE_MODULES = [
-  'Department', 'Designation', 'Employee List',
-  'Employee Leave Type', 'User Privilege'
-]
+const EMPLOYEE_MODULES = ['Department', 'Designation', 'Employee List', 'Employee Leave Type', 'User Privilege']
 
 const ATTENDANCE_MODULES = [
-  'Attendance Slots', 'Attendance', 'Attendance Schedule',
-  'Attendance Timesheet', 'Payslip Summary'
+  'Attendance Slots',
+  'Attendance',
+  'Attendance Schedule',
+  'Attendance Timesheet',
+  'Payslip Summary'
 ]
 
-const STOCK_MODULES = [
-  'Material Request', 'Stock Report', 'Usage Report'
-]
-
+const STOCK_MODULES = ['Material Request', 'Stock Report', 'Usage Report']
 
 const RenderExpandIcon = ({ open, transitionDuration }) => (
   <StyledVerticalNavExpandIcon open={open} transitionDuration={transitionDuration}>
@@ -105,13 +112,13 @@ const VerticalMenu = ({ scrollMenu }) => {
     <ScrollWrapper
       {...(isBreakpointReached
         ? {
-          className: 'bs-full overflow-y-auto overflow-x-hidden'
-          // onScroll: container => scrollMenu(container, false)
-        }
+            className: 'bs-full overflow-y-auto overflow-x-hidden'
+            // onScroll: container => scrollMenu(container, false)
+          }
         : {
-          options: { wheelPropagation: false, suppressScrollX: true }
-          // onScrollY: container => scrollMenu(container, true)
-        })}
+            options: { wheelPropagation: false, suppressScrollX: true }
+            // onScrollY: container => scrollMenu(container, true)
+          })}
     >
       <Menu
         popoutMenuOffset={{ mainAxis: 23 }}
@@ -146,7 +153,9 @@ const VerticalMenu = ({ scrollMenu }) => {
         </PermissionItem>
 
         {/* ✅ Employee */}
-        <PermissionGroup modules={['Department', 'Designation', 'Employee List', 'Employee Leave Type', 'User Privilege']}>
+        <PermissionGroup
+          modules={['Department', 'Designation', 'Employee List', 'Employee Leave Type', 'User Privilege']}
+        >
           <SubMenu label='Employee' icon={<i className='tabler-user' />}>
             <MenuItem href={`/${locale}/admin/department`}>Department</MenuItem>
             <MenuItem href={`/${locale}/admin/designation`}>Designation</MenuItem>
@@ -182,46 +191,6 @@ const VerticalMenu = ({ scrollMenu }) => {
           </MenuItem>
         </PermissionItem>
 
-        <PermissionItem module='View Contract Status'>
-          <MenuItem href={`/${locale}/admin/view-contract-status`} icon={<i className='tabler-list-details' />}>
-            View Contract Status
-          </MenuItem>
-        </PermissionItem>
-
-        {/* ✅ Attendance */}
-        <PermissionGroup modules={['Attendance Slots', 'Attendance', 'Attendance Schedule', 'Attendance Timesheet', 'Payslip Summary']}>
-          <SubMenu label='Attendance' icon={<i className='tabler-user-check' />}>
-            <MenuItem href={`/${locale}/admin/attendance/slots`}>Slots</MenuItem>
-            <MenuItem href={`/${locale}/admin/attendance/attendance`}>Attendance</MenuItem>
-            <MenuItem href={`/${locale}/admin/attendance/schedule`}>Schedule</MenuItem>
-            {/* <MenuItem href={`/${locale}/admin/attendance/hr-project-report`}>HR & Project Report</MenuItem>
-            <MenuItem href={`/${locale}/admin/attendance/hr-report`}>HR Report</MenuItem> */}
-            <MenuItem href={`/${locale}/admin/attendance/timesheet`}>Attendance Timesheet</MenuItem>
-            {/* <MenuItem href={`/${locale}/admin/attendance/timesheet-with-leave`}>Attendance Timesheet With Leave</MenuItem> */}
-            <MenuItem href={`/${locale}/admin/attendance/payslip-summary`}>Payslip Summary Report</MenuItem>
-            {/* <MenuItem href={`/${locale}/admin/attendance/salary-report`}>Salary Report</MenuItem> */}
-          </SubMenu>
-        </PermissionGroup>
-
-        {/* ✅ Suppliers & Stock */}
-        {/* {showHeadings && <SectionHeader label="Suppliers & Stock" />} */}
-
-        <PermissionItem module='Suppliers'>
-          <MenuItem href={`/${locale}/admin/suppliers`} icon={<i className='tabler-building-store' />}>
-            Suppliers
-          </MenuItem>
-        </PermissionItem>
-
-        {/* ✅ Stock Dropdown */}
-        <PermissionGroup modules={['Material Request', 'Stock Report', 'Usage Report']}>
-          <SubMenu label='Stock' icon={<i className='tabler-package' />}>
-            {/* <MenuItem href={`/${locale}/admin/stock/chemicals`}>Chemicals</MenuItem> */}
-            <MenuItem href={`/${locale}/admin/stock/material-request`}>Material Request</MenuItem>
-            <MenuItem href={`/${locale}/admin/stock/report`}>Stock Report</MenuItem>
-            <MenuItem href={`/${locale}/admin/stock/usage-report`}>Usage Report</MenuItem>
-          </SubMenu>
-        </PermissionGroup>
-
         {/* ✅ Service Request */}
         <PermissionItem module='Service Request'>
           <MenuItem href={`/${locale}/admin/service-request`} icon={<i className='tabler-calendar' />}>
@@ -243,6 +212,42 @@ const VerticalMenu = ({ scrollMenu }) => {
           </MenuItem>
         </PermissionItem>
 
+        {/* ✅ Stock Dropdown */}
+        <PermissionGroup modules={['Suppliers', 'Material Request', 'Stock Report', 'Usage Report']}>
+          <SubMenu label='Stock' icon={<i className='tabler-package' />}>
+            <MenuItem href={`/${locale}/admin/suppliers`}>Suppliers</MenuItem>
+
+            <MenuItem href={`/${locale}/admin/stock/material-request`}>Material Request</MenuItem>
+
+            <MenuItem href={`/${locale}/admin/stock/report`}>Stock Report</MenuItem>
+
+            <MenuItem href={`/${locale}/admin/stock/usage-report`}>Usage Report</MenuItem>
+          </SubMenu>
+        </PermissionGroup>
+
+        {/* ✅ Attendance */}
+        <PermissionGroup
+          modules={['Attendance Slots', 'Attendance', 'Attendance Schedule', 'Attendance Timesheet', 'Payslip Summary']}
+        >
+          <SubMenu label='Attendance' icon={<i className='tabler-user-check' />}>
+            <MenuItem href={`/${locale}/admin/attendance/slots`}>Slots</MenuItem>
+            <MenuItem href={`/${locale}/admin/attendance/attendance`}>Attendance</MenuItem>
+            <MenuItem href={`/${locale}/admin/attendance/schedule`}>Schedule</MenuItem>
+            {/* <MenuItem href={`/${locale}/admin/attendance/hr-project-report`}>HR & Project Report</MenuItem>
+            <MenuItem href={`/${locale}/admin/attendance/hr-report`}>HR Report</MenuItem> */}
+            <MenuItem href={`/${locale}/admin/attendance/timesheet`}>Attendance Timesheet</MenuItem>
+            {/* <MenuItem href={`/${locale}/admin/attendance/timesheet-with-leave`}>Attendance Timesheet With Leave</MenuItem> */}
+            <MenuItem href={`/${locale}/admin/attendance/payslip-summary`}>Payslip Summary Report</MenuItem>
+            {/* <MenuItem href={`/${locale}/admin/attendance/salary-report`}>Salary Report</MenuItem> */}
+          </SubMenu>
+        </PermissionGroup>
+
+        <PermissionItem module='View Contract Status'>
+          <MenuItem href={`/${locale}/admin/view-contract-status`} icon={<i className='tabler-list-details' />}>
+            View Contract Status
+          </MenuItem>
+        </PermissionItem>
+
         {/* ✅ Map */}
         <PermissionItem module='Map'>
           <MenuItem href={`/${locale}/admin/map`} icon={<i className='tabler-map' />}>
@@ -251,7 +256,13 @@ const VerticalMenu = ({ scrollMenu }) => {
         </PermissionItem>
 
         {/* ==================== FINDER ==================== */}
-        {showHeadings && <PermissionGroup modules={['Non Pre-Schedule', 'Backlog Finder', 'Followup Finder', 'KIV Finder', 'Productivity Finder']}><SectionHeader label='Finder' /></PermissionGroup>}
+        {showHeadings && (
+          <PermissionGroup
+            modules={['Non Pre-Schedule', 'Backlog Finder', 'Followup Finder', 'KIV Finder', 'Productivity Finder']}
+          >
+            <SectionHeader label='Finder' />
+          </PermissionGroup>
+        )}
 
         <PermissionItem module='Non Pre-Schedule'>
           <MenuItem href={`/${locale}/admin/non-pre-schedule`} icon={<i className='tabler-chart-line' />}>
@@ -284,7 +295,20 @@ const VerticalMenu = ({ scrollMenu }) => {
         </PermissionItem>
 
         {/* ==================== REPORTS ==================== */}
-        {showHeadings && <PermissionGroup modules={['Service Summary Report', 'RIC / Follow-up Report', 'Productivity Summary', 'SCDF Report', 'Sales Report', 'Pest Trending']}><SectionHeader label='Reports' /></PermissionGroup>}
+        {showHeadings && (
+          <PermissionGroup
+            modules={[
+              'Service Summary Report',
+              'RIC / Follow-up Report',
+              'Productivity Summary',
+              'SCDF Report',
+              'Sales Report',
+              'Pest Trending'
+            ]}
+          >
+            <SectionHeader label='Reports' />
+          </PermissionGroup>
+        )}
 
         <PermissionItem module='Service Summary Report'>
           <MenuItem href={`/${locale}/admin/service-summary-report`} icon={<i className='tabler-report' />}>
@@ -323,7 +347,11 @@ const VerticalMenu = ({ scrollMenu }) => {
         </PermissionItem>
 
         {/* ==================== AUDIT TRIAL ==================== */}
-        {showHeadings && <PermissionGroup modules={['Customer Audit', 'Contracts Audit']}><SectionHeader label='Audit Trial' /></PermissionGroup>}
+        {showHeadings && (
+          <PermissionGroup modules={['Customer Audit', 'Contracts Audit']}>
+            <SectionHeader label='Audit Trial' />
+          </PermissionGroup>
+        )}
 
         <PermissionItem module='Customer Audit'>
           <MenuItem href={`/${locale}/admin/customer-audit`} icon={<i className='tabler-archive' />}>

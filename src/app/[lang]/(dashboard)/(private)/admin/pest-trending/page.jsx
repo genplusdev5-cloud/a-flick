@@ -4,7 +4,7 @@
 import { useState, forwardRef } from 'react'
 
 // MUI Imports
-import { Box, Card, Grid, Typography, Checkbox, FormControlLabel, Chip } from '@mui/material'
+import { Box, Card, Grid, Typography, Checkbox, FormControlLabel, Chip, CardHeader, Divider } from '@mui/material'
 import Breadcrumbs from '@mui/material/Breadcrumbs'
 import Link from 'next/link'
 
@@ -40,7 +40,6 @@ const DateRangePickerField = () => {
 
   const CustomInput = forwardRef((props, ref) => {
     const { label, start, end, ...rest } = props
-
     const s = start ? format(start, 'MM/dd/yyyy') : ''
     const e = end ? ` - ${format(end, 'MM/dd/yyyy')}` : ''
 
@@ -64,7 +63,7 @@ const DateRangePickerField = () => {
       selected={startDate}
       onChange={handleChange}
       shouldCloseOnSelect={false}
-      customInput={<CustomInput label='Date Filter' start={startDate} end={endDate} />}
+      customInput={<CustomInput start={startDate} end={endDate} />}
     />
   )
 }
@@ -84,7 +83,7 @@ const generateDummyData = selectedPests => {
 }
 
 /* ------------------------------------------------------------------
-   📊 AREA CHART (AppRecharts Wrapper)
+   📊 AREA CHART
 ------------------------------------------------------------------ */
 const DummyTrendingChart = ({ data }) => {
   if (!data || data.length === 0) {
@@ -116,7 +115,6 @@ const DummyTrendingChart = ({ data }) => {
               <XAxis dataKey='month' />
               <YAxis />
               <Tooltip />
-
               <Area type='monotone' dataKey='count' stroke='#1976d2' fill='#90caf9' strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
@@ -127,7 +125,7 @@ const DummyTrendingChart = ({ data }) => {
 }
 
 /* ------------------------------------------------------------------
-   MAIN PAGE — COMPLETED + WORKING
+   MAIN PAGE — PEST TRENDING
 ------------------------------------------------------------------ */
 const PestTrendingPageContent = () => {
   const [customer, setCustomer] = useState(null)
@@ -162,69 +160,85 @@ const PestTrendingPageContent = () => {
         <Typography color='text.primary'>Pest Trending</Typography>
       </Breadcrumbs>
 
-      {/* FILTER CARD */}
-      <Card sx={{ p: 2.5, borderRadius: 2, mb: 3, boxShadow: '0px 1px 4px rgba(0,0,0,0.1)' }}>
-        <Grid container spacing={2} alignItems='center'>
-          {/* Checkbox */}
-          <Grid item xs={12} md={2}>
-            <FormControlLabel control={<Checkbox defaultChecked />} label='Date Filter' />
-          </Grid>
+      {/* 🔥 FILTER CARD – SAME ALIGNMENT AS OTHER REPORTS */}
+      <Card sx={{ borderRadius: 2, boxShadow: '0px 4px 20px rgba(0,0,0,0.08)', mb: 3 }}>
+        <CardHeader
+          sx={{ px: 4, pb: 2 }}
+          title={
+            <Typography variant='h5' fontWeight={600}>
+              Pest Trending
+            </Typography>
+          }
+        />
 
-          {/* Date Picker */}
-          <Grid item xs={12} md={3}>
-            <DateRangePickerField />
-          </Grid>
+        <Divider />
 
-          {/* Customer */}
-          <Grid item xs={12} md={3}>
-            <GlobalAutocomplete
-              label='Customer'
-              placeholder='Select Customer'
-              value={customer}
-              onChange={(e, val) => setCustomer(val)}
-              options={customerOptions}
-              fullWidth
-            />
-          </Grid>
+        <Box sx={{ p: 4 }}>
+          <Grid
+            container
+            spacing={3}
+            alignItems='flex-start'
+            sx={{ '& .MuiInputBase-root': { height: 40, fontSize: 15 } }}
+          >
+            {/* DATE FILTER */}
+            <Grid item xs={12} md={3}>
+              <FormControlLabel control={<Checkbox defaultChecked />} label='Date Filter' />
+              <DateRangePickerField />
+            </Grid>
 
-          {/* Contract */}
-          <Grid item xs={12} md={4}>
-            <GlobalAutocomplete
-              label='Contracts'
-              placeholder='Select Contract'
-              value={contract}
-              onChange={(e, val) => setContract(val)}
-              options={contractOptions}
-              fullWidth
-            />
-          </Grid>
+            {/* CUSTOMER */}
+            <Grid item xs={12} md={3}>
+              <GlobalAutocomplete
+                label='Customer'
+                placeholder='Select Customer'
+                value={customer}
+                onChange={(e, val) => setCustomer(val)}
+                options={customerOptions}
+                fullWidth
+              />
+            </Grid>
 
-          {/* Contract Pests – Chip Multi-select */}
-          <Grid item xs={12} md={5}>
-            <CustomAutocomplete
-              multiple
-              value={selectedPests}
-              options={pestOptions}
-              getOptionLabel={opt => opt.label || ''}
-              onChange={(e, newValue) => setSelectedPests(newValue)}
-              renderInput={params => <CustomTextField {...params} label='Contract Pests' placeholder='Select pests' />}
-              renderTags={(tagValue, getTagProps) =>
-                tagValue.map((option, index) => {
-                  const props = getTagProps({ index })
-                  delete props.key
-                  return <Chip {...props} key={index} label={option.label} size='small' />
-                })
-              }
-            />
-          </Grid>
+            {/* CONTRACT */}
+            <Grid item xs={12} md={3}>
+              <GlobalAutocomplete
+                label='Contracts'
+                placeholder='Select Contract'
+                value={contract}
+                onChange={(e, val) => setContract(val)}
+                options={contractOptions}
+                fullWidth
+              />
+            </Grid>
 
-          {/* Refresh */}
-          <Grid item xs={12} md={2}>
-            <GlobalButton variant='contained' color='primary' fullWidth sx={{ height: 40 }}>
-              Refresh
-            </GlobalButton>
+            {/* CONTRACT PESTS */}
+            <Grid item xs={12} md={3}>
+              <CustomAutocomplete
+                multiple
+                value={selectedPests}
+                options={pestOptions}
+                getOptionLabel={opt => opt.label || ''}
+                onChange={(e, newValue) => setSelectedPests(newValue)}
+                renderInput={params => (
+                  <CustomTextField {...params} label='Contract Pests' placeholder='Select pests' />
+                )}
+                renderTags={(tagValue, getTagProps) =>
+                  tagValue.map((option, index) => {
+                    const props = getTagProps({ index })
+                    delete props.key
+                    return <Chip {...props} key={index} label={option.label} size='small' />
+                  })
+                }
+              />
+            </Grid>
+
+            {/* REFRESH */}
+            <Grid item xs={12} md={2} alignSelf='flex-end'>
+              <GlobalButton variant='contained' color='primary' fullWidth sx={{ height: 45, fontWeight: 700 }}>
+                Refresh
+              </GlobalButton>
+            </Grid>
           </Grid>
-        </Grid>
+        </Box>
       </Card>
 
       {/* TRENDING CHART */}
@@ -236,7 +250,7 @@ const PestTrendingPageContent = () => {
 // Wrapper for RBAC
 export default function PestTrendingPage() {
   return (
-    <PermissionGuard permission="Pest Trending">
+    <PermissionGuard permission='Pest Trending'>
       <PestTrendingPageContent />
     </PermissionGuard>
   )

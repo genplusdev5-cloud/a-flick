@@ -26,6 +26,10 @@ import {
   InputLabel,
   CircularProgress
 } from '@mui/material'
+import { Controller } from 'react-hook-form'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { taxSchema } from '@/validations/tax.schema'
 
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
@@ -116,15 +120,22 @@ const TaxPageContent = () => {
   const [loading, setLoading] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
-  const [unsavedAddData, setUnsavedAddData] = useState(null)
+  const [editId, setEditId] = useState(null)
 
-  const [originalData, setOriginalData] = useState(null) // for validation
-
-  const [formData, setFormData] = useState({
-    id: null,
-    name: '',
-    tax_value: '',
-    status: 1
+  const {
+    control,
+    register,
+    handleSubmit: hookSubmit,
+    formState: { errors },
+    reset
+  } = useForm({
+    resolver: zodResolver(taxSchema),
+    defaultValues: {
+      name: '',
+      tax_value: '',
+      description: '',
+      status: 1
+    }
   })
 
   const filteredRows = useMemo(() => {
@@ -178,8 +189,13 @@ const TaxPageContent = () => {
   }
 
   const handleCancel = () => {
-    setFormData({ id: null, name: '', tax_value: '', description: '', status: 1 })
-    setUnsavedAddData(null) // clear cached data
+    reset({
+      name: '',
+      tax_value: '',
+      description: '',
+      status: 1
+    })
+    setEditId(null)
     setDrawerOpen(false)
   }
 
@@ -192,38 +208,25 @@ const TaxPageContent = () => {
 
   const handleAdd = () => {
     setIsEdit(false)
-
-    // reopen – restore unsaved data
-    if (unsavedAddData) {
-      setFormData(unsavedAddData)
-    } else {
-      setFormData({ id: null, name: '', tax_value: '', description: '', status: 1 })
-    }
-
-    setDrawerOpen(true)
-    setTimeout(() => nameRef.current?.focus(), 100)
-  }
-  const handleFieldChange = (field, value) => {
-    setFormData(prev => {
-      const updated = { ...prev, [field]: value }
-
-      // only cache for Add, not Edit
-      if (!isEdit) {
-        setUnsavedAddData(updated)
-      }
-
-      return updated
+    setEditId(null)
+    reset({
+      name: '',
+      tax_value: '',
+      description: '',
+      status: 1
     })
+    setDrawerOpen(true)
   }
 
   const handleEdit = row => {
     setIsEdit(true)
-    setFormData({
-      id: row.id,
+    setEditId(row.id)
+
+    reset({
       name: row.name,
-      tax_value: row.tax,
-      description: row.description,
-      status: row.is_active // idhu correct dhaan
+      tax_value: String(row.tax),
+      description: row.description ?? '',
+      status: row.is_active
     })
 
     setDrawerOpen(true)
@@ -251,14 +254,9 @@ const TaxPageContent = () => {
     }
   }
 
-  const handleSubmit = async e => {
-    e.preventDefault()
-
-    // 🔥 Duplicate validation (SAFE here)
+  const handleSubmit = async data => {
     const duplicate = rows.find(
-      r =>
-        r.name.trim().toLowerCase() === formData.name.trim().toLowerCase() &&
-        Number(r.tax) === Number(formData.tax_value)
+      r => r.name.trim().toLowerCase() === data.name.trim().toLowerCase() && Number(r.tax) === Number(data.tax_value)
     )
 
     if (!isEdit && duplicate) {
@@ -266,45 +264,26 @@ const TaxPageContent = () => {
       return
     }
 
-    // Required validation
-    if (!formData.name || !formData.tax_value) {
-      showToast('warning', 'Please fill all fields')
-      return
-    }
-
     setLoading(true)
 
     try {
       const payload = {
-        id: formData.id,
-        name: formData.name.trim(),
-        percent: Number(formData.tax_value),
-        description: formData.description?.trim() || '',
-        status: Number(formData.status), // ADD THIS
-        is_active: Number(formData.status) // KEEP THIS
+        id: editId,
+        name: data.name.trim(),
+        percent: Number(data.tax_value),
+        description: data.description?.trim() || '',
+        status: Number(data.status ?? 1),
+        is_active: Number(data.status ?? 1)
       }
 
-      let res
-      if (isEdit) {
-        res = await updateTax(payload)
-      } else {
-        res = await addTax(payload)
-      }
+      const res = isEdit ? await updateTax(payload) : await addTax(payload)
 
       if (res.status === 'success') {
         showToast('success', isEdit ? 'Tax updated successfully' : 'Tax added successfully')
-
-        setUnsavedAddData(null)
-        setOriginalData(null)
         setDrawerOpen(false)
-
-        setRows([]) // 👈 CLEAR OLD DATA
-        setRowCount(0) // 👈 RESET COUNT
-
-        await loadTaxes() // 👈 RELOAD FRESH
+        await loadTaxes()
       }
     } catch (err) {
-      console.error('❌ TAX SAVE ERROR:', err.response?.data || err.message)
       showToast('error', err.response?.data?.message || 'Error saving tax')
     } finally {
       setLoading(false)
@@ -710,68 +689,62 @@ const TaxPageContent = () => {
             </Box>
             <Divider sx={{ mb: 3 }} />
 
-            <form onSubmit={handleSubmit} style={{ flexGrow: 1 }}>
+            <form onSubmit={hookSubmit(handleSubmit)} style={{ flexGrow: 1 }}>
               <Grid container spacing={4}>
                 <Grid item xs={12}>
-                  <GlobalTextField
-                    label='Tax Name'
-                    placeholder='Enter tax name'
-                    value={formData.name}
-                    inputRef={nameRef}
-                    required
-                    onChange={e => handleFieldChange('name', e.target.value)}
-                    sx={{
-                      '& .MuiFormLabel-asterisk': {
-                        color: '#e91e63 !important',
-                        fontWeight: 700
-                      },
-                      '& .MuiInputLabel-root.Mui-required': {
-                        color: 'inherit'
-                      }
-                    }}
+                  <Controller
+                    name='name'
+                    control={control}
+                    render={({ field }) => (
+                      <GlobalTextField
+                        label='Tax Name'
+                        placeholder='Enter tax name'
+                        {...field}
+                        error={!!errors.name}
+                        helperText={errors.name?.message}
+                        required
+                      />
+                    )}
                   />
                 </Grid>
 
                 <Grid item xs={12}>
-                  <GlobalTextField
-                    label='Tax Value (%)'
-                    placeholder='e.g. 5.00'
-                    value={formData.tax_value}
-                    required
-                    onChange={e => handleFieldChange('tax_value', e.target.value.replace(/[^0-9.]/g, ''))}
-                    sx={{
-                      '& .MuiFormLabel-asterisk': {
-                        color: '#e91e63 !important',
-                        fontWeight: 700
-                      },
-                      '& .MuiInputLabel-root.Mui-required': {
-                        color: 'inherit'
-                      }
-                    }}
+                  <Controller
+                    name='tax_value'
+                    control={control}
+                    render={({ field }) => (
+                      <GlobalTextField
+                        label='Tax Value (%)'
+                        placeholder='e.g. 5.00'
+                        {...field}
+                        error={!!errors.tax_value}
+                        helperText={errors.tax_value?.message}
+                        required
+                      />
+                    )}
                   />
                 </Grid>
 
                 <Grid item xs={12}>
-                  <GlobalTextarea
-                    label='Description'
-                    placeholder='Enter additional details...'
-                    rows={3}
-                    value={formData.description}
-                    onChange={e => handleFieldChange('description', e.target.value)}
+                  <Controller
+                    name='description'
+                    control={control}
+                    render={({ field }) => <GlobalTextarea label='Description' rows={3} {...field} />}
                   />
                 </Grid>
 
                 {isEdit && (
                   <Grid item xs={12}>
-                    <GlobalSelect
-                      label='Status'
-                      value={formData.status === 1 ? 'Active' : 'Inactive'}
-                      onChange={e =>
-                        setFormData(p => ({
-                          ...p,
-                          status: e.target.value === 'Active' ? 1 : 0
-                        }))
-                      }
+                    <Controller
+                      name='status'
+                      control={control}
+                      render={({ field }) => (
+                        <GlobalSelect
+                          label='Status'
+                          value={field.value === 1 ? 'Active' : 'Inactive'}
+                          onChange={e => field.onChange(e.target.value === 'Active' ? 1 : 0)}
+                        />
+                      )}
                     />
                   </Grid>
                 )}

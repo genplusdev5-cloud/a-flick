@@ -27,11 +27,9 @@ export const generateServiceSummary = async payload => {
       responseType: 'blob'
     })
 
-    // இந்த check இல்லைன்னா corrupted file தான் வரும்!
     const contentType = res.headers['content-type']
 
     if (contentType && contentType.includes('application/json')) {
-      // Error JSON வந்திருக்கு – அதை text ஆ convert பண்ணி படிக்கணும்
       const text = await res.data.text()
       const json = JSON.parse(text)
       return {
@@ -39,8 +37,6 @@ export const generateServiceSummary = async payload => {
         message: json.message || 'Invalid response from server'
       }
     }
-
-    // இப்போதான் real Excel file
     return {
       status: 'success',
       file: res.data
