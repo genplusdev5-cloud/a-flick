@@ -95,6 +95,16 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
 // Component
 // ───────────────────────────────────────────
 // ───────────────────────────────────────────
+import { Controller, useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { employeeLeaveTypeSchema } from '@/validations/employeeLeaveType.schema'
+
+// ... existing imports ...
+
+// ───────────────────────────────────────────
+// Component
+// ───────────────────────────────────────────
+// ───────────────────────────────────────────
 const EmployeeLeaveTypePageContent = () => {
   const [rows, setRows] = useState([])
   const { canAccess } = usePermission()
@@ -106,18 +116,27 @@ const EmployeeLeaveTypePageContent = () => {
   const [loading, setLoading] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
+  
+  // Draft State
   const [unsavedAddData, setUnsavedAddData] = useState(null)
   const [closeReason, setCloseReason] = useState(null)
 
-  const [formData, setFormData] = useState({
-    id: null,
-    leaveCode: '',
-    name: '',
-    status: 'Active'
+  // React Hook Form
+  const {
+    control,
+    handleSubmit: hookSubmit,
+    reset,
+    formState: { errors },
+    getValues
+  } = useForm({
+    resolver: zodResolver(employeeLeaveTypeSchema),
+    defaultValues: {
+      leaveCode: '',
+      name: '',
+      description: '',
+      status: 1
+    }
   })
-  const leaveCodeRef = useRef(null)
-  const nameRef = useRef(null)
-  const statusRef = useRef(null)
 
   // Load rows
   const loadData = async () => {
@@ -147,16 +166,23 @@ const EmployeeLeaveTypePageContent = () => {
     }
   }
 
+  // 🔹 Effect: Handle Drawer Closing Logic
   useEffect(() => {
     if (!drawerOpen) {
       if (closeReason === 'save' || closeReason === 'cancel') {
-        setFormData({
-          id: null,
-          leaveCode: '',
-          name: '',
-          status: 'Active'
-        })
-        setUnsavedAddData(null)
+         // Explicitly cleared → Clear draft
+         setUnsavedAddData(null)
+         // Reset form to default (clean state)
+         reset({
+           leaveCode: '',
+           name: '',
+           description: '',
+           status: 1
+         })
+      } else if (!isEdit) {
+         // Manual Close in Add Mode → Save Draft
+         const currentValues = getValues()
+         setUnsavedAddData(currentValues)
       }
     }
   }, [drawerOpen])
@@ -168,7 +194,7 @@ const EmployeeLeaveTypePageContent = () => {
   // Drawer
   const toggleDrawer = () => {
     setCloseReason('manual') // outside click / X button
-    setDrawerOpen(false)
+    setDrawerOpen(p => !p)
   }
 
   // 🔹 Cancel drawer + reset form
@@ -177,43 +203,34 @@ const EmployeeLeaveTypePageContent = () => {
     setDrawerOpen(false)
   }
 
-  // 🔹 Handle field change + store unsaved add data
-  const handleFieldChange = (field, value) => {
-    setFormData(prev => {
-      const updated = { ...prev, [field]: value }
-      if (!isEdit) setUnsavedAddData(updated)
-      return updated
-    })
-  }
-
   // 🔹 Updated Add handler with unsaved data restore
   const handleAdd = () => {
     setIsEdit(false)
     if (unsavedAddData) {
-      setFormData(unsavedAddData)
+      reset(unsavedAddData)
     } else {
-      setFormData({
-        id: null,
+      reset({
         leaveCode: '',
         name: '',
-        status: 'Active'
+        description: '',
+        status: 1
       })
     }
+    setCloseReason(null)
     setDrawerOpen(true)
-    setTimeout(() => leaveCodeRef.current?.focus(), 100)
   }
 
   // 🔹 Edit Handler
   const handleEdit = row => {
     setIsEdit(true)
-    setFormData({
+    reset({
       id: row.id,
       leaveCode: row.leaveCode || '',
       name: row.name || '',
-      status: row.is_active === 1 ? 'Active' : 'Inactive' // ✅ correct field
+      status: row.is_active // 1 or 0
     })
+    setCloseReason(null)
     setDrawerOpen(true)
-    setTimeout(() => leaveCodeRef.current?.focus(), 100)
   }
 
   const handleDelete = async row => {
@@ -244,21 +261,36 @@ const EmployeeLeaveTypePageContent = () => {
     }
   }
 
-  const handleSubmit = async e => {
-    e.preventDefault()
+  const onSubmit = async (data) => {
+    // 🔍 Duplicate Check (Name)
+    const isDuplicate = rows.some(r =>
+      r.name.toLowerCase() === data.name.trim().toLowerCase() &&
+      r.id !== (isEdit ? data.id : -1)
+    )
 
-    if (!formData.leaveCode.trim() || !formData.name.trim()) {
-      showToast('warning', 'Leave Code and Name are required')
+    if (isDuplicate) {
+      showToast('error', 'Leave Type name already exists')
+      return
+    }
+    
+    // 🔍 Duplicate Check (Code)
+    const isDuplicateCode = rows.some(r =>
+      r.leaveCode.toLowerCase() === data.leaveCode.trim().toLowerCase() &&
+      r.id !== (isEdit ? data.id : -1)
+    )
+
+    if (isDuplicateCode) {
+      showToast('error', 'Leave Type code already exists')
       return
     }
 
     setLoading(true)
     try {
       const payload = {
-        id: formData.id,
-        leave_code: formData.leaveCode,
-        name: formData.name,
-        is_active: formData.status === 'Active' ? 1 : 0,
+        id: isEdit ? data.id : undefined,
+        leave_code: data.leaveCode,
+        name: data.name,
+        is_active: data.status === 'Active' || data.status === 1 ? 1 : 0,
         status: 1
       }
 
@@ -271,28 +303,15 @@ const EmployeeLeaveTypePageContent = () => {
         await addLeaveType(payload)
         showToast('success', 'Leave Type added successfully!')
       }
-
+      
+      setCloseReason('save')
+      setDrawerOpen(false)
       await loadData()
-
-      setCloseReason('save') // 🔥 save means clear form
-      setDrawerOpen(false) // close drawer only (no clear here)
     } catch (err) {
       console.error('❌ Error while saving:', err)
       showToast('error', err.response?.data?.message || err.message)
     } finally {
       setLoading(false)
-    }
-  }
-
-  const handleStatusChange = async e => {
-    const newStatus = e.target.value
-    setFormData(prev => ({ ...prev, status: newStatus }))
-    if (isEdit && formData.id) {
-      const updatedRow = { ...formData, status: newStatus, id: formData.id }
-      setRows(prev => prev.map(r => (r.id === formData.id ? updatedRow : r)))
-      const db = await initDB()
-      await db.put(STORE_NAME, updatedRow)
-      showToast('success', 'Status updated')
     }
   }
 
@@ -670,74 +689,96 @@ const EmployeeLeaveTypePageContent = () => {
 
           <Divider sx={{ mb: 3 }} />
 
-          <form onSubmit={handleSubmit} style={{ flexGrow: 1 }}>
+          <form onSubmit={hookSubmit(onSubmit)} style={{ flexGrow: 1 }}>
             <Grid container spacing={3}>
               {/* Leave Code */}
               <Grid item xs={12}>
-                <GlobalTextField
-                  fullWidth
-                  required
-                  label='Leave Code'
-                  placeholder='Enter leave code'
-                  value={formData.leaveCode}
-                  inputRef={leaveCodeRef}
-                  onChange={e => handleFieldChange('leaveCode', e.target.value)}
-                  sx={{
-                    '& .MuiFormLabel-asterisk': {
-                      color: '#e91e63 !important',
-                      fontWeight: 700
-                    },
-                    '& .MuiInputLabel-root.Mui-required': {
-                      color: 'inherit'
-                    }
-                  }}
+                <Controller
+                  name="leaveCode"
+                  control={control}
+                  render={({ field }) => (
+                    <GlobalTextField
+                      {...field}
+                      fullWidth
+                      required
+                      label='Leave Code'
+                      placeholder='Enter leave code'
+                      error={!!errors.leaveCode}
+                      helperText={errors.leaveCode?.message}
+                      sx={{
+                        '& .MuiFormLabel-asterisk': {
+                           color: '#e91e63 !important',
+                           fontWeight: 700
+                        },
+                        '& .MuiInputLabel-root.Mui-required': {
+                           color: 'inherit'
+                        }
+                      }}
+                    />
+                  )}
                 />
               </Grid>
 
               {/* Leave Name */}
               <Grid item xs={12}>
-                <GlobalTextField
-                  fullWidth
-                  required
-                  label=' Name'
-                  placeholder='Enter leave type name'
-                  value={formData.name}
-                  inputRef={nameRef}
-                  onChange={e => handleFieldChange('name', e.target.value.replace(/[^a-zA-Z\s]/g, ''))}
-                  sx={{
-                    '& .MuiFormLabel-asterisk': {
-                      color: '#e91e63 !important',
-                      fontWeight: 700
-                    },
-                    '& .MuiInputLabel-root.Mui-required': {
-                      color: 'inherit'
-                    }
-                  }}
+                <Controller
+                  name="name"
+                  control={control}
+                  render={({ field }) => (
+                    <GlobalTextField
+                      {...field}
+                      fullWidth
+                      required
+                      label='Name'
+                      placeholder='Enter leave type name'
+                      error={!!errors.name}
+                      helperText={errors.name?.message}
+                      sx={{
+                        '& .MuiFormLabel-asterisk': {
+                           color: '#e91e63 !important',
+                           fontWeight: 700
+                        },
+                        '& .MuiInputLabel-root.Mui-required': {
+                           color: 'inherit'
+                        }
+                      }}
+                    />
+                  )}
                 />
               </Grid>
 
               {/* Optional: Add Description */}
               <Grid item xs={12}>
-                <GlobalTextarea
-                  label='Description'
-                  placeholder='Enter a short note or purpose for this leave type...'
-                  rows={3}
-                  value={formData.description || ''}
-                  onChange={e => handleFieldChange('description', e.target.value)}
+                <Controller
+                  name="description"
+                  control={control}
+                  render={({ field }) => (
+                    <GlobalTextarea
+                      {...field}
+                      label='Description'
+                      placeholder='Enter a short note or purpose for this leave type...'
+                      rows={3}
+                    />
+                  )}
                 />
               </Grid>
 
               {/* Status (Only for Edit Mode) */}
               {isEdit && (
                 <Grid item xs={12}>
-                  <GlobalSelect
-                    label='Status'
-                    value={formData.status}
-                    onChange={e => handleFieldChange('status', e.target.value)}
-                    options={[
-                      { value: 'Active', label: 'Active' },
-                      { value: 'Inactive', label: 'Inactive' }
-                    ]}
+                  <Controller
+                    name="status"
+                    control={control}
+                    render={({ field }) => (
+                       <GlobalSelect
+                         {...field}
+                         label='Status'
+                         options={[
+                           { value: 1, label: 'Active' },
+                           { value: 0, label: 'Inactive' }
+                         ]}
+                       />
+                    )}
                   />
                 </Grid>
               )}

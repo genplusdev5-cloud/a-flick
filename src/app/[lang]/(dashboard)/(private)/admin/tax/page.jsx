@@ -122,12 +122,16 @@ const TaxPageContent = () => {
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
   const [editId, setEditId] = useState(null)
 
+  const [unsavedAddData, setUnsavedAddData] = useState(null)
+  const [closeReason, setCloseReason] = useState(null)
+
   const {
     control,
     register,
     handleSubmit: hookSubmit,
     formState: { errors },
-    reset
+    reset,
+    getValues
   } = useForm({
     resolver: zodResolver(taxSchema),
     defaultValues: {
@@ -154,12 +158,35 @@ const TaxPageContent = () => {
 
   const nameRef = useRef(null)
 
+  // 🔹 Effect: Handle Drawer Closing Logic
+  useEffect(() => {
+    if (!drawerOpen) {
+      if (closeReason === 'save' || closeReason === 'cancel') {
+        // Explicitly cleared → Clear draft
+        setUnsavedAddData(null)
+        // Reset form to default (clean state)
+        reset({
+          name: '',
+          tax_value: '',
+          description: '',
+          status: 1
+        })
+      } else if (!isEdit) {
+        // Manual Close in Add Mode → Save Draft
+        const currentValues = getValues()
+        // Ensure we don't save empty default values as a "draft" if user touched nothing?
+        // Actually simple requirement: "entered data... must remain".
+        // Even if empty, it's fine.
+        setUnsavedAddData(currentValues)
+      }
+      // If isEdit, we don't care about drafts (requirement: "Edit mode... fresh data")
+    }
+  }, [drawerOpen])
+
   const loadTaxes = async () => {
     setLoading(true)
     try {
       const res = await getTaxList()
-      console.log('🧾 TAX LIST RAW RESPONSE:', res)
-
       // ✅ Handle nested response correctly
       const data = res?.data?.results || res?.data?.data?.results || res?.results || []
 
@@ -174,8 +201,7 @@ const TaxPageContent = () => {
         name: item.name,
         tax: Number(item.percent ?? 0),
         description: item.description ?? '',
-        is_active: item.is_active ?? 1 // idhu mattum use pannu
-        // status: item.status remove pannu or ignore pannu
+        is_active: item.is_active ?? 1
       }))
 
       setRows(normalized)
@@ -189,12 +215,7 @@ const TaxPageContent = () => {
   }
 
   const handleCancel = () => {
-    reset({
-      name: '',
-      tax_value: '',
-      description: '',
-      status: 1
-    })
+    setCloseReason('cancel')
     setEditId(null)
     setDrawerOpen(false)
   }
@@ -204,31 +225,44 @@ const TaxPageContent = () => {
   }, [pagination.pageIndex, pagination.pageSize, searchText])
 
   // Drawer
-  const toggleDrawer = () => setDrawerOpen(p => !p)
+  const toggleDrawer = () => {
+    setCloseReason('manual')
+    setDrawerOpen(p => !p)
+  }
 
   const handleAdd = () => {
     setIsEdit(false)
     setEditId(null)
-    reset({
-      name: '',
-      tax_value: '',
-      description: '',
-      status: 1
-    })
+
+    if (unsavedAddData) {
+      // ♻️ Restore unsaved draft
+      reset(unsavedAddData)
+    } else {
+      // 🆕 New clean form
+      reset({
+        name: '',
+        tax_value: '',
+        description: '',
+        status: 1
+      })
+    }
+
+    // Reset reason so we track new interactions
+    setCloseReason(null)
     setDrawerOpen(true)
   }
 
   const handleEdit = row => {
     setIsEdit(true)
     setEditId(row.id)
-
+    // Edit always loads fresh
     reset({
       name: row.name,
       tax_value: String(row.tax),
       description: row.description ?? '',
       status: row.is_active
     })
-
+    setCloseReason(null)
     setDrawerOpen(true)
   }
 
@@ -255,9 +289,7 @@ const TaxPageContent = () => {
   }
 
   const handleSubmit = async data => {
-    const duplicate = rows.find(
-      r => r.name.trim().toLowerCase() === data.name.trim().toLowerCase() && r.id !== editId // 👈 current edit row skip
-    )
+    const duplicate = rows.find(r => r.name.trim().toLowerCase() === data.name.trim().toLowerCase() && r.id !== editId)
 
     if (duplicate) {
       showToast('warning', 'Tax name already exists')
@@ -280,6 +312,7 @@ const TaxPageContent = () => {
 
       if (res.status === 'success') {
         showToast('success', isEdit ? 'Tax updated successfully' : 'Tax added successfully')
+        setCloseReason('save') // Mark as saved to clear draft
         setDrawerOpen(false)
         await loadTaxes()
       }
@@ -703,6 +736,15 @@ const TaxPageContent = () => {
                         error={!!errors.name}
                         helperText={errors.name?.message}
                         required
+                        sx={{
+                          '& .MuiFormLabel-asterisk': {
+                            color: '#e91e63 !important',
+                            fontWeight: 700
+                          },
+                          '& .MuiInputLabel-root.Mui-required': {
+                            color: 'inherit'
+                          }
+                        }}
                       />
                     )}
                   />
@@ -720,6 +762,15 @@ const TaxPageContent = () => {
                         error={!!errors.tax_value}
                         helperText={errors.tax_value?.message}
                         required
+                        sx={{
+                          '& .MuiFormLabel-asterisk': {
+                            color: '#e91e63 !important',
+                            fontWeight: 700
+                          },
+                          '& .MuiInputLabel-root.Mui-required': {
+                            color: 'inherit'
+                          }
+                        }}
                       />
                     )}
                   />

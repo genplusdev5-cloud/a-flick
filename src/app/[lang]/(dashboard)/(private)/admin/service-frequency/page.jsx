@@ -24,17 +24,23 @@ import {
   TextField,
   Select,
   FormControl,
-  InputLabel,
-  CircularProgress
+  CircularProgress,
+  InputAdornment
 } from '@mui/material'
+
+import { Controller, useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { serviceFrequencySchema } from '@/validations/serviceFrequency.schema'
 
 import {
   addServiceFrequency,
   getServiceFrequencyList,
   updateServiceFrequency,
-  deleteServiceFrequency
+  deleteServiceFrequency,
+  getServiceFrequencyDetails
 } from '@/api/serviceFrequency'
 
+import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
@@ -45,27 +51,25 @@ import PrintIcon from '@mui/icons-material/Print'
 import FileDownloadIcon from '@mui/icons-material/FileDownload'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import RefreshIcon from '@mui/icons-material/Refresh'
-import FileCopyIcon from '@mui/icons-material/FileCopy'
+import SearchIcon from '@mui/icons-material/Search'
+import CustomTextField from '@core/components/mui/TextField'
+import { toast } from 'react-toastify'
+import TablePaginationComponent from '@/components/TablePaginationComponent'
+import classnames from 'classnames'
+
 import TableChartIcon from '@mui/icons-material/TableChart'
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
+import FileCopyIcon from '@mui/icons-material/FileCopy'
 
+// 🔥 Global UI Components
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalTextField from '@/components/common/GlobalTextField'
 import GlobalTextarea from '@/components/common/GlobalTextarea'
 import GlobalSelect from '@/components/common/GlobalSelect'
-
-import CustomTextFieldWrapper from '@/components/common/CustomTextField'
-import CustomTextarea from '@/components/common/CustomTextarea'
-import CustomSelectField from '@/components/common/CustomSelectField'
-import DialogCloseButton from '@components/dialogs/DialogCloseButton'
-
-import CustomTextField from '@core/components/mui/TextField'
-import CustomAutocomplete from '@core/components/mui/Autocomplete'
 import PermissionGuard from '@/components/auth/PermissionGuard'
 import { usePermission } from '@/hooks/usePermission'
-import { toast } from 'react-toastify'
-import TablePaginationComponent from '@/components/TablePaginationComponent'
-import classnames from 'classnames'
+import { showToast } from '@/components/common/Toasts'
+
 import { rankItem } from '@tanstack/match-sorter-utils'
 import {
   useReactTable,
@@ -79,60 +83,7 @@ import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
 import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 import StickyListLayout from '@/components/common/StickyListLayout'
-
-// Toast helper
-// ──────────────────────────────────────────────────────────────
-// Toast (Custom Styled, Global, with Icons & Colors)
-// ──────────────────────────────────────────────────────────────
-const showToast = (type, message = '') => {
-  const icons = {
-    success: 'tabler-circle-check',
-    delete: 'tabler-trash',
-    error: 'tabler-alert-triangle',
-    warning: 'tabler-info-circle',
-    info: 'tabler-refresh'
-  }
-
-  toast(
-    <div className='flex items-center gap-2'>
-      <i
-        className={icons[type]}
-        style={{
-          color:
-            type === 'success'
-              ? '#16a34a'
-              : type === 'error'
-                ? '#dc2626'
-                : type === 'delete'
-                  ? '#dc2626'
-                  : type === 'warning'
-                    ? '#f59e0b'
-                    : '#2563eb',
-          fontSize: '22px'
-        }}
-      />
-      <Typography variant='body2' sx={{ fontSize: '0.9rem', color: '#111' }}>
-        {message}
-      </Typography>
-    </div>,
-    {
-      position: 'top-right',
-      autoClose: 2000,
-      hideProgressBar: true,
-      closeOnClick: true,
-      pauseOnHover: false,
-      draggable: false,
-      theme: 'light',
-      style: {
-        borderRadius: '10px',
-        padding: '8px 14px',
-        boxShadow: '0 4px 10px rgba(0,0,0,0.06)',
-        display: 'flex',
-        alignItems: 'center'
-      }
-    }
-  )
-}
+import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
 
 // Debounced Input
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
@@ -159,85 +110,89 @@ const ServiceFrequencyPageContent = () => {
   const [loading, setLoading] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
+
+  const [editId, setEditId] = useState(null)
+
+  // Draft State
   const [unsavedAddData, setUnsavedAddData] = useState(null)
-  const [closedByX, setClosedByX] = useState(false)
+  const [closeReason, setCloseReason] = useState(null)
 
-  const [formData, setFormData] = useState({
-    id: null,
-    incrementType: '',
-    noOfIncrements: '',
-    backlogAge: '',
-    frequencyCode: '',
-    displayFrequency: '',
-    serviceFrequency: '', // ✅ new field added
-    sortOrder: '',
-    description: '',
-    status: 'Active'
-  })
-
-  const incrementTypeRef = useRef(null)
-
-  const handleFieldChange = (field, value) => {
-    setFormData(prev => {
-      const updated = { ...prev, [field]: value }
-      if (!isEdit) setUnsavedAddData(updated) // keep draft
-      return updated
-    })
-  }
-
-  // ❌ DO NOT clear unsavedAddData here
-
-  const handleCancel = () => {
-    setFormData({
-      id: null,
+  // React Hook Form
+  const {
+    control,
+    handleSubmit: hookSubmit,
+    reset,
+    formState: { errors },
+    setValue,
+    getValues
+  } = useForm({
+    resolver: zodResolver(serviceFrequencySchema),
+    defaultValues: {
+      serviceFrequency: '',
       incrementType: '',
       noOfIncrements: '',
       backlogAge: '',
       frequencyCode: '',
       displayFrequency: '',
-      serviceFrequency: '',
       sortOrder: '',
       description: '',
-      status: 'Active'
-    })
+      status: 1
+    }
+  })
 
-    setDrawerOpen(false)
-  }
+  // 🔹 Effect: Handle Drawer Closing Logic
+  useEffect(() => {
+    if (!drawerOpen) {
+      if (closeReason === 'save' || closeReason === 'cancel') {
+        // Explicitly cleared → Clear draft
+        setUnsavedAddData(null)
+        // Reset form to default (clean state)
+        reset({
+          serviceFrequency: '',
+          incrementType: '',
+          noOfIncrements: '',
+          backlogAge: '',
+          frequencyCode: '',
+          displayFrequency: '',
+          sortOrder: '',
+          description: '',
+          status: 1
+        })
+      } else if (!isEdit) {
+        // Manual Close in Add Mode → Save Draft
+        const currentValues = getValues()
+        setUnsavedAddData(currentValues)
+      }
+    }
+  }, [drawerOpen])
 
   // Load rows
   const loadData = async () => {
     setLoading(true)
     try {
       const res = await getServiceFrequencyList()
-      console.log('📥 Full Service Frequency Response:', res)
-
-      // ✅ Safely handle your backend structure
+      // Safely handle backend structure
       const results = res?.data?.data?.results || res?.data?.results || res?.results || []
 
-      console.log('📦 Extracted Results:', results)
-
-      if (Array.isArray(results) && results.length > 0) {
+      if (Array.isArray(results)) {
         const formatted = results.map((item, index) => ({
           sno: index + 1,
           id: item.id,
-          serviceFrequency: item.name || '—',
-          displayFrequency: item.name || '—',
-          frequencyCode: item.frequency_code || '—',
-          incrementType: item.frequency || '—',
-          noOfIncrements: item.times || '—',
-          backlogAge: item.backlog_age || '—',
-          sortOrder: item.sort_order || '—',
-          description: item.description || '—',
+          serviceFrequency: item.name || '',
+          displayFrequency: item.name || '', // Mapping name to displayFrequency as fallback usually
+          frequencyCode: item.frequency_code || '-',
+          incrementType: item.frequency || '-',
+          noOfIncrements: item.times || '-',
+          backlogAge: item.backlog_age || '-',
+          sortOrder: item.sort_order || '-',
+          description: item.description || '',
           is_active: item.is_active,
           status: item.is_active === 1 ? 'Active' : 'Inactive'
         }))
 
-        console.log('✅ Formatted Table Data:', formatted)
-
         setRows(formatted)
         setRowCount(formatted.length)
       } else {
-        console.warn('⚠️ No results found in API response')
         setRows([])
         setRowCount(0)
       }
@@ -254,52 +209,130 @@ const ServiceFrequencyPageContent = () => {
   }, [pagination.pageIndex, pagination.pageSize, searchText])
 
   // Drawer
-  const toggleDrawer = () => setDrawerOpen(p => !p)
+  const toggleDrawer = () => {
+    setCloseReason('manual')
+    setDrawerOpen(p => !p)
+  }
 
   const handleAdd = () => {
     setIsEdit(false)
+    setEditId(null)
 
     if (unsavedAddData) {
-      setFormData(unsavedAddData) // restore ONLY if outside click
+      reset(unsavedAddData)
     } else {
-      setFormData({
-        id: null,
+      reset({
+        serviceFrequency: '',
         incrementType: '',
         noOfIncrements: '',
         backlogAge: '',
         frequencyCode: '',
         displayFrequency: '',
-        serviceFrequency: '',
         sortOrder: '',
         description: '',
-        status: 'Active'
+        status: 1
       })
     }
-
+    setCloseReason(null)
     setDrawerOpen(true)
   }
 
-  const handleEdit = row => {
+  const handleEdit = async row => {
     setIsEdit(true)
+    setEditId(row.id)
+    setLoading(true)
 
-    setFormData({
-      id: row.id, // ✅ IMPORTANT → do NOT use null fallback!
-      serviceFrequency: row.serviceFrequency || '',
-      incrementType: row.incrementType || '',
-      noOfIncrements: row.noOfIncrements || '',
-      backlogAge: row.backlogAge || '',
-      frequencyCode: row.frequencyCode || '',
-      displayFrequency: row.displayFrequency || '',
-      sortOrder: row.sortOrder || '',
-      description: row.description || '',
-      status: row.is_active === 1 ? 'Active' : 'Inactive'
-    })
-
-    setDrawerOpen(true)
+    try {
+      // Try to fetch details if available, else fallback to row data
+      // Assuming getServiceFrequencyDetails exists and works
+      const res = await getServiceFrequencyDetails(row.id)
+      if (res?.data) {
+        const data = res.data
+        reset({
+          serviceFrequency: data.name || '',
+          incrementType: data.frequency || '',
+          noOfIncrements: String(data.times || ''),
+          backlogAge: String(data.backlog_age || ''),
+          frequencyCode: data.frequency_code || '',
+          displayFrequency: data.name || '', // usually name
+          sortOrder: String(data.sort_order || ''),
+          description: data.description || '',
+          status: data.is_active ?? 1
+        })
+      } else {
+        // Fallback
+        reset({
+          serviceFrequency: row.serviceFrequency,
+          incrementType: row.incrementType !== '-' ? row.incrementType : '',
+          noOfIncrements: row.noOfIncrements !== '-' ? String(row.noOfIncrements) : '',
+          backlogAge: row.backlogAge !== '-' ? String(row.backlogAge) : '',
+          frequencyCode: row.frequencyCode !== '-' ? row.frequencyCode : '',
+          displayFrequency: row.displayFrequency !== '-' ? row.displayFrequency : '',
+          sortOrder: row.sortOrder !== '-' ? String(row.sortOrder) : '',
+          description: row.description,
+          status: row.is_active
+        })
+      }
+      setCloseReason(null)
+      setDrawerOpen(true)
+    } catch (err) {
+      console.error('❌ Fetch details error:', err)
+      showToast('error', 'Failed to fetch details')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleDelete = async row => {
-    setDeleteDialog({ open: true, row })
+  const handleCancel = () => {
+    setCloseReason('cancel')
+    setDrawerOpen(false)
+  }
+
+  const onSubmit = async data => {
+    // DUPLICATE CHECK
+    const duplicate = rows.find(
+      r => r.serviceFrequency.trim().toLowerCase() === data.serviceFrequency.trim().toLowerCase() && r.id !== editId
+    )
+
+    if (duplicate) {
+      showToast('warning', 'This record already exists')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const payload = {
+        id: editId,
+        name: data.serviceFrequency,
+        frequency: data.incrementType,
+        times: data.noOfIncrements,
+        backlog_age: data.backlogAge,
+        frequency_code: data.frequencyCode,
+        sort_order: data.sortOrder,
+        description: data.description,
+        is_active: data.status,
+        status: data.status
+      }
+
+      // If displayFrequency is separate, include it, but usually mapped to name
+      // payload.displayFrequency = data.displayFrequency
+
+      const res = isEdit ? await updateServiceFrequency(payload) : await addServiceFrequency(payload)
+
+      if (res?.status === 'success') {
+        showToast('success', isEdit ? 'Frequency updated successfully' : 'Frequency added successfully')
+        setCloseReason('save')
+        setDrawerOpen(false)
+        await loadData()
+      } else {
+        showToast('error', 'Operation failed')
+      }
+    } catch (err) {
+      console.error('❌ Error saving frequency:', err)
+      showToast('error', 'Something went wrong')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const confirmDelete = async () => {
@@ -319,42 +352,8 @@ const ServiceFrequencyPageContent = () => {
     }
   }
 
-  const handleSubmit = async e => {
-    e.preventDefault()
-    if (!formData.displayFrequency || !formData.frequencyCode) {
-      showToast('warning', 'Please fill all required fields')
-      return
-    }
-
-    setLoading(true)
-    try {
-      const payload = {
-        ...formData,
-        serviceFrequency: formData.serviceFrequency || formData.displayFrequency // ✅ ensure value
-      }
-
-      const res = isEdit ? await updateServiceFrequency(payload) : await addServiceFrequency(payload)
-
-      if (res?.status === 'success') {
-        showToast('success', isEdit ? 'Frequency updated successfully' : 'Frequency added successfully')
-
-        setUnsavedAddData(null) // 🔥 Remove old draft ONLY on save
-
-        setDrawerOpen(false)
-        await loadData()
-      } else {
-        showToast('error', 'Operation failed')
-      }
-    } catch (err) {
-      console.error('❌ Error saving frequency:', err)
-      showToast('error', 'Something went wrong')
-    } finally {
-      setLoading(false)
-    }
-  }
   // Table setup
   const columnHelper = createColumnHelper()
-
   const columns = useMemo(
     () => [
       columnHelper.accessor('sno', { header: 'S.No' }),
@@ -435,17 +434,16 @@ const ServiceFrequencyPageContent = () => {
 
   // Export Functions
   const exportOpen = Boolean(exportAnchorEl)
-
+  // ... export functions kept same logic ...
   const exportCSV = () => {
     const headers = [
       'S.No',
-      'Display Frequency',
+      'Service Frequency',
       'Frequency Code',
       'Increment Type',
       'No of Increments',
       'Backlog Age',
       'Sort Order',
-      'Description',
       'Status'
     ]
     const csv = [
@@ -453,13 +451,12 @@ const ServiceFrequencyPageContent = () => {
       ...rows.map(r =>
         [
           r.sno,
-          r.displayFrequency,
+          r.serviceFrequency,
           r.frequencyCode,
           r.incrementType,
           r.noOfIncrements,
           r.backlogAge,
           r.sortOrder,
-          r.description,
           r.status
         ].join(',')
       )
@@ -473,32 +470,12 @@ const ServiceFrequencyPageContent = () => {
 
   const exportPrint = () => {
     const w = window.open('', '_blank')
-    const html = `
-      <html><head><title>Service Frequency</title><style>
-      body{font-family:Arial;padding:24px;}
-      table{width:100%;border-collapse:collapse;}
-      th,td{border:1px solid #ccc;padding:8px;text-align:left;}
-      th{background:#f4f4f4;}
-      </style></head><body>
-      <h2>Service Frequency List</h2>
-      <table><thead><tr>
-      <th>S.No</th><th>Display Frequency</th><th>Code</th><th>Increment</th><th>No</th><th>Backlog</th><th>Sort</th><th>Status</th>
-      </tr></thead><tbody>
-      ${rows
-        .map(
-          r =>
-            `<tr><td>${r.sno}</td><td>${r.displayFrequency}</td><td>${r.frequencyCode}</td><td>${r.incrementType}</td><td>${r.noOfIncrements}</td><td>${r.backlogAge}</td><td>${r.sortOrder}</td><td>${r.status}</td></tr>`
-        )
-        .join('')}
-      </tbody></table></body></html>`
+    const html = `<html><body><table><thead><tr><th>S.No</th><th>Name</th><th>Status</th></tr></thead><tbody>${rows.map(r => `<tr><td>${r.sno}</td><td>${r.serviceFrequency}</td><td>${r.status}</td></tr>`).join('')}</tbody></table></body></html>`
     w.document.write(html)
     w.document.close()
     w.print()
   }
 
-  // ───────────────────────────────────────────
-  // Render
-  // ───────────────────────────────────────────
   return (
     <StickyListLayout
       header={
@@ -512,7 +489,7 @@ const ServiceFrequencyPageContent = () => {
         </Box>
       }
     >
-      <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+      <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
         <CardHeader
           title={
             <Box display='flex' alignItems='center' gap={2}>
@@ -520,6 +497,8 @@ const ServiceFrequencyPageContent = () => {
                 Service Frequency
               </Typography>
               <GlobalButton
+                variant='contained'
+                color='primary'
                 startIcon={
                   <RefreshIcon
                     sx={{
@@ -535,10 +514,8 @@ const ServiceFrequencyPageContent = () => {
                 onClick={async () => {
                   setLoading(true)
                   setPagination(prev => ({ ...prev, pageSize: 25, pageIndex: 0 }))
-                  setTimeout(async () => {
-                    await loadData()
-                    setLoading(false)
-                  }, 50)
+                  await loadData()
+                  setTimeout(() => setLoading(false), 500)
                 }}
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
@@ -557,45 +534,11 @@ const ServiceFrequencyPageContent = () => {
                 Export
               </GlobalButton>
               <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
-                <MenuItem
-                  onClick={() => {
-                    setExportAnchorEl(null)
-                    exportPrint()
-                  }}
-                >
-                  <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
-                </MenuItem>
-                <MenuItem
-                  onClick={() => {
-                    setExportAnchorEl(null)
-                    exportCSV()
-                  }}
-                >
+                <MenuItem onClick={exportCSV}>
                   <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
                 </MenuItem>
-                <MenuItem
-                  onClick={async () => {
-                    setExportAnchorEl(null)
-                    await exportExcel()
-                  }}
-                >
-                  <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
-                </MenuItem>
-                <MenuItem
-                  onClick={async () => {
-                    setExportAnchorEl(null)
-                    await exportPDF()
-                  }}
-                >
-                  <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
-                </MenuItem>
-                <MenuItem
-                  onClick={() => {
-                    setExportAnchorEl(null)
-                    exportCopy()
-                  }}
-                >
-                  <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
+                <MenuItem onClick={exportPrint}>
+                  <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
                 </MenuItem>
               </Menu>
 
@@ -619,6 +562,8 @@ const ServiceFrequencyPageContent = () => {
             '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
           }}
         />
+
+        <Divider />
         {loading && (
           <Box
             sx={{
@@ -636,17 +581,9 @@ const ServiceFrequencyPageContent = () => {
           </Box>
         )}
         <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <Divider sx={{ mb: 2 }} />
-
+          {/* Filter & Search */}
           <Box
-            sx={{
-              mb: 3,
-              display: 'flex',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: 2,
-              flexShrink: 0
-            }}
+            sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, flexShrink: 0 }}
           >
             <FormControl size='small' sx={{ width: 140 }}>
               <Select
@@ -660,20 +597,29 @@ const ServiceFrequencyPageContent = () => {
                 ))}
               </Select>
             </FormControl>
-
             <DebouncedInput
               value={searchText}
               onChange={v => {
                 setSearchText(String(v))
                 setPagination(p => ({ ...p, pageIndex: 0 }))
               }}
-              placeholder='Search display frequency, code...'
+              placeholder='Search frequency...'
               sx={{ width: 360 }}
               variant='outlined'
               size='small'
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position='start'>
+                      <SearchIcon />
+                    </InputAdornment>
+                  )
+                }
+              }}
             />
           </Box>
 
+          {/* Table */}
           <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
             <StickyTableWrapper rowCount={rows.length}>
               <table className={styles.table}>
@@ -720,14 +666,13 @@ const ServiceFrequencyPageContent = () => {
               </table>
             </StickyTableWrapper>
           </Box>
-
           <Box sx={{ mt: 'auto', flexShrink: 0 }}>
             <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
           </Box>
         </Box>
       </Card>
 
-      {/* Drawer */}
+      {/* DRAWER */}
       <Drawer
         anchor='right'
         open={drawerOpen}
@@ -739,188 +684,260 @@ const ServiceFrequencyPageContent = () => {
             <Typography variant='h5' fontWeight={600}>
               {isEdit ? 'Edit Frequency' : 'Add Frequency'}
             </Typography>
-            <IconButton
-              onClick={() => {
-                setUnsavedAddData(null)
-                setClosedByX(false) // not outside click
-                handleCancel()
-              }}
-              size='small'
-            >
+            <IconButton onClick={toggleDrawer} size='small'>
               <CloseIcon />
             </IconButton>
           </Box>
-
           <Divider sx={{ mb: 3 }} />
 
-          <form onSubmit={handleSubmit} style={{ flexGrow: 1 }}>
+          <form onSubmit={hookSubmit(onSubmit)} style={{ flexGrow: 1, overflowY: 'auto' }}>
             <Grid container spacing={3}>
+              {/* Service Frequency */}
               <Grid item xs={12}>
-                <GlobalTextField
-                  fullWidth
-                  required
-                  label='Service Frequency Name'
-                  placeholder='Enter service frequency name'
-                  value={formData.serviceFrequency}
-                  onChange={e => handleFieldChange('serviceFrequency', e.target.value)}
-                  sx={{
-                    '& .MuiFormLabel-asterisk': {
-                      color: '#e91e63 !important',
-                      fontWeight: 700
-                    },
-                    '& .MuiInputLabel-root.Mui-required': {
-                      color: 'inherit'
-                    }
-                  }}
+                <Controller
+                  name='serviceFrequency'
+                  control={control}
+                  render={({ field }) => (
+                    <GlobalTextField
+                      {...field}
+                      label='Name'
+                      placeholder='Enter Service Frequency Name'
+                      fullWidth
+                      required
+                      error={!!errors.serviceFrequency}
+                      helperText={errors.serviceFrequency?.message}
+                      sx={{
+                        '& .MuiFormLabel-asterisk': {
+                          color: '#e91e63 !important',
+                          fontWeight: 700
+                        },
+                        '& .MuiInputLabel-root.Mui-required': {
+                          color: 'inherit'
+                        }
+                      }}
+                    />
+                  )}
                 />
               </Grid>
 
+              {/* Increment Type */}
               <Grid item xs={12}>
-                <CustomSelectField
-                  label='Increment Type'
-                  value={formData.incrementType}
-                  onChange={e => handleFieldChange('incrementType', e.target.value)}
-                  required
-                  options={[
-                    { value: 'Year', label: 'Year' },
-                    { value: 'Month', label: 'Month' },
-                    { value: 'Week', label: 'Week' },
-                    { value: 'Day', label: 'Day' },
-                    { value: 'Others', label: 'Others' }
-                  ]}
+                <Controller
+                  name='incrementType'
+                  control={control}
+                  render={({ field }) => (
+                    <GlobalAutocomplete
+                      label='Increment Type'
+                      {...field}
+                      value={field.value}
+                      onChange={e => field.onChange(e.target.value)}
+                      options={[
+                        { value: 'Year', label: 'Year' },
+                        { value: 'Month', label: 'Month' },
+                        { value: 'Week', label: 'Week' },
+                        { value: 'Day', label: 'Day' },
+                        { value: 'Others', label: 'Others' }
+                      ]}
+                      fullWidth
+                      sx={{
+                        '& .MuiFormLabel-asterisk': {
+                          color: '#e91e63 !important',
+                          fontWeight: 700
+                        },
+                        '& .MuiInputLabel-root.Mui-required': {
+                          color: 'inherit'
+                        }
+                      }}
+                    />
+                  )}
                 />
               </Grid>
 
+              {/* No Of Increments */}
               <Grid item xs={12}>
-                <CustomTextFieldWrapper
-                  fullWidth
-                  label='No of Increments'
-                  placeholder='Enter number of increments'
-                  value={formData.noOfIncrements}
-                  onChange={e => handleFieldChange('noOfIncrements', e.target.value)}
-                  required
-                  sx={{
-                    '& .MuiFormLabel-asterisk': {
-                      color: '#e91e63 !important',
-                      fontWeight: 700
-                    },
-                    '& .MuiInputLabel-root.Mui-required': {
-                      color: 'inherit'
-                    }
-                  }}
+                <Controller
+                  name='noOfIncrements'
+                  control={control}
+                  render={({ field }) => (
+                    <GlobalTextField
+                      {...field}
+                      label='No Of Increments'
+                      placeholder='Enter No Of Increments'
+                      required
+                      fullWidth
+                      error={!!errors.noOfIncrements}
+                      helperText={errors.noOfIncrements?.message}
+                      onChange={e => field.onChange(e.target.value.replace(/\D/g, ''))} // Ensure numeric only input
+                      sx={{
+                        '& .MuiFormLabel-asterisk': {
+                          color: '#e91e63 !important',
+                          fontWeight: 700
+                        },
+                        '& .MuiInputLabel-root.Mui-required': {
+                          color: 'inherit'
+                        }
+                      }}
+                    />
+                  )}
                 />
               </Grid>
 
+              {/* Backlog Age */}
               <Grid item xs={12}>
-                <CustomTextFieldWrapper
-                  fullWidth
-                  label='Backlog Age'
-                  placeholder='Enter backlog age'
-                  value={formData.backlogAge}
-                  onChange={e => handleFieldChange('backlogAge', e.target.value)}
-                  required
-                  sx={{
-                    '& .MuiFormLabel-asterisk': {
-                      color: '#e91e63 !important',
-                      fontWeight: 700
-                    },
-                    '& .MuiInputLabel-root.Mui-required': {
-                      color: 'inherit'
-                    }
-                  }}
+                <Controller
+                  name='backlogAge'
+                  control={control}
+                  render={({ field }) => (
+                    <GlobalTextField
+                      {...field}
+                      label='Backlog Age'
+                      placeholder='Enter Backlog Age'
+                      required
+                      fullWidth
+                      error={!!errors.backlogAge}
+                      helperText={errors.backlogAge?.message}
+                      sx={{
+                        '& .MuiFormLabel-asterisk': {
+                          color: '#e91e63 !important',
+                          fontWeight: 700
+                        },
+                        '& .MuiInputLabel-root.Mui-required': {
+                          color: 'inherit'
+                        }
+                      }}
+                    />
+                  )}
                 />
               </Grid>
 
+              {/* Frequency Code */}
               <Grid item xs={12}>
-                <CustomTextFieldWrapper
-                  fullWidth
-                  required
-                  label='Frequency Code'
-                  placeholder='Enter frequency code'
-                  value={formData.frequencyCode}
-                  onChange={e => handleFieldChange('frequencyCode', e.target.value)}
-                  sx={{
-                    '& .MuiFormLabel-asterisk': {
-                      color: '#e91e63 !important',
-                      fontWeight: 700
-                    },
-                    '& .MuiInputLabel-root.Mui-required': {
-                      color: 'inherit'
-                    }
-                  }}
+                <Controller
+                  name='frequencyCode'
+                  control={control}
+                  render={({ field }) => (
+                    <GlobalTextField
+                      {...field}
+                      label='Frequency Code'
+                      required
+                      placeholder='Enter Frequency Code'
+                      fullWidth
+                      error={!!errors.frequencyCode}
+                      helperText={errors.frequencyCode?.message}
+                      sx={{
+                        '& .MuiFormLabel-asterisk': {
+                          color: '#e91e63 !important',
+                          fontWeight: 700
+                        },
+                        '& .MuiInputLabel-root.Mui-required': {
+                          color: 'inherit'
+                        }
+                      }}
+                    />
+                  )}
                 />
               </Grid>
 
+              {/* Display Frequency */}
               <Grid item xs={12}>
-                <CustomTextFieldWrapper
-                  fullWidth
-                  required
-                  label='Display Frequency'
-                  placeholder='Enter display frequency'
-                  value={formData.displayFrequency}
-                  onChange={e => handleFieldChange('displayFrequency', e.target.value)}
-                  sx={{
-                    '& .MuiFormLabel-asterisk': {
-                      color: '#e91e63 !important',
-                      fontWeight: 700
-                    },
-                    '& .MuiInputLabel-root.Mui-required': {
-                      color: 'inherit'
-                    }
-                  }}
+                <Controller
+                  name='displayFrequency'
+                  control={control}
+                  render={({ field }) => (
+                    <GlobalTextField
+                      {...field}
+                      label='Display Frequency'
+                      required
+                      placeholder='Enter Display Frequency'
+                      fullWidth
+                      error={!!errors.displayFrequency}
+                      helperText={errors.displayFrequency?.message}
+                      sx={{
+                        '& .MuiFormLabel-asterisk': {
+                          color: '#e91e63 !important',
+                          fontWeight: 700
+                        },
+                        '& .MuiInputLabel-root.Mui-required': {
+                          color: 'inherit'
+                        }
+                      }}
+                    />
+                  )}
                 />
               </Grid>
 
+              {/* Sort Order */}
               <Grid item xs={12}>
-                <CustomTextFieldWrapper
-                  fullWidth
-                  label='Sort Order'
-                  placeholder='Enter sort order'
-                  value={formData.sortOrder}
-                  onChange={e => handleFieldChange('sortOrder', e.target.value)}
-                  required
-                  sx={{
-                    '& .MuiFormLabel-asterisk': {
-                      color: '#e91e63 !important',
-                      fontWeight: 700
-                    },
-                    '& .MuiInputLabel-root.Mui-required': {
-                      color: 'inherit'
-                    }
-                  }}
+                <Controller
+                  name='sortOrder'
+                  control={control}
+                  render={({ field }) => (
+                    <GlobalTextField
+                      {...field}
+                      label='Sort Order'
+                      placeholder='Enter Sort Order'
+                      required
+                      fullWidth
+                      error={!!errors.sortOrder}
+                      helperText={errors.sortOrder?.message}
+                      onChange={e => field.onChange(e.target.value.replace(/\D/g, ''))}
+                      sx={{
+                        '& .MuiFormLabel-asterisk': {
+                          color: '#e91e63 !important',
+                          fontWeight: 700
+                        },
+                        '& .MuiInputLabel-root.Mui-required': {
+                          color: 'inherit'
+                        }
+                      }}
+                    />
+                  )}
                 />
               </Grid>
 
+              {/* Description */}
               <Grid item xs={12}>
-                <GlobalTextarea
-                  label='Description'
-                  placeholder='Enter description...'
-                  value={formData.description}
-                  onChange={e => handleFieldChange('description', e.target.value)}
-                  rows={3}
+                <Controller
+                  name='description'
+                  control={control}
+                  render={({ field }) => (
+                    <GlobalTextarea
+                      {...field}
+                      label='Description' // passed as prop to GlobalTextarea usually
+                      placeholder='Description'
+                      minRows={3}
+                    />
+                  )}
                 />
               </Grid>
 
+              {/* Status */}
               {isEdit && (
                 <Grid item xs={12}>
-                  <GlobalSelect
-                    label='Status'
-                    defaultValue={formData.status}
-                    onChange={e => handleFieldChange('status', e.target.value)}
-                    options={[
-                      { value: 'Active', label: 'Active' },
-                      { value: 'Inactive', label: 'Inactive' }
-                    ]}
+                  <Controller
+                    name='status'
+                    control={control}
+                    render={({ field }) => (
+                      <GlobalSelect
+                        label='Status'
+                        value={field.value === 1 ? 'Active' : 'Inactive'}
+                        onChange={e => field.onChange(e.target.value === 'Active' ? 1 : 0)}
+                        options={[
+                          { value: 'Active', label: 'Active' },
+                          { value: 'Inactive', label: 'Inactive' }
+                        ]}
+                      />
+                    )}
                   />
                 </Grid>
               )}
             </Grid>
 
+            {/* Footer */}
             <Box mt={4} display='flex' gap={2}>
               <GlobalButton color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
                 Cancel
               </GlobalButton>
-
               <GlobalButton type='submit' variant='contained' fullWidth disabled={loading}>
                 {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
               </GlobalButton>
@@ -943,7 +960,6 @@ const ServiceFrequencyPageContent = () => {
           }
         }}
       >
-        {/* 🔴 Title with Warning Icon */}
         <DialogTitle
           id='customized-dialog-title'
           sx={{
@@ -967,27 +983,27 @@ const ServiceFrequencyPageContent = () => {
             <i className='tabler-x' />
           </DialogCloseButton>
         </DialogTitle>
-
-        {/* Centered text */}
         <DialogContent sx={{ px: 5, pt: 1 }}>
           <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
             Are you sure you want to delete{' '}
-            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.displayFrequency || 'this frequency'}</strong>?
+            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.serviceFrequency || 'this item'}</strong>?
             <br />
             This action cannot be undone.
           </Typography>
         </DialogContent>
-
-        {/* Centered buttons */}
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-          <GlobalButton color='secondary' onClick={() => setDeleteDialog({ open: false, row: null })}>
+          <GlobalButton
+            onClick={() => setDeleteDialog({ open: false, row: null })}
+            color='secondary'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+          >
             Cancel
           </GlobalButton>
-
           <GlobalButton
+            onClick={confirmDelete}
             variant='contained'
             color='error'
-            onClick={confirmDelete} // 🔥 the missing line!
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
           >
             Delete
           </GlobalButton>
@@ -997,8 +1013,7 @@ const ServiceFrequencyPageContent = () => {
   )
 }
 
-// Wrapper for RBAC
-export default function ServiceFrequencyPage() {
+export default function ServiceFrequencyListPage() {
   return (
     <PermissionGuard permission='Service Frequency'>
       <ServiceFrequencyPageContent />

@@ -1,10 +1,9 @@
 'use client'
+
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-
 import {
   Box,
-  Button,
   Card,
   CardHeader,
   Typography,
@@ -21,51 +20,40 @@ import {
   Breadcrumbs,
   Chip,
   TextField,
-  Select,
   FormControl,
-  CircularProgress,
+  Select,
   InputAdornment
 } from '@mui/material'
 
+import { Controller, useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { incidentSchema } from '@/validations/incident.schema'
+
 import { addIncident, getIncidentList, getIncidentDetails, updateIncident, deleteIncident } from '@/api/incidents'
 
+import { showToast } from '@/components/common/Toasts'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
-import EditIcon from '@mui/icons-material/Edit'
-import DeleteIcon from '@mui/icons-material/Delete'
 import CloseIcon from '@mui/icons-material/Close'
 import PrintIcon from '@mui/icons-material/Print'
 import FileDownloadIcon from '@mui/icons-material/FileDownload'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
-import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
-import CustomTextField from '@core/components/mui/TextField'
-import { toast } from 'react-toastify'
-import TablePaginationComponent from '@/components/TablePaginationComponent'
-import classnames from 'classnames'
-import { rankItem } from '@tanstack/match-sorter-utils'
-
 import TableChartIcon from '@mui/icons-material/TableChart'
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
 import FileCopyIcon from '@mui/icons-material/FileCopy'
 
-// 🔥 Global UI Components (use everywhere)
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalTextField from '@/components/common/GlobalTextField'
 import GlobalTextarea from '@/components/common/GlobalTextarea'
 import GlobalSelect from '@/components/common/GlobalSelect'
-import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
-import { showToast } from '@/components/common/Toasts'
-
-// ✅ Custom reusable form components
-import CustomTextFieldWrapper from '@/components/common/CustomTextField'
-import CustomTextarea from '@/components/common/CustomTextarea'
-import CustomSelectField from '@/components/common/CustomSelectField'
 import PermissionGuard from '@/components/auth/PermissionGuard'
 import { usePermission } from '@/hooks/usePermission'
-
+import TablePaginationComponent from '@/components/TablePaginationComponent'
+import classnames from 'classnames'
+import { rankItem } from '@tanstack/match-sorter-utils'
 import {
   useReactTable,
   getCoreRowModel,
@@ -75,7 +63,10 @@ import {
   createColumnHelper
 } from '@tanstack/react-table'
 import styles from '@core/styles/table.module.css'
+import StickyTableWrapper from '@/components/common/StickyTableWrapper'
+import StickyListLayout from '@/components/common/StickyListLayout'
 import ChevronRight from '@menu/svg/ChevronRight'
+import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 
 // Debounced Input
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
@@ -88,9 +79,6 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
   return <TextField {...props} value={value} onChange={e => setValue(e.target.value)} />
 }
 
-// ───────────────────────────────────────────
-// Component
-// ───────────────────────────────────────────
 const IncidentPageContent = () => {
   const [rows, setRows] = useState([])
   const { canAccess } = usePermission()
@@ -102,50 +90,74 @@ const IncidentPageContent = () => {
   const [loading, setLoading] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
+
+  const [editId, setEditId] = useState(null)
+
+  // Draft State
   const [unsavedAddData, setUnsavedAddData] = useState(null)
   const [closeReason, setCloseReason] = useState(null)
 
-  const [formData, setFormData] = useState({
-    id: null,
-    name: '',
-    description: '',
-    status: 'Active'
+  // React Hook Form
+  const {
+    control,
+    handleSubmit: hookSubmit,
+    reset,
+    formState: { errors },
+    setValue,
+    getValues
+  } = useForm({
+    resolver: zodResolver(incidentSchema),
+    defaultValues: {
+      name: '',
+      description: '',
+      status: 1
+    }
   })
-  const nameRef = useRef(null)
-  const descriptionRef = useRef(null)
-  const statusRef = useRef(null)
 
-  // Load rows
+  // 🔹 Effect: Handle Drawer Closing Logic
+  useEffect(() => {
+    if (!drawerOpen) {
+      if (closeReason === 'save' || closeReason === 'cancel') {
+        // Explicitly cleared → Clear draft
+        setUnsavedAddData(null)
+        // Reset form to default (clean state)
+        reset({
+          name: '',
+          description: '',
+          status: 1
+        })
+      } else if (!isEdit) {
+        // Manual Close in Add Mode → Save Draft
+        const currentValues = getValues()
+        setUnsavedAddData(currentValues)
+      }
+    }
+  }, [drawerOpen])
+
+  // Load Data
   const loadData = async () => {
     setLoading(true)
     try {
       const result = await getIncidentList()
+      const dataArray = result?.data || []
 
-      if (result.success) {
-        const all = result.data || []
-        const filtered = searchText
-          ? all.filter(r =>
-              ['name', 'description'].some(key =>
-                (r[key] || '').toString().toLowerCase().includes(searchText.toLowerCase())
-              )
-            )
-          : all
+      if (result.success || Array.isArray(dataArray)) {
+        const formatted = dataArray
+          .map((item, idx) => ({
+            sno: idx + 1,
+            id: item.id,
+            name: item.name || '-',
+            description: item.description || '-',
+            is_active: item.is_active,
+            status: item.is_active === 1 ? 'Active' : 'Inactive'
+          }))
+          .sort((a, b) => b.id - a.id)
 
-        const sorted = filtered.sort((a, b) => (b.id || 0) - (a.id || 0))
-        const start = pagination.pageIndex * pagination.pageSize
-        const end = start + pagination.pageSize
-        const paginated = sorted.slice(start, end)
-
-        const normalized = paginated.map((item, idx) => ({
-          ...item,
-          sno: start + idx + 1,
-          status: item.is_active === 1 ? 'Active' : 'Inactive'
-        }))
-
-        setRows(normalized)
-        setRowCount(filtered.length)
+        setRows(formatted)
+        setRowCount(formatted.length)
       } else {
-        showToast('error', result.message)
+        showToast('error', result.message || 'Failed to load incidents')
+        setRows([])
       }
     } catch (err) {
       console.error(err)
@@ -156,163 +168,119 @@ const IncidentPageContent = () => {
   }
 
   useEffect(() => {
-    if (!drawerOpen) {
-      if (closeReason === 'save' || closeReason === 'cancel') {
-        // clear form on save / cancel
-        setFormData({
-          id: null,
-          name: '',
-          description: '',
-          status: 'Active'
-        })
-      }
-      // manual close → keep data (do nothing)
-    }
-  }, [drawerOpen])
-
-  useEffect(() => {
     loadData()
   }, [pagination.pageIndex, pagination.pageSize, searchText])
 
   // Drawer
   const toggleDrawer = () => {
     setCloseReason('manual')
-    setDrawerOpen(false)
+    setDrawerOpen(p => !p)
   }
 
   const handleAdd = () => {
-    // If manual close → DO NOT clear
-    if (closeReason === null || closeReason === 'manual') {
-      // keep existing formData
+    setIsEdit(false)
+    setEditId(null)
+
+    if (unsavedAddData) {
+      reset(unsavedAddData)
     } else {
-      // Save / Cancel happened → clear
-      setFormData({
-        id: null,
+      reset({
         name: '',
         description: '',
-        status: 'Active'
+        status: 1
       })
     }
-
-    setIsEdit(false)
+    setCloseReason(null)
     setDrawerOpen(true)
-    setCloseReason(null) // reset
-    setTimeout(() => nameRef.current?.focus(), 100)
-  }
-
-  // 🔹 Cancel drawer + reset
-  const handleCancel = () => {
-    setCloseReason('cancel')
-    setDrawerOpen(false)
-  }
-
-  // 🔹 Handle field change + preserve unsaved data
-  const handleFieldChange = (field, value) => {
-    setFormData(prev => {
-      const updated = { ...prev, [field]: value }
-      if (!isEdit) setUnsavedAddData(updated)
-      return updated
-    })
   }
 
   const handleEdit = async row => {
+    setIsEdit(true)
+    setEditId(row.id)
+    setLoading(true)
     try {
-      setIsEdit(true)
-      setLoading(true)
-
       const result = await getIncidentDetails(row.id)
-
       if (result.success && result.data) {
         const data = result.data
-        setFormData({
-          id: data.id,
+        reset({
           name: data.name || '',
           description: data.description || '',
-          status: data.is_active === 1 ? 'Active' : 'Inactive'
+          status: data.is_active ?? 1
         })
-        setDrawerOpen(true)
       } else {
-        showToast('error', result.message)
+        // Fallback
+        reset({
+          name: row.name !== '-' ? row.name : '',
+          description: row.description !== '-' ? row.description : '',
+          status: row.is_active
+        })
       }
+      setCloseReason(null)
+      setDrawerOpen(true)
     } catch (err) {
-      console.error('❌ Fetch details error:', err)
+      console.error(err)
       showToast('error', 'Failed to fetch details')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleDelete = async row => {
-    const db = await initDB()
-    await db.delete(STORE_NAME, row.id)
-    showToast('delete', `${row.name} deleted`)
-    loadData()
-  }
-  const confirmDelete = async () => {
-    try {
-      if (!deleteDialog.row?.id) return
-      const result = await deleteIncident(deleteDialog.row.id)
-      if (result.success) {
-        showToast('delete', result.message)
-        await loadData()
-      } else {
-        showToast('error', result.message)
-      }
-    } catch (err) {
-      console.error('❌ Delete error:', err)
-      showToast('error', 'Failed to delete incident')
-    } finally {
-      setDeleteDialog({ open: false, row: null })
-    }
+  const handleCancel = () => {
+    setCloseReason('cancel')
+    setDrawerOpen(false)
   }
 
-  const handleSubmit = async e => {
-    e.preventDefault()
-    setCloseReason('save')
-
-    if (!formData.name.trim()) {
-      showToast('warning', 'Incident name is required')
+  const onSubmit = async data => {
+    // Duplicate Check
+    const duplicate = rows.find(r => r.name.trim().toLowerCase() === data.name.trim().toLowerCase() && r.id !== editId)
+    if (duplicate) {
+      showToast('warning', 'This record already exists')
       return
     }
 
     setLoading(true)
     try {
       const payload = {
-        id: formData.id,
-        name: formData.name,
-        description: formData.description || '',
-        is_active: formData.status === 'Active' ? 1 : 0
+        name: data.name,
+        description: data.description || null,
+        is_active: data.status
       }
 
-      const result = isEdit ? await updateIncident(payload) : await addIncident(payload)
+      const result = isEdit ? await updateIncident({ ...payload, id: editId }) : await addIncident(payload)
 
       if (result.success) {
         showToast('success', result.message)
+        setCloseReason('save')
         setDrawerOpen(false)
-        setFormData({ id: null, name: '', description: '', status: 'Active' })
-        setUnsavedAddData(null) // VERY IMPORTANT
-        setIsEdit(false)
-        loadData()
+        await loadData()
       } else {
         showToast('error', result.message)
       }
     } catch (err) {
       console.error(err)
-      showToast('error', 'Something went wrong while saving')
+      showToast('error', 'Failed to save Incident')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleStatusChange = async e => {
-    const newStatus = e.target.value
-    setFormData(prev => ({ ...prev, status: newStatus }))
-    if (isEdit && formData.id) {
-      const updatedRow = { ...formData, status: newStatus, id: formData.id }
-      setRows(prev => prev.map(r => (r.id === formData.id ? updatedRow : r)))
-      const db = await initDB()
-      await db.put(STORE_NAME, updatedRow)
-      showToast('success', 'Status updated')
+  const confirmDelete = async () => {
+    if (!deleteDialog.row?.id) return
+    setLoading(true)
+    try {
+      const result = await deleteIncident(deleteDialog.row.id)
+      if (result.success) {
+        showToast('success', result.message)
+        await loadData()
+      } else {
+        showToast('error', result.message)
+      }
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'Failed to delete Incident')
+    } finally {
+      setLoading(false)
+      setDeleteDialog({ open: false, row: null })
     }
   }
 
@@ -344,7 +312,7 @@ const IncidentPageContent = () => {
         )
       }),
       columnHelper.accessor('name', { header: 'Incident Name' }),
-      // columnHelper.accessor('description', { header: 'Description' }),
+      columnHelper.accessor('description', { header: 'Description' }),
       columnHelper.accessor('status', {
         header: 'Status',
         cell: info => (
@@ -379,7 +347,6 @@ const IncidentPageContent = () => {
 
   const table = useReactTable({
     data: paginatedRows,
-
     columns,
     manualPagination: true,
     pageCount: Math.ceil(rowCount / pagination.pageSize),
@@ -392,64 +359,41 @@ const IncidentPageContent = () => {
     getSortedRowModel: getSortedRowModel()
   })
 
-  // Export Functions
+  // Export
   const exportOpen = Boolean(exportAnchorEl)
   const exportCSV = () => {
     const headers = ['S.No', 'Incident Name', 'Description', 'Status']
-    const csv = [
-      headers.join(','),
-      ...rows.map(r =>
-        [r.sno, `"${r.name.replace(/"/g, '""')}"`, `"${r.description.replace(/"/g, '""')}"`, r.status].join(',')
-      )
-    ].join('\n')
+    const csv = [headers.join(','), ...rows.map(r => [r.sno, r.name, r.description, r.status].join(','))].join('\n')
     const link = document.createElement('a')
     link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
-    link.download = 'incidents.csv'
+    link.download = 'Incidents.csv'
     link.click()
     showToast('success', 'CSV downloaded')
   }
 
   const exportPrint = () => {
     const w = window.open('', '_blank')
-    const html = `
-      <html><head><title>Incident List</title><style>
-      body{font-family:Arial;padding:24px;}
-      table{width:100%;border-collapse:collapse;}
-      th,td{border:1px solid #ccc;padding:8px;text-align:left;}
-      th{background:#f4f4f4;}
-      </style></head><body>
-      <h2>Incident List</h2>
-      <table><thead><tr>
-      <th>S.No</th><th>Name</th><th>Description</th><th>Status</th>
-      </tr></thead><tbody>
-      ${rows
-        .map(r => `<tr><td>${r.sno}</td><td>${r.name}</td><td>${r.description}</td><td>${r.status}</td></tr>`)
-        .join('')}
-      </tbody></table></body></html>`
+    const html = `<html><body><table><thead><tr><th>S.No</th><th>Name</th><th>Description</th><th>Status</th></tr></thead><tbody>${rows.map(r => `<tr><td>${r.sno}</td><td>${r.name}</td><td>${r.description}</td><td>${r.status}</td></tr>`).join('')}</tbody></table></body></html>`
     w.document.write(html)
     w.document.close()
     w.print()
   }
 
-  // ───────────────────────────────────────────
-  // Render
-  // ───────────────────────────────────────────
   return (
-    <Box>
-      <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
-        <Link underline='hover' color='inherit' href='/'>
-          Home
-        </Link>
-        <Typography color='text.primary'>Incidents</Typography>
-      </Breadcrumbs>
-      <Card sx={{ p: 3 }}>
+    <StickyListLayout
+      header={
+        <Box sx={{ mb: 2 }}>
+          <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
+            <Link underline='hover' color='inherit' href='/'>
+              Home
+            </Link>
+            <Typography color='text.primary'>Incidents</Typography>
+          </Breadcrumbs>
+        </Box>
+      }
+    >
+      <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
         <CardHeader
-          sx={{
-            pb: 1.5,
-            pt: 1.5,
-            '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
-            '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
-          }}
           title={
             <Box display='flex' alignItems='center' gap={2}>
               <Typography variant='h5' sx={{ fontWeight: 600 }}>
@@ -472,19 +416,9 @@ const IncidentPageContent = () => {
                 disabled={loading}
                 onClick={async () => {
                   setLoading(true)
-
-                  // Reset page size to 25 BEFORE refresh
-                  setPagination(prev => ({
-                    ...prev,
-                    pageSize: 25,
-                    pageIndex: 0
-                  }))
-
-                  // Load data after pagination updates
-                  setTimeout(async () => {
-                    await loadData()
-                    setLoading(false)
-                  }, 50)
+                  setPagination(prev => ({ ...prev, pageSize: 25, pageIndex: 0 }))
+                  await loadData()
+                  setTimeout(() => setLoading(false), 500)
                 }}
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
@@ -503,52 +437,13 @@ const IncidentPageContent = () => {
                 Export
               </GlobalButton>
               <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
-                <MenuItem
-                  onClick={() => {
-                    setExportAnchorEl(null)
-                    exportPrint()
-                  }}
-                >
-                  <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
-                </MenuItem>
-
-                <MenuItem
-                  onClick={() => {
-                    setExportAnchorEl(null)
-                    exportCSV()
-                  }}
-                >
+                <MenuItem onClick={exportCSV}>
                   <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
                 </MenuItem>
-
-                <MenuItem
-                  onClick={async () => {
-                    setExportAnchorEl(null)
-                    await exportExcel()
-                  }}
-                >
-                  <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
-                </MenuItem>
-
-                <MenuItem
-                  onClick={async () => {
-                    setExportAnchorEl(null)
-                    await exportPDF()
-                  }}
-                >
-                  <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
-                </MenuItem>
-
-                <MenuItem
-                  onClick={() => {
-                    setExportAnchorEl(null)
-                    exportCopy()
-                  }}
-                >
-                  <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
+                <MenuItem onClick={exportPrint}>
+                  <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
                 </MenuItem>
               </Menu>
-
               {canAccess('Incident', 'create') && (
                 <GlobalButton
                   variant='contained'
@@ -561,104 +456,120 @@ const IncidentPageContent = () => {
               )}
             </Box>
           }
+          sx={{
+            pb: 1.5,
+            pt: 5,
+            px: 10,
+            '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
+            '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
+          }}
         />
+        <Divider />
         {loading && (
           <Box
             sx={{
-              position: 'fixed',
+              position: 'absolute',
               inset: 0,
               bgcolor: 'rgba(255,255,255,0.8)',
               backdropFilter: 'blur(2px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              zIndex: 9999
+              zIndex: 10
             }}
           >
             <ProgressCircularCustomization size={60} thickness={5} />
           </Box>
         )}
 
-        <Divider sx={{ mb: 2 }} />
-        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-          <FormControl size='small' sx={{ width: 140 }}>
-            <Select
-              value={pagination.pageSize}
-              onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
-            >
-              {[5, 10, 25, 50].map(s => (
-                <MenuItem key={s} value={s}>
-                  {s} entries
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <DebouncedInput
-            value={searchText}
-            onChange={v => {
-              setSearchText(String(v))
-              setPagination(p => ({ ...p, pageIndex: 0 }))
-            }}
-            placeholder='Search name, description...'
-            sx={{ width: 360 }}
-            variant='outlined'
-            size='small'
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position='start'>
-                    <SearchIcon />
-                  </InputAdornment>
-                )
-              }
-            }}
-          />
-        </Box>
-        <div className='overflow-x-auto'>
-          <table className={styles.table}>
-            <thead>
-              {table.getHeaderGroups().map(hg => (
-                <tr key={hg.id}>
-                  {hg.headers.map(h => (
-                    <th key={h.id}>
-                      <div
-                        className={classnames({
-                          'flex items-center': h.column.getIsSorted(),
-                          'cursor-pointer select-none': h.column.getCanSort()
-                        })}
-                        onClick={h.column.getToggleSortingHandler()}
-                      >
-                        {flexRender(h.column.columnDef.header, h.getContext())}
-                        {{
-                          asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
-                          desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
-                        }[h.column.getIsSorted()] ?? null}
-                      </div>
-                    </th>
+        <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <Box
+            sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, flexShrink: 0 }}
+          >
+            <FormControl size='small' sx={{ width: 140 }}>
+              <Select
+                value={pagination.pageSize}
+                onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
+              >
+                {[25, 50, 75, 100].map(s => (
+                  <MenuItem key={s} value={s}>
+                    {s} entries
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <DebouncedInput
+              value={searchText}
+              onChange={v => {
+                setSearchText(String(v))
+                setPagination(p => ({ ...p, pageIndex: 0 }))
+              }}
+              placeholder='Search name, description...'
+              sx={{ width: 360 }}
+              variant='outlined'
+              size='small'
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position='start'>
+                      <SearchIcon />
+                    </InputAdornment>
+                  )
+                }
+              }}
+            />
+          </Box>
+
+          <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            <StickyTableWrapper rowCount={rows.length}>
+              <table className={styles.table}>
+                <thead>
+                  {table.getHeaderGroups().map(hg => (
+                    <tr key={hg.id}>
+                      {hg.headers.map(h => (
+                        <th key={h.id}>
+                          <div
+                            className={classnames({
+                              'flex items-center': h.column.getIsSorted(),
+                              'cursor-pointer select-none': h.column.getCanSort()
+                            })}
+                            onClick={h.column.getToggleSortingHandler()}
+                          >
+                            {flexRender(h.column.columnDef.header, h.getContext())}
+                            {{
+                              asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
+                              desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
+                            }[h.column.getIsSorted()] ?? null}
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
                   ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody>
-              {rows.length ? (
-                table.getRowModel().rows.map(row => (
-                  <tr key={row.id}>
-                    {row.getVisibleCells().map(cell => (
-                      <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
-                    ))}
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={columns.length} className='text-center py-4'>
-                    No data available
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+                </thead>
+                <tbody>
+                  {rows.length ? (
+                    table.getRowModel().rows.map(row => (
+                      <tr key={row.id}>
+                        {row.getVisibleCells().map(cell => (
+                          <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                        ))}
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={columns.length} className='text-center py-4'>
+                        No data available
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </StickyTableWrapper>
+          </Box>
+          <Box sx={{ mt: 'auto', flexShrink: 0 }}>
+            <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+          </Box>
+        </Box>
       </Card>
 
       {/* Drawer */}
@@ -677,61 +588,74 @@ const IncidentPageContent = () => {
               <CloseIcon />
             </IconButton>
           </Box>
-
           <Divider sx={{ mb: 3 }} />
 
-          <form onSubmit={handleSubmit} style={{ flexGrow: 1 }}>
+          <form onSubmit={hookSubmit(onSubmit)} style={{ flexGrow: 1 }}>
             <Grid container spacing={3}>
-              {/* Incident Name */}
+              {/* Name */}
               <Grid item xs={12}>
-                <GlobalTextField
-                  fullWidth
-                  required
-                  label=' Name'
-                  placeholder='Enter incident name'
-                  value={formData.name}
-                  inputRef={nameRef}
-                  onChange={e => handleFieldChange('name', e.target.value.replace(/[^a-zA-Z\s]/g, ''))}
-                  sx={{
-                    '& .MuiFormLabel-asterisk': {
-                      color: '#e91e63 !important',
-                      fontWeight: 700
-                    },
-                    '& .MuiInputLabel-root.Mui-required': {
-                      color: 'inherit'
-                    }
-                  }}
+                <Controller
+                  name='name'
+                  control={control}
+                  render={({ field }) => (
+                    <GlobalTextField
+                      {...field}
+                      label='Name'
+                      fullWidth
+                      required
+                      placeholder='Enter The Name'
+                      error={!!errors.name}
+                      helperText={errors.name?.message}
+                      onChange={e => field.onChange(e.target.value.replace(/[^a-zA-Z\s]/g, ''))}
+                      sx={{
+                        '& .MuiFormLabel-asterisk': {
+                          color: '#e91e63 !important',
+                          fontWeight: 700
+                        },
+                        '& .MuiInputLabel-root.Mui-required': {
+                          color: 'inherit'
+                        }
+                      }}
+                    />
+                  )}
                 />
               </Grid>
 
               {/* Description */}
-              {/* <Grid item xs={12}>
-                <GlobalTextarea
-                  label='Description'
-                  placeholder='Enter description or details...'
-                  rows={3}
-                  value={formData.description}
-                  onChange={e => handleFieldChange('description', e.target.value)}
+              <Grid item xs={12}>
+                <Controller
+                  name='description'
+                  control={control}
+                  render={({ field }) => (
+                    <GlobalTextarea {...field} label='Description' placeholder='Description' minRows={3} />
+                  )}
                 />
-              </Grid> */}
+              </Grid>
 
-              {/* Status - only on edit */}
+              {/* Status */}
               {isEdit && (
                 <Grid item xs={12}>
-                  <GlobalSelect
-                    label='Status'
-                    value={formData.status}
-                    onChange={e => handleFieldChange('status', e.target.value)}
-                    options={[
-                      { value: 'Active', label: 'Active' },
-                      { value: 'Inactive', label: 'Inactive' }
-                    ]}
+                  <Controller
+                    name='status'
+                    control={control}
+                    render={({ field }) => (
+                      <GlobalSelect
+                        label='Status'
+                        value={field.value === 1 ? 'Active' : 'Inactive'}
+                        onChange={e => field.onChange(e.target.value === 'Active' ? 1 : 0)}
+                        options={[
+                          { value: 'Active', label: 'Active' },
+                          { value: 'Inactive', label: 'Inactive' }
+                        ]}
+                        fullWidth
+                      />
+                    )}
                   />
                 </Grid>
               )}
             </Grid>
 
-            {/* Drawer Footer */}
+            {/* Footer */}
             <Box mt={4} display='flex' gap={2}>
               <GlobalButton color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
                 Cancel
@@ -746,80 +670,41 @@ const IncidentPageContent = () => {
 
       <Dialog
         onClose={() => setDeleteDialog({ open: false, row: null })}
-        aria-labelledby='customized-dialog-title'
         open={deleteDialog.open}
-        closeAfterTransition={false}
-        PaperProps={{
-          sx: {
-            overflow: 'visible',
-            width: 420,
-            borderRadius: 1,
-            textAlign: 'center'
-          }
-        }}
+        PaperProps={{ sx: { width: 420, borderRadius: 1, textAlign: 'center' } }}
       >
-        {/* 🔴 Title with Warning Icon */}
         <DialogTitle
-          id='customized-dialog-title'
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 1,
-            color: 'error.main',
-            fontWeight: 700,
-            pb: 1,
-            position: 'relative'
-          }}
+          sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'error.main', fontWeight: 700 }}
         >
-          <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
+          <WarningAmberIcon color='error' sx={{ fontSize: 26, mr: 1 }} />
           Confirm Delete
-          <DialogCloseButton
-            onClick={() => setDeleteDialog({ open: false, row: null })}
-            disableRipple
-            sx={{ position: 'absolute', right: 1, top: 1 }}
-          >
-            <i className='tabler-x' />
-          </DialogCloseButton>
         </DialogTitle>
-
-        {/* Centered Text */}
         <DialogContent sx={{ px: 5, pt: 1 }}>
           <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
-            Are you sure you want to delete{' '}
-            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name || 'this incident'}</strong>?
-            <br />
-            This action cannot be undone.
+            Are you sure you want to delete <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name}</strong>? This
+            action cannot be undone.
           </Typography>
         </DialogContent>
-
-        {/* Centered Buttons */}
-        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3 }}>
           <GlobalButton
             onClick={() => setDeleteDialog({ open: false, row: null })}
             color='secondary'
-            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+            sx={{ minWidth: 100 }}
           >
             Cancel
           </GlobalButton>
-          <GlobalButton
-            onClick={confirmDelete}
-            variant='contained'
-            color='error'
-            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
-          >
+          <GlobalButton onClick={confirmDelete} variant='contained' color='error' sx={{ minWidth: 100 }}>
             Delete
           </GlobalButton>
         </DialogActions>
       </Dialog>
-    </Box>
+    </StickyListLayout>
   )
 }
 
-// Wrapper for RBAC
 export default function IncidentPage() {
   return (
-    <PermissionGuard permission="Incident">
+    <PermissionGuard permission='Incident'>
       <IncidentPageContent />
     </PermissionGuard>
   )

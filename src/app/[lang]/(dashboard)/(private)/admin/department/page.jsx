@@ -100,6 +100,16 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
 // Component
 // ───────────────────────────────────────────
 // ───────────────────────────────────────────
+import { Controller, useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { departmentSchema } from '@/validations/department.schema'
+
+// ... existing imports ...
+
+// ───────────────────────────────────────────
+// Component
+// ───────────────────────────────────────────
+// ───────────────────────────────────────────
 const DepartmentPageContent = () => {
   const { canAccess } = usePermission()
   const [rows, setRows] = useState([])
@@ -111,18 +121,26 @@ const DepartmentPageContent = () => {
   const [loading, setLoading] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
+  
+  // Draft State
   const [unsavedAddData, setUnsavedAddData] = useState(null)
   const [closeReason, setCloseReason] = useState(null)
 
-  const [formData, setFormData] = useState({
-    id: null,
-    name: '',
-    description: '',
-    status: 'Active'
+  // React Hook Form
+  const {
+    control,
+    handleSubmit: hookSubmit,
+    reset,
+    formState: { errors },
+    getValues
+  } = useForm({
+    resolver: zodResolver(departmentSchema),
+    defaultValues: {
+      name: '',
+      description: '',
+      status: 1
+    }
   })
-  const nameRef = useRef(null)
-  const descriptionRef = useRef(null)
-  const statusRef = useRef(null)
 
   // Load rows
   const loadData = async () => {
@@ -167,16 +185,22 @@ const DepartmentPageContent = () => {
     }
   }
 
+  // 🔹 Effect: Handle Drawer Closing Logic
   useEffect(() => {
     if (!drawerOpen) {
       if (closeReason === 'save' || closeReason === 'cancel') {
-        setFormData({
-          id: null,
+        // Explicitly cleared → Clear draft
+        setUnsavedAddData(null)
+        // Reset form to default (clean state)
+        reset({
           name: '',
           description: '',
-          status: 'Active'
+          status: 1
         })
-        setUnsavedAddData(null)
+      } else if (!isEdit) {
+        // Manual Close in Add Mode → Save Draft
+        const currentValues = getValues()
+        setUnsavedAddData(currentValues)
       }
     }
   }, [drawerOpen])
@@ -188,7 +212,7 @@ const DepartmentPageContent = () => {
   // Drawer
   const toggleDrawer = () => {
     setCloseReason('manual') // outside click close
-    setDrawerOpen(false)
+    setDrawerOpen(p => !p)
   }
 
   // 🔹 Cancel drawer + reset form
@@ -197,35 +221,22 @@ const DepartmentPageContent = () => {
     setDrawerOpen(false)
   }
 
-  // 🔹 Handle field change + store unsaved add data
-  const handleFieldChange = (field, value) => {
-    setFormData(prev => {
-      const updated = { ...prev, [field]: value }
-      if (!isEdit) setUnsavedAddData(updated)
-      return updated
-    })
-  }
-
   // 🔹 Updated Add handler with unsaved data restore
   const handleAdd = () => {
     setIsEdit(false)
 
-    if (closeReason === 'manual' && unsavedAddData) {
-      // Outside click → keep data
-      setFormData(unsavedAddData)
+    if (unsavedAddData) {
+       reset(unsavedAddData)
     } else {
-      // After save/cancel → start fresh
-      setFormData({
-        id: null,
-        name: '',
-        description: '',
-        status: 'Active'
-      })
+       reset({
+          name: '',
+          description: '',
+          status: 1
+       })
     }
 
+    setCloseReason(null)
     setDrawerOpen(true)
-    setCloseReason(null) // reset
-    setTimeout(() => nameRef.current?.focus(), 100)
   }
 
   const handleEdit = async row => {
@@ -237,12 +248,13 @@ const DepartmentPageContent = () => {
 
       if (result.success && result.data) {
         const data = result.data
-        setFormData({
+        reset({
           id: data.id,
           name: data.name || '',
           description: data.description || '',
-          status: data.is_active === 1 ? 'Active' : 'Inactive'
+          status: data.is_active // Assuming API returns 1/0
         })
+        setCloseReason(null)
         setDrawerOpen(true)
       } else {
         showToast('error', result.message)
@@ -255,17 +267,6 @@ const DepartmentPageContent = () => {
     }
   }
 
-  const closeByAction = () => {
-    setUnsavedAddData(null)
-    setFormData({
-      id: null,
-      name: '',
-      description: '',
-      status: 'Active'
-    })
-    setDrawerOpen(false)
-  }
-
   const handleDelete = async row => {
     setDeleteDialog({ open: true, row })
   }
@@ -275,9 +276,7 @@ const DepartmentPageContent = () => {
       const result = await deleteDepartment(deleteDialog.row.id)
       if (result.success) {
         showToast('success', result.message)
-
-        closeByAction() // 🔥 SAVE clears
-
+        // No draft stuff needed for delete
         await loadData()
       } else {
         showToast('error', result.message)
@@ -290,32 +289,33 @@ const DepartmentPageContent = () => {
     }
   }
 
-  const handleSubmit = async e => {
-    e.preventDefault()
+  const onSubmit = async (data) => {
+    // 🔍 Duplicate Check (Client-Side)
+    const isDuplicate = rows.some(r =>
+      r.name.toLowerCase() === data.name.trim().toLowerCase() &&
+      r.id !== (isEdit ? data.id : -1)
+    )
 
-    if (!formData.name.trim()) {
-      showToast('warning', 'Department name is required')
+    if (isDuplicate) {
+      showToast('error', 'Department name already exists')
       return
     }
 
     setLoading(true)
     try {
       const payload = {
-        id: formData.id,
-        name: formData.name,
-        description: formData.description,
-        is_active: formData.status === 'Active' ? 1 : 0
+        id: isEdit ? data.id : undefined, // Only send ID if edit
+        name: data.name,
+        description: data.description,
+        is_active: data.status === 'Active' || data.status === 1 ? 1 : 0
       }
 
       const result = isEdit ? await updateDepartment(payload) : await addDepartment(payload)
 
       if (result.success) {
         showToast('success', result.message)
-
-        setDrawerOpen(false) // <-- THIS IS WHERE WE PUT closeReason
-
-        setFormData({ id: null, name: '', description: '', status: 'Active' })
-        setIsEdit(false)
+        setCloseReason('save')
+        setDrawerOpen(false)
         await loadData()
       } else {
         showToast('error', result.message)
@@ -326,11 +326,6 @@ const DepartmentPageContent = () => {
     } finally {
       setLoading(false)
     }
-  }
-
-  const handleStatusChange = async e => {
-    const newStatus = e.target.value
-    setFormData(prev => ({ ...prev, status: newStatus }))
   }
 
   // Table setup
@@ -703,52 +698,68 @@ const DepartmentPageContent = () => {
 
         <Divider sx={{ mb: 3 }} />
 
-        <form onSubmit={handleSubmit} style={{ flexGrow: 1 }}>
+        <form onSubmit={hookSubmit(onSubmit)} style={{ flexGrow: 1 }}>
           <Grid container spacing={3}>
             {/* Department Name */}
             <Grid item xs={12}>
-              <GlobalTextField
-                fullWidth
-                required
-                label=' Name'
-                placeholder='Enter department name'
-                value={formData.name}
-                inputRef={nameRef}
-                onChange={e => handleFieldChange('name', e.target.value.replace(/[^a-zA-Z\s]/g, ''))}
-                sx={{
-                  '& .MuiFormLabel-asterisk': {
-                    color: '#e91e63 !important',
-                    fontWeight: 700
-                  },
-                  '& .MuiInputLabel-root.Mui-required': {
-                    color: 'inherit'
-                  }
-                }}
+              <Controller
+                name="name"
+                control={control}
+                render={({ field }) => (
+                  <GlobalTextField
+                    {...field}
+                    fullWidth
+                    required
+                    label='Name'
+                    placeholder='Enter department name'
+                    error={!!errors.name}
+                    helperText={errors.name?.message}
+                    sx={{
+                      '& .MuiFormLabel-asterisk': {
+                        color: '#e91e63 !important',
+                        fontWeight: 700
+                      },
+                      '& .MuiInputLabel-root.Mui-required': {
+                        color: 'inherit'
+                      }
+                    }}
+                  />
+                )}
               />
             </Grid>
 
             {/* Description */}
             <Grid item xs={12}>
-              <GlobalTextarea
-                label='Description'
-                placeholder='Enter department description...'
-                rows={3}
-                value={formData.description}
-                onChange={e => handleFieldChange('description', e.target.value)}
+              <Controller
+                name="description"
+                control={control}
+                render={({ field }) => (
+                  <GlobalTextarea
+                    {...field}
+                    label='Description'
+                    placeholder='Enter department description...'
+                    rows={3}
+                  />
+                )}
               />
             </Grid>
 
             {/* Status (only in edit mode) */}
             {isEdit && (
               <Grid item xs={12}>
-                <GlobalSelect
-                  label='Status'
-                  value={formData.status}
-                  onChange={e => handleFieldChange('status', e.target.value)}
-                  options={[
-                    { value: 'Active', label: 'Active' },
-                    { value: 'Inactive', label: 'Inactive' }
-                  ]}
+                <Controller
+                  name="status"
+                  control={control}
+                  render={({ field }) => (
+                     <GlobalSelect
+                       {...field}
+                       label='Status'
+                       options={[
+                         { value: 1, label: 'Active' },
+                         { value: 0, label: 'Inactive' }
+                       ]}
+                     />
+                  )}
                 />
               </Grid>
             )}

@@ -100,6 +100,16 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
 // Component
 // ───────────────────────────────────────────
 // ───────────────────────────────────────────
+import { Controller, useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { designationSchema } from '@/validations/designation.schema'
+
+// ... existing imports ...
+
+// ───────────────────────────────────────────
+// Component
+// ───────────────────────────────────────────
+// ───────────────────────────────────────────
 const DesignationPageContent = () => {
   const { canAccess } = usePermission()
   const [rows, setRows] = useState([])
@@ -111,19 +121,26 @@ const DesignationPageContent = () => {
   const [loading, setLoading] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
-  // 🧠 Store unsaved Add form data (restores if drawer reopened)
+  
+  // Draft State
   const [unsavedAddData, setUnsavedAddData] = useState(null)
   const [closeReason, setCloseReason] = useState(null)
 
-  const [formData, setFormData] = useState({
-    id: null,
-    name: '',
-    description: '',
-    status: 'Active'
+  // React Hook Form
+  const {
+    control,
+    handleSubmit: hookSubmit,
+    reset,
+    formState: { errors },
+    getValues
+  } = useForm({
+    resolver: zodResolver(designationSchema),
+    defaultValues: {
+      name: '',
+      description: '',
+      status: 1
+    }
   })
-  const nameRef = useRef(null)
-  const descriptionRef = useRef(null)
-  const statusRef = useRef(null)
 
   // Load rows
   const loadData = async () => {
@@ -167,16 +184,22 @@ const DesignationPageContent = () => {
     }
   }
 
+  // 🔹 Effect: Handle Drawer Closing Logic
   useEffect(() => {
     if (!drawerOpen) {
       if (closeReason === 'save' || closeReason === 'cancel') {
-        setFormData({
-          id: null,
+        // Explicitly cleared → Clear draft
+        setUnsavedAddData(null)
+        // Reset form to default (clean state)
+        reset({
           name: '',
           description: '',
-          status: 'Active'
+          status: 1
         })
-        setUnsavedAddData(null)
+      } else if (!isEdit) {
+        // Manual Close in Add Mode → Save Draft
+        const currentValues = getValues()
+        setUnsavedAddData(currentValues)
       }
     }
   }, [drawerOpen])
@@ -188,7 +211,7 @@ const DesignationPageContent = () => {
   // Drawer
   const toggleDrawer = () => {
     setCloseReason('manual') // outside click / X button
-    setDrawerOpen(false)
+    setDrawerOpen(p => !p)
   }
 
   // 🔹 Cancel drawer + reset form
@@ -197,30 +220,20 @@ const DesignationPageContent = () => {
     setDrawerOpen(false)
   }
 
-  // 🔹 Handle field change + store unsaved add data
-  const handleFieldChange = (field, value) => {
-    setFormData(prev => {
-      const updated = { ...prev, [field]: value }
-      if (!isEdit) setUnsavedAddData(updated)
-      return updated
-    })
-  }
-
   // 🔹 Updated Add handler with unsaved data restore
   const handleAdd = () => {
     setIsEdit(false)
     if (unsavedAddData) {
-      setFormData(unsavedAddData)
+      reset(unsavedAddData)
     } else {
-      setFormData({
-        id: null,
+      reset({
         name: '',
         description: '',
-        status: 'Active'
+        status: 1
       })
     }
+    setCloseReason(null)
     setDrawerOpen(true)
-    setTimeout(() => nameRef.current?.focus(), 100)
   }
 
   const handleEdit = async row => {
@@ -232,12 +245,13 @@ const DesignationPageContent = () => {
 
       if (result.success && result.data) {
         const data = result.data
-        setFormData({
+        reset({
           id: data.id,
           name: data.name || '',
           description: data.description || '',
-          status: data.is_active === 1 ? 'Active' : 'Inactive'
+          status: data.is_active // 1 or 0
         })
+        setCloseReason(null)
         setDrawerOpen(true)
       } else {
         showToast('error', result.message)
@@ -260,9 +274,7 @@ const DesignationPageContent = () => {
       if (result.success) {
         showToast('success', result.message)
 
-        setCloseReason('save') // <-- 🔥 THIS triggers clearing
-        setDrawerOpen(false) // close the drawer ONLY
-
+        // No need to set closeReason here as delete is separate dialog
         await loadData()
       } else {
         showToast('error', result.message)
@@ -275,30 +287,33 @@ const DesignationPageContent = () => {
     }
   }
 
-  const handleSubmit = async e => {
-    e.preventDefault()
+  const onSubmit = async (data) => {
+    // 🔍 Duplicate Check (Client-Side)
+    const isDuplicate = rows.some(r =>
+      r.name.toLowerCase() === data.name.trim().toLowerCase() &&
+      r.id !== (isEdit ? data.id : -1)
+    )
 
-    if (!formData.name.trim()) {
-      showToast('warning', 'Designation name is required')
+    if (isDuplicate) {
+      showToast('error', 'Designation name already exists')
       return
     }
 
     setLoading(true)
     try {
       const payload = {
-        id: formData.id,
-        name: formData.name,
-        description: formData.description,
-        is_active: formData.status === 'Active' ? 1 : 0
+        id: isEdit ? data.id : undefined,
+        name: data.name,
+        description: data.description,
+        is_active: data.status === 'Active' || data.status === 1 ? 1 : 0
       }
 
       const result = isEdit ? await updateDesignation(payload) : await addDesignation(payload)
 
       if (result.success) {
         showToast('success', result.message)
+        setCloseReason('save')
         setDrawerOpen(false)
-        setFormData({ id: null, name: '', description: '', status: 'Active' })
-        setIsEdit(false)
         await loadData()
       } else {
         showToast('error', result.message)
@@ -309,11 +324,6 @@ const DesignationPageContent = () => {
     } finally {
       setLoading(false)
     }
-  }
-
-  const handleStatusChange = async e => {
-    const newStatus = e.target.value
-    setFormData(prev => ({ ...prev, status: newStatus }))
   }
 
   // Table setup
@@ -686,52 +696,68 @@ const DesignationPageContent = () => {
 
         <Divider sx={{ mb: 3 }} />
 
-        <form onSubmit={handleSubmit} style={{ flexGrow: 1 }}>
+        <form onSubmit={hookSubmit(onSubmit)} style={{ flexGrow: 1 }}>
           <Grid container spacing={3}>
             {/* Designation Name */}
             <Grid item xs={12}>
-              <GlobalTextField
-                fullWidth
-                required
-                label='Name'
-                placeholder='Enter designation name'
-                value={formData.name}
-                inputRef={nameRef}
-                onChange={e => handleFieldChange('name', e.target.value.replace(/[^a-zA-Z\s]/g, ''))}
-                sx={{
-                  '& .MuiFormLabel-asterisk': {
-                    color: '#e91e63 !important',
-                    fontWeight: 700
-                  },
-                  '& .MuiInputLabel-root.Mui-required': {
-                    color: 'inherit'
-                  }
-                }}
+              <Controller
+                name="name"
+                control={control}
+                render={({ field }) => (
+                  <GlobalTextField
+                    {...field}
+                    fullWidth
+                    required
+                    label='Name'
+                    placeholder='Enter designation name'
+                    error={!!errors.name}
+                    helperText={errors.name?.message}
+                    sx={{
+                      '& .MuiFormLabel-asterisk': {
+                        color: '#e91e63 !important',
+                        fontWeight: 700
+                      },
+                      '& .MuiInputLabel-root.Mui-required': {
+                        color: 'inherit'
+                      }
+                    }}
+                  />
+                )}
               />
             </Grid>
 
             {/* Description */}
             <Grid item xs={12}>
-              <GlobalTextarea
-                label='Description'
-                placeholder='Enter designation description...'
-                rows={3}
-                value={formData.description}
-                onChange={e => handleFieldChange('description', e.target.value)}
+              <Controller
+                name="description"
+                control={control}
+                render={({ field }) => (
+                  <GlobalTextarea
+                    {...field}
+                    label='Description'
+                    placeholder='Enter designation description...'
+                    rows={3}
+                  />
+                )}
               />
             </Grid>
 
             {/* Status (Edit only) */}
             {isEdit && (
               <Grid item xs={12}>
-                <GlobalSelect
-                  label='Status'
-                  value={formData.status}
-                  onChange={e => handleFieldChange('status', e.target.value)}
-                  options={[
-                    { value: 'Active', label: 'Active' },
-                    { value: 'Inactive', label: 'Inactive' }
-                  ]}
+                <Controller
+                  name="status"
+                  control={control}
+                  render={({ field }) => (
+                     <GlobalSelect
+                       {...field}
+                       label='Status'
+                       options={[
+                         { value: 1, label: 'Active' },
+                         { value: 0, label: 'Inactive' }
+                       ]}
+                     />
+                  )}
                 />
               </Grid>
             )}

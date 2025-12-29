@@ -1,10 +1,9 @@
 'use client'
+
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-
 import {
   Box,
-  Button,
   Card,
   CardHeader,
   Typography,
@@ -21,43 +20,39 @@ import {
   Breadcrumbs,
   Chip,
   TextField,
-  Select,
   FormControl,
-  CircularProgress
+  Select,
+  InputAdornment
 } from '@mui/material'
 
-import { getUomList, addUom, updateUom, deleteUom } from '@/api/uom'
-import { showToast } from '@/components/common/Toasts'
+import { Controller, useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { uomSchema } from '@/validations/uom.schema'
 
+import { getUomList, addUom, updateUom, deleteUom } from '@/api/uom'
+
+import { showToast } from '@/components/common/Toasts'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
-import EditIcon from '@mui/icons-material/Edit'
-import DeleteIcon from '@mui/icons-material/Delete'
 import CloseIcon from '@mui/icons-material/Close'
 import PrintIcon from '@mui/icons-material/Print'
 import FileDownloadIcon from '@mui/icons-material/FileDownload'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import RefreshIcon from '@mui/icons-material/Refresh'
-import CustomTextField from '@core/components/mui/TextField'
-import { toast } from 'react-toastify'
-import TablePaginationComponent from '@/components/TablePaginationComponent'
-import classnames from 'classnames'
-import GlobalTextField from '@/components/common/GlobalTextField'
-import GlobalButton from '@/components/common/GlobalButton'
-import GlobalSelect from '@/components/common/GlobalSelect'
-
+import SearchIcon from '@mui/icons-material/Search'
 import TableChartIcon from '@mui/icons-material/TableChart'
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
 import FileCopyIcon from '@mui/icons-material/FileCopy'
 
-import CustomTextFieldWrapper from '@/components/common/CustomTextField'
-import CustomTextarea from '@/components/common/CustomTextarea'
-import CustomSelectField from '@/components/common/CustomSelectField'
-import DialogCloseButton from '@components/dialogs/DialogCloseButton'
+import GlobalButton from '@/components/common/GlobalButton'
+import GlobalTextField from '@/components/common/GlobalTextField'
+import GlobalTextarea from '@/components/common/GlobalTextarea'
+import GlobalSelect from '@/components/common/GlobalSelect'
 import PermissionGuard from '@/components/auth/PermissionGuard'
 import { usePermission } from '@/hooks/usePermission'
-
+import TablePaginationComponent from '@/components/TablePaginationComponent'
+import classnames from 'classnames'
 import { rankItem } from '@tanstack/match-sorter-utils'
 import {
   useReactTable,
@@ -83,9 +78,6 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
   return <TextField {...props} value={value} onChange={e => setValue(e.target.value)} />
 }
 
-// ───────────────────────────────────────────
-// Component
-// ───────────────────────────────────────────
 const UnitOfMeasurementPageContent = () => {
   const [rows, setRows] = useState([])
   const { canAccess } = usePermission()
@@ -97,73 +89,91 @@ const UnitOfMeasurementPageContent = () => {
   const [loading, setLoading] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
-  const [unsavedAddData, setUnsavedAddData] = useState(null)
-  const [formData, setFormData] = useState({
-    id: null,
-    name: '',
-    description: '',
-    status: 'Active',
-    uomStore: '',
-    uomPurchase: '',
-    conversion: ''
-  })
-  const nameRef = useRef(null)
 
-  // Load rows
+  const [editId, setEditId] = useState(null)
+
+  // Draft State
+  const [unsavedAddData, setUnsavedAddData] = useState(null)
+  const [closeReason, setCloseReason] = useState(null)
+
+  // React Hook Form
+  const {
+    control,
+    handleSubmit: hookSubmit,
+    reset,
+    formState: { errors },
+    setValue,
+    getValues
+  } = useForm({
+    resolver: zodResolver(uomSchema),
+    defaultValues: {
+      name: '',
+      uomStore: '',
+      uomPurchase: '',
+      conversion: '',
+      description: '',
+      status: 1
+    }
+  })
+
+  // 🔹 Effect: Handle Drawer Closing Logic
+  useEffect(() => {
+    if (!drawerOpen) {
+      if (closeReason === 'save' || closeReason === 'cancel') {
+        // Explicitly cleared → Clear draft
+        setUnsavedAddData(null)
+        // Reset form to default (clean state)
+        reset({
+          name: '',
+          uomStore: '',
+          uomPurchase: '',
+          conversion: '',
+          description: '',
+          status: 1
+        })
+      } else if (!isEdit) {
+        // Manual Close in Add Mode → Save Draft
+        const currentValues = getValues()
+        setUnsavedAddData(currentValues)
+      }
+    }
+  }, [drawerOpen])
+
   const loadData = async () => {
     setLoading(true)
     try {
       const result = await getUomList()
+      // Adapt to various possible response shapes
+      const raw = result?.data || result
+      const dataArray = Array.isArray(raw) ? raw : Array.isArray(raw?.results) ? raw.results : []
 
-      if (result.success) {
-        // 🧠 Handle both array and paginated-object responses
-        const raw = result.data
-        const dataArray = Array.isArray(raw) ? raw : Array.isArray(raw?.results) ? raw.results : []
+      if (dataArray) {
+        // Sort & Normalize
+        const formatted = dataArray
+          .map((item, idx) => ({
+            sno: idx + 1,
+            id: item.id,
+            name: item.name || '-',
+            uomStore: item.uom_store || '-',
+            uomPurchase: item.uom_purchase || '-',
+            conversion: item.conversion || '-',
+            description: item.description || '-',
+            is_active: item.is_active,
+            status: item.is_active === 1 ? 'Active' : 'Inactive'
+          }))
+          .sort((a, b) => b.id - a.id)
 
-        // 🔢 Sort newest first
-        const sorted = dataArray.sort((a, b) => (b.id || 0) - (a.id || 0))
-
-        // 🧾 Normalize and add serial numbers
-        const normalized = sorted.map((item, idx) => ({
-          ...item,
-          sno: idx + 1,
-          name: item.name || '-',
-          status: item.is_active === 1 ? 'Active' : 'Inactive'
-        }))
-
-        setRows(normalized)
-        setRowCount(normalized.length)
+        setRows(formatted)
+        setRowCount(formatted.length)
       } else {
-        showToast('error', result.message)
         setRows([])
       }
-    } catch (error) {
-      console.error('❌ Load Data Error:', error)
-      showToast('error', 'Failed to load data')
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'Failed to load UOM list')
     } finally {
       setLoading(false)
     }
-  }
-
-  const handleFieldChange = (field, value) => {
-    setFormData(prev => {
-      const updated = { ...prev, [field]: value }
-      if (!isEdit) setUnsavedAddData(updated) // 🔥 store only for Add mode
-      return updated
-    })
-  }
-  const handleCancel = () => {
-    setFormData({
-      id: null,
-      name: '',
-      description: '',
-      status: 'Active',
-      uomStore: '',
-      uomPurchase: '',
-      conversion: ''
-    })
-    setUnsavedAddData(null) // 🔥 reset stored values
-    setDrawerOpen(false)
   }
 
   useEffect(() => {
@@ -172,129 +182,106 @@ const UnitOfMeasurementPageContent = () => {
 
   // Drawer
   const toggleDrawer = () => {
-    setDrawerOpen(prev => {
-      if (prev && isEdit) {
-        // 🔴 Edit mode → clear always
-        setFormData({
-          id: null,
-          name: '',
-          description: '',
-          status: 'Active',
-          uomStore: '',
-          uomPurchase: '',
-          conversion: ''
-        })
-        setIsEdit(false)
-      }
-      return !prev
-    })
+    setCloseReason('manual')
+    setDrawerOpen(p => !p)
   }
 
   const handleAdd = () => {
     setIsEdit(false)
+    setEditId(null)
 
     if (unsavedAddData) {
-      setFormData(unsavedAddData) // 🔥 Restore previous unsaved inputs
+      reset(unsavedAddData)
     } else {
-      setFormData({
-        id: null,
+      reset({
         name: '',
-        description: '',
-        status: 'Active',
         uomStore: '',
         uomPurchase: '',
-        conversion: ''
+        conversion: '',
+        description: '',
+        status: 1
       })
     }
-
+    setCloseReason(null)
     setDrawerOpen(true)
   }
 
   const handleEdit = row => {
     setIsEdit(true)
-    setFormData({
-      id: row.id,
-      name: row.name,
-      description: row.description || '',
-      uomStore: row.uomStore || '',
-      uomPurchase: row.uomPurchase || '',
-      conversion: row.conversion || '',
-      status: row.is_active === 1 ? 'Active' : 'Inactive' // 🔥 EXACT TAX PAGE STYLE
+    setEditId(row.id)
+    reset({
+      name: row.name !== '-' ? row.name : '',
+      uomStore: row.uomStore !== '-' ? row.uomStore : '',
+      uomPurchase: row.uomPurchase !== '-' ? row.uomPurchase : '',
+      conversion: row.conversion !== '-' ? String(row.conversion) : '',
+      description: row.description !== '-' ? row.description : '',
+      status: row.is_active ?? 1
     })
+    setCloseReason(null)
     setDrawerOpen(true)
   }
 
-  const handleDelete = async row => {
-    setDeleteDialog({ open: true, row })
-  }
-  const confirmDelete = async () => {
-    if (!deleteDialog.row) return
-
-    setLoading(true)
-    try {
-      const result = await deleteUom(deleteDialog.row.id) // ✅ correct
-      if (result.success) {
-        showToast('delete', result.message)
-        loadData()
-      } else {
-        showToast('error', result.message)
-      }
-    } catch (err) {
-      console.error(err)
-      showToast('error', 'Failed to delete UOM')
-    } finally {
-      setDeleteDialog({ open: false, row: null })
-      setLoading(false)
-    }
+  const handleCancel = () => {
+    setCloseReason('cancel')
+    setDrawerOpen(false)
   }
 
-  const handleSubmit = async e => {
-    e.preventDefault()
-
-    if (!formData.name) {
-      showToast('warning', 'Please enter UOM name')
+  const onSubmit = async data => {
+    // Duplicate Check
+    const duplicate = rows.find(r => r.name.trim().toLowerCase() === data.name.trim().toLowerCase() && r.id !== editId)
+    if (duplicate) {
+      showToast('warning', 'This record already exists')
       return
     }
 
     setLoading(true)
     try {
       const payload = {
-        id: formData.id,
-        name: formData.name,
-        description: formData.description || '',
-        uom_store: formData.uomStore || '',
-        uom_purchase: formData.uomPurchase || '',
-        conversion: formData.conversion || '',
-        is_active: formData.status === 'Active' ? 1 : 0 // 🔥 EXACT FIX
+        id: editId,
+        name: data.name,
+        description: data.description,
+        uom_store: data.uomStore,
+        uom_purchase: data.uomPurchase,
+        conversion: data.conversion, // API handles conversion appropriately (likely string or int)
+        is_active: data.status,
+        status: data.status
       }
 
-      const result = isEdit ? await updateUom(payload) : await addUom(payload)
+      const res = isEdit ? await updateUom(payload) : await addUom(payload)
 
-      if (result.success) {
-        showToast('success', result.message)
-
-        setUnsavedAddData(null) // 🔥 clear saved cache
-        setFormData({
-          id: null,
-          name: '',
-          description: '',
-          status: 'Active',
-          uomStore: '',
-          uomPurchase: '',
-          conversion: ''
-        })
-
+      if (res?.success) {
+        showToast('success', isEdit ? 'UOM updated successfully' : 'UOM added successfully')
+        setCloseReason('save')
         setDrawerOpen(false)
-        setIsEdit(false)
-        loadData()
+        await loadData()
       } else {
-        showToast('error', result.message)
+        showToast('error', res?.message || 'Operation failed')
       }
     } catch (err) {
       console.error(err)
-      showToast('error', 'Failed to save data')
+      showToast('error', 'Something went wrong')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteDialog.row?.id) return
+    setLoading(true)
+    try {
+      const res = await deleteUom(deleteDialog.row.id)
+      if (res?.success) {
+        showToast('delete', 'UOM deleted successfully')
+        await loadData()
+      } else {
+        showToast('error', res?.message || 'Failed to delete')
+      }
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'Something went wrong')
+    } finally {
+      setLoading(false)
+      setDeleteDialog({ open: false, row: null })
     }
   }
 
@@ -310,7 +297,7 @@ const UnitOfMeasurementPageContent = () => {
           <Box sx={{ display: 'flex', gap: 1 }}>
             {canAccess('Unit Of Measurement', 'update') && (
               <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
-                <i className='tabler-edit ' />
+                <i className='tabler-edit' />
               </IconButton>
             )}
             {canAccess('Unit Of Measurement', 'delete') && (
@@ -326,24 +313,25 @@ const UnitOfMeasurementPageContent = () => {
         )
       }),
       columnHelper.accessor('name', { header: 'UOM Name' }),
-      columnHelper.accessor('is_active', {
+      columnHelper.accessor('uomStore', { header: 'Store UOM' }),
+      columnHelper.accessor('uomPurchase', { header: 'Purchase UOM' }),
+      columnHelper.accessor('conversion', { header: 'Conversion' }),
+      columnHelper.accessor('description', { header: 'Description' }),
+      columnHelper.accessor('status', {
         header: 'Status',
-        cell: info => {
-          const val = info.getValue()
-          return (
-            <Chip
-              label={val === 1 ? 'Active' : 'Inactive'}
-              size='small'
-              sx={{
-                color: '#fff',
-                bgcolor: val === 1 ? 'success.main' : 'error.main',
-                fontWeight: 600,
-                borderRadius: '6px',
-                px: 1.5
-              }}
-            />
-          )
-        }
+        cell: info => (
+          <Chip
+            label={info.getValue() === 'Active' ? 'Active' : 'Inactive'}
+            size='small'
+            sx={{
+              color: '#fff',
+              bgcolor: info.getValue() === 'Active' ? 'success.main' : 'error.main',
+              fontWeight: 600,
+              borderRadius: '6px',
+              px: 1.5
+            }}
+          />
+        )
       })
     ],
     []
@@ -355,7 +343,6 @@ const UnitOfMeasurementPageContent = () => {
     return itemRank.passed
   }
 
-  // Apply pagination slicing (VERY IMPORTANT)
   const paginatedRows = useMemo(() => {
     const start = pagination.pageIndex * pagination.pageSize
     const end = start + pagination.pageSize
@@ -376,49 +363,29 @@ const UnitOfMeasurementPageContent = () => {
     getSortedRowModel: getSortedRowModel()
   })
 
-  // Export Functions
+  // Export
   const exportOpen = Boolean(exportAnchorEl)
   const exportCSV = () => {
-    const headers = ['S.No', 'UOM Name', 'UOM Store', 'UOM Purchase', 'Conversion', 'Description', 'Status']
+    const headers = ['S.No', 'UOM Name', 'Store UOM', 'Purchase UOM', 'Conversion', 'Description', 'Status']
     const csv = [
       headers.join(','),
       ...rows.map(r => [r.sno, r.name, r.uomStore, r.uomPurchase, r.conversion, r.description, r.status].join(','))
     ].join('\n')
     const link = document.createElement('a')
     link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
-    link.download = 'Unit_of_Measurements.csv'
+    link.download = 'UOM_List.csv'
     link.click()
     showToast('success', 'CSV downloaded')
   }
 
   const exportPrint = () => {
     const w = window.open('', '_blank')
-    const html = `
-      <html><head><title>Unit of Measurement</title><style>
-      body{font-family:Arial;padding:24px;}
-      table{width:100%;border-collapse:collapse;}
-      th,td{border:1px solid #ccc;padding:8px;text-align:left;}
-      th{background:#f4f4f4;}
-      </style></head><body>
-      <h2>Unit of Measurement List</h2>
-      <table><thead><tr>
-      <th>S.No</th><th>Name</th><th>Store</th><th>Purchase</th><th>Conversion</th><th>Description</th><th>Status</th>
-      </tr></thead><tbody>
-      ${rows
-        .map(
-          r =>
-            `<tr><td>${r.sno}</td><td>${r.name}</td><td>${r.uomStore}</td><td>${r.uomPurchase}</td><td>${r.conversion}</td><td>${r.description}</td><td>${r.status}</td></tr>`
-        )
-        .join('')}
-      </tbody></table></body></html>`
+    const html = `<html><body><table><thead><tr><th>S.No</th><th>Name</th><th>Store</th><th>Purchase</th><th>Conversion</th><th>Status</th></tr></thead><tbody>${rows.map(r => `<tr><td>${r.sno}</td><td>${r.name}</td><td>${r.uomStore}</td><td>${r.uomPurchase}</td><td>${r.conversion}</td><td>${r.status}</td></tr>`).join('')}</tbody></table></body></html>`
     w.document.write(html)
     w.document.close()
     w.print()
   }
 
-  // ───────────────────────────────────────────
-  // Render
-  // ───────────────────────────────────────────
   return (
     <StickyListLayout
       header={
@@ -440,6 +407,8 @@ const UnitOfMeasurementPageContent = () => {
                 Unit of Measurement
               </Typography>
               <GlobalButton
+                variant='contained'
+                color='primary'
                 startIcon={
                   <RefreshIcon
                     sx={{
@@ -454,26 +423,11 @@ const UnitOfMeasurementPageContent = () => {
                 disabled={loading}
                 onClick={async () => {
                   setLoading(true)
-
-                  // Reset page size to 25 BEFORE refresh
-                  setPagination(prev => ({
-                    ...prev,
-                    pageSize: 25,
-                    pageIndex: 0
-                  }))
-
-                  // Load data after pagination updates
-                  setTimeout(async () => {
-                    await loadData()
-                    setLoading(false)
-                  }, 50)
+                  setPagination(prev => ({ ...prev, pageSize: 25, pageIndex: 0 }))
+                  await loadData()
+                  setTimeout(() => setLoading(false), 500)
                 }}
-                sx={{
-                  textTransform: 'none',
-                  fontWeight: 500,
-                  px: 2.5,
-                  height: 36
-                }}
+                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
                 {loading ? 'Refreshing...' : 'Refresh'}
               </GlobalButton>
@@ -490,52 +444,13 @@ const UnitOfMeasurementPageContent = () => {
                 Export
               </GlobalButton>
               <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
-                <MenuItem
-                  onClick={() => {
-                    setExportAnchorEl(null)
-                    exportPrint()
-                  }}
-                >
-                  <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
-                </MenuItem>
-
-                <MenuItem
-                  onClick={() => {
-                    setExportAnchorEl(null)
-                    exportCSV()
-                  }}
-                >
+                <MenuItem onClick={exportCSV}>
                   <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
                 </MenuItem>
-
-                <MenuItem
-                  onClick={async () => {
-                    setExportAnchorEl(null)
-                    await exportExcel()
-                  }}
-                >
-                  <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
-                </MenuItem>
-
-                <MenuItem
-                  onClick={async () => {
-                    setExportAnchorEl(null)
-                    await exportPDF()
-                  }}
-                >
-                  <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
-                </MenuItem>
-
-                <MenuItem
-                  onClick={() => {
-                    setExportAnchorEl(null)
-                    exportCopy()
-                  }}
-                >
-                  <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
+                <MenuItem onClick={exportPrint}>
+                  <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
                 </MenuItem>
               </Menu>
-
               {canAccess('Unit Of Measurement', 'create') && (
                 <GlobalButton
                   variant='contained'
@@ -556,7 +471,7 @@ const UnitOfMeasurementPageContent = () => {
             '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
           }}
         />
-         <Divider />
+        <Divider />
         {loading && (
           <Box
             sx={{
@@ -576,14 +491,7 @@ const UnitOfMeasurementPageContent = () => {
 
         <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <Box
-            sx={{
-              mb: 3,
-              display: 'flex',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: 2,
-              flexShrink: 0
-            }}
+            sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, flexShrink: 0 }}
           >
             <FormControl size='small' sx={{ width: 140 }}>
               <Select
@@ -597,17 +505,25 @@ const UnitOfMeasurementPageContent = () => {
                 ))}
               </Select>
             </FormControl>
-
             <DebouncedInput
               value={searchText}
               onChange={v => {
                 setSearchText(String(v))
                 setPagination(p => ({ ...p, pageIndex: 0 }))
               }}
-              placeholder='Search name, store, purchase, conversion...'
+              placeholder='Search name, store, purchase...'
               sx={{ width: 360 }}
               variant='outlined'
               size='small'
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position='start'>
+                      <SearchIcon />
+                    </InputAdornment>
+                  )
+                }
+              }}
             />
           </Box>
 
@@ -657,7 +573,6 @@ const UnitOfMeasurementPageContent = () => {
               </table>
             </StickyTableWrapper>
           </Box>
-
           <Box sx={{ mt: 'auto', flexShrink: 0 }}>
             <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
           </Box>
@@ -680,51 +595,162 @@ const UnitOfMeasurementPageContent = () => {
               <CloseIcon />
             </IconButton>
           </Box>
-
           <Divider sx={{ mb: 3 }} />
 
-          <form onSubmit={handleSubmit} style={{ flexGrow: 1 }}>
+          <form onSubmit={hookSubmit(onSubmit)} style={{ flexGrow: 1 }}>
             <Grid container spacing={3}>
+              {/* Name */}
               <Grid item xs={12}>
-                <GlobalTextField
-                  fullWidth
-                  label=' Name'
-                  placeholder='Enter UOM name'
-                  value={formData.name}
-                  onChange={e => handleFieldChange('name', e.target.value)}
-                  required
-                  sx={{
-                    '& .MuiFormLabel-asterisk': {
-                      color: '#e91e63 !important',
-                      fontWeight: 700
-                    },
-                    '& .MuiInputLabel-root.Mui-required': {
-                      color: 'inherit'
-                    }
-                  }}
+                <Controller
+                  name='name'
+                  control={control}
+                  render={({ field }) => (
+                    <GlobalTextField
+                      {...field}
+                      label='Name'
+                      placeholder='Enter The UOM Name'
+                      fullWidth
+                      required
+                      error={!!errors.name}
+                      helperText={errors.name?.message}
+                      sx={{
+                        '& .MuiFormLabel-asterisk': {
+                          color: '#e91e63 !important',
+                          fontWeight: 700
+                        },
+                        '& .MuiInputLabel-root.Mui-required': {
+                          color: 'inherit'
+                        }
+                      }}
+                    />
+                  )}
                 />
               </Grid>
 
+              {/* UOM Store */}
+              <Grid item xs={12}>
+                <Controller
+                  name='uomStore'
+                  control={control}
+                  render={({ field }) => (
+                    <GlobalTextField
+                      {...field}
+                      label='Store UOM'
+                      placeholder='Enter The Store UOM'
+                      required
+                      fullWidth
+                      error={!!errors.uomStore}
+                      helperText={errors.uomStore?.message}
+                      sx={{
+                        '& .MuiFormLabel-asterisk': {
+                          color: '#e91e63 !important',
+                          fontWeight: 700
+                        },
+                        '& .MuiInputLabel-root.Mui-required': {
+                          color: 'inherit'
+                        }
+                      }}
+                    />
+                  )}
+                />
+              </Grid>
+
+              {/* UOM Purchase */}
+              <Grid item xs={12}>
+                <Controller
+                  name='uomPurchase'
+                  control={control}
+                  render={({ field }) => (
+                    <GlobalTextField
+                      {...field}
+                      label='Purchase UOM'
+                      placeholder='Enter The Purchase UOM'
+                      required
+                      fullWidth
+                      error={!!errors.uomPurchase}
+                      helperText={errors.uomPurchase?.message}
+                      sx={{
+                        '& .MuiFormLabel-asterisk': {
+                          color: '#e91e63 !important',
+                          fontWeight: 700
+                        },
+                        '& .MuiInputLabel-root.Mui-required': {
+                          color: 'inherit'
+                        }
+                      }}
+                    />
+                  )}
+                />
+              </Grid>
+
+              {/* Conversion */}
+              <Grid item xs={12}>
+                <Controller
+                  name='conversion'
+                  control={control}
+                  render={({ field }) => (
+                    <GlobalTextField
+                      {...field}
+                      label='Conversion'
+                      placeholder='Enter The Conversion Value'
+                      required
+                      fullWidth
+                      error={!!errors.conversion}
+                      helperText={errors.conversion?.message}
+                      onChange={e => field.onChange(e.target.value.replace(/[^0-9.]/g, ''))} // Numeric
+                      sx={{
+                        '& .MuiFormLabel-asterisk': {
+                          color: '#e91e63 !important',
+                          fontWeight: 700
+                        },
+                        '& .MuiInputLabel-root.Mui-required': {
+                          color: 'inherit'
+                        }
+                      }}
+                    />
+                  )}
+                />
+              </Grid>
+
+              {/* Description */}
+              <Grid item xs={12}>
+                <Controller
+                  name='description'
+                  control={control}
+                  render={({ field }) => (
+                    <GlobalTextarea {...field} label='Description' placeholder='Description' minRows={3} />
+                  )}
+                />
+              </Grid>
+
+              {/* Status */}
               {isEdit && (
                 <Grid item xs={12}>
-                  <GlobalSelect
-                    label='Status'
-                    value={formData.status}
-                    onChange={e => handleFieldChange('status', e.target.value)}
-                    options={[
-                      { value: 'Active', label: 'Active' },
-                      { value: 'Inactive', label: 'Inactive' }
-                    ]}
+                  <Controller
+                    name='status'
+                    control={control}
+                    render={({ field }) => (
+                      <GlobalSelect
+                        label='Status'
+                        value={field.value === 1 ? 'Active' : 'Inactive'}
+                        onChange={e => field.onChange(e.target.value === 'Active' ? 1 : 0)}
+                        options={[
+                          { value: 'Active', label: 'Active' },
+                          { value: 'Inactive', label: 'Inactive' }
+                        ]}
+                        fullWidth
+                      />
+                    )}
                   />
                 </Grid>
               )}
             </Grid>
 
+            {/* Footer */}
             <Box mt={4} display='flex' gap={2}>
               <GlobalButton color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
                 Cancel
               </GlobalButton>
-
               <GlobalButton type='submit' variant='contained' fullWidth disabled={loading}>
                 {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
               </GlobalButton>
@@ -735,63 +761,30 @@ const UnitOfMeasurementPageContent = () => {
 
       <Dialog
         onClose={() => setDeleteDialog({ open: false, row: null })}
-        aria-labelledby='customized-dialog-title'
         open={deleteDialog.open}
-        closeAfterTransition={false}
-        PaperProps={{
-          sx: {
-            overflow: 'visible',
-            width: 420,
-            borderRadius: 1,
-            textAlign: 'center'
-          }
-        }}
+        PaperProps={{ sx: { width: 420, borderRadius: 1, textAlign: 'center' } }}
       >
         <DialogTitle
-          id='customized-dialog-title'
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 1,
-            color: 'error.main',
-            fontWeight: 700,
-            pb: 1,
-            position: 'relative'
-          }}
+          sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'error.main', fontWeight: 700 }}
         >
-          <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
+          <WarningAmberIcon color='error' sx={{ fontSize: 26, mr: 1 }} />
           Confirm Delete
-          <DialogCloseButton
-            onClick={() => setDeleteDialog({ open: false, row: null })}
-            disableRipple
-            sx={{ position: 'absolute', right: 1, top: 1 }}
-          >
-            <i className='tabler-x' />
-          </DialogCloseButton>
         </DialogTitle>
         <DialogContent sx={{ px: 5, pt: 1 }}>
           <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
-            Are you sure you want to delete{' '}
-            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name || 'this UOM'}</strong>?
-            <br />
-            This action cannot be undone.
+            Are you sure you want to delete <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name}</strong>? This
+            action cannot be undone.
           </Typography>
         </DialogContent>
-        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3 }}>
           <GlobalButton
             onClick={() => setDeleteDialog({ open: false, row: null })}
             color='secondary'
-            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+            sx={{ minWidth: 100 }}
           >
             Cancel
           </GlobalButton>
-          <GlobalButton
-            onClick={confirmDelete}
-            variant='contained'
-            color='error'
-            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
-          >
+          <GlobalButton onClick={confirmDelete} variant='contained' color='error' sx={{ minWidth: 100 }}>
             Delete
           </GlobalButton>
         </DialogActions>
@@ -800,8 +793,7 @@ const UnitOfMeasurementPageContent = () => {
   )
 }
 
-// Wrapper for RBAC
-export default function UnitOfMeasurementPage() {
+export default function UnitOfMeasurementListPage() {
   return (
     <PermissionGuard permission='Unit Of Measurement'>
       <UnitOfMeasurementPageContent />
