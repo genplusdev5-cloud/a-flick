@@ -57,7 +57,7 @@ const fmt = n =>
     maximumFractionDigits: 2
   })
 
-export default function ProductivityReportPage() {
+const ProductivityReportPage = () => {
   const [allRows, setAllRows] = useState([])
   const [rows, setRows] = useState([])
   const [rowCount, setRowCount] = useState(0)
@@ -796,5 +796,14 @@ export default function ProductivityReportPage() {
         </Box>
       </Card>
     </StickyListLayout>
+  )
+}
+
+// Wrapper for RBAC
+export default function ProductivityReportPageWrapper() {
+  return (
+    <PermissionGuard permission='Productivity Finder'>
+      <ProductivityReportPage />
+    </PermissionGuard>
   )
 }

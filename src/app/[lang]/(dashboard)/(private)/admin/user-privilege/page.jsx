@@ -309,7 +309,6 @@ const UserPrivilegePageContent = () => {
     }, 100)
   }
 
-
   // ───────────────────────────────────────────
   // Select All Logic
   // ───────────────────────────────────────────
@@ -544,6 +543,7 @@ const UserPrivilegePageContent = () => {
       columnHelper.accessor('module', { header: 'Module' }),
 
       columnHelper.accessor('create', {
+        enableSorting: false, // 🔥 IMPORTANT
         header: () => {
           const { checked, indeterminate } = getColumnState('create')
           return (
@@ -551,6 +551,7 @@ const UserPrivilegePageContent = () => {
               <Checkbox
                 checked={checked}
                 indeterminate={indeterminate}
+                onClick={e => e.stopPropagation()} // 🔥 STOP SORT
                 onChange={e => handleColumnSelectAll('create', e.target.checked)}
                 disabled={!selectedRole || !mergedRows.length}
                 size='small'
@@ -564,13 +565,16 @@ const UserPrivilegePageContent = () => {
           return (
             <Checkbox
               checked={!!row.create}
+              onClick={e => e.stopPropagation()} // 🔥 STOP SORT
               onChange={e => handlePrivilegeChange(row.module_id, 'create', e.target.checked)}
               disabled={!selectedRole}
             />
           )
         }
       }),
+
       columnHelper.accessor('view', {
+        enableSorting: false, // 🔥 IMPORTANT
         header: () => {
           const { checked, indeterminate } = getColumnState('view')
           return (
@@ -578,6 +582,7 @@ const UserPrivilegePageContent = () => {
               <Checkbox
                 checked={checked}
                 indeterminate={indeterminate}
+                onClick={e => e.stopPropagation()} // 🔥 STOP SORT
                 onChange={e => handleColumnSelectAll('view', e.target.checked)}
                 disabled={!selectedRole || !mergedRows.length}
                 size='small'
@@ -591,6 +596,7 @@ const UserPrivilegePageContent = () => {
           return (
             <Checkbox
               checked={!!row.view}
+              onClick={e => e.stopPropagation()} // 🔥 STOP SORT
               onChange={e => handlePrivilegeChange(row.module_id, 'view', e.target.checked)}
               disabled={!selectedRole}
             />
@@ -598,6 +604,7 @@ const UserPrivilegePageContent = () => {
         }
       }),
       columnHelper.accessor('update', {
+        enableSorting: false, // 🔥 IMPORTANT
         header: () => {
           const { checked, indeterminate } = getColumnState('update')
           return (
@@ -605,6 +612,7 @@ const UserPrivilegePageContent = () => {
               <Checkbox
                 checked={checked}
                 indeterminate={indeterminate}
+                onClick={e => e.stopPropagation()} // 🔥 STOP SORT
                 onChange={e => handleColumnSelectAll('update', e.target.checked)}
                 disabled={!selectedRole || !mergedRows.length}
                 size='small'
@@ -618,6 +626,7 @@ const UserPrivilegePageContent = () => {
           return (
             <Checkbox
               checked={!!row.update}
+              onClick={e => e.stopPropagation()} // 🔥 STOP SORT
               onChange={e => handlePrivilegeChange(row.module_id, 'update', e.target.checked)}
               disabled={!selectedRole}
             />
@@ -626,6 +635,7 @@ const UserPrivilegePageContent = () => {
       }),
 
       columnHelper.accessor('delete', {
+        enableSorting: false, // 🔥 IMPORTANT
         header: () => {
           const { checked, indeterminate } = getColumnState('delete')
           return (
@@ -633,6 +643,7 @@ const UserPrivilegePageContent = () => {
               <Checkbox
                 checked={checked}
                 indeterminate={indeterminate}
+                onClick={e => e.stopPropagation()} // 🔥 STOP SORT
                 onChange={e => handleColumnSelectAll('delete', e.target.checked)}
                 disabled={!selectedRole || !mergedRows.length}
                 size='small'
@@ -646,6 +657,7 @@ const UserPrivilegePageContent = () => {
           return (
             <Checkbox
               checked={!!row.delete}
+              onClick={e => e.stopPropagation()} // 🔥 STOP SORT
               onChange={e => handlePrivilegeChange(row.module_id, 'delete', e.target.checked)}
               disabled={!selectedRole}
             />

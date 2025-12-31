@@ -766,7 +766,7 @@ const AttendanceSchedulePageContent = () => {
 // Wrapper for RBAC
 export default function AttendanceSchedulePage() {
   return (
-    <PermissionGuard permission='Schedule'>
+    <PermissionGuard permission='Attendance Schedule'>
       <AttendanceSchedulePageContent />
     </PermissionGuard>
   )

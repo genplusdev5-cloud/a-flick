@@ -750,7 +750,7 @@ const SlotsPageContent = () => {
 // Wrapper for RBAC
 export default function SlotsPage() {
   return (
-    <PermissionGuard permission='Slots'>
+    <PermissionGuard permission='Attendance Slots'>
       <SlotsPageContent />
     </PermissionGuard>
   )

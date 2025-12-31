@@ -15,7 +15,10 @@ import { showToast } from '@/components/common/Toasts'
 import { addAction, updateAction } from '@/api/actions'
 import GlobalButton from '../common/GlobalButton'
 
+import { usePermission } from '@/hooks/usePermission'
+
 export default function ActionDrawerContent({ pestId, rows, reload, onDelete }) {
+  const { canAccess } = usePermission()
   const [editId, setEditId] = useState(null)
   const [loading, setLoading] = useState(false)
 
@@ -124,9 +127,11 @@ export default function ActionDrawerContent({ pestId, rows, reload, onDelete }) 
               Cancel
             </GlobalButton>
           )}
-          <GlobalButton variant='contained' fullWidth disabled={loading} onClick={handleSubmit}>
-            {editId ? 'Update Action' : 'Add Action'}
-          </GlobalButton>
+          {canAccess('Service Type (Pest)', editId ? 'update' : 'create') && (
+            <GlobalButton variant='contained' fullWidth disabled={loading} onClick={handleSubmit}>
+              {editId ? 'Update Action' : 'Add Action'}
+            </GlobalButton>
+          )}
         </Grid>
       </Grid>
 
@@ -154,13 +159,17 @@ export default function ActionDrawerContent({ pestId, rows, reload, onDelete }) 
 
                   <td>
                     <Box sx={{ display: 'flex', gap: 1 }}>
-                      <IconButton size='small' color='primary' onClick={() => handleEditClick(row)}>
-                        <i className='tabler-edit' />
-                      </IconButton>
+                      {canAccess('Service Type (Pest)', 'update') && (
+                        <IconButton size='small' color='primary' onClick={() => handleEditClick(row)}>
+                          <i className='tabler-edit' />
+                        </IconButton>
+                      )}
 
-                      <IconButton size='small' color='error' onClick={() => onDelete(row.id)}>
-                        <i className='tabler-trash text-red-600 text-lg' />
-                      </IconButton>
+                      {canAccess('Service Type (Pest)', 'delete') && (
+                        <IconButton size='small' color='error' onClick={() => onDelete(row.id)}>
+                          <i className='tabler-trash text-red-600 text-lg' />
+                        </IconButton>
+                      )}
                     </Box>
                   </td>
 

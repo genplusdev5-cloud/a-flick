@@ -58,6 +58,7 @@ import { showToast } from '@/components/common/Toasts'
 import SummaryCards from '@/components/common/SummaryCards'
 import PermissionGuard from '@/components/auth/PermissionGuard'
 import { usePermission } from '@/hooks/usePermission'
+import GlobalButton from '@/components/common/GlobalButton'
 
 const columnHelper = createColumnHelper()
 
@@ -748,37 +749,45 @@ const InvoiceListPageFullContent = () => {
       </div>
 
       <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
+        {/* ✅ CARD HEADER (STANDARD – SAME AS TAX PAGE) */}
+        <CardHeader
+          title={
+            <Box display='flex' alignItems='center' gap={2}>
+              <Typography variant='h5' sx={{ fontWeight: 600 }}>
+                Invoice List
+              </Typography>
 
-        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant='h5' sx={{ fontWeight: 600 }}>
-              Invoice List
-            </Typography>
+              <GlobalButton
+                variant='contained'
+                startIcon={
+                  <RefreshIcon
+                    sx={{
+                      animation: loading ? 'spin 1s linear infinite' : 'none',
+                      '@keyframes spin': {
+                        '0%': { transform: 'rotate(0deg)' },
+                        '100%': { transform: 'rotate(360deg)' }
+                      }
+                    }}
+                  />
+                }
+                disabled={loading}
+                onClick={handleRefresh}
+              >
+                {loading ? 'Refreshing...' : 'Refresh'}
+              </GlobalButton>
+            </Box>
+          }
+          sx={{
+            pb: 1.5,
+            pt: 4,
+            px: 4,
+            '& .MuiCardHeader-title': {
+              fontWeight: 600
+            }
+          }}
+        />
 
-            <Button
-              variant='contained'
-              startIcon={
-                <RefreshIcon
-                  sx={{
-                    animation: loading ? 'spin 1s linear infinite' : 'none',
-                    '@keyframes spin': {
-                      '0%': { transform: 'rotate(0deg)' },
-                      '100%': { transform: 'rotate(360deg)' }
-                    }
-                  }}
-                />
-              }
-              disabled={loading}
-              onClick={handleRefresh}
-              sx={{ textTransform: 'none', height: 36, px: 2.5 }}
-              size='small'
-            >
-              {loading ? 'Refreshing...' : 'Refresh'}
-            </Button>
-          </Box>
-        </Box>
-
-        <Divider sx={{ mb: 2 }} />
+        <Divider />
 
         {/* FILTERS */}
         <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -1100,7 +1109,6 @@ const InvoiceListPageFullContent = () => {
     </StickyListLayout>
   )
 }
-
 
 // Wrapper for RBAC
 export default function InvoiceListPageFull() {

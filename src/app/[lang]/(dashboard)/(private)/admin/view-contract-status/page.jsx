@@ -908,7 +908,7 @@ const ContractStatusPageContent = () => {
 // Wrapper for RBAC
 export default function ContractStatusPage() {
   return (
-    <PermissionGuard permission='Contract Status'>
+    <PermissionGuard permission='View Contract Status'>
       <ContractStatusPageContent />
     </PermissionGuard>
   )

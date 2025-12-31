@@ -20,6 +20,7 @@ import DeleteIcon from '@mui/icons-material/Delete'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import GlobalSelect from '@/components/common/GlobalSelect'
 import GlobalButton from '@/components/common/GlobalButton'
+import { usePermission } from '@/hooks/usePermission'
 
 import CustomTextFieldWrapper from '@/components/common/CustomTextField'
 import CustomSelectField from '@/components/common/CustomSelectField'
@@ -33,6 +34,7 @@ import styles from '@core/styles/table.module.css'
 import { Global } from 'recharts'
 
 export default function FindingDrawerContent({ pestId }) {
+  const { canAccess } = usePermission()
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(false)
   const [editId, setEditId] = useState(null)
@@ -195,9 +197,11 @@ export default function FindingDrawerContent({ pestId }) {
               Cancel
             </GlobalButton>
           )}
-          <GlobalButton variant='contained' fullWidth onClick={handleSubmit}>
-            {editId ? 'Update Finding' : 'Add Finding'}
-          </GlobalButton>
+          {canAccess('Service Type (Pest)', editId ? 'update' : 'create') && (
+            <GlobalButton variant='contained' fullWidth onClick={handleSubmit}>
+              {editId ? 'Update Finding' : 'Add Finding'}
+            </GlobalButton>
+          )}
         </Grid>
       </Grid>
 
@@ -229,20 +233,24 @@ export default function FindingDrawerContent({ pestId }) {
                     <td>{index + 1}</td>
 
                     <td>
-                      <IconButton size='small' color='primary' onClick={() => handleEdit(row)}>
-                        <i className='tabler-edit' />
-                      </IconButton>
+                      {canAccess('Service Type (Pest)', 'update') && (
+                        <IconButton size='small' color='primary' onClick={() => handleEdit(row)}>
+                          <i className='tabler-edit' />
+                        </IconButton>
+                      )}
 
-                      <IconButton
-                        size='small'
-                        color='error'
-                        onClick={() => {
-                          setDeleteId(row.id)
-                          setOpenDelete(true)
-                        }}
-                      >
-                        <i className='tabler-trash text-red-600 text-lg' />
-                      </IconButton>
+                      {canAccess('Service Type (Pest)', 'delete') && (
+                        <IconButton
+                          size='small'
+                          color='error'
+                          onClick={() => {
+                            setDeleteId(row.id)
+                            setOpenDelete(true)
+                          }}
+                        >
+                          <i className='tabler-trash text-red-600 text-lg' />
+                        </IconButton>
+                      )}
                     </td>
 
                     <td>{row.name}</td>

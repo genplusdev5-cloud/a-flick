@@ -546,12 +546,12 @@ const PestPageContent = () => {
         header: 'Actions',
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
-            {canAccess('Pests', 'update') && (
+            {canAccess('Service Type (Pest)', 'update') && (
               <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
                 <i className='tabler-edit' />
               </IconButton>
             )}
-            {canAccess('Pests', 'delete') && (
+            {canAccess('Service Type (Pest)', 'delete') && (
               <IconButton
                 size='small'
                 color='error'
@@ -810,126 +810,68 @@ const PestPageContent = () => {
   return (
     <StickyListLayout
       header={
-        <Box sx={{ mb: 2 }}>
-          <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
-            <Link underline='hover' color='inherit' href='/'>
-              Home
-            </Link>
-            <Typography color='text.primary'>Pest</Typography>
-          </Breadcrumbs>
-
-          <CardHeader
-            sx={{
-              pb: 1.5,
-              pt: 1.5,
-              '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
-              '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
-            }}
-            title={
-              <Box display='flex' alignItems='center' gap={2}>
-                <Typography variant='h5' sx={{ fontWeight: 600 }}>
-                  Pest
-                </Typography>
-                <Button
-                  variant='contained'
-                  color='primary'
-                  startIcon={
-                    <RefreshIcon
-                      sx={{
-                        animation: loading ? 'spin 1s linear infinite' : 'none',
-                        '@keyframes spin': {
-                          '0%': { transform: 'rotate(0deg)' },
-                          '100%': { transform: 'rotate(360deg)' }
-                        }
-                      }}
-                    />
-                  }
-                  disabled={loading}
-                  onClick={loadData}
-                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-                >
-                  {loading ? 'Refreshing...' : 'Refresh'}
-                </Button>
-              </Box>
-            }
-            action={
-              <Box display='flex' alignItems='center' gap={2}>
-                <GlobalButton
-                  color='secondary'
-                  endIcon={<ArrowDropDownIcon />}
-                  onClick={e => setExportAnchorEl(e.currentTarget)}
-                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-                >
-                  Export
-                </GlobalButton>
-                <Menu
-                  anchorEl={exportAnchorEl}
-                  open={Boolean(exportAnchorEl)}
-                  onClose={() => setExportAnchorEl(null)}
-                >
-                  <MenuItem
-                    onClick={() => {
-                      setExportAnchorEl(null)
-                      exportPrint()
-                    }}
-                  >
-                    <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
-                  </MenuItem>
-
-                  <MenuItem
-                    onClick={() => {
-                      setExportAnchorEl(null)
-                      exportCSV()
-                    }}
-                  >
-                    <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
-                  </MenuItem>
-
-                  <MenuItem
-                    onClick={async () => {
-                      setExportAnchorEl(null)
-                      await exportExcel()
-                    }}
-                  >
-                    <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
-                  </MenuItem>
-
-                  <MenuItem
-                    onClick={async () => {
-                      setExportAnchorEl(null)
-                      await exportPDF()
-                    }}
-                  >
-                    <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
-                  </MenuItem>
-
-                  <MenuItem
-                    onClick={() => {
-                      setExportAnchorEl(null)
-                      exportCopy()
-                    }}
-                  >
-                    <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
-                  </MenuItem>
-                </Menu>
-
-                {canAccess('Pests', 'create') && (
-                  <Button
-                    variant='contained'
-                    startIcon={<AddIcon />}
-                    onClick={handleAdd}
-                    sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-                  >
-                    Add Pest
-                  </Button>
-                )}
-              </Box>
-            }
-          />
-        </Box>
+        <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
+          <Link underline='hover' color='inherit' href='/'>
+            Home
+          </Link>
+          <Typography color='text.primary'>Pest</Typography>
+        </Breadcrumbs>
       }
     >
       <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
+        <CardHeader
+          title={
+            <Box display='flex' alignItems='center' gap={2}>
+              <Typography variant='h5' sx={{ fontWeight: 600 }}>
+                Pest
+              </Typography>
+
+              <GlobalButton
+                startIcon={
+                  <RefreshIcon
+                    sx={{
+                      animation: loading ? 'spin 1s linear infinite' : 'none',
+                      '@keyframes spin': {
+                        '0%': { transform: 'rotate(0deg)' },
+                        '100%': { transform: 'rotate(360deg)' }
+                      }
+                    }}
+                  />
+                }
+                disabled={loading}
+                onClick={loadData}
+              >
+                {loading ? 'Refreshing...' : 'Refresh'}
+              </GlobalButton>
+            </Box>
+          }
+          action={
+            <Box display='flex' alignItems='center' gap={2}>
+              <GlobalButton
+                color='secondary'
+                endIcon={<ArrowDropDownIcon />}
+                onClick={e => setExportAnchorEl(e.currentTarget)}
+              >
+                Export
+              </GlobalButton>
+
+              {canAccess('Service Type (Pest)', 'create') && (
+                <GlobalButton startIcon={<AddIcon />} onClick={handleAdd}>
+                  Add Pest
+                </GlobalButton>
+              )}
+            </Box>
+          }
+          sx={{
+            pb: 1.5,
+            pt: 4,
+            px: 4,
+            '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
+            '& .MuiCardHeader-title': { fontWeight: 600 }
+          }}
+        />
+
+        <Divider />
         {loading && (
           <Box
             sx={{
@@ -977,84 +919,84 @@ const PestPageContent = () => {
               </Select>
             </FormControl>
 
-          <DebouncedInput
-            value={searchText}
-            onChange={v => {
-              setSearchText(String(v))
-              setPagination(p => ({ ...p, pageIndex: 0 }))
-            }}
-            placeholder='Search code or name...'
-            sx={{ width: 360 }}
-            variant='outlined'
-            size='small'
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position='start'>
-                    <SearchIcon />
-                  </InputAdornment>
-                )
-              }
-            }}
-          />
-        </Box>
+            <DebouncedInput
+              value={searchText}
+              onChange={v => {
+                setSearchText(String(v))
+                setPagination(p => ({ ...p, pageIndex: 0 }))
+              }}
+              placeholder='Search code or name...'
+              sx={{ width: 360 }}
+              variant='outlined'
+              size='small'
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position='start'>
+                      <SearchIcon />
+                    </InputAdornment>
+                  )
+                }
+              }}
+            />
+          </Box>
 
-        <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-          <StickyTableWrapper rowCount={rows.length}>
-            <table className={styles.table}>
-              <thead>
-                {table.getHeaderGroups().map(hg => (
-                  <tr key={hg.id}>
-                    {hg.headers.map(h => (
-                      <th key={h.id}>
-                        <div
-                          className={classnames({
-                            'flex items-center': h.column.getIsSorted(),
-                            'cursor-pointer select-none': h.column.getCanSort()
-                          })}
-                          onClick={h.column.getToggleSortingHandler()}
-                        >
-                          {flexRender(h.column.columnDef.header, h.getContext())}
-                          {{
-                            asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
-                            desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
-                          }[h.column.getIsSorted()] ?? null}
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                ))}
-              </thead>
-              <tbody>
-                {rows.length ? (
-                  table.getRowModel().rows.map(row => (
-                    <tr key={row.id}>
-                      {row.getVisibleCells().map(cell => (
-                        <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+          <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            <StickyTableWrapper rowCount={rows.length}>
+              <table className={styles.table}>
+                <thead>
+                  {table.getHeaderGroups().map(hg => (
+                    <tr key={hg.id}>
+                      {hg.headers.map(h => (
+                        <th key={h.id}>
+                          <div
+                            className={classnames({
+                              'flex items-center': h.column.getIsSorted(),
+                              'cursor-pointer select-none': h.column.getCanSort()
+                            })}
+                            onClick={h.column.getToggleSortingHandler()}
+                          >
+                            {flexRender(h.column.columnDef.header, h.getContext())}
+                            {{
+                              asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
+                              desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
+                            }[h.column.getIsSorted()] ?? null}
+                          </div>
+                        </th>
                       ))}
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={columns.length} className='text-center py-4'>
-                      No results found
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </StickyTableWrapper>
-        </Box>
+                  ))}
+                </thead>
+                <tbody>
+                  {rows.length ? (
+                    table.getRowModel().rows.map(row => (
+                      <tr key={row.id}>
+                        {row.getVisibleCells().map(cell => (
+                          <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                        ))}
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={columns.length} className='text-center py-4'>
+                        No results found
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </StickyTableWrapper>
+          </Box>
 
-        <Box sx={{ mt: 'auto', flexShrink: 0 }}>
-          <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+          <Box sx={{ mt: 'auto', flexShrink: 0 }}>
+            <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+          </Box>
         </Box>
-      </Box>
-    </Card>
+      </Card>
 
-    {/* Main Drawer */}
-    <Drawer anchor='right' open={mainDrawerOpen} onClose={toggleMainDrawer}>
-      <Box sx={{ p: 5, width: 440 }}>
+      {/* Main Drawer */}
+      <Drawer anchor='right' open={mainDrawerOpen} onClose={toggleMainDrawer}>
+        <Box sx={{ p: 5, width: 440 }}>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
             <Typography variant='h5' fontWeight={600}>
               {isEdit ? 'Edit Pest' : 'Add New Pest'}
@@ -1309,9 +1251,11 @@ const PestPageContent = () => {
                 </Grid>
 
                 {/* Add / Update Button */}
-                <Button variant='contained' fullWidth sx={{ mt: 2 }} onClick={handleSubSubmit} disabled={loading}>
-                  {editSubRow ? 'Update' : 'Add'} {drawerType}
-                </Button>
+                {canAccess('Service Type (Pest)', editSubRow ? 'update' : 'create') && (
+                  <Button variant='contained' fullWidth sx={{ mt: 2 }} onClick={handleSubSubmit} disabled={loading}>
+                    {editSubRow ? 'Update' : 'Add'} {drawerType}
+                  </Button>
+                )}
 
                 {/* Table Section */}
                 <Box mt={4}>
@@ -1335,22 +1279,26 @@ const PestPageContent = () => {
                             <tr key={row.id}>
                               <td>
                                 <Box sx={{ display: 'flex', gap: 1 }}>
-                                  <IconButton size='small' onClick={() => handleSubEdit(row)}>
-                                    <EditIcon />
-                                  </IconButton>
-                                  <IconButton
-                                    size='small'
-                                    color='error'
-                                    onClick={() =>
-                                      setDeleteDialog({
-                                        open: true,
-                                        isSub: true,
-                                        subId: row.id
-                                      })
-                                    }
-                                  >
-                                    <DeleteIcon />
-                                  </IconButton>
+                                  {canAccess('Service Type (Pest)', 'update') && (
+                                    <IconButton size='small' onClick={() => handleSubEdit(row)}>
+                                      <EditIcon />
+                                    </IconButton>
+                                  )}
+                                  {canAccess('Service Type (Pest)', 'delete') && (
+                                    <IconButton
+                                      size='small'
+                                      color='error'
+                                      onClick={() =>
+                                        setDeleteDialog({
+                                          open: true,
+                                          isSub: true,
+                                          subId: row.id
+                                        })
+                                      }
+                                    >
+                                      <DeleteIcon />
+                                    </IconButton>
+                                  )}
                                 </Box>
                               </td>
 
@@ -1469,7 +1417,7 @@ const PestPageContent = () => {
 // Wrapper for RBAC
 export default function PestPage() {
   return (
-    <PermissionGuard permission="Service Type (Pest)">
+    <PermissionGuard permission='Service Type (Pest)'>
       <PestPageContent />
     </PermissionGuard>
   )

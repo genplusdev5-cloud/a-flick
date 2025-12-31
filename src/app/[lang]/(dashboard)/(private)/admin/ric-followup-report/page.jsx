@@ -247,7 +247,7 @@ const RicFollowUpReportPageContent = () => {
 // Wrapper for RBAC
 export default function RicFollowUpReportPage() {
   return (
-    <PermissionGuard permission='RIC Followup Report'>
+    <PermissionGuard permission='RIC / Follow-up Report'>
       <RicFollowUpReportPageContent />
     </PermissionGuard>
   )
