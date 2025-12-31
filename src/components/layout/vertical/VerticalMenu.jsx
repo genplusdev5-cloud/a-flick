@@ -133,7 +133,7 @@ const VerticalMenu = ({ scrollMenu }) => {
 
         {/* ✅ Master */}
         <PermissionSubMenu label='Master' icon={<i className='tabler-database' />} modules={MASTER_MODULES}>
-          <PermissionItem module='Tax'><MenuItem href={`/${locale}/tax`}>Tax</MenuItem></PermissionItem>
+          <PermissionItem module='Tax'><MenuItem href={`/${locale}/admin/tax`}>Tax</MenuItem></PermissionItem>
           <PermissionItem module='Company Origin'><MenuItem href={`/${locale}/admin/company-origin`}>Company Origin</MenuItem></PermissionItem>
           <PermissionItem module='Service Frequency'><MenuItem href={`/${locale}/admin/service-frequency`}>Service Frequency</MenuItem></PermissionItem>
           <PermissionItem module='Billing Frequency'><MenuItem href={`/${locale}/admin/billing-frequency`}>Billing Frequency</MenuItem></PermissionItem>

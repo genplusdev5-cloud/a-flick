@@ -132,7 +132,7 @@ const AttendanceSummaryPageContent = () => {
 // Wrapper for RBAC
 export default function AttendanceSummaryPage() {
   return (
-    <PermissionGuard permission='Timesheet'>
+    <PermissionGuard permission='Attendance Timesheet'>
       <AttendanceSummaryPageContent />
     </PermissionGuard>
   )

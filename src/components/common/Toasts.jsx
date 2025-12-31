@@ -64,18 +64,4 @@ export const showToast = (type, message = '') => {
   )
 }
 
-// -------------------------------------------------------------
-// 🔥 Global Toast Container (Place ONLY in ClientWrapper)
-// -------------------------------------------------------------
-export const GlobalToastContainer = () => (
-  <ToastContainer
-    position='top-right'
-    autoClose={2500}
-    hideProgressBar={true}
-    newestOnTop
-    pauseOnHover={false}
-    closeOnClick
-    draggable={false}
-    theme='light'
-  />
-)
+

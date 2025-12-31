@@ -42,7 +42,7 @@ import CustomTextField from '@core/components/mui/TextField'
 import CustomAutocomplete from '@core/components/mui/Autocomplete'
 import GlobalDateRange from '@/components/common/GlobalDateRange'
 
-import { toast, ToastContainer } from 'react-toastify'
+import { toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 
 import {
@@ -638,7 +638,6 @@ const MaterialRequestPageContent = () => {
             </Box>
           </Box>
         </Card>
-        <ToastContainer />
       </StickyListLayout>
 
       {/* Delete Confirmation Dialog */}

@@ -337,7 +337,7 @@ const TimesoftSummaryReportContent = () => {
 // Wrapper for RBAC
 export default function TimesoftSummaryReport() {
   return (
-    <PermissionGuard permission='Payslip'>
+    <PermissionGuard permission='Payslip Summary'>
       <TimesoftSummaryReportContent />
     </PermissionGuard>
   )

@@ -48,7 +48,7 @@ import ProgressCircularCustomization from '@/components/common/ProgressCircularC
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import CustomTextField from '@core/components/mui/TextField'
 import CustomAutocomplete from '@core/components/mui/Autocomplete'
-import { toast, ToastContainer } from 'react-toastify'
+import { toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { showToast } from '@/components/common/Toasts'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'

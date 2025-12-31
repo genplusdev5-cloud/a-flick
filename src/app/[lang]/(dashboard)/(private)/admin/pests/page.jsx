@@ -1469,7 +1469,7 @@ const PestPageContent = () => {
 // Wrapper for RBAC
 export default function PestPage() {
   return (
-    <PermissionGuard permission="Pest Type">
+    <PermissionGuard permission="Service Type (Pest)">
       <PestPageContent />
     </PermissionGuard>
   )

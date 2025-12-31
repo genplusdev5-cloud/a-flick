@@ -15,9 +15,6 @@ export default function ClientWrapper({ children }) {
   return (
     <>
       {children}
-      <ClientOnly>
-        <GlobalToastContainer />
-      </ClientOnly>
     </>
   )
 }

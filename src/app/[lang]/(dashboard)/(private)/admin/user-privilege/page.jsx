@@ -310,6 +310,49 @@ const UserPrivilegePageContent = () => {
   }
 
 
+  // ───────────────────────────────────────────
+  // Select All Logic
+  // ───────────────────────────────────────────
+  const handleColumnSelectAll = (key, checked) => {
+    if (!selectedRole) {
+      showToast('warning', 'Please select a role first')
+      return
+    }
+
+    setPrivileges(prev => {
+      // Create a map of existing privileges for fast lookup
+      const privMap = new Map(prev.map(p => [p.module_id, p]))
+
+      return modules.map(mod => {
+        const existing = privMap.get(mod.id)
+        if (existing) {
+          return { ...existing, [key]: checked }
+        } else {
+          // If no privilege exists yet for this module, create one
+          return {
+            module_id: mod.id,
+            module: mod.name || mod.module_name, // fallback
+            id: null,
+            create: key === 'create' ? checked : false,
+            view: key === 'view' ? checked : false,
+            update: key === 'update' ? checked : false,
+            delete: key === 'delete' ? checked : false
+          }
+        }
+      })
+    })
+  }
+
+  const getColumnState = key => {
+    if (!mergedRows.length) return { checked: false, indeterminate: false }
+    const allChecked = mergedRows.every(r => r[key])
+    const someChecked = mergedRows.some(r => r[key])
+    return {
+      checked: allChecked,
+      indeterminate: someChecked && !allChecked
+    }
+  }
+
   const handlePrivilegeChange = (moduleId, key, value) => {
     setPrivileges(prev => {
       const existing = prev.find(p => p.module_id === moduleId)
@@ -501,7 +544,21 @@ const UserPrivilegePageContent = () => {
       columnHelper.accessor('module', { header: 'Module' }),
 
       columnHelper.accessor('create', {
-        header: 'Create',
+        header: () => {
+          const { checked, indeterminate } = getColumnState('create')
+          return (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Checkbox
+                checked={checked}
+                indeterminate={indeterminate}
+                onChange={e => handleColumnSelectAll('create', e.target.checked)}
+                disabled={!selectedRole || !mergedRows.length}
+                size='small'
+              />
+              <span>Create</span>
+            </Box>
+          )
+        },
         cell: info => {
           const row = info.row.original
           return (
@@ -514,7 +571,21 @@ const UserPrivilegePageContent = () => {
         }
       }),
       columnHelper.accessor('view', {
-        header: 'View',
+        header: () => {
+          const { checked, indeterminate } = getColumnState('view')
+          return (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Checkbox
+                checked={checked}
+                indeterminate={indeterminate}
+                onChange={e => handleColumnSelectAll('view', e.target.checked)}
+                disabled={!selectedRole || !mergedRows.length}
+                size='small'
+              />
+              <span>View</span>
+            </Box>
+          )
+        },
         cell: info => {
           const row = info.row.original
           return (
@@ -527,7 +598,21 @@ const UserPrivilegePageContent = () => {
         }
       }),
       columnHelper.accessor('update', {
-        header: 'Add/Edit',
+        header: () => {
+          const { checked, indeterminate } = getColumnState('update')
+          return (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Checkbox
+                checked={checked}
+                indeterminate={indeterminate}
+                onChange={e => handleColumnSelectAll('update', e.target.checked)}
+                disabled={!selectedRole || !mergedRows.length}
+                size='small'
+              />
+              <span>Add/Edit</span>
+            </Box>
+          )
+        },
         cell: info => {
           const row = info.row.original
           return (
@@ -541,7 +626,21 @@ const UserPrivilegePageContent = () => {
       }),
 
       columnHelper.accessor('delete', {
-        header: 'Delete',
+        header: () => {
+          const { checked, indeterminate } = getColumnState('delete')
+          return (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Checkbox
+                checked={checked}
+                indeterminate={indeterminate}
+                onChange={e => handleColumnSelectAll('delete', e.target.checked)}
+                disabled={!selectedRole || !mergedRows.length}
+                size='small'
+              />
+              <span>Delete</span>
+            </Box>
+          )
+        },
         cell: info => {
           const row = info.row.original
           return (
@@ -554,7 +653,7 @@ const UserPrivilegePageContent = () => {
         }
       })
     ],
-    [selectedRole]
+    [selectedRole, mergedRows] // ✅ Added mergedRows dependency to ensuring headers update
   )
 
   const fuzzyFilter = (row, columnId, value, addMeta) => {
