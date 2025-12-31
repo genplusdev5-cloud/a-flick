@@ -47,6 +47,8 @@ import {
   getUserModuleList
 } from '@/api/userPrivilege'
 
+import { getPaginationRowModel } from '@tanstack/react-table'
+
 import FileCopyIcon from '@mui/icons-material/FileCopy'
 import CustomTextFieldWrapper from '@/components/common/CustomTextField'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
@@ -131,15 +133,6 @@ const UserPrivilegePageContent = () => {
     update: false,
     delete: false
   })
-
-  const paginatedRows = useMemo(() => {
-    const start = pagination.pageIndex * pagination.pageSize
-    const end = start + pagination.pageSize
-    return rows.slice(start, end).map((row, index) => ({
-      ...row,
-      sno: start + index + 1 // ⭐ continuous S.No
-    }))
-  }, [rows, pagination])
 
   const moduleRef = useRef(null)
 
@@ -493,7 +486,11 @@ const UserPrivilegePageContent = () => {
   const columnHelper = createColumnHelper()
   const columns = useMemo(
     () => [
-      columnHelper.accessor('sno', { header: 'S.No' }),
+      columnHelper.display({
+        id: 'sno',
+        header: 'S.No',
+        cell: info => pagination.pageIndex * pagination.pageSize + info.row.index + 1
+      }),
 
       columnHelper.accessor('module', { header: 'Module' }),
 
@@ -561,17 +558,17 @@ const UserPrivilegePageContent = () => {
   }
 
   const table = useReactTable({
-    data: paginatedRows,
+    data: rows, // ✅ FULL DATA (50 modules)
     columns,
-    manualPagination: true,
-    pageCount: Math.ceil(rowCount / pagination.pageSize),
     state: { globalFilter: searchText, pagination },
     onGlobalFilterChange: setSearchText,
     onPaginationChange: setPagination,
     globalFilterFn: fuzzyFilter,
+
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
-    getSortedRowModel: getSortedRowModel()
+    getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel() // ✅ IMPORTANT
   })
 
   // Export Functions
@@ -804,7 +801,7 @@ const UserPrivilegePageContent = () => {
                   value={pagination.pageSize}
                   onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
                 >
-                  {[5, 10, 25, 50].map(s => (
+                  {[25, 50, 75, 100].map(s => (
                     <MenuItem key={s} value={s}>
                       {s} entries
                     </MenuItem>

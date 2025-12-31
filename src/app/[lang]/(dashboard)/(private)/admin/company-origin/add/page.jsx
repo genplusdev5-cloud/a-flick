@@ -29,6 +29,7 @@ import { Autocomplete } from '@mui/material'
 import { addCompany } from '@/api/company' // un API import
 import { showToast } from '@/components/common/Toasts'
 import { useRouter } from 'next/navigation'
+import GlobalButton from '@/components/common/GlobalButton'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -71,6 +72,10 @@ export default function CompanyOriginAddPage() {
   const [taxNumberOpen, setTaxNumberOpen] = useState(false)
 
   const taxNumberOptions = ['TN-001', 'TN-002', 'TN-003', 'Others']
+
+  const handleCancel = () => {
+    router.push('/admin/company-origin') // ✅ list page route
+  }
 
   // Input Handlers
   const handleChange = e => {
@@ -499,15 +504,14 @@ export default function CompanyOriginAddPage() {
 
         {/* Action Buttons */}
         <Box mt={6} display='flex' justifyContent='flex-end' gap={2}>
-          <Button
-            variant='outlined'
+          <GlobalButton
             color='secondary'
-            onClick={handleRefresh}
+            onClick={handleCancel} // ✅ CHANGE HERE
             disabled={loading}
-            startIcon={loading ? <CircularProgress size={20} /> : null}
           >
             Cancel
-          </Button>
+          </GlobalButton>
+
           <Button
             variant='contained'
             onClick={handleSave}

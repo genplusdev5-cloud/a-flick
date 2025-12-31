@@ -448,123 +448,116 @@ const SupplierPageContent = () => {
             </Link>
             <Typography color='text.primary'>Suppliers</Typography>
           </Breadcrumbs>
-
-          <CardHeader
-            sx={{
-              pb: 1.5,
-              pt: 1.5,
-              '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
-              '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
-            }}
-            title={
-              <Box display='flex' alignItems='center' gap={2}>
-                <Typography variant='h5' sx={{ fontWeight: 600 }}>
-                  Supplier
-                </Typography>
-                <Button
-                  variant='contained'
-                  color='primary'
-                  startIcon={
-                    <RefreshIcon
-                      sx={{
-                        animation: loading ? 'spin 1s linear infinite' : 'none',
-                        '@keyframes spin': {
-                          '0%': { transform: 'rotate(0deg)' },
-                          '100%': { transform: 'rotate(360deg)' }
-                        }
-                      }}
-                    />
-                  }
-                  disabled={loading}
-                  onClick={async () => {
-                    setLoading(true)
-                    await loadData()
-                    setTimeout(() => setLoading(false), 600)
-                  }}
-                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-                >
-                  {loading ? 'Refreshing...' : 'Refresh'}
-                </Button>
-              </Box>
-            }
-            action={
-              <Box display='flex' alignItems='center' gap={2}>
-                <GlobalButton
-                  color='secondary'
-                  endIcon={<ArrowDropDownIcon />}
-                  onClick={e => setExportAnchorEl(e.currentTarget)}
-                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-                >
-                  Export
-                </GlobalButton>
-                <Menu
-                  anchorEl={exportAnchorEl}
-                  open={Boolean(exportAnchorEl)}
-                  onClose={() => setExportAnchorEl(null)}
-                >
-                  <MenuItem
-                    onClick={() => {
-                      setExportAnchorEl(null)
-                      exportPrint()
-                    }}
-                  >
-                    <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
-                  </MenuItem>
-
-                  <MenuItem
-                    onClick={() => {
-                      setExportAnchorEl(null)
-                      exportCSV()
-                    }}
-                  >
-                    <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
-                  </MenuItem>
-
-                  <MenuItem
-                    onClick={async () => {
-                      setExportAnchorEl(null)
-                      await exportExcel()
-                    }}
-                  >
-                    <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
-                  </MenuItem>
-
-                  <MenuItem
-                    onClick={async () => {
-                      setExportAnchorEl(null)
-                      await exportPDF()
-                    }}
-                  >
-                    <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
-                  </MenuItem>
-
-                  <MenuItem
-                    onClick={() => {
-                      setExportAnchorEl(null)
-                      exportCopy()
-                    }}
-                  >
-                    <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
-                  </MenuItem>
-                </Menu>
-
-                {canAccess('Suppliers', 'create') && (
-                  <Button
-                    variant='contained'
-                    startIcon={<AddIcon />}
-                    onClick={handleAdd}
-                    sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-                  >
-                    Add Supplier
-                  </Button>
-                )}
-              </Box>
-            }
-          />
         </Box>
       }
     >
       <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
+        <CardHeader
+          title={
+            <Box display='flex' alignItems='center' gap={2}>
+              <Typography variant='h5' sx={{ fontWeight: 600 }}>
+                Supplier
+              </Typography>
+
+              <GlobalButton
+                startIcon={
+                  <RefreshIcon
+                    sx={{
+                      animation: loading ? 'spin 1s linear infinite' : 'none',
+                      '@keyframes spin': {
+                        '0%': { transform: 'rotate(0deg)' },
+                        '100%': { transform: 'rotate(360deg)' }
+                      }
+                    }}
+                  />
+                }
+                disabled={loading}
+                onClick={async () => {
+                  setLoading(true)
+                  setPagination({ pageIndex: 0, pageSize: pagination.pageSize })
+                  await loadData()
+                  setTimeout(() => setLoading(false), 800)
+                }}
+              >
+                {loading ? 'Refreshing...' : 'Refresh'}
+              </GlobalButton>
+            </Box>
+          }
+          action={
+            <Box display='flex' alignItems='center' gap={2}>
+              <GlobalButton
+                color='secondary'
+                endIcon={<ArrowDropDownIcon />}
+                onClick={e => setExportAnchorEl(e.currentTarget)}
+              >
+                Export
+              </GlobalButton>
+
+              <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportPrint()
+                  }}
+                >
+                  <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
+                </MenuItem>
+
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportCSV()
+                  }}
+                >
+                  <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
+                </MenuItem>
+
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportExcel()
+                  }}
+                >
+                  <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
+                </MenuItem>
+
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportPDF()
+                  }}
+                >
+                  <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
+                </MenuItem>
+
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportCopy()
+                  }}
+                >
+                  <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
+                </MenuItem>
+              </Menu>
+
+              {canAccess('Suppliers', 'create') && (
+                <GlobalButton startIcon={<AddIcon />} onClick={handleAdd}>
+                  Add Supplier
+                </GlobalButton>
+              )}
+            </Box>
+          }
+          sx={{
+            pb: 1.5,
+            pt: 5,
+            px: 10,
+            '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
+            '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
+          }}
+        />
+
+        <Divider />
+
         {loading && (
           <Box
             sx={{
@@ -608,71 +601,71 @@ const SupplierPageContent = () => {
               </Select>
             </FormControl>
 
-          <DebouncedInput
-            value={searchText}
-            onChange={v => {
-              setSearchText(v)
-              setPagination(p => ({ ...p, pageIndex: 0 }))
-            }}
-            placeholder='Search name, type, address...'
-            sx={{ width: 360 }}
-            variant='outlined'
-            size='small'
-          />
-        </Box>
+            <DebouncedInput
+              value={searchText}
+              onChange={v => {
+                setSearchText(v)
+                setPagination(p => ({ ...p, pageIndex: 0 }))
+              }}
+              placeholder='Search name, type, address...'
+              sx={{ width: 360 }}
+              variant='outlined'
+              size='small'
+            />
+          </Box>
 
-        <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-          <StickyTableWrapper rowCount={rows.length}>
-            <table className={styles.table}>
-              <thead>
-                {table.getHeaderGroups().map(hg => (
-                  <tr key={hg.id}>
-                    {hg.headers.map(h => (
-                      <th key={h.id}>
-                        <div
-                          className={classnames({
-                            'flex items-center': h.column.getIsSorted(),
-                            'cursor-pointer select-none': h.column.getCanSort()
-                          })}
-                          onClick={h.column.getToggleSortingHandler()}
-                        >
-                          {flexRender(h.column.columnDef.header, h.getContext())}
-                          {{
-                            asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
-                            desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
-                          }[h.column.getIsSorted()] ?? null}
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                ))}
-              </thead>
-              <tbody>
-                {rows.length ? (
-                  table.getRowModel().rows.map(row => (
-                    <tr key={row.id}>
-                      {row.getVisibleCells().map(cell => (
-                        <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+          <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            <StickyTableWrapper rowCount={rows.length}>
+              <table className={styles.table}>
+                <thead>
+                  {table.getHeaderGroups().map(hg => (
+                    <tr key={hg.id}>
+                      {hg.headers.map(h => (
+                        <th key={h.id}>
+                          <div
+                            className={classnames({
+                              'flex items-center': h.column.getIsSorted(),
+                              'cursor-pointer select-none': h.column.getCanSort()
+                            })}
+                            onClick={h.column.getToggleSortingHandler()}
+                          >
+                            {flexRender(h.column.columnDef.header, h.getContext())}
+                            {{
+                              asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
+                              desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
+                            }[h.column.getIsSorted()] ?? null}
+                          </div>
+                        </th>
                       ))}
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={columns.length} className='text-center py-4'>
-                      No data available
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </StickyTableWrapper>
-        </Box>
+                  ))}
+                </thead>
+                <tbody>
+                  {rows.length ? (
+                    table.getRowModel().rows.map(row => (
+                      <tr key={row.id}>
+                        {row.getVisibleCells().map(cell => (
+                          <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                        ))}
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={columns.length} className='text-center py-4'>
+                        No data available
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </StickyTableWrapper>
+          </Box>
 
-        <Box sx={{ mt: 'auto', flexShrink: 0 }}>
-          <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+          <Box sx={{ mt: 'auto', flexShrink: 0 }}>
+            <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+          </Box>
         </Box>
-      </Box>
-    </Card>
+      </Card>
 
       {/* Drawer */}
       <Drawer

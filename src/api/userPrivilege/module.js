@@ -7,11 +7,15 @@ import api from '@/utils/axiosInstance'
  */
 export const getUserModuleList = async () => {
   try {
-    const res = await api.get('user_module-list/')
+    const res = await api.get('user_module-list/', {
+      params: {
+        page_size: 1000 // 🔥 FULL LIST
+      }
+    })
 
     return {
       status: res.data?.status || 'success',
-      data: res.data?.data || res.data || []
+      data: res.data?.data
     }
   } catch (error) {
     console.error('❌ Module list error:', error)
