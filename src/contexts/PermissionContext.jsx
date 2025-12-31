@@ -70,9 +70,9 @@ export const PermissionProvider = ({ children }) => {
       const storedUser = localStorage.getItem('user_info')
       if (!storedUser) {
         console.warn('⚠️ No user_info in localStorage')
-        setPermissions([])
-        setPermissionMap({})
-        setIsLoading(false)
+        // Only update if not already in initial/cleared state
+        if (permissions.length > 0) setPermissions([])
+        if (Object.keys(permissionMap).length > 0) setPermissionMap({})
         return
       }
 
@@ -154,6 +154,12 @@ export const PermissionProvider = ({ children }) => {
 
   // Helper to check access
   const canAccess = useCallback((moduleName, action = 'view') => {
+    // 1. Critical: Bypass all checks if user is not logged in (to prevent loops during logout)
+    if (typeof window !== 'undefined') {
+      const storedUser = localStorage.getItem('user_info')
+      if (!storedUser) return true // Allow if no user, so auth guards can handle redirect cleanly
+    }
+
     if (!moduleName) return true
     
     // ✅ Dashboard is common for all
@@ -168,13 +174,12 @@ export const PermissionProvider = ({ children }) => {
     const perm = permissionMap[key]
 
     if (!perm) {
-       // console.log(`🔍 canAccess: Module "${key}" not found in map. Current keys:`, Object.keys(permissionMap))
-       
-       // If it's a known module and we have permissions loaded, but it's not here, it's denied
-       if (!isLoading && Object.keys(permissionMap).length > 0) {
+       // If permissions are loaded and the map has data, but this key is missing, it's denied
+       const hasPermissionsLoaded = !isLoading && Object.keys(permissionMap).length > 0
+       if (hasPermissionsLoaded) {
          return false
        }
-       return true // Default allow while loading or if map is empty (initial state)
+       return true // Default allow while initial loading is in progress
     }
 
     if (action === 'view') return perm.view

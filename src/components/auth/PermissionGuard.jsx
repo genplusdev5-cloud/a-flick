@@ -32,6 +32,14 @@ const PermissionGuard = props => {
       return
     }
 
+    // 1. Bypass if not logged in (to prevent loops during logout)
+    const storedUser = typeof window !== 'undefined' ? localStorage.getItem('user_info') : null
+    if (!storedUser) {
+      setIsAuthorized(true)
+      setLoading(false)
+      return
+    }
+
     const authorized = canAccess(permission, action) 
 
     if (authorized) {

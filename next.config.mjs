@@ -23,19 +23,7 @@ const nextConfig = {
         permanent: true,
         locale: false
       },
-      {
-        source: '/:path*',
-        has: [
-          {
-            type: 'header',
-            key: 'accept',
-            value: 'text/html'
-          }
-        ],
-        destination: '/en/:path*',
-        permanent: true,
-        locale: false
-      }
+
     ]
   }
 }

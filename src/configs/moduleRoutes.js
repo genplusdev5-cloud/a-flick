@@ -1,6 +1,6 @@
 export const MODULE_ROUTES = {
   '/admin/dashboards': 'Dashboard',
-  '/admin/tax': 'Tax',
+  '/tax': 'Tax',
   '/admin/company-origin': 'Company Origin',
   '/admin/service-frequency': 'Service Frequency',
   '/admin/billing-frequency': 'Billing Frequency',
