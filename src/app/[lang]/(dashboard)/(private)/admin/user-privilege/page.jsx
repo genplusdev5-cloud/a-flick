@@ -107,8 +107,8 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
 // ───────────────────────────────────────────
 // ───────────────────────────────────────────
 const UserPrivilegePageContent = () => {
-  const [rows, setRows] = useState([])
-  const [rowCount, setRowCount] = useState(0)
+  const [modules, setModules] = useState([])
+  const [privileges, setPrivileges] = useState([])
   const [searchText, setSearchText] = useState('')
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -120,9 +120,6 @@ const UserPrivilegePageContent = () => {
   const [roles, setRoles] = useState([])
   const [selectedRole, setSelectedRole] = useState('')
   const [selectedRoleId, setSelectedRoleId] = useState(null)
-  const [data, setData] = useState([])
-
-  const [privileges, setPrivileges] = useState([])
 
   const [formData, setFormData] = useState({
     id: null,
@@ -138,6 +135,22 @@ const UserPrivilegePageContent = () => {
 
   const { triggerPrivilegeUpdate, canAccess } = usePermission() // Destructure new helper
 
+  const mergedRows = useMemo(() => {
+    return modules.map((mod, index) => {
+      const priv = privileges.find(p => p.module_id === mod.id)
+      return {
+        sno: index + 1,
+        module: mod.name || mod.module_name,
+        module_id: mod.id,
+        id: priv?.id || null,
+        create: !!priv?.create,
+        view: !!priv?.view,
+        update: !!priv?.update,
+        delete: !!priv?.delete
+      }
+    })
+  }, [modules, privileges])
+
   const handleUpdatePrivileges = async () => {
     if (!selectedRole) {
       showToast('warning', 'Select a role first')
@@ -146,7 +159,7 @@ const UserPrivilegePageContent = () => {
 
     setLoading(true)
     try {
-      const payload = privileges.map(p => ({
+      const payload = mergedRows.map(p => ({
         module_id: p.module_id,
         create: p.create ? 1 : 0,
         read: p.view ? 1 : 0,
@@ -216,8 +229,7 @@ const UserPrivilegePageContent = () => {
       }
 
       // ✅ Convert integer values to boolean for checkboxes
-      const formatted = data.map((item, idx) => ({
-        sno: idx + 1,
+      const formatted = data.map(item => ({
         module: item.module_name,
         id: item.id,
         module_id: item.module_id,
@@ -228,8 +240,6 @@ const UserPrivilegePageContent = () => {
       }))
 
       setPrivileges(formatted)
-      setRows(formatted)
-      setRowCount(formatted.length)
     } catch (err) {
       console.error('❌ Error loading privileges:', err)
       showToast('error', 'Failed to load privileges')
@@ -261,8 +271,7 @@ const UserPrivilegePageContent = () => {
         delete: false
       }))
 
-      setRows(formatted)
-      setRowCount(formatted.length)
+      setModules(list)
     } catch (err) {
       console.error('❌ Error loading modules:', err)
       showToast('error', 'Failed to load module list')
@@ -300,32 +309,28 @@ const UserPrivilegePageContent = () => {
     }, 100)
   }
 
-  const fetchPrivileges = async roleId => {
-    try {
-      const res = await getUserPrivilegeList(roleId)
-      console.log('Fetched privileges:', res.data)
-
-      const formatted = (res.data.results || []).map(item => ({
-        id: item.id,
-        module_id: item.module_id,
-        module: item.module_name,
-        is_create: item.is_create === 1, // ✅ convert int → boolean
-        is_read: item.is_read === 1,
-        is_update: item.is_update === 1,
-        is_delete: item.is_delete === 1
-      }))
-
-      setPrivileges(formatted)
-    } catch (error) {
-      console.error('❌ Error fetching privileges:', error)
-    }
-  }
 
   const handlePrivilegeChange = (moduleId, key, value) => {
-    // Update both privileges and rows correctly
-    setPrivileges(prev => prev.map(p => (p.module_id === moduleId ? { ...p, [key]: value } : p)))
-
-    setRows(prev => prev.map(r => (r.module_id === moduleId ? { ...r, [key]: value } : r)))
+    setPrivileges(prev => {
+      const existing = prev.find(p => p.module_id === moduleId)
+      if (existing) {
+        return prev.map(p => (p.module_id === moduleId ? { ...p, [key]: value } : p))
+      } else {
+        const mod = modules.find(m => m.id === moduleId)
+        return [
+          ...prev,
+          {
+            module_id: moduleId,
+            module: mod?.name || '',
+            id: null,
+            create: key === 'create' ? value : false,
+            view: key === 'view' ? value : false,
+            update: key === 'update' ? value : false,
+            delete: key === 'delete' ? value : false
+          }
+        ]
+      }
+    })
   }
 
   const handleEdit = row => {
@@ -365,7 +370,8 @@ const UserPrivilegePageContent = () => {
     try {
       // you can call your delete API here (if backend delete endpoint exists)
       showToast('delete', `${row.module} deleted successfully`)
-      setRows(prev => prev.filter(r => r.id !== row.id)) // instantly remove from UI
+      // If we need to filter modules or privileges, we should do it here
+      // But usually deleting a module should happen via a dedicated API and then reload modules
     } catch (err) {
       console.error(err)
       showToast('error', 'Failed to delete')
@@ -558,7 +564,7 @@ const UserPrivilegePageContent = () => {
   }
 
   const table = useReactTable({
-    data: rows, // ✅ FULL DATA (50 modules)
+    data: mergedRows, // ✅ FULL DATA (50 modules)
     columns,
     state: { globalFilter: searchText, pagination },
     onGlobalFilterChange: setSearchText,
@@ -568,7 +574,8 @@ const UserPrivilegePageContent = () => {
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel() // ✅ IMPORTANT
+    getPaginationRowModel: getPaginationRowModel(), // ✅ IMPORTANT
+    autoResetPageIndex: false // ✅ Prevent reset on data update
   })
 
   // Export Functions
@@ -577,7 +584,7 @@ const UserPrivilegePageContent = () => {
     const headers = ['S.No', 'Module', 'Create', 'View', 'Edit/Update', 'Delete']
     const csv = [
       headers.join(','),
-      ...rows.map(r =>
+      ...mergedRows.map(r =>
         [
           r.sno,
           `"${r.module}"`,
@@ -609,7 +616,7 @@ const UserPrivilegePageContent = () => {
       <table><thead><tr>
       <th>S.No</th><th>Module</th><th>Create</th><th>View</th><th>Edit/Update</th><th>Delete</th>
       </tr></thead><tbody>
-      ${rows
+      ${mergedRows
         .map(
           r => `<tr>
           <td>${r.sno}</td>
@@ -700,11 +707,12 @@ const UserPrivilegePageContent = () => {
                     onChange={(e, newValue) => {
                       if (newValue) {
                         setSelectedRole(newValue.id)
-                        fetchPrivileges(newValue.id) // This fetches actual privileges
+                        loadPrivileges(newValue.id) // This fetches actual privileges
+                        setPagination(p => ({ ...p, pageIndex: 0 }))
                       } else {
                         setSelectedRole('')
                         setPrivileges([]) // clear privileges
-                        loadModules() // 🟢 Reset to base module list
+                        setPagination(p => ({ ...p, pageIndex: 0 }))
                       }
                     }}
                     renderInput={params => (
@@ -830,7 +838,7 @@ const UserPrivilegePageContent = () => {
               />
             </Box>
             <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-              <StickyTableWrapper rowCount={rows.length}>
+              <StickyTableWrapper rowCount={mergedRows.length}>
                 <table className={styles.table}>
                   <thead>
                     {table.getHeaderGroups().map(hg => (
@@ -856,7 +864,7 @@ const UserPrivilegePageContent = () => {
                     ))}
                   </thead>
                   <tbody>
-                    {rows.length ? (
+                    {mergedRows.length ? (
                       table.getRowModel().rows.map(row => (
                         <tr key={row.id}>
                           {row.getVisibleCells().map(cell => (
@@ -877,7 +885,11 @@ const UserPrivilegePageContent = () => {
             </Box>
 
             <Box sx={{ mt: 'auto', flexShrink: 0 }}>
-              <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+              <TablePaginationComponent
+                totalCount={mergedRows.length}
+                pagination={pagination}
+                setPagination={setPagination}
+              />
             </Box>
           </Box>
         </Card>
