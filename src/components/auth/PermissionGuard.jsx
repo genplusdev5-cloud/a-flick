@@ -15,7 +15,7 @@ import Box from '@mui/material/Box'
 import { toast } from 'react-toastify'
 
 const PermissionGuard = props => {
-  const { children, permission, action = 'view', fallbackPath = '/pages/misc/401-not-authorized' } = props
+  const { children, permission, action = 'view', fallback = null } = props
   const [loading, setLoading] = useState(true)
   const [isAuthorized, setIsAuthorized] = useState(false)
   const router = useRouter()
@@ -25,7 +25,7 @@ const PermissionGuard = props => {
   useEffect(() => {
     if (isLoading) return
 
-    // If no permission prop is passed, we assume it's public or basic auth is enough
+    // If no permission prop is passed, we assume it's public
     if (!permission) {
       setIsAuthorized(true)
       setLoading(false)
@@ -38,15 +38,20 @@ const PermissionGuard = props => {
       setIsAuthorized(true)
     } else {
       setIsAuthorized(false)
-      toast.error("You are not authorized to access this page", {
-        toastId: 'auth-error'
-      })
-      router.push(fallbackPath)
+      
+      // ONLY redirect for "view" action on full page guards
+      // Button-level guards (action='create', etc.) should just return null/fallback
+      if (action === 'view') {
+        toast.error("You are not authorized to access this page", {
+          toastId: 'auth-error'
+        })
+        router.push('/en/pages/misc/401-not-authorized')
+      }
     }
     setLoading(false)
-  }, [permission, fallbackPath, router, isLoading, canAccess])
+  }, [permission, action, router, isLoading, canAccess])
 
-  if (loading) {
+  if (loading || isLoading) {
     return (
       <Box className="flex justify-center items-center h-[50vh]">
         <CircularProgress />
@@ -54,15 +59,8 @@ const PermissionGuard = props => {
     )
   }
 
-  // ⚠️ REVERT: Always render children
-  return <>{children}</>
-  
-  /*
-  // If we are done loading and authorized, render children.
-  // If not authorized, we already triggered redirect in useEffect, 
-  // but we return null here to avoid flashing content.
-  return isAuthorized ? <>{children}</> : null
-  */
+  return isAuthorized ? <>{children}</> : fallback
 }
 
 export default PermissionGuard
+

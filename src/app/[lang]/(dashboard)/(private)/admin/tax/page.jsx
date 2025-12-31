@@ -334,12 +334,12 @@ const TaxPageContent = () => {
         header: 'Actions',
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
-            {canAccess('Tax', 'update') && (
+            <PermissionGuard permission='Tax' action='update'>
               <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original)}>
                 <i className='tabler-edit ' />
               </IconButton>
-            )}
-            {canAccess('Tax', 'delete') && (
+            </PermissionGuard>
+            <PermissionGuard permission='Tax' action='delete'>
               <IconButton
                 size='small'
                 color='error'
@@ -347,7 +347,7 @@ const TaxPageContent = () => {
               >
                 <i className='tabler-trash text-red-600 text-lg' />
               </IconButton>
-            )}
+            </PermissionGuard>
           </Box>
         )
       }),
@@ -573,11 +573,11 @@ const TaxPageContent = () => {
                   </MenuItem>
                 </Menu>
 
-                {canAccess('Tax', 'create') && (
+                <PermissionGuard permission='Tax' action='create'>
                   <GlobalButton startIcon={<AddIcon />} onClick={handleAdd}>
                     Add Tax
                   </GlobalButton>
-                )}
+                </PermissionGuard>
               </Box>
             }
             sx={{

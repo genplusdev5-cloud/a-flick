@@ -66,13 +66,6 @@ export const PermissionProvider = ({ children }) => {
   }
 
   const fetchPermissions = useCallback(async () => {
-    // ⚠️ REVERT: Disabled for now to restore original behavior
-    setIsLoading(false)
-    setPermissions([])
-    setPermissionMap({})
-    return
-
-    /* 
     try {
       const storedUser = localStorage.getItem('user_info')
       if (!storedUser) {
@@ -93,39 +86,42 @@ export const PermissionProvider = ({ children }) => {
       
       if (!userId) {
         console.warn('⚠️ No user ID found in local storage')
+        setIsLoading(false)
         return
       }
 
       // 2. Fetch FRESH user details to get the current Role ID
       const userDetails = await getEmployeeDetails(userId)
-      // Check response structure: EditPage suggests res.data contains fields like user_role_id
       const freshData = userDetails?.data || userDetails || {}
       
-      // Try multiple possible keys for Role ID
-      const freshRoleId = freshData.user_role_id || freshData.role_id || freshData.role?.id
+      // Try multiple possible keys for Role ID or Name
+      const freshRoleId = 
+        freshData.role_id || 
+        freshData.user_role_id || 
+        freshData.role?.id || 
+        (freshData.user_roles && freshData.user_roles[0]?.id) ||
+        userInfo.role_id || 
+        userInfo.user_role_id // Fallback to localStorage
 
       if (!freshRoleId) {
-        console.error('❌ Could not find Role ID for user', userId, 'Response:', userDetails)
+        console.error('❌ RBAC: Could not find Role ID for user', userId, 'Response:', userDetails)
+        setIsLoading(false)
         return
       }
 
-      console.log('✅ Fresh Role ID fetched:', freshRoleId)
+      console.log('👤 RBAC: User ID:', userId, 'Email:', userInfo.email)
+      console.log('✅ RBAC: freshRoleId detected:', freshRoleId)
 
       // 3. Fetch privileges for this FRESH role
       const res = await getUserPrivilegeList(freshRoleId)
-      data = res?.results || res?.data?.results || []
-
-      console.log('🔐 Permissions Data to Process:', data)
-
-      console.log('🔐 Permissions fetched Raw:', data)
-      if (data.length > 0) {
-        console.log('🧐 First item structure:', Object.keys(data[0]))
-        console.log('🧐 First item sample:', data[0])
-      }
+      data = res?.results || res?.data?.results || res?.data || []
+      
+      console.log(`🔐 RBAC: Fetched ${data.length} privileges from backend for role ${freshRoleId}`)
 
       setPermissions(data)
       const normalizedMap = normalizePermissions(data)
-      console.log('🗺️ Permission Map Created with Keys:', Object.keys(normalizedMap))
+      
+      console.log('🗺️ RBAC: Permission map keys (normalized):', Object.keys(normalizedMap))
       
       setPermissionMap(normalizedMap)
 
@@ -134,7 +130,6 @@ export const PermissionProvider = ({ children }) => {
     } finally {
       setIsLoading(false)
     }
-    */
   }, [])
 
   // Initial Fetch & Listener
@@ -159,19 +154,27 @@ export const PermissionProvider = ({ children }) => {
 
   // Helper to check access
   const canAccess = useCallback((moduleName, action = 'view') => {
-    // ⚠️ REVERT: Always allow access
-    return true
-    
-    /* 
     if (!moduleName) return true
+    
+    // ✅ Dashboard is common for all
+    if (moduleName.toLowerCase() === 'dashboard') return true
+
+    if (isLoading && permissions.length === 0) return true 
 
     // Normalize lookup to lowercase to avoid casing issues
-    const key = moduleName.toLowerCase()
+    const key = moduleName.toLowerCase().trim()
+    
+    // Check if the module exists in our map
     const perm = permissionMap[key]
 
     if (!perm) {
-       // console.warn(`🚫 Access Denied: Module "${moduleName}" not found in map. Keys avail:`, Object.keys(permissionMap))
-       return false // Strict deny if not found
+       // console.log(`🔍 canAccess: Module "${key}" not found in map. Current keys:`, Object.keys(permissionMap))
+       
+       // If it's a known module and we have permissions loaded, but it's not here, it's denied
+       if (!isLoading && Object.keys(permissionMap).length > 0) {
+         return false
+       }
+       return true // Default allow while loading or if map is empty (initial state)
     }
 
     if (action === 'view') return perm.view
@@ -180,8 +183,7 @@ export const PermissionProvider = ({ children }) => {
     if (action === 'delete') return perm.delete
 
     return false
-    */
-  }, [permissionMap])
+  }, [permissionMap, isLoading, permissions])
 
   const triggerPrivilegeUpdate = () => {
     // Dispatch event so all tabs/components know to update

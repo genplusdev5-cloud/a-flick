@@ -4,14 +4,19 @@
  * Value = Frontend Standard Key (used in VerticalMenu and usePermission checks)
  */
 export const PERMISSION_ALIASES = {
+  // Dashboard
+  'Dashboard': 'Dashboard',
+
   // Master
   'Master': 'Master',
   'Tax': 'Tax',
+  'Taxes': 'Tax',
   'Company Origin': 'Company Origin',
-  'Frequency_master': 'Service Frequency', // Confirmed from context
+  'Company_origin': 'Company Origin',
+  'Frequency_master': 'Service Frequency',
   'Service Frequency': 'Service Frequency',
   'Billing Frequency': 'Billing Frequency',
-  'UOM': 'Unit Of Measurement', // Check if DB uses 'UOM' or full name
+  'UOM': 'Unit Of Measurement',
   'Unit Of Measurement': 'Unit Of Measurement',
   'Call Type': 'Call Type',
   'Chemicals': 'Chemicals',
@@ -25,27 +30,40 @@ export const PERMISSION_ALIASES = {
   // Employee
   'Department': 'Department',
   'Designation': 'Designation',
-  'Employee': 'Employee List', // Screenshot shows 'Employee'
-  'Employee_leave': 'Employee Leave', // Change to match VerticalMenu: 'Employee Leave'
+  'Employee': 'Employee List',
+  'Employee List': 'Employee List',
+  'Employee_leave': 'Employee Leave',
+  'Employee Leave': 'Employee Leave',
+  'Employee Leaves': 'Employee Leave',
   'Employee Leave Type': 'Employee Leave Type',
   'User Privilege': 'User Privilege',
+  'Employee/User Privilege': 'User Privilege',
+  'Employee/Employee List': 'Employee List',
+  'Employee/Department': 'Department',
+  'Employee/Designation': 'Designation',
+  'Employee/Employee Leave Type': 'Employee Leave Type',
 
   // Service / Pest
-  'Service_types': 'Service Type (Pest)', // Change to match VerticalMenu: 'Service Type (Pest)'
+  'Service_types': 'Service Type (Pest)',
+  'Service Type Pest': 'Service Type (Pest)',
+  'Service Type (Pest)': 'Service Type (Pest)',
 
   // Contracts
   'Customers': 'Customers',
   'Contracts': 'Contracts',
   'Contract Status': 'Contract Status',
+  'View Contract Status': 'View Contract Status',
 
   // Attendance
-  'Scheduling': 'Attendance Schedule', // Screenshot shows 'Scheduling'
+  'Scheduling': 'Attendance Schedule',
+  'Attendance Schedule': 'Attendance Schedule',
   'Attendance': 'Attendance',
   'Attendance Slots': 'Attendance Slots',
   'Payslip Summary': 'Payslip Summary',
 
   // Operations
-  'Service Requests': 'Service Request', // Screenshot shows 'Service Requests' (plural)
+  'Service Requests': 'Service Request',
+  'Service Request': 'Service Request',
   'Calendar': 'Calendar',
   'Invoice': 'Invoice',
   'Suppliers': 'Suppliers',
@@ -64,7 +82,8 @@ export const PERMISSION_ALIASES = {
 
   // Reports
   'Service Summary Report': 'Service Summary Report',
-  'RIC Report': 'RIC / Follow-up Report', // Likely DB name based on short alias pattern
+  'RIC Report': 'RIC / Follow-up Report',
+  'RIC Follow-up Report': 'RIC / Follow-up Report',
   'RIC / Follow-up Report': 'RIC / Follow-up Report',
   'Productivity Summary': 'Productivity Summary',
   'SCDF Report': 'SCDF Report',
@@ -73,6 +92,7 @@ export const PERMISSION_ALIASES = {
 
   // Audit
   'Customer Audit': 'Customer Audit',
+  'Contract Audit': 'Contracts Audit',
   'Contracts Audit': 'Contracts Audit',
 
   // Map

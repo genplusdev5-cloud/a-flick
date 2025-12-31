@@ -11,21 +11,22 @@ import menuItemStyles from '@core/styles/vertical/menuItemStyles'
 import menuSectionStyles from '@core/styles/vertical/menuSectionStyles'
 import { usePermission } from '@/hooks/usePermission'
 
-const PermissionMenuItem = ({ module, action = 'view', children, ...props }) => {
-  // ⚠️ REVERT: Always render
-  return children
-}
-
-// Wrapper for checking permission before rendering MenuItem
-// We can't easily wrap MenuItem because it might need direct parent to be Menu/SubMenu?
-// Actually, MenuItem just renders li. So wrapping it in a logic block is fine.
 const PermissionItem = ({ module, action = 'view', children }) => {
-  // ⚠️ REVERT: Always render
+  const { canAccess } = usePermission()
+
+  if (!canAccess(module, action)) return null
+
   return children
 }
 
 const PermissionGroup = ({ modules = [], children }) => {
-  // ⚠️ REVERT: Always render
+  const { canAccess } = usePermission()
+
+  // Show group if at least one module in the group is accessible
+  const hasOne = modules.some(m => canAccess(m, 'view'))
+
+  if (!hasOne) return null
+
   return children
 }
 
@@ -127,14 +128,31 @@ const VerticalMenu = ({ scrollMenu }) => {
         renderExpandedMenuItemIcon={{ icon: <i className='tabler-circle text-xs' /> }}
         menuSectionStyles={menuSectionStyles(verticalNavOptions, theme)}
       >
-        {/* ✅ Dashboard - Always Visible or specific permission? Assuming public for now or separate dash permission */}
-        <MenuItem href={`/${locale}/admin/dashboards`} icon={<i className='tabler-home' />}>
-          Dashboard
-        </MenuItem>
+        {/* ✅ Dashboard */}
+        <PermissionItem module='Dashboard'>
+          <MenuItem href={`/${locale}/admin/dashboards`} icon={<i className='tabler-home' />}>
+            Dashboard
+          </MenuItem>
+        </PermissionItem>
 
         {/* ✅ Master */}
-        {/* If 'Master' module is allowed, show the group AND all children regardless of individual permissions (they are protected by page guards) */}
-        <PermissionItem module='Master'>
+        <PermissionGroup
+          modules={[
+            'Tax',
+            'Company Origin',
+            'Service Frequency',
+            'Billing Frequency',
+            'Unit Of Measurement',
+            'Call Type',
+            'Chemicals',
+            'Industry',
+            'Holidays',
+            'Incident',
+            'Todo Items',
+            'Site Risk',
+            'Equipments'
+          ]}
+        >
           <SubMenu label='Master' icon={<i className='tabler-database' />}>
             <MenuItem href={`/${locale}/admin/tax`}>Tax</MenuItem>
             <MenuItem href={`/${locale}/admin/company-origin`}>Company Origin</MenuItem>
@@ -150,7 +168,7 @@ const VerticalMenu = ({ scrollMenu }) => {
             <MenuItem href={`/${locale}/admin/site-risk`}>Site Risk</MenuItem>
             <MenuItem href={`/${locale}/admin/equipments`}>Equipments</MenuItem>
           </SubMenu>
-        </PermissionItem>
+        </PermissionGroup>
 
         {/* ✅ Employee */}
         <PermissionGroup
