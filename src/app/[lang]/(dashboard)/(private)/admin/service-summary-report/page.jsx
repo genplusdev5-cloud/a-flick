@@ -1,22 +1,18 @@
 'use client'
-
 import { useState, useEffect, forwardRef } from 'react'
 import { Box, Card, Grid, Typography, Checkbox, CardHeader, Divider } from '@mui/material'
 import Breadcrumbs from '@mui/material/Breadcrumbs'
 import Link from 'next/link'
 import { format } from 'date-fns'
-
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import CustomTextField from '@core/components/mui/TextField'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalDateRange from '@/components/common/GlobalDateRange'
 import StickyListLayout from '@/components/common/StickyListLayout'
-
 import { getReportDropdown, generateServiceSummary } from '@/api/serviceSummary'
 import { showToast } from '@/components/common/Toasts'
 import PermissionGuard from '@/components/auth/PermissionGuard'
-
 /* -----------------------------------
    📅 DATE RANGE PICKER
 ----------------------------------- */
@@ -25,10 +21,8 @@ const DateRangePickerField = ({ startDate, endDate, setDates }) => {
     const [start, end] = dates
     setDates({ startDate: start, endDate: end })
   }
-
   const CustomInput = forwardRef((props, ref) => {
     const { label, start, end, ...rest } = props
-
     return (
       <CustomTextField
         fullWidth
@@ -39,7 +33,6 @@ const DateRangePickerField = ({ startDate, endDate, setDates }) => {
       />
     )
   })
-
   return (
     <AppReactDatepicker
       selectsRange
@@ -52,28 +45,25 @@ const DateRangePickerField = ({ startDate, endDate, setDates }) => {
     />
   )
 }
-
 /* -----------------------------------
    📌 MAIN PAGE
 ----------------------------------- */
 const ServiceSummaryReportPageContent = () => {
   const [dropdown, setDropdown] = useState({})
-  const [enableDateFilter, setEnableDateFilter] = useState(true)
-  const [fromDate, setFromDate] = useState(format(new Date(), 'yyyy-MM-dd'))
-  const [toDate, setToDate] = useState(format(new Date(), 'yyyy-MM-dd'))
-
+  const [enableDateFilter, setEnableDateFilter] = useState(false)
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
   const [filters, setFilters] = useState({
     customer_id: '',
     contract_id: '',
     group_code: '',
     pest_level: ''
   })
-
+  // This state seems unused based on correct implementation, but leaving if needed elsewhere or removal
   const [dates, setDates] = useState({
     startDate: new Date(),
     endDate: new Date()
   })
-
   /* LOAD INITIAL DROPDOWNS */
   const loadDropdowns = async () => {
     const res = await getReportDropdown()
@@ -83,25 +73,23 @@ const ServiceSummaryReportPageContent = () => {
       showToast('error', res.message)
     }
   }
-
   useEffect(() => {
     loadDropdowns()
   }, [])
-
   const handleGenerate = async () => {
     const payload = {}
-
-    if (enableDateFilter && fromDate) payload.from_date = fromDate
-    if (enableDateFilter && toDate) payload.to_date = toDate
-    if (filters.customer_id) payload.customer_id = Number(filters.customer_id)
-    if (filters.contract_id) payload.contract_id = Number(filters.contract_id)
-    if (filters.group_code) payload.group_code = Number(filters.group_code)
-    if (filters.pest_level) payload.pest_level = Number(filters.pest_level)
-
-    console.log('Final JSON payload →', payload) // இத பாரு console-ல
-
-    const res = await generateServiceSummary(payload) // இப்போ JSON ஆ போகும்
-
+    // Add dates only if filter is enabled and both dates are selected
+    if (enableDateFilter && fromDate && toDate) {
+      payload.from_date = fromDate
+      payload.to_date = toDate
+    }
+    // Ensure payload excludes empty fields and matches Postman types
+    if (filters.customer_id) payload.customer_id = filters.customer_id
+    if (filters.contract_id) payload.contract_id = filters.contract_id
+    if (filters.group_code) payload.group_code = filters.group_code
+    if (filters.pest_level) payload.pest_level = filters.pest_level
+    console.log('Final JSON payload →', payload)
+    const res = await generateServiceSummary(payload, filters.customer_id)
     if (res.status === 'success') {
       const url = window.URL.createObjectURL(new Blob([res.file]))
       const link = document.createElement('a')
@@ -114,7 +102,6 @@ const ServiceSummaryReportPageContent = () => {
       showToast('error', res.message)
     }
   }
-
   return (
     <StickyListLayout
       header={
@@ -143,9 +130,7 @@ const ServiceSummaryReportPageContent = () => {
             </Typography>
           }
         />
-
         <Divider />
-
         {/* 🔥 CONTENT – auto height, proper padding */}
         <Box sx={{ p: 4 }}>
           <Grid container spacing={3} alignItems='flex-start'>
@@ -158,7 +143,6 @@ const ServiceSummaryReportPageContent = () => {
                     onChange={e => {
                       const checked = e.target.checked
                       setEnableDateFilter(checked)
-
                       if (!checked) {
                         setFromDate('')
                         setToDate('')
@@ -168,7 +152,6 @@ const ServiceSummaryReportPageContent = () => {
                   />
                   <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Date Range</Typography>
                 </Box>
-
                 <GlobalDateRange
                   start={fromDate}
                   end={toDate}
@@ -180,7 +163,6 @@ const ServiceSummaryReportPageContent = () => {
                 />
               </Box>
             </Grid>
-
             {/* CUSTOMER */}
             <Grid item xs={12} md={2.2}>
               <GlobalAutocomplete
@@ -199,14 +181,11 @@ const ServiceSummaryReportPageContent = () => {
                 }))}
                 onChange={async selected => {
                   const value = selected?.value || ''
-
                   setFilters(prev => ({
                     ...prev,
                     customer_id: value
                   }))
-
                   const dependent = await getReportDropdown({ customer_id: value })
-
                   setDropdown(prev => ({
                     ...prev,
                     contract_list: dependent.data.contract_list || {},
@@ -215,7 +194,6 @@ const ServiceSummaryReportPageContent = () => {
                 }}
               />
             </Grid>
-
             {/* CONTRACT */}
             <Grid item xs={12} md={2.2}>
               <GlobalAutocomplete
@@ -241,7 +219,6 @@ const ServiceSummaryReportPageContent = () => {
                 }
               />
             </Grid>
-
             {/* GROUP CODE */}
             <Grid item xs={12} md={2.2}>
               <GlobalAutocomplete
@@ -249,15 +226,16 @@ const ServiceSummaryReportPageContent = () => {
                 value={
                   filters.group_code
                     ? {
-                        label:
+                        label: String(
                           (dropdown?.group_code?.category || []).find(g => g.id === filters.group_code)?.category ||
-                          'No Category',
+                            filters.group_code
+                        ),
                         value: filters.group_code
                       }
                     : null
                 }
                 options={(dropdown?.group_code?.category || []).map(g => ({
-                  label: g.category || 'No Category',
+                  label: String(g.category || g.id),
                   value: g.id
                 }))}
                 onChange={selected =>
@@ -268,7 +246,6 @@ const ServiceSummaryReportPageContent = () => {
                 }
               />
             </Grid>
-
             {/* PEST LEVEL */}
             <Grid item xs={12} md={1.8}>
               <GlobalAutocomplete
@@ -285,7 +262,6 @@ const ServiceSummaryReportPageContent = () => {
                 }
               />
             </Grid>
-
             {/* GENERATE */}
             <Grid item xs={12} md={1.4} alignSelf='flex-end'>
               <GlobalButton
@@ -304,7 +280,6 @@ const ServiceSummaryReportPageContent = () => {
     </StickyListLayout>
   )
 }
-
 // Wrapper for RBAC
 export default function ServiceSummaryReportPage() {
   return (

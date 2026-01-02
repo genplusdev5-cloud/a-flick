@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams, usePathname } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import {
   Box,
   Button,
@@ -26,7 +26,7 @@ import {
   InputAdornment
 } from '@mui/material'
 
-import { getEmployeeList, addEmployee, updateEmployee, deleteEmployee, getEmployeeDetails } from '@/api/employee'
+import { getEmployeeList, deleteEmployee } from '@/api/employee'
 
 // 🔥 Global UI Components (use everywhere)
 import GlobalButton from '@/components/common/GlobalButton'
@@ -40,7 +40,6 @@ import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
 import FileCopyIcon from '@mui/icons-material/FileCopy'
 
 import { showToast } from '@/components/common/Toasts'
-import { encryptId } from '@/utils/encryption'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
@@ -67,6 +66,8 @@ import ChevronRight from '@menu/svg/ChevronRight'
 import { loadRowOrder, saveRowOrder } from '@/utils/tableUtils'
 import StickyListLayout from '@/components/common/StickyListLayout'
 import StickyTableWrapper from '@/components/common/StickyTableWrapper'
+import EmployeeFormDialog from './EmployeeFormDialog'
+
 
 const getEmployees = async () => {
   const db = await openDBInstance()
@@ -120,9 +121,7 @@ const supervisorOptions = [
 // ───────────────────────────────────────────
 const EmployeePageContent = () => {
   const { canAccess } = usePermission()
-  const router = useRouter()
   const searchParams = useSearchParams()
-  const pathname = usePathname()
 
   const [department, setDepartment] = useState(null)
   const [designation, setDesignation] = useState(null)
@@ -140,6 +139,10 @@ const EmployeePageContent = () => {
   const [loading, setLoading] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
+
+  const [openEmployeeDialog, setOpenEmployeeDialog] = useState(false)
+  const [dialogMode, setDialogMode] = useState('add')
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState(null)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -244,8 +247,9 @@ const EmployeePageContent = () => {
   }, [])
 
   const handleEdit = id => {
-    const encodedId = encryptId(id)
-    router.push(`/en/admin/employee-list/edit?id=${encodedId}`)
+    setDialogMode('edit')
+    setSelectedEmployeeId(id)
+    setOpenEmployeeDialog(true)
   }
   const confirmDelete = async () => {
     if (deleteDialog.row) {
@@ -654,7 +658,11 @@ const EmployeePageContent = () => {
                 <GlobalButton
                   variant='contained'
                   startIcon={<AddIcon />}
-                  onClick={() => router.push('/admin/employee-list/add')}
+                  onClick={() => {
+                    setDialogMode('add')
+                    setSelectedEmployeeId(null)
+                    setOpenEmployeeDialog(true)
+                  }}
                   sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
                 >
                   Add Employee
@@ -872,40 +880,35 @@ const EmployeePageContent = () => {
           </DialogCloseButton>
         </DialogTitle>
         <DialogContent sx={{ px: 5, pt: 1 }}>
-          <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
-            Are you sure you want to delete employee{' '}
-            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name}</strong>?
-            <br />
-            This action cannot be undone.
+          <Typography>
+            Are you sure you want to delete <b>{deleteDialog.row?.name}</b>? This action cannot be undone.
           </Typography>
         </DialogContent>
-        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-          <GlobalButton
-            onClick={() => setDeleteDialog({ open: false })}
-            color='secondary'
-            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
-          >
+         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+          <GlobalButton onClick={() => setDeleteDialog({ open: false, row: null })} color='secondary' variant='tonal'>
             Cancel
           </GlobalButton>
-          <GlobalButton
-            onClick={confirmDelete}
-            variant='contained'
-            color='error'
-            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
-          >
+          <GlobalButton onClick={confirmDelete} color='error' variant='contained'>
             Delete
           </GlobalButton>
         </DialogActions>
       </Dialog>
+
+      <EmployeeFormDialog
+        open={openEmployeeDialog}
+        mode={dialogMode}
+        employeeId={selectedEmployeeId}
+        onClose={() => setOpenEmployeeDialog(false)}
+        onSuccess={() => loadData()}
+      />
     </StickyListLayout>
   )
 }
 
-// Wrapper for RBAC
-export default function EmployeePage() {
-  return (
-    <PermissionGuard permission='Employee List'>
-      <EmployeePageContent />
-    </PermissionGuard>
-  )
-}
+const EmployeeListPage = () => (
+  <PermissionGuard permission='Employee List'>
+    <EmployeePageContent />
+  </PermissionGuard>
+)
+
+export default EmployeeListPage

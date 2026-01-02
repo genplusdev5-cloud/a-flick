@@ -21,9 +21,11 @@ export const getReportDropdown = async (params = {}) => {
   }
 }
 
-export const generateServiceSummary = async payload => {
+export const generateServiceSummary = async (payload, customerId) => {
   try {
-    const res = await api.post('service-summary/', payload, {
+    const url = `service-summary/${customerId ? `?customer_id=${customerId}` : ''}`
+
+    const res = await api.post(url, payload, {
       responseType: 'blob'
     })
 
