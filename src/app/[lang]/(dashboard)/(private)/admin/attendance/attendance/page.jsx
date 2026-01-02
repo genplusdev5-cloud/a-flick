@@ -82,11 +82,26 @@ const initialDropdowns = {
 const AttendancePageContent = () => {
   const [rows, setRows] = useState([])
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 })
-  const [searchText, setSearchText] = useState('')
-  const [startDate, setStartDate] = useState(new Date())
-  const [endDate, setEndDate] = useState(new Date())
-  const [dateFilter, setDateFilter] = useState(true)
-  const [dateRange, setDateRange] = useState([null, null])
+  // -- UI (TEMPORARY) FILTER STATES --
+  const [uiSearchText, setUiSearchText] = useState('')
+  const [uiDateFilter, setUiDateFilter] = useState(true)
+  const [uiDateRange, setUiDateRange] = useState([null, null])
+  const [uiCustomer, setUiCustomer] = useState(null)
+  const [uiTechnician, setUiTechnician] = useState(null)
+  const [uiSupervisor, setUiSupervisor] = useState(null)
+  const [uiSlot, setUiSlot] = useState(null)
+
+  // -- APPLIED (PERSISTENT) FILTER STATES --
+  const [appliedFilters, setAppliedFilters] = useState({
+    searchText: '',
+    dateFilter: true,
+    dateRange: [null, null],
+    customer: null,
+    technician: null,
+    supervisor: null,
+    slot: null
+  })
+
   const [loading, setLoading] = useState(false)
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
@@ -121,14 +136,20 @@ const AttendancePageContent = () => {
       const params = {
         page: pagination.pageIndex + 1,
         page_size: pagination.pageSize,
-        search: searchText || undefined,
-        customer_id: selectedCustomer?.value || undefined,
-        technician_id: selectedTechnician?.value || undefined,
-        supervisor_id: selectedSupervisor?.value || undefined,
-        slot_id: selectedSlot?.value || undefined,
-        start_date: dateFilter && dateRange[0] ? format(dateRange[0], 'yyyy-MM-dd') : undefined,
-        end_date: dateFilter && dateRange[1] ? format(dateRange[1], 'yyyy-MM-dd') : undefined,
-        ...overrideParams // 🔥 ADD THIS
+        search: appliedFilters.searchText || undefined,
+        customer_id: appliedFilters.customer?.value || undefined,
+        technician_id: appliedFilters.technician?.value || undefined,
+        supervisor_id: appliedFilters.supervisor?.value || undefined,
+        slot_id: appliedFilters.slot?.value || undefined,
+        start_date:
+          appliedFilters.dateFilter && appliedFilters.dateRange[0]
+            ? format(appliedFilters.dateRange[0], 'yyyy-MM-dd')
+            : undefined,
+        end_date:
+          appliedFilters.dateFilter && appliedFilters.dateRange[1]
+            ? format(appliedFilters.dateRange[1], 'yyyy-MM-dd')
+            : undefined,
+        ...overrideParams
       }
 
       Object.keys(params).forEach(k => params[k] === undefined && delete params[k])
@@ -186,10 +207,7 @@ const AttendancePageContent = () => {
     slots: []
   })
 
-  const [selectedCustomer, setSelectedCustomer] = useState(null)
-  const [selectedTechnician, setSelectedTechnician] = useState(null)
-  const [selectedSupervisor, setSelectedSupervisor] = useState(null)
-  const [selectedSlot, setSelectedSlot] = useState(null)
+  // UI State selection (direct, no reload)
 
   useEffect(() => {
     const fetchDropdowns = async () => {
@@ -255,16 +273,7 @@ const AttendancePageContent = () => {
 
   useEffect(() => {
     fetchAttendances()
-  }, [
-    pagination.pageIndex,
-    pagination.pageSize,
-    searchText,
-    dateRange,
-    selectedCustomer,
-    selectedTechnician,
-    selectedSupervisor,
-    selectedSlot
-  ])
+  }, [pagination.pageIndex, pagination.pageSize, appliedFilters])
 
   // Update your columns array like this (exact match with table)
   const columns = [
@@ -309,7 +318,18 @@ const AttendancePageContent = () => {
                 variant='contained'
                 color='primary'
                 startIcon={<RefreshIcon />}
-                onClick={fetchAttendances}
+                onClick={() => {
+                  setPagination(p => ({ ...p, pageIndex: 0 }))
+                  setAppliedFilters({
+                    searchText: uiSearchText,
+                    dateFilter: uiDateFilter,
+                    dateRange: uiDateRange,
+                    customer: uiCustomer,
+                    technician: uiTechnician,
+                    supervisor: uiSupervisor,
+                    slot: uiSlot
+                  })
+                }}
                 sx={{
                   textTransform: 'none',
                   fontWeight: 500,
@@ -427,16 +447,16 @@ const AttendancePageContent = () => {
 
               <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                 <FormControlLabel
-                  control={<Checkbox checked={dateFilter} onChange={e => setDateFilter(e.target.checked)} />}
+                  control={<Checkbox checked={uiDateFilter} onChange={e => setUiDateFilter(e.target.checked)} />}
                   label='Date Filter'
                   sx={{ mb: -0.5 }}
                 />
                 <Box sx={{ width: 220 }}>
                   <GlobalDateRange
-                    start={dateRange[0]}
-                    end={dateRange[1]}
-                    onSelectRange={({ start, end }) => setDateRange([start, end])}
-                    disabled={!dateFilter}
+                    start={uiDateRange[0]}
+                    end={uiDateRange[1]}
+                    onSelectRange={({ start, end }) => setUiDateRange([start, end])}
+                    disabled={!uiDateFilter}
                   />
                 </Box>
               </Box>
@@ -448,10 +468,9 @@ const AttendancePageContent = () => {
                     label: String(c.name ?? '').trim() || `Customer ${c.id}`,
                     value: c.id
                   }))}
-                  value={selectedCustomer}
+                  value={uiCustomer}
                   onChange={value => {
-                    setSelectedCustomer(value)
-                    setPagination(p => ({ ...p, pageIndex: 0 }))
+                    setUiCustomer(value)
                   }}
                   placeholder='Select Customer'
                 />
@@ -464,10 +483,9 @@ const AttendancePageContent = () => {
                     label: String(t.name ?? '').trim() || `Technician ${t.id}`,
                     value: t.id
                   }))}
-                  value={selectedTechnician}
+                  value={uiTechnician}
                   onChange={value => {
-                    setSelectedTechnician(value)
-                    setPagination(p => ({ ...p, pageIndex: 0 }))
+                    setUiTechnician(value)
                   }}
                 />
               </Box>
@@ -479,11 +497,9 @@ const AttendancePageContent = () => {
                     label: String(s.name ?? '').trim() || `Supervisor ${s.id}`,
                     value: s.id
                   }))}
-                  value={selectedSupervisor}
+                  value={uiSupervisor}
                   onChange={value => {
-                    setSelectedSupervisor(value)
-                    setPagination(p => ({ ...p, pageIndex: 0 }))
-                    fetchAttendances()
+                    setUiSupervisor(value)
                   }}
                 />
               </Box>
@@ -495,18 +511,17 @@ const AttendancePageContent = () => {
                     label: String(s.name ?? '').trim() || `Slot ${s.id}`,
                     value: s.id
                   }))}
-                  value={selectedSlot}
+                  value={uiSlot}
                   onChange={value => {
-                    setSelectedSlot(value)
-                    setPagination(p => ({ ...p, pageIndex: 0 }))
+                    setUiSlot(value)
                   }}
                 />
               </Box>
             </Box>
 
             <TextField
-              value={searchText}
-              onChange={e => setSearchText(e.target.value)}
+              value={uiSearchText}
+              onChange={e => setUiSearchText(e.target.value)}
               placeholder='Search...'
               sx={{ width: 250 }}
               size='small'

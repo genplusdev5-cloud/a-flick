@@ -114,8 +114,23 @@ const CustomersPageContent = () => {
   const [companyOptions, setCompanyOptions] = useState([])
   const [sorting, setSorting] = useState([])
 
+  const [appliedSearchText, setAppliedSearchText] = useState('')
+  const [appliedFilterOrigin, setAppliedFilterOrigin] = useState(null)
+  const [appliedFilterMyob, setAppliedFilterMyob] = useState(null)
+
   // Sync pagination state to URL search params
   const isFirstRender = useRef(true)
+
+  const handleRefresh = () => {
+    setAppliedSearchText(searchText)
+    setAppliedFilterOrigin(filterOrigin)
+    setAppliedFilterMyob(filterMyob)
+
+    setPagination(p => ({
+      ...p,
+      pageIndex: 0
+    }))
+  }
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -123,17 +138,15 @@ const CustomersPageContent = () => {
       const params = {
         page: pagination.pageIndex + 1,
         page_size: pagination.pageSize,
-        search: searchText.trim()
+        search: appliedSearchText.trim()
       }
 
-      // ⭐ APPLY ORIGIN FILTER
-      if (filterOrigin?.id) {
-        params.company = filterOrigin.id
+      if (appliedFilterOrigin?.id) {
+        params.company = appliedFilterOrigin.id
       }
 
-      // ⭐ APPLY MYOB FILTER
-      if (filterMyob?.value) {
-        params.myob_status = filterMyob.value
+      if (appliedFilterMyob?.value) {
+        params.myob_status = appliedFilterMyob.value
       }
 
       const res = await getCustomerList(params)
@@ -163,7 +176,7 @@ const CustomersPageContent = () => {
     } finally {
       setLoading(false)
     }
-  }, [pagination.pageIndex, pagination.pageSize, searchText, filterOrigin, filterMyob, originMap])
+  }, [pagination.pageIndex, pagination.pageSize, appliedSearchText, appliedFilterOrigin, appliedFilterMyob, originMap])
 
   useEffect(() => {
     const loadCompanies = async () => {
@@ -200,7 +213,7 @@ const CustomersPageContent = () => {
 
   useEffect(() => {
     loadData()
-  }, [pagination.pageIndex, pagination.pageSize, searchText, filterOrigin, filterMyob])
+  }, [loadData])
 
   const handleEdit = id => {
     const encodedId = btoa(id.toString())
@@ -550,26 +563,12 @@ const CustomersPageContent = () => {
               <GlobalButton
                 variant='contained'
                 color='primary'
-                startIcon={
-                  <RefreshIcon
-                    sx={{
-                      animation: loading ? 'spin 1s linear infinite' : 'none',
-                      '@keyframes spin': {
-                        '0%': { transform: 'rotate(0deg)' },
-                        '100%': { transform: 'rotate(360deg)' }
-                      }
-                    }}
-                  />
-                }
+                startIcon={<RefreshIcon />}
                 disabled={loading}
-                onClick={async () => {
-                  setLoading(true)
-                  await loadData()
-                  setTimeout(() => setLoading(false), 600)
-                }}
+                onClick={handleRefresh}
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
-                {loading ? 'Refreshing...' : 'Refresh'}
+                Refresh
               </GlobalButton>
             </Box>
           }
@@ -709,7 +708,6 @@ const CustomersPageContent = () => {
                   value={filterOrigin}
                   onChange={val => {
                     setFilterOrigin(val)
-                    setPagination(p => ({ ...p, pageIndex: 0 }))
                   }}
                 />
               </Box>
@@ -726,7 +724,6 @@ const CustomersPageContent = () => {
                   value={filterMyob}
                   onChange={val => {
                     setFilterMyob(val)
-                    setPagination(p => ({ ...p, pageIndex: 0 }))
                   }}
                 />
               </Box>
@@ -737,7 +734,6 @@ const CustomersPageContent = () => {
               value={searchText}
               onChange={v => {
                 setSearchText(String(v))
-                setPagination(p => ({ ...p, pageIndex: 0 }))
               }}
               placeholder='Search by Name, Email, Address, Origin...'
               sx={{ width: 420 }}
@@ -808,7 +804,6 @@ const CustomersPageContent = () => {
         </Box>
       </Card>
 
-
       {/* Delete Confirmation Dialog */}
       <Dialog
         onClose={() => setDeleteDialog({ open: false })}
@@ -877,7 +872,6 @@ const CustomersPageContent = () => {
     </StickyListLayout>
   )
 }
-
 
 // Wrapper for RBAC
 export default function CustomersPage() {

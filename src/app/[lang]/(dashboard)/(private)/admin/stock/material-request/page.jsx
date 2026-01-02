@@ -70,15 +70,28 @@ const MaterialRequestPageContent = () => {
   const [page, setPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
 
-  // Filters
-  const [enableDateFilter, setEnableDateFilter] = useState(false)
-  const [startDate, setStartDate] = useState(new Date())
-  const [endDate, setEndDate] = useState(new Date())
-  const [requestStatus, setRequestStatus] = useState('')
-  const [fromLocation, setFromLocation] = useState('')
-  const [toLocation, setToLocation] = useState('')
-  const [requestedBy, setRequestedBy] = useState('')
-  const [searchText, setSearchText] = useState('')
+  // -- UI (TEMPORARY) FILTER STATES --
+  const [uiEnableDateFilter, setUiEnableDateFilter] = useState(false)
+  const [uiStartDate, setUiStartDate] = useState(new Date())
+  const [uiEndDate, setUiEndDate] = useState(new Date())
+  const [uiRequestStatus, setUiRequestStatus] = useState('')
+  const [uiFromLocation, setUiFromLocation] = useState('')
+  const [uiToLocation, setUiToLocation] = useState('')
+  const [uiRequestedBy, setUiRequestedBy] = useState('')
+  const [uiSearchText, setUiSearchText] = useState('')
+
+  // -- APPLIED (PERSISTENT) FILTER STATES --
+  const [appliedFilters, setAppliedFilters] = useState({
+    enableDateFilter: false,
+    startDate: new Date(),
+    endDate: new Date(),
+    requestStatus: '',
+    fromLocation: '',
+    toLocation: '',
+    requestedBy: '',
+    searchText: ''
+  })
+
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [sorting, setSorting] = useState([])
 
@@ -122,15 +135,17 @@ const MaterialRequestPageContent = () => {
       }))
 
       const filtered = mapped.filter(row => {
-        const text = searchText.trim().toLowerCase()
+        const text = (appliedFilters.searchText || '').trim().toLowerCase()
         const matchesSearch = !text || Object.values(row).join(' ').toLowerCase().includes(text)
-        const matchesDate = !enableDateFilter
+        const matchesDate = !appliedFilters.enableDateFilter
           ? true
-          : row.requestDate && new Date(row.requestDate) >= startDate && new Date(row.requestDate) <= endDate
-        const matchesStatus = !requestStatus || row.status === requestStatus
-        const matchesFrom = !fromLocation || row.fromLocation === fromLocation
-        const matchesTo = !toLocation || row.toLocation === toLocation
-        const matchesBy = !requestedBy || row.requestedBy === requestedBy
+          : row.requestDate &&
+            new Date(row.requestDate) >= appliedFilters.startDate &&
+            new Date(row.requestDate) <= appliedFilters.endDate
+        const matchesStatus = !appliedFilters.requestStatus || row.status === appliedFilters.requestStatus
+        const matchesFrom = !appliedFilters.fromLocation || row.fromLocation === appliedFilters.fromLocation
+        const matchesTo = !appliedFilters.toLocation || row.toLocation === appliedFilters.toLocation
+        const matchesBy = !appliedFilters.requestedBy || row.requestedBy === appliedFilters.requestedBy
         return matchesSearch && matchesDate && matchesStatus && matchesFrom && matchesTo && matchesBy
       })
 
@@ -151,7 +166,7 @@ const MaterialRequestPageContent = () => {
 
   useEffect(() => {
     loadData(false)
-  }, [page, searchText, enableDateFilter, startDate, endDate, requestStatus, fromLocation, toLocation, requestedBy])
+  }, [page, appliedFilters])
 
   const getStatusColor = status => {
     switch (status) {
@@ -347,7 +362,20 @@ const MaterialRequestPageContent = () => {
                     />
                   }
                   disabled={loading}
-                  onClick={() => loadData(true)}
+                  onClick={() => {
+                    setPage(1)
+                    setAppliedFilters({
+                      enableDateFilter: uiEnableDateFilter,
+                      startDate: uiStartDate,
+                      endDate: uiEndDate,
+                      requestStatus: uiRequestStatus,
+                      fromLocation: uiFromLocation,
+                      toLocation: uiToLocation,
+                      requestedBy: uiRequestedBy,
+                      searchText: uiSearchText
+                    })
+                    loadData(true)
+                  }}
                   sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
                 >
                   {loading ? 'Refreshing...' : 'Refresh'}
@@ -400,26 +428,26 @@ const MaterialRequestPageContent = () => {
               <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                 <FormControlLabel
                   control={
-                    <Checkbox checked={enableDateFilter} onChange={e => setEnableDateFilter(e.target.checked)} />
+                    <Checkbox checked={uiEnableDateFilter} onChange={e => setUiEnableDateFilter(e.target.checked)} />
                   }
                   label='Date Filter'
                 />
                 <Box sx={{ width: 220 }}>
                   <GlobalDateRange
-                    start={startDate}
-                    end={endDate}
+                    start={uiStartDate}
+                    end={uiEndDate}
                     onSelectRange={({ start, end }) => {
-                      setStartDate(start)
-                      setEndDate(end)
+                      setUiStartDate(start)
+                      setUiEndDate(end)
                     }}
-                    disabled={!enableDateFilter}
+                    disabled={!uiEnableDateFilter}
                   />
                 </Box>
               </Box>
               <CustomAutocomplete
                 options={['Waiting', 'Pending', 'Rejected', 'Approved', 'Issued', 'Completed', 'Declined']}
-                value={requestStatus || null}
-                onChange={(e, val) => setRequestStatus(val || '')}
+                value={uiRequestStatus || null}
+                onChange={(e, val) => setUiRequestStatus(val || '')}
                 renderInput={params => (
                   <CustomTextField
                     {...params}
@@ -432,8 +460,8 @@ const MaterialRequestPageContent = () => {
               />
               <CustomAutocomplete
                 options={['Stock-TECH STOCK 1', 'Supplier-ABC']}
-                value={fromLocation || null}
-                onChange={(e, val) => setFromLocation(val || '')}
+                value={uiFromLocation || null}
+                onChange={(e, val) => setUiFromLocation(val || '')}
                 renderInput={params => (
                   <CustomTextField
                     {...params}
@@ -446,16 +474,16 @@ const MaterialRequestPageContent = () => {
               />
               <CustomAutocomplete
                 options={['Stock-TECH STOCK 1', 'Site-A', 'Site-B']}
-                value={toLocation || null}
-                onChange={(e, val) => setToLocation(val || '')}
+                value={uiToLocation || null}
+                onChange={(e, val) => setUiToLocation(val || '')}
                 renderInput={params => (
                   <CustomTextField {...params} size='small' label='To Location' sx={{ width: 180 }} placeholder='To' />
                 )}
               />
               <CustomAutocomplete
                 options={['Admin', 'Tech', 'John Doe']}
-                value={requestedBy || null}
-                onChange={(e, val) => setRequestedBy(val || '')}
+                value={uiRequestedBy || null}
+                onChange={(e, val) => setUiRequestedBy(val || '')}
                 renderInput={params => (
                   <CustomTextField
                     {...params}
@@ -524,8 +552,8 @@ const MaterialRequestPageContent = () => {
               <CustomTextField
                 size='small'
                 placeholder='Search any field...'
-                value={searchText}
-                onChange={e => setSearchText(e.target.value)}
+                value={uiSearchText}
+                onChange={e => setUiSearchText(e.target.value)}
                 sx={{ width: 350 }}
                 slotProps={{
                   input: {

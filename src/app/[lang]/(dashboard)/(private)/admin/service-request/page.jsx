@@ -97,9 +97,6 @@ const ServiceRequestPageContent = () => {
   const [allTickets, setAllTickets] = useState([])
 
   // filters
-  const [enableDateFilter, setEnableDateFilter] = useState(false)
-  const [startDate, setStartDate] = useState(new Date())
-  const [endDate, setEndDate] = useState(new Date())
 
   const searchParams = useSearchParams()
 
@@ -109,14 +106,38 @@ const ServiceRequestPageContent = () => {
   const decodedCustomerId = encodedCustomer ? Number(atob(encodedCustomer)) : ''
   const decodedContractId = encodedContract ? Number(atob(encodedContract)) : ''
 
-  const [customerFilter, setCustomerFilter] = useState(decodedCustomerId)
-  const [contractFilter, setContractFilter] = useState(decodedContractId)
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 })
 
-  const [technicianFilter, setTechnicianFilter] = useState('')
-  const [supervisorFilter, setSupervisorFilter] = useState('')
-  const [appointmentStatusFilter, setAppointmentStatusFilter] = useState('')
-  const [appointmentTypeFilter, setAppointmentTypeFilter] = useState('')
+  // -- UI (TEMPORARY) FILTER STATES --
+  const [uiEnableDateFilter, setUiEnableDateFilter] = useState(false)
+  const [uiStartDate, setUiStartDate] = useState(new Date())
+  const [uiEndDate, setUiEndDate] = useState(new Date())
+  const [uiCustomer, setUiCustomer] = useState(decodedCustomerId)
+  const [uiContract, setUiContract] = useState(decodedContractId)
+  const [uiTechnician, setUiTechnician] = useState('')
+  const [uiSupervisor, setUiSupervisor] = useState('')
+  const [uiStatus, setUiStatus] = useState('')
+  const [uiAppointment, setUiAppointment] = useState('')
+  const [uiSearch, setUiSearch] = useState('')
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
+
+  // -- APPLIED FILTER STATES (Triggers API) --
+  const [appliedFilters, setAppliedFilters] = useState({
+    enableDate: false,
+    start: new Date(),
+    end: new Date(),
+    customer: decodedCustomerId,
+    contract: decodedContractId,
+    technician: '',
+    supervisor: '',
+    status: '',
+    appointment: '',
+    search: ''
+  })
+
+  // refs
+  const techRef = useRef(null)
+  const contractRef = useRef(null)
 
   // Lazy init Contract Options from URL
   const [contractOptions, setContractOptions] = useState(() => {
@@ -124,14 +145,6 @@ const ServiceRequestPageContent = () => {
     const contractCode = searchParams.get('contractCode')
     return contractId && contractCode ? [{ id: Number(contractId), label: contractCode }] : []
   })
-
-  const [searchText, setSearchText] = useState('')
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 })
-
-  // refs
-  const customerRef = useRef(null)
-  const contractRef = useRef(null)
-  const techRef = useRef(null)
 
   // Lazy init Customer Options from URL
   const [customerOptions, setCustomerOptions] = useState(() => {
@@ -186,11 +199,7 @@ const ServiceRequestPageContent = () => {
 
   useEffect(() => {
     fetchTicketsFromApi()
-  }, [pagination.pageIndex, pagination.pageSize, customerFilter, contractFilter])
-
-  useEffect(() => {
-    setPagination(p => ({ ...p, pageIndex: 0 }))
-  }, [customerFilter, contractFilter, technicianFilter, supervisorFilter])
+  }, [pagination.pageIndex, pagination.pageSize, appliedFilters])
 
   useEffect(() => {
     loadReportDropdownData()
@@ -400,19 +409,19 @@ const ServiceRequestPageContent = () => {
         page_size: pagination.pageSize
       }
 
-      if (customerFilter) params.customer_id = customerFilter
-      if (contractFilter) params.contract_id = contractFilter
-      if (technicianFilter) params.technician_id = technicianFilter
-      if (supervisorFilter) params.supervisor_id = supervisorFilter
-      if (appointmentStatusFilter) params.ticket_status = appointmentStatusFilter
-      if (appointmentTypeFilter) params.ticket_type = appointmentTypeFilter
+      if (appliedFilters.customer) params.customer_id = appliedFilters.customer
+      if (appliedFilters.contract) params.contract_id = appliedFilters.contract
+      if (appliedFilters.technician) params.technician_id = appliedFilters.technician
+      if (appliedFilters.supervisor) params.supervisor_id = appliedFilters.supervisor
+      if (appliedFilters.status) params.ticket_status = appliedFilters.status
+      if (appliedFilters.appointment) params.ticket_type = appliedFilters.appointment
 
-      if (enableDateFilter && startDate && endDate) {
-        params.from_date = format(startDate, 'yyyy-MM-dd')
-        params.to_date = format(endDate, 'yyyy-MM-dd')
+      if (appliedFilters.enableDate && appliedFilters.start && appliedFilters.end) {
+        params.from_date = format(appliedFilters.start, 'yyyy-MM-dd')
+        params.to_date = format(appliedFilters.end, 'yyyy-MM-dd')
       }
 
-      if (searchText?.trim()) params.search = searchText.trim()
+      if (appliedFilters.search?.trim()) params.search = appliedFilters.search.trim()
 
       console.log('Ticket Params =>', params)
 
@@ -474,14 +483,14 @@ const ServiceRequestPageContent = () => {
 
   useEffect(() => {
     const fetchContractByCustomer = async () => {
-      if (!customerFilter) {
+      if (!uiCustomer) {
         setContractOptions([])
-        setContractFilter('')
+        setUiContract('')
         return
       }
 
       try {
-        const res = await getReportDropdowns({ customer_id: customerFilter })
+        const res = await getReportDropdowns({ customer_id: uiCustomer })
 
         const dd = res?.data?.data || {}
         const list = dd?.contract_list?.label || [] // ⭐ backend key
@@ -494,7 +503,7 @@ const ServiceRequestPageContent = () => {
         // 🔥 URL contract persistence
         const urlContractCode = searchParams.get('contractCode')
 
-        if (decodedContractId && urlContractCode && customerFilter === decodedCustomerId) {
+        if (decodedContractId && urlContractCode && uiCustomer === decodedCustomerId) {
           const exists = formattedContracts.find(c => c.id === decodedContractId)
 
           if (!exists) {
@@ -509,8 +518,10 @@ const ServiceRequestPageContent = () => {
         setContractOptions(formattedContracts)
 
         // 🔥 AUTO APPLY CONTRACT FILTER (IMPORTANT)
-        if (decodedContractId && customerFilter === decodedCustomerId) {
-          setContractFilter(decodedContractId)
+        if (decodedContractId && uiCustomer === decodedCustomerId) {
+          setUiContract(decodedContractId)
+          // Also set in applied if it's initial load from URL
+          setAppliedFilters(prev => ({ ...prev, contract: decodedContractId }))
         }
       } catch (err) {
         console.error('Contract fetch failed:', err)
@@ -519,7 +530,7 @@ const ServiceRequestPageContent = () => {
     }
 
     fetchContractByCustomer()
-  }, [customerFilter, decodedContractId, decodedCustomerId])
+  }, [uiCustomer, decodedContractId, decodedCustomerId])
 
   // react-table
   const table = useReactTable({
@@ -527,8 +538,8 @@ const ServiceRequestPageContent = () => {
     columns,
     manualPagination: true,
     pageCount: Math.ceil(rowCount / pagination.pageSize),
-    state: { globalFilter: searchText, pagination },
-    onGlobalFilterChange: setSearchText,
+    state: { globalFilter: appliedFilters.search, pagination },
+    onGlobalFilterChange: (val) => setAppliedFilters(prev => ({ ...prev, search: val })),
     onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -615,9 +626,20 @@ const ServiceRequestPageContent = () => {
               <Button
                 variant='contained'
                 startIcon={<RefreshIcon />}
-                onClick={async () => {
+                onClick={() => {
                   setPagination({ pageIndex: 0, pageSize: pagination.pageSize })
-                  await fetchTicketsFromApi(true)
+                  setAppliedFilters({
+                    enableDate: uiEnableDateFilter,
+                    start: uiStartDate,
+                    end: uiEndDate,
+                    customer: uiCustomer,
+                    contract: uiContract,
+                    technician: uiTechnician,
+                    supervisor: uiSupervisor,
+                    status: uiStatus,
+                    appointment: uiAppointment,
+                    search: uiSearch
+                  })
                 }}
                 sx={{ textTransform: 'none' }}
               >
@@ -651,33 +673,33 @@ const ServiceRequestPageContent = () => {
           >
             <Box sx={{ display: 'flex', flexDirection: 'column' }}>
               <FormControlLabel
-                control={<Checkbox checked={enableDateFilter} onChange={e => setEnableDateFilter(e.target.checked)} />}
+                control={<Checkbox checked={uiEnableDateFilter} onChange={e => setUiEnableDateFilter(e.target.checked)} />}
                 label='Date Filter'
                 sx={{ mb: -0.5 }}
               />
               <Box sx={{ width: 220 }}>
                 <GlobalDateRange
-                  start={startDate}
-                  end={endDate}
+                  start={uiStartDate}
+                  end={uiEndDate}
                   onSelectRange={({ start, end }) => {
-                    setStartDate(start)
-                    setEndDate(end)
+                    setUiStartDate(start)
+                    setUiEndDate(end)
                   }}
-                  disabled={!enableDateFilter}
+                  disabled={!uiEnableDateFilter}
                 />
               </Box>
             </Box>
 
             <CustomAutocomplete
               options={customerOptions}
-              value={customerOptions.find(o => o.id === customerFilter) || null}
+              value={customerOptions.find(o => o.id === uiCustomer) || null}
               getOptionLabel={option => option?.label || ''}
               getOptionKey={option => option?.id}
               isOptionEqualToValue={(o, v) => o.id === v?.id}
               onChange={(_, v) => {
                 const id = v?.id || ''
-                setCustomerFilter(id)
-                setContractFilter('')
+                setUiCustomer(id)
+                setUiContract('')
               }}
               renderInput={params => (
                 <CustomTextField
@@ -692,11 +714,11 @@ const ServiceRequestPageContent = () => {
 
             <CustomAutocomplete
               options={contractOptions}
-              value={contractOptions.find(o => o.id === contractFilter) || null}
+              value={contractOptions.find(o => o.id === uiContract) || null}
               getOptionLabel={option => option?.label || ''}
               getOptionKey={option => option?.id}
               isOptionEqualToValue={(o, v) => o.id === v?.id}
-              onChange={(_, v) => setContractFilter(v?.id || '')}
+              onChange={(_, v) => setUiContract(v?.id || '')}
               renderInput={params => (
                 <CustomTextField
                   {...params}
@@ -710,8 +732,8 @@ const ServiceRequestPageContent = () => {
 
             <CustomAutocomplete
               options={technicianOptions}
-              value={technicianOptions.find(o => o.id === technicianFilter) || null}
-              onChange={(_, v) => setTechnicianFilter(v?.id || '')}
+              value={technicianOptions.find(o => o.id === uiTechnician) || null}
+              onChange={(_, v) => setUiTechnician(v?.id || '')}
               getOptionLabel={option => option?.label || ''}
               renderInput={params => (
                 <CustomTextField
@@ -726,8 +748,8 @@ const ServiceRequestPageContent = () => {
 
             <CustomAutocomplete
               options={supervisorOptions}
-              value={supervisorOptions.find(o => o.id === supervisorFilter) || null}
-              onChange={(_, v) => setSupervisorFilter(v?.id || '')}
+              value={supervisorOptions.find(o => o.id === uiSupervisor) || null}
+              onChange={(_, v) => setUiSupervisor(v?.id || '')}
               getOptionLabel={option => option?.label || ''}
               renderInput={params => (
                 <CustomTextField
@@ -742,8 +764,8 @@ const ServiceRequestPageContent = () => {
 
             <CustomAutocomplete
               options={appointmentStatusList}
-              value={appointmentStatusList.find(o => o.id === appointmentStatusFilter) || null}
-              onChange={(_, v) => setAppointmentStatusFilter(v?.id || '')}
+              value={appointmentStatusList.find(o => o.id === uiStatus) || null}
+              onChange={(_, v) => setUiStatus(v?.id || '')}
               getOptionLabel={option => option?.label || ''}
               renderInput={params => (
                 <CustomTextField
@@ -758,8 +780,8 @@ const ServiceRequestPageContent = () => {
 
             <CustomAutocomplete
               options={appointmentList}
-              value={appointmentList.find(o => o.id === appointmentTypeFilter) || null}
-              onChange={(_, v) => setAppointmentTypeFilter(v?.id || '')}
+              value={appointmentList.find(o => o.id === uiAppointment) || null}
+              onChange={(_, v) => setUiAppointment(v?.id || '')}
               getOptionLabel={option => option?.label || ''}
               renderInput={params => (
                 <CustomTextField
@@ -824,10 +846,9 @@ const ServiceRequestPageContent = () => {
             <TextField
               size='small'
               placeholder='Search any field...'
-              value={searchText}
+              value={uiSearch}
               onChange={e => {
-                setSearchText(e.target.value)
-                setPagination(p => ({ ...p, pageIndex: 0 }))
+                setUiSearch(e.target.value)
               }}
               sx={{ width: 360 }}
               InputProps={{

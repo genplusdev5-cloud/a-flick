@@ -1,6 +1,7 @@
 .table {
   inline-size: 100%;
-  border-collapse: collapse;
+    border-collapse: separate;   /* 🔥 IMPORTANT */
+  border-spacing: 0;
   font-size: 0.8125rem;
   white-space: nowrap;
 
@@ -71,14 +72,20 @@
       }
     }
 
-    tr:not(:last-child) {
-      border-block-end: 1px solid var(--border-color);
-    }
-    tr {
-      border-block-start: 1px solid var(--border-color);
-    }
+
   }
 }
+
+/* ✅ Correct row separators */
+.table tbody td {
+  border-block-end: 1px solid var(--border-color);
+}
+
+/* Optional – last row clean */
+.table tbody tr:last-child td {
+  border-block-end: none;
+}
+
 
 /* ================================
    LIST PAGE – REUSABLE TABLE SCROLL

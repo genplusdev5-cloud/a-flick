@@ -86,11 +86,30 @@ const appointmentStatusOptions = [
 const AttendanceSchedulePageContent = () => {
   const [rows, setRows] = useState([])
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
-  const [searchText, setSearchText] = useState('')
-  const [dateFilter, setDateFilter] = useState(false)
-  const [dateRange, setDateRange] = useState([new Date(), new Date()])
-  const [startDate, setStartDate] = useState(new Date())
-  const [endDate, setEndDate] = useState(addDays(new Date(), 7))
+  // -- UI (TEMPORARY) FILTER STATES --
+  const [uiSearchText, setUiSearchText] = useState('')
+  const [uiDateFilter, setUiDateFilter] = useState(false)
+  const [uiDateRange, setUiDateRange] = useState([new Date(), new Date()])
+  const [uiAttendance, setUiAttendance] = useState(null)
+  const [uiTechnician, setUiTechnician] = useState(null)
+  const [uiSupervisor, setUiSupervisor] = useState(null)
+  const [uiCustomer, setUiCustomer] = useState(null)
+  const [uiApproval, setUiApproval] = useState(null)
+  const [uiAppointment, setUiAppointment] = useState(null)
+
+  // -- APPLIED (PERSISTENT) FILTER STATES --
+  const [appliedFilters, setAppliedFilters] = useState({
+    searchText: '',
+    dateFilter: false,
+    dateRange: [new Date(), new Date()],
+    attendance: null,
+    technician: null,
+    supervisor: null,
+    customer: null,
+    approval: null,
+    appointment: null
+  })
+
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
   const [loading, setLoading] = useState(false)
   const [sorting, setSorting] = useState([])
@@ -99,13 +118,6 @@ const AttendanceSchedulePageContent = () => {
   const [technicianList, setTechnicianList] = useState([])
   const [supervisorList, setSupervisorList] = useState([])
   const [customerList, setCustomerList] = useState([])
-
-  const [selectedAttendance, setSelectedAttendance] = useState(null)
-  const [selectedTechnician, setSelectedTechnician] = useState(null)
-  const [selectedSupervisor, setSelectedSupervisor] = useState(null)
-  const [selectedCustomer, setSelectedCustomer] = useState(null)
-  const [selectedApproval, setSelectedApproval] = useState(null)
-  const [selectedAppointment, setSelectedAppointment] = useState(null)
 
   const CustomDateInput = ({ label, start, end, ...rest }, ref) => {
     const startDateFormatted = format(start, 'dd/MM/yyyy')
@@ -214,20 +226,6 @@ const AttendanceSchedulePageContent = () => {
     loadScheduleList()
   }
 
-  useEffect(() => {
-    setPagination(prev => ({ ...prev, pageIndex: 0 }))
-  }, [
-    selectedAttendance,
-    selectedTechnician,
-    selectedSupervisor,
-    selectedCustomer,
-    selectedApproval,
-    selectedAppointment,
-    dateFilter,
-    dateRange,
-    searchText
-  ])
-
   // FETCH FUNCTION
   const loadScheduleList = async () => {
     try {
@@ -236,19 +234,19 @@ const AttendanceSchedulePageContent = () => {
       const params = {
         page: pagination.pageIndex + 1,
         page_size: pagination.pageSize,
-        search_text: searchText,
+        search_text: appliedFilters.searchText,
 
-        ...(dateFilter && {
-          start_date: format(dateRange[0], 'yyyy-MM-dd'),
-          end_date: format(dateRange[1], 'yyyy-MM-dd')
+        ...(appliedFilters.dateFilter && {
+          start_date: format(appliedFilters.dateRange[0], 'yyyy-MM-dd'),
+          end_date: format(appliedFilters.dateRange[1], 'yyyy-MM-dd')
         }),
 
-        ...(selectedAttendance && { attendance_id: selectedAttendance.value }),
-        ...(selectedTechnician && { technician_id: selectedTechnician.value }),
-        ...(selectedSupervisor && { supervisor_id: selectedSupervisor.value }),
-        ...(selectedCustomer && { customer_id: selectedCustomer.value }),
-        ...(selectedApproval && { approval_status: selectedApproval.value }),
-        ...(selectedAppointment && { appointment_status: selectedAppointment.value })
+        ...(appliedFilters.attendance && { attendance_id: appliedFilters.attendance.value }),
+        ...(appliedFilters.technician && { technician_id: appliedFilters.technician.value }),
+        ...(appliedFilters.supervisor && { supervisor_id: appliedFilters.supervisor.value }),
+        ...(appliedFilters.customer && { customer_id: appliedFilters.customer.value }),
+        ...(appliedFilters.approval && { approval_status: appliedFilters.approval.value }),
+        ...(appliedFilters.appointment && { appointment_status: appliedFilters.appointment.value })
       }
 
       const res = await getScheduleList(params)
@@ -271,30 +269,12 @@ const AttendanceSchedulePageContent = () => {
   }
 
   useEffect(() => {
-    const delayDebounce = setTimeout(() => {
-      loadScheduleList()
-    }, 500) // wait 0.5 sec after typing stops
-
-    return () => clearTimeout(delayDebounce)
-  }, [searchText])
+    loadScheduleList()
+  }, [pagination.pageIndex, pagination.pageSize, appliedFilters])
 
   useEffect(() => {
-    loadScheduleList()
-  }, [
-    selectedAttendance,
-    selectedTechnician,
-    selectedSupervisor,
-    selectedCustomer,
-    selectedApproval,
-    selectedAppointment,
-    dateFilter,
-    dateRange
-  ])
-
-  useEffect(() => {
-    loadScheduleList()
     loadDropdownData()
-  }, [pagination.pageIndex, pagination.pageSize])
+  }, [])
 
   const loadDropdownData = async () => {
     try {
@@ -407,11 +387,19 @@ const AttendanceSchedulePageContent = () => {
                     />
                   }
                   disabled={loading}
-                  onClick={async () => {
-                    setLoading(true)
-                    setPagination({ pageIndex: 0, pageSize: 25 })
-                    await loadScheduleList()
-                    setTimeout(() => setLoading(false), 800)
+                  onClick={() => {
+                    setPagination(p => ({ ...p, pageIndex: 0 }))
+                    setAppliedFilters({
+                      searchText: uiSearchText,
+                      dateFilter: uiDateFilter,
+                      dateRange: uiDateRange,
+                      attendance: uiAttendance,
+                      technician: uiTechnician,
+                      supervisor: uiSupervisor,
+                      customer: uiCustomer,
+                      approval: uiApproval,
+                      appointment: uiAppointment
+                    })
                   }}
                 >
                   {loading ? 'Refreshing...' : 'Refresh'}
@@ -498,17 +486,17 @@ const AttendanceSchedulePageContent = () => {
                   {/* Date Filter + Range */}
                   <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                     <FormControlLabel
-                      control={<Checkbox checked={dateFilter} onChange={e => setDateFilter(e.target.checked)} />}
+                      control={<Checkbox checked={uiDateFilter} onChange={e => setUiDateFilter(e.target.checked)} />}
                       label='Date Filter'
                     />
 
                     <Box sx={{ width: 220 }}>
                       <GlobalDateRange
                         label=''
-                        start={dateRange[0]}
-                        end={dateRange[1]}
-                        onSelectRange={({ start, end }) => setDateRange([start, end])}
-                        disabled={!dateFilter}
+                        start={uiDateRange[0]}
+                        end={uiDateRange[1]}
+                        onSelectRange={({ start, end }) => setUiDateRange([start, end])}
+                        disabled={!uiDateFilter}
                       />
                     </Box>
                   </Box>
@@ -522,8 +510,8 @@ const AttendanceSchedulePageContent = () => {
                         label: a.label,
                         value: a.id
                       }))}
-                      value={selectedAttendance}
-                      onChange={setSelectedAttendance}
+                      value={uiAttendance}
+                      onChange={setUiAttendance}
                     />
                   </Box>
 
@@ -536,8 +524,8 @@ const AttendanceSchedulePageContent = () => {
                         label: t.name,
                         value: t.id
                       }))}
-                      value={selectedTechnician}
-                      onChange={setSelectedTechnician}
+                      value={uiTechnician}
+                      onChange={setUiTechnician}
                     />
                   </Box>
 
@@ -550,8 +538,8 @@ const AttendanceSchedulePageContent = () => {
                         label: s.name,
                         value: s.id
                       }))}
-                      value={selectedSupervisor}
-                      onChange={setSelectedSupervisor}
+                      value={uiSupervisor}
+                      onChange={setUiSupervisor}
                     />
                   </Box>
 
@@ -564,8 +552,8 @@ const AttendanceSchedulePageContent = () => {
                         label: c.name,
                         value: c.id
                       }))}
-                      value={selectedCustomer}
-                      onChange={setSelectedCustomer}
+                      value={uiCustomer}
+                      onChange={setUiCustomer}
                     />
                   </Box>
 
@@ -575,8 +563,8 @@ const AttendanceSchedulePageContent = () => {
                       label='Approval Status'
                       placeholder='Select'
                       options={approvalStatusOptions}
-                      value={selectedApproval}
-                      onChange={setSelectedApproval}
+                      value={uiApproval}
+                      onChange={setUiApproval}
                     />
                   </Box>
 
@@ -586,14 +574,32 @@ const AttendanceSchedulePageContent = () => {
                       label='Appointment Status'
                       placeholder='Select'
                       options={appointmentStatusOptions}
-                      value={selectedAppointment}
-                      onChange={setSelectedAppointment}
+                      value={uiAppointment}
+                      onChange={setUiAppointment}
                     />
                   </Box>
                 </Box>
 
                 {/* Refresh Button */}
-                <GlobalButton variant='contained' color='primary' sx={{ height: 40 }} onClick={loadScheduleList}>
+                <GlobalButton
+                  variant='contained'
+                  color='primary'
+                  sx={{ height: 40 }}
+                  onClick={() => {
+                    setPagination(p => ({ ...p, pageIndex: 0 }))
+                    setAppliedFilters({
+                      searchText: uiSearchText,
+                      dateFilter: uiDateFilter,
+                      dateRange: uiDateRange,
+                      attendance: uiAttendance,
+                      technician: uiTechnician,
+                      supervisor: uiSupervisor,
+                      customer: uiCustomer,
+                      approval: uiApproval,
+                      appointment: uiAppointment
+                    })
+                  }}
+                >
                   Refresh
                 </GlobalButton>
 
@@ -685,8 +691,8 @@ const AttendanceSchedulePageContent = () => {
 
               <Box>
                 <TextField
-                  value={searchText}
-                  onChange={e => setSearchText(e.target.value)}
+                  value={uiSearchText}
+                  onChange={e => setUiSearchText(e.target.value)}
                   placeholder='Search...'
                   sx={{ width: 300 }}
                   size='small'

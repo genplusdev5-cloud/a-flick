@@ -54,7 +54,6 @@ import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 import classnames from 'classnames'
-import { rankItem } from '@tanstack/match-sorter-utils'
 import {
   useReactTable,
   getCoreRowModel,
@@ -88,6 +87,31 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
 import PermissionGuard from '@/components/auth/PermissionGuard'
 import { usePermission } from '@/hooks/usePermission'
 
+const departmentOptions = [
+  { id: 'hr', label: 'HR' },
+  { id: 'sales', label: 'Sales' },
+  { id: 'tech', label: 'Technical' },
+  { id: 'accounts', label: 'Accounts' }
+]
+
+const designationOptions = [
+  { id: 'manager', label: 'Manager' },
+  { id: 'executive', label: 'Executive' },
+  { id: 'technician', label: 'Technician' }
+]
+
+const userRoleOptions = [
+  { id: 'admin', label: 'Admin' },
+  { id: 'employee', label: 'Employee' },
+  { id: 'supervisor', label: 'Supervisor' }
+]
+
+const supervisorOptions = [
+  { id: 1, label: 'Ravi' },
+  { id: 2, label: 'Kumar' },
+  { id: 3, label: 'John' }
+]
+
 // ───────────────────────────────────────────
 // Component
 // ───────────────────────────────────────────
@@ -99,6 +123,11 @@ const EmployeePageContent = () => {
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
+
+  const [department, setDepartment] = useState(null)
+  const [designation, setDesignation] = useState(null)
+  const [userRole, setUserRole] = useState(null)
+  const [supervisor, setSupervisor] = useState(null)
 
   // Initialize pagination from URL search params
   const initialPageIndex = searchParams.get('pageIndex') ? Number(searchParams.get('pageIndex')) : 0
@@ -116,11 +145,12 @@ const EmployeePageContent = () => {
     setLoading(true)
     try {
       // ✅ API returns { message, status, count, data: { results: [...] } }
-      const res = await getEmployeeList(
-        pagination.pageSize,
-        pagination.pageIndex + 1, // page number
-        searchText
-      )
+      const res = await getEmployeeList(pagination.pageSize, pagination.pageIndex + 1, searchText, {
+        department: department?.id,
+        designation: designation?.id,
+        user_role: userRole?.id,
+        supervisor: supervisor?.id
+      })
 
       const results = res?.results || []
 
@@ -192,7 +222,7 @@ const EmployeePageContent = () => {
     } finally {
       setLoading(false)
     }
-  }, [pagination.pageIndex, pagination.pageSize, searchText])
+  }, [pagination.pageIndex, pagination.pageSize, searchText, department, designation, userRole, supervisor])
 
   useEffect(() => {
     // ✅ Auto refresh after adding new employee
@@ -458,12 +488,9 @@ const EmployeePageContent = () => {
     columns,
     manualPagination: true,
     pageCount: Math.ceil(rowCount / pagination.pageSize),
-    state: { globalFilter: searchText, pagination },
-    onGlobalFilterChange: setSearchText,
+    state: { pagination },
     onPaginationChange: setPagination,
-    globalFilterFn: fuzzyFilter,
     getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel()
   })
 
@@ -639,8 +666,76 @@ const EmployeePageContent = () => {
 
         <Divider />
 
+        {/* ───────── Filters Section ───────── */}
+        <Box
+          sx={{
+            px: 4,
+            py: 2,
+            display: 'flex',
+            gap: 2,
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            borderBottom: '1px solid',
+            borderColor: 'divider'
+          }}
+        >
+          {/* Department */}
+          <GlobalAutocomplete
+            size='small'
+            sx={{ width: 220 }}
+            placeholder='Department'
+            options={departmentOptions}
+            value={department}
+            onChange={(_, value) => {
+              setDepartment(value)
+              setPagination(p => ({ ...p, pageIndex: 0 }))
+            }}
+          />
+
+          {/* Designation */}
+          <GlobalAutocomplete
+            size='small'
+            sx={{ width: 220 }}
+            placeholder='Designation'
+            options={designationOptions}
+            value={designation}
+            onChange={(_, value) => {
+              setDesignation(value)
+              setPagination(p => ({ ...p, pageIndex: 0 }))
+            }}
+          />
+
+          {/* User Role */}
+          <GlobalAutocomplete
+            size='small'
+            sx={{ width: 220 }}
+            placeholder='User Role'
+            options={userRoleOptions}
+            value={userRole}
+            onChange={(_, value) => {
+              setUserRole(value)
+              setPagination(p => ({ ...p, pageIndex: 0 }))
+            }}
+          />
+
+          {/* Supervisor */}
+          <GlobalAutocomplete
+            size='small'
+            sx={{ width: 240 }}
+            placeholder='Supervisor'
+            options={supervisorOptions}
+            value={supervisor}
+            onChange={(_, value) => {
+              setSupervisor(value)
+              setPagination(p => ({ ...p, pageIndex: 0 }))
+            }}
+          />
+        </Box>
+
         <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, flexShrink: 0 }}>
+          <Box
+            sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, flexShrink: 0 }}
+          >
             <FormControl size='small' sx={{ width: 140 }}>
               <Select
                 value={pagination.pageSize}
@@ -653,7 +748,6 @@ const EmployeePageContent = () => {
                 ))}
               </Select>
             </FormControl>
-
             <DebouncedInput
               value={searchText}
               onChange={v => {
@@ -661,17 +755,20 @@ const EmployeePageContent = () => {
                 setPagination(p => ({ ...p, pageIndex: 0 }))
               }}
               placeholder='Search name, email, phone, department...'
-              sx={{ width: 420 }}
-              variant='outlined'
               size='small'
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position='start'>
-                      <SearchIcon />
-                    </InputAdornment>
-                  )
+              sx={{
+                width: 300, // 🔥 OLD WIDTH
+                '& .MuiInputBase-root': {
+                  height: 36, // 🔥 OLD HEIGHT
+                  fontSize: '0.875rem'
                 }
+              }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position='start'>
+                    <SearchIcon fontSize='small' />
+                  </InputAdornment>
+                )
               }}
             />
           </Box>
@@ -745,7 +842,7 @@ const EmployeePageContent = () => {
           </Box>
         </Box>
       </Card>
-      
+
       {/* Delete Confirmation Dialog */}
       <Dialog
         open={deleteDialog.open}
@@ -803,7 +900,6 @@ const EmployeePageContent = () => {
     </StickyListLayout>
   )
 }
-
 
 // Wrapper for RBAC
 export default function EmployeePage() {

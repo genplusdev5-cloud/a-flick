@@ -58,6 +58,13 @@ export default function DashboardList() {
   const [loading, setLoading] = useState(false)
   const runOnce = useRef(false)
 
+  const [appliedSearchText, setAppliedSearchText] = useState('')
+  const [appliedRadioFilter, setAppliedRadioFilter] = useState('')
+
+  const handleRadioToggle = value => {
+    setRadioFilter(prev => (prev === value ? '' : value))
+  }
+
   const columnHelper = createColumnHelper()
 
   // ----------------------------
@@ -163,8 +170,8 @@ export default function DashboardList() {
         pagination.pageIndex + 1,
         pagination.pageSize,
         cancelSource.token,
-        radioFilter,
-        searchText
+        appliedRadioFilter,
+        appliedSearchText
       )
 
       if (res.status === 'success') {
@@ -209,35 +216,98 @@ export default function DashboardList() {
     } finally {
       setLoading(false)
     }
-  }, [filterType, pagination.pageIndex, pagination.pageSize, radioFilter, searchText])
+  }, [filterType, pagination.pageIndex, pagination.pageSize, appliedRadioFilter, appliedSearchText])
+
+  const handleRefresh = () => {
+    setAppliedSearchText(searchText)
+    setAppliedRadioFilter(radioFilter)
+
+    setPagination(p => ({
+      ...p,
+      pageIndex: 0
+    }))
+  }
 
   useEffect(() => {
     loadList()
   }, [loadList])
-
-  const handleRefresh = () => loadList()
 
   // ----------------------------
   // RADIO BUTTONS (DYNAMIC)
   // ----------------------------
   const customerRadios = (
     <>
-      <FormControlLabel value='business_name' control={<Radio />} label='Business Name' />
-      <FormControlLabel value='billing_name' control={<Radio />} label='Billing Name' />
-      <FormControlLabel value='billing_address' control={<Radio />} label='Billing Address' />
-      <FormControlLabel value='billing_postal' control={<Radio />} label='Billing Postal' />
-      <FormControlLabel value='billing_contact' control={<Radio />} label='Billing Contact' />
-      <FormControlLabel value='billing_phone' control={<Radio />} label='Billing Phone' />
+      <FormControlLabel
+        value='business_name'
+        control={<Radio />}
+        label='Business Name'
+        onClick={() => handleRadioToggle('business_name')}
+      />
+      <FormControlLabel
+        value='billing_name'
+        control={<Radio />}
+        label='Billing Name'
+        onClick={() => handleRadioToggle('billing_name')}
+      />
+      <FormControlLabel
+        value='billing_address'
+        control={<Radio />}
+        label='Billing Address'
+        onClick={() => handleRadioToggle('billing_address')}
+      />
+      <FormControlLabel
+        value='billing_postal'
+        control={<Radio />}
+        label='Billing Postal'
+        onClick={() => handleRadioToggle('billing_postal')}
+      />
+      <FormControlLabel
+        value='billing_contact'
+        control={<Radio />}
+        label='Billing Contact'
+        onClick={() => handleRadioToggle('billing_contact')}
+      />
+      <FormControlLabel
+        value='billing_phone'
+        control={<Radio />}
+        label='Billing Phone'
+        onClick={() => handleRadioToggle('billing_phone')}
+      />
     </>
   )
 
   const contractRadios = (
     <>
-      <FormControlLabel value='contract_no' control={<Radio />} label='Contract No.' />
-      <FormControlLabel value='service_address' control={<Radio />} label='Service Address' />
-      <FormControlLabel value='service_postal' control={<Radio />} label='Service Postal' />
-      <FormControlLabel value='service_contact' control={<Radio />} label='Service Contact' />
-      <FormControlLabel value='service_phone' control={<Radio />} label='Service Phone' />
+      <FormControlLabel
+        value='contract_no'
+        control={<Radio />}
+        label='Contract No.'
+        onClick={() => handleRadioToggle('contract_no')}
+      />
+      <FormControlLabel
+        value='service_address'
+        control={<Radio />}
+        label='Service Address'
+        onClick={() => handleRadioToggle('service_address')}
+      />
+      <FormControlLabel
+        value='service_postal'
+        control={<Radio />}
+        label='Service Postal'
+        onClick={() => handleRadioToggle('service_postal')}
+      />
+      <FormControlLabel
+        value='service_contact'
+        control={<Radio />}
+        label='Service Contact'
+        onClick={() => handleRadioToggle('service_contact')}
+      />
+      <FormControlLabel
+        value='service_phone'
+        control={<Radio />}
+        label='Service Phone'
+        onClick={() => handleRadioToggle('service_phone')}
+      />
     </>
   )
 
@@ -317,12 +387,7 @@ export default function DashboardList() {
               placeholder='Search...'
               value={searchText}
               onChange={e => {
-                const value = e.target.value
-                setSearchText(value)
-                if (!value) {
-                  setRadioFilter('')
-                  loadList()
-                }
+                setSearchText(e.target.value)
               }}
               InputProps={{
                 startAdornment: (
@@ -372,12 +437,7 @@ export default function DashboardList() {
         </Box>
 
         {/* RADIO FILTERS */}
-        <RadioGroup
-          row
-          value={radioFilter}
-          onChange={e => setRadioFilter(e.target.value)}
-          sx={{ mb: 4, flexWrap: 'wrap', gap: 2 }}
-        >
+        <RadioGroup row value={radioFilter} sx={{ mb: 4, flexWrap: 'wrap', gap: 2 }}>
           {filterType === 'Customer' ? customerRadios : contractRadios}
         </RadioGroup>
 

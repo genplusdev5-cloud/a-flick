@@ -59,7 +59,7 @@ return { status: 'success' }
       return { status: 'skipped' }
     }
 
-    ; ```
+    ;```
 console.error('Logout API error:', err)
 return { status: 'error', message: 'Server logout failed; proceeding locally.' }
 ```
@@ -176,10 +176,10 @@ const UserDropdown = () => {
                   <Divider className='mlb-1' />
 
                   {/* ✅ Example menu link */}
-                  <MenuItem className='mli-2 gap-3' onClick={e => handleDropdownClose(e, '/pages/user-profile')}>
+                  {/* <MenuItem className='mli-2 gap-3' onClick={e => handleDropdownClose(e, '/pages/user-profile')}>
                     <i className='tabler-user' />
                     <Typography color='text.primary'>My Profile</Typography>
-                  </MenuItem>
+                  </MenuItem> */}
 
                   {/* ✅ Logout Button */}
                   <div className='flex items-center plb-2 pli-3'>

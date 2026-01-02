@@ -131,7 +131,6 @@ const ContractsPageContent = () => {
 
   const [rows, setRows] = useState([])
   const [rowCount, setRowCount] = useState(0)
-  const [searchText, setSearchText] = useState('')
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
   const [loading, setLoading] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
@@ -141,13 +140,23 @@ const ContractsPageContent = () => {
   const [openDrawer, setOpenDrawer] = useState(false)
   const [selectedContract, setSelectedContract] = useState(null)
 
+  // -- FILTER STATES --
+  const [uiSearch, setUiSearch] = useState('')
+  const [uiCustomer, setUiCustomer] = useState(null)
+  const [uiType, setUiType] = useState(null)
+  const [uiStatus, setUiStatus] = useState(null)
+  const [uiUuid, setUiUuid] = useState(null)
+
+  const [appliedFilters, setAppliedFilters] = useState({
+    search: '',
+    customer: null,
+    type: null,
+    status: null,
+    uuid: null
+  })
+
   const encodedCustomerId = searchParams.get('customer')
   const decodedCustomerId = encodedCustomerId ? parseInt(atob(encodedCustomerId)) : null
-  const [uuidFilter, setUuidFilter] = useState(null)
-
-  const [customerFilter, setCustomerFilter] = useState(null)
-  const [typeFilter, setTypeFilter] = useState(null)
-  const [statusFilter, setStatusFilter] = useState(null)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -155,12 +164,13 @@ const ContractsPageContent = () => {
       const params = {
         page: pagination.pageIndex + 1,
         page_size: pagination.pageSize,
-        search: searchText
+        search: appliedFilters.search
       }
 
-      if (customerFilter?.id) params.customer_id = customerFilter.id
-      if (typeFilter?.value) params.contract_type = typeFilter.value
-      if (statusFilter?.value) params.contract_status = statusFilter.value
+      if (appliedFilters.uuid) params.uuid = appliedFilters.uuid
+      if (appliedFilters.customer?.id) params.customer_id = appliedFilters.customer.id
+      if (appliedFilters.type?.value) params.contract_type = appliedFilters.type.value
+      if (appliedFilters.status?.value) params.contract_status = appliedFilters.status.value
 
       const res = await getContractList(params)
 
@@ -190,7 +200,7 @@ const ContractsPageContent = () => {
     } finally {
       setLoading(false)
     }
-  }, [pagination.pageIndex, pagination.pageSize, searchText, customerFilter, typeFilter, statusFilter])
+  }, [pagination.pageIndex, pagination.pageSize, appliedFilters])
 
   useEffect(() => {
     loadData()
@@ -274,7 +284,9 @@ const ContractsPageContent = () => {
     if (decodedCustomerId && customerOptions.length > 0) {
       const matched = customerOptions.find(c => c.id === decodedCustomerId)
       if (matched) {
-        setCustomerFilter(matched)
+        setUiCustomer(matched)
+        // Also apply immediately if it's from URL
+        setAppliedFilters(prev => ({ ...prev, customer: matched }))
       }
     }
   }, [decodedCustomerId, customerOptions])
@@ -284,10 +296,10 @@ const ContractsPageContent = () => {
     loadCustomers()
   }, [])
 
-  // Load contracts whenever filters / pagination / search changes
+  // Load contracts whenever applied filters / pagination changes
   useEffect(() => {
     loadData()
-  }, [customerFilter, typeFilter, statusFilter, uuidFilter, pagination.pageIndex, pagination.pageSize, searchText])
+  }, [appliedFilters, pagination.pageIndex, pagination.pageSize])
 
   const handleEdit = row => {
     router.push(`/admin/contracts/${row.uuid}/edit`)
@@ -550,8 +562,8 @@ const ContractsPageContent = () => {
     columns,
     manualPagination: true,
     pageCount: Math.ceil(rowCount / pagination.pageSize),
-    state: { globalFilter: searchText, pagination },
-    onGlobalFilterChange: setSearchText,
+    state: { globalFilter: appliedFilters.search, pagination },
+    onGlobalFilterChange: (val) => setAppliedFilters(prev => ({ ...prev, search: val })),
     onPaginationChange: setPagination,
     globalFilterFn: fuzzyFilter,
     getCoreRowModel: getCoreRowModel(),
@@ -655,10 +667,15 @@ const ContractsPageContent = () => {
           />
         }
         disabled={loading}
-        onClick={async () => {
-          setLoading(true)
-          await loadData()
-          setTimeout(() => setLoading(false), 600)
+        onClick={() => {
+          setPagination(p => ({ ...p, pageIndex: 0 }))
+          setAppliedFilters({
+            search: uiSearch,
+            customer: uiCustomer,
+            type: uiType,
+            status: uiStatus,
+            uuid: uiUuid
+          })
         }}
         sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
       >
@@ -757,8 +774,8 @@ const ContractsPageContent = () => {
                   id='customer-filter'
                   options={customerOptions}
                   getOptionLabel={option => option?.name || ''}
-                  value={customerOptions.find(opt => opt.id === customerFilter?.id) || null}
-                  onChange={newVal => setCustomerFilter(newVal)}
+                  value={customerOptions.find(opt => opt.id === uiCustomer?.id) || null}
+                  onChange={newVal => setUiCustomer(newVal)}
                   renderInput={params => (
                     <GlobalTextField {...params} label='Customer' placeholder='Select Customer' size='small' />
                   )}
@@ -770,9 +787,9 @@ const ContractsPageContent = () => {
                 fullWidth
                 options={CONTRACT_TYPES}
                 getOptionLabel={o => o.label}
-                value={CONTRACT_TYPES.find(v => v.value === typeFilter) || null}
+                value={CONTRACT_TYPES.find(v => v.value === uiType) || null}
                 onChange={newValue => {
-                  setTypeFilter(newValue?.value || null)
+                  setUiType(newValue?.value || null)
                 }}
                 renderInput={params => (
                   <GlobalTextField {...params} label='Contract Type' placeholder='Select Type' size='small' />
@@ -785,9 +802,9 @@ const ContractsPageContent = () => {
                 fullWidth
                 options={CONTRACT_STATUS}
                 getOptionLabel={o => o.label}
-                value={CONTRACT_STATUS.find(s => s.value === statusFilter) || null}
+                value={CONTRACT_STATUS.find(s => s.value === uiStatus) || null}
                 onChange={newValue => {
-                  setStatusFilter(newValue?.value || null)
+                  setUiStatus(newValue?.value || null)
                 }}
                 renderInput={params => (
                   <GlobalTextField {...params} label='Contract Status' placeholder='Select Status' size='small' />
@@ -798,19 +815,19 @@ const ContractsPageContent = () => {
 
             {/* SEARCH RIGHT SIDE */}
             <DebouncedInput
-              value={searchText}
+              value={uiUuid ? `uuid:${uiUuid}` : uiSearch}
               onChange={v => {
                 const value = String(v)
 
                 if (value.startsWith('uuid:')) {
                   const uid = value.replace('uuid:', '').trim()
-                  setUuidFilter(uid)
+                  setUiUuid(uid)
+                  setUiSearch('')
                   return
                 }
 
-                setUuidFilter(null)
-                setSearchText(value)
-                setPagination(p => ({ ...p, pageIndex: 0 }))
+                setUiUuid(null)
+                setUiSearch(value)
               }}
               placeholder='Search customer, code, address, pests...'
               size='small'

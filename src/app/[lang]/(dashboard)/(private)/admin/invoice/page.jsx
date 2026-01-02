@@ -74,14 +74,18 @@ const InvoiceListPageFullContent = () => {
 
   // ── Filters ──────────────────────────────────
 
-  const [originFilter, setOriginFilter] = useState(null)
-  const [contractTypeFilter, setContractTypeFilter] = useState('')
-  const [invoiceStatusFilter, setInvoiceStatusFilter] = useState(null)
-  const [serviceFreqFilter, setServiceFreqFilter] = useState('')
-  const [billingFreqFilter, setBillingFreqFilter] = useState('')
-  const [contractLevelFilter, setContractLevelFilter] = useState('')
-  const [invoiceTypeFilter, setInvoiceTypeFilter] = useState('')
-  const [salesPersonFilter, setSalesPersonFilter] = useState('')
+  // -- UI (TEMPORARY) FILTER STATES --
+  const [uiOrigin, setUiOrigin] = useState(null)
+  const [uiContractType, setUiContractType] = useState('')
+  const [uiInvoiceStatus, setUiInvoiceStatus] = useState(null)
+  const [uiServiceFreq, setUiServiceFreq] = useState('')
+  const [uiBillingFreq, setUiBillingFreq] = useState('')
+  const [uiContractLevel, setUiContractLevel] = useState('')
+  const [uiInvoiceType, setUiInvoiceType] = useState('')
+  const [uiSalesPerson, setUiSalesPerson] = useState('')
+  const [uiSearch, setUiSearch] = useState('')
+  const [uiDateFilter, setUiDateFilter] = useState(false)
+  const [uiDateRange, setUiDateRange] = useState([null, null])
   const [sorting, setSorting] = useState([])
 
   const encodedCustomer = searchParams.get('customer')
@@ -91,8 +95,25 @@ const InvoiceListPageFullContent = () => {
   const decodedContractId = encodedContract ? Number(atob(encodedContract)) : null
 
   // ✅ REQUIRED STATES (YOU MISSED THIS)
-  const [customerFilter, setCustomerFilter] = useState(null)
-  const [contractFilter, setContractFilter] = useState(null)
+  const [uiCustomer, setUiCustomer] = useState(null)
+  const [uiContract, setUiContract] = useState(null)
+
+  // -- APPLIED FILTER STATES (Triggers API) --
+  const [appliedFilters, setAppliedFilters] = useState({
+    origin: null,
+    contractType: null,
+    invoiceStatus: null,
+    serviceFreq: null,
+    billingFreq: null,
+    contractLevel: null,
+    invoiceType: null,
+    salesPerson: null,
+    customer: null,
+    contract: null,
+    search: '',
+    dateFilter: false,
+    dateRange: [null, null]
+  })
 
   //CUSTOMER FILTERS
   useEffect(() => {
@@ -101,7 +122,9 @@ const InvoiceListPageFullContent = () => {
     const matchedCustomer = dropdownData.customers.find(c => Number(c.id) === Number(decodedCustomerId))
 
     if (matchedCustomer) {
-      setCustomerFilter(matchedCustomer)
+      setUiCustomer(matchedCustomer)
+      // Also apply initially if it's from URL
+      setAppliedFilters(prev => ({ ...prev, customer: matchedCustomer }))
     }
   }, [decodedCustomerId, dropdownData.customers])
 
@@ -113,16 +136,14 @@ const InvoiceListPageFullContent = () => {
     const matchedContract = dropdownData.contracts.find(c => Number(c.id) === Number(decodedContractId))
 
     if (matchedContract) {
-      setContractFilter(matchedContract)
+      setUiContract(matchedContract)
+      // Also apply initially if it's from URL
+      setAppliedFilters(prev => ({ ...prev, contract: matchedContract }))
     }
   }, [decodedContractId, dropdownData.contracts])
 
-  const [searchText, setSearchText] = useState('')
   const [totalCount, setTotalCount] = useState(0)
   const [customerSpecificContracts, setCustomerSpecificContracts] = useState(null)
-  const [dateFilter, setDateFilter] = useState(false) // renamed from dateFilterEnabled
-  const today = new Date()
-  const [dateRange, setDateRange] = useState([null, null])
 
   // PDF Preview Invoice Data
   const [selectedInvoiceData, setSelectedInvoiceData] = useState(null)
@@ -175,60 +196,31 @@ const InvoiceListPageFullContent = () => {
     }
 
     // Date range
-    if (dateFilter && dateRange[0]) {
-      params.from_date = format(dateRange[0], 'yyyy-MM-dd')
-      if (dateRange[1]) {
-        params.to_date = format(dateRange[1], 'yyyy-MM-dd')
+    if (appliedFilters.dateFilter && appliedFilters.dateRange[0]) {
+      params.from_date = format(appliedFilters.dateRange[0], 'yyyy-MM-dd')
+      if (appliedFilters.dateRange[1]) {
+        params.to_date = format(appliedFilters.dateRange[1], 'yyyy-MM-dd')
       }
     }
 
-    // Only add if value exists
-    if (originFilter?.id) params.company_id = originFilter.id
-    if (contractTypeFilter?.id) params.contract_type = contractTypeFilter.id
-    if (invoiceStatusFilter?.label) params.is_issued = invoiceStatusFilter.label === 'Yes' ? 1 : 0
-    if (serviceFreqFilter?.id) params.service_frequency = serviceFreqFilter.id
-    if (billingFreqFilter?.id) params.billing_frequency_id = billingFreqFilter.id
-    if (contractLevelFilter?.id) params.contract_level = contractLevelFilter.id
-    if (invoiceTypeFilter?.id) params.invoice_type = invoiceTypeFilter.id
-    if (salesPersonFilter?.id) params.sales_person_id = salesPersonFilter.id
-    // 🔥 ALWAYS SEND DECODED IDs TO API
-    if (decodedCustomerId) {
-      params.customer_id = decodedCustomerId
-    } else if (customerFilter?.id) {
-      params.customer_id = customerFilter.id
+    if (appliedFilters.origin?.id) params.company_id = appliedFilters.origin.id
+    if (appliedFilters.contractType?.id) params.contract_type = appliedFilters.contractType.id
+    if (appliedFilters.invoiceStatus?.label) params.is_issued = appliedFilters.invoiceStatus.label === 'Yes' ? 1 : 0
+    if (appliedFilters.serviceFreq?.id) params.service_frequency = appliedFilters.serviceFreq.id
+    if (appliedFilters.billingFreq?.id) params.billing_frequency_id = appliedFilters.billingFreq.id
+    if (appliedFilters.contractLevel?.id) params.contract_level = appliedFilters.contractLevel.id
+    if (appliedFilters.invoiceType?.id) params.invoice_type = appliedFilters.invoiceType.id
+    if (appliedFilters.salesPerson?.id) params.sales_person_id = appliedFilters.salesPerson.id
+
+    if (appliedFilters.customer?.id) {
+      params.customer_id = appliedFilters.customer.id
     }
 
-    if (decodedContractId) {
-      params.contract_id = decodedContractId
-    } else if (contractFilter?.id) {
-      params.contract_id = contractFilter.id
+    if (appliedFilters.contract?.id) {
+      params.contract_id = appliedFilters.contract.id
     }
 
-    if (searchText.trim()) params.search = searchText.trim()
-
-    return params
-  }
-
-  const buildFilters = () => {
-    const params = {
-      page: pagination.pageIndex + 1,
-      page_size: pagination.pageSize
-    }
-
-    if (dateFilterEnabled && filterDate) params.invoice_date = format(filterDate, 'yyyy-MM-dd')
-
-    if (originFilter?.id) params.company_id = originFilter.id
-    if (contractTypeFilter?.id) params.contract_type = contractTypeFilter.id
-    if (invoiceStatusFilter?.label) params.is_issued = invoiceStatusFilter.label === 'Yes' ? 1 : 0
-    if (serviceFreqFilter?.id) params.service_frequency = serviceFreqFilter.id
-    if (billingFreqFilter?.id) params.billing_frequency = billingFreqFilter.id
-    if (contractLevelFilter?.id) params.contract_level = contractLevelFilter.id
-    if (invoiceTypeFilter?.id) params.invoice_type = invoiceTypeFilter.id
-    if (salesPersonFilter?.id) params.sales_person_id = salesPersonFilter.id
-    if (customerFilter?.id) params.customer_id = customerFilter.id
-    if (contractFilter?.id) params.contract_id = contractFilter.id
-
-    if (searchText) params.search = searchText
+    if (appliedFilters.search.trim()) params.search = appliedFilters.search.trim()
 
     return params
   }
@@ -368,34 +360,27 @@ const InvoiceListPageFullContent = () => {
     }
   }
   useEffect(() => {
-    const timer = setTimeout(() => {
-      loadEverything()
-    }, 300) // wait 300ms so state finishes update
-
-    return () => clearTimeout(timer)
-  }, [
-    pagination.pageIndex,
-    pagination.pageSize,
-    dateFilter,
-    dateRange[0],
-    dateRange[1],
-    originFilter?.id,
-    contractTypeFilter?.id,
-    invoiceStatusFilter?.label,
-    serviceFreqFilter?.id,
-    billingFreqFilter?.id,
-    contractLevelFilter?.id,
-    invoiceTypeFilter?.id,
-    salesPersonFilter?.id,
-    customerFilter?.id,
-    contractFilter?.id,
-    searchText
-  ])
+    loadEverything()
+  }, [pagination.pageIndex, pagination.pageSize, appliedFilters])
 
   // ── Refresh ───────────────────────────────────
   const handleRefresh = () => {
-    setLoading(true)
-    setTimeout(() => loadEverything(), 300)
+    setPagination(p => ({ ...p, pageIndex: 0 }))
+    setAppliedFilters({
+      origin: uiOrigin,
+      contractType: uiContractType,
+      invoiceStatus: uiInvoiceStatus,
+      serviceFreq: uiServiceFreq,
+      billingFreq: uiBillingFreq,
+      contractLevel: uiContractLevel,
+      invoiceType: uiInvoiceType,
+      salesPerson: uiSalesPerson,
+      customer: uiCustomer,
+      contract: uiContract,
+      search: uiSearch,
+      dateFilter: uiDateFilter,
+      dateRange: uiDateRange
+    })
   }
 
   // APPROVE (Issue Invoice)
@@ -701,7 +686,7 @@ const InvoiceListPageFullContent = () => {
 
   useEffect(() => {
     const today = new Date()
-    setDateRange([today, today])
+    setUiDateRange([today, today])
   }, [])
 
   const pageIndex = pagination.pageIndex
@@ -832,14 +817,14 @@ const InvoiceListPageFullContent = () => {
               <Grid item xs={12} sm={6} md={3}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Checkbox
-                    checked={dateFilter}
+                    checked={uiDateFilter}
                     onChange={e => {
-                      setDateFilter(e.target.checked)
+                      setUiDateFilter(e.target.checked)
                       if (!e.target.checked) {
-                        setDateRange([null, null])
+                        setUiDateRange([null, null])
                       } else {
                         const today = new Date()
-                        setDateRange([today, today])
+                        setUiDateRange([today, today])
                       }
                     }}
                     size='small'
@@ -848,10 +833,10 @@ const InvoiceListPageFullContent = () => {
                 </Box>
 
                 <GlobalDateRange
-                  start={dateRange[0]}
-                  end={dateRange[1]}
-                  onSelectRange={({ start, end }) => setDateRange([start, end])}
-                  disabled={!dateFilter}
+                  start={uiDateRange[0]}
+                  end={uiDateRange[1]}
+                  onSelectRange={({ start, end }) => setUiDateRange([start, end])}
+                  disabled={!uiDateFilter}
                   size='small'
                 />
               </Grid>
@@ -859,8 +844,8 @@ const InvoiceListPageFullContent = () => {
               <Grid item xs={12} sm={6} md={3}>
                 <CustomAutocomplete
                   options={originOptions}
-                  value={originFilter || null}
-                  onChange={(_, v) => setOriginFilter(v || null)}
+                  value={uiOrigin || null}
+                  onChange={(_, v) => setUiOrigin(v || null)}
                   getOptionLabel={opt => opt?.label || ''}
                   renderInput={p => <CustomTextField {...p} label='Origin' size='small' />}
                 />
@@ -869,8 +854,8 @@ const InvoiceListPageFullContent = () => {
               <Grid item xs={12} sm={6} md={3}>
                 <CustomAutocomplete
                   options={contractTypeOptions}
-                  value={contractTypeFilter || null}
-                  onChange={(_, v) => setContractTypeFilter(v || null)}
+                  value={uiContractType || null}
+                  onChange={(_, v) => setUiContractType(v || null)}
                   getOptionLabel={opt => opt?.label || ''}
                   renderInput={p => <CustomTextField {...p} label='Contract Type' size='small' />}
                 />
@@ -879,8 +864,8 @@ const InvoiceListPageFullContent = () => {
               <Grid item xs={12} sm={6} md={3}>
                 <CustomAutocomplete
                   options={invoiceStatusOptions}
-                  value={invoiceStatusFilter || null}
-                  onChange={(_, v) => setInvoiceStatusFilter(v || null)}
+                  value={uiInvoiceStatus || null}
+                  onChange={(_, v) => setUiInvoiceStatus(v || null)}
                   getOptionLabel={opt => opt?.label || ''}
                   renderInput={p => <CustomTextField {...p} label='Invoice Status' size='small' />}
                 />
@@ -890,8 +875,8 @@ const InvoiceListPageFullContent = () => {
               <Grid item xs={12} sm={6} md={3}>
                 <CustomAutocomplete
                   options={serviceFreqOptions}
-                  value={serviceFreqFilter || null}
-                  onChange={(_, v) => setServiceFreqFilter(v || null)}
+                  value={uiServiceFreq || null}
+                  onChange={(_, v) => setUiServiceFreq(v || null)}
                   getOptionLabel={opt => opt?.label || ''}
                   renderInput={p => <CustomTextField {...p} label='Service Frequency' size='small' />}
                 />
@@ -900,8 +885,8 @@ const InvoiceListPageFullContent = () => {
               <Grid item xs={12} sm={6} md={3}>
                 <CustomAutocomplete
                   options={billingFreqOptions}
-                  value={billingFreqFilter || null}
-                  onChange={(_, v) => setBillingFreqFilter(v || null)}
+                  value={uiBillingFreq || null}
+                  onChange={(_, v) => setUiBillingFreq(v || null)}
                   getOptionLabel={opt => opt?.label || ''}
                   renderInput={p => <CustomTextField {...p} label='Billing Frequency' size='small' />}
                 />
@@ -910,8 +895,8 @@ const InvoiceListPageFullContent = () => {
               <Grid item xs={12} sm={6} md={3}>
                 <CustomAutocomplete
                   options={contractLevelOptions}
-                  value={contractLevelFilter || null}
-                  onChange={(_, v) => setContractLevelFilter(v || null)}
+                  value={uiContractLevel || null}
+                  onChange={(_, v) => setUiContractLevel(v || null)}
                   getOptionLabel={opt => opt?.label || ''}
                   renderInput={p => <CustomTextField {...p} label='Contract Level' size='small' />}
                 />
@@ -920,8 +905,8 @@ const InvoiceListPageFullContent = () => {
               <Grid item xs={12} sm={6} md={3}>
                 <CustomAutocomplete
                   options={invoiceTypeOptions}
-                  value={invoiceTypeFilter || null}
-                  onChange={(_, v) => setInvoiceTypeFilter(v || null)}
+                  value={uiInvoiceType || null}
+                  onChange={(_, v) => setUiInvoiceType(v || null)}
                   getOptionLabel={opt => opt?.label || ''}
                   renderInput={p => <CustomTextField {...p} label='Invoice Type' size='small' />}
                 />
@@ -931,8 +916,8 @@ const InvoiceListPageFullContent = () => {
               <Grid item xs={12} sm={6} md={3}>
                 <CustomAutocomplete
                   options={salesPersonOptions}
-                  value={salesPersonFilter || null}
-                  onChange={(_, v) => setSalesPersonFilter(v || null)}
+                  value={uiSalesPerson || null}
+                  onChange={(_, v) => setUiSalesPerson(v || null)}
                   getOptionLabel={opt => opt?.label || ''}
                   renderInput={p => <CustomTextField {...p} label='Sales Person' size='small' />}
                 />
@@ -941,12 +926,12 @@ const InvoiceListPageFullContent = () => {
               <Grid item xs={12} sm={6} md={3}>
                 <CustomAutocomplete
                   options={customerOptions}
-                  value={customerFilter || null}
+                  value={uiCustomer || null}
                   getOptionLabel={option => option?.label || ''}
                   isOptionEqualToValue={(option, value) => option?.id === value?.id}
                   onChange={(_, v) => {
-                    setCustomerFilter(v || null)
-                    setContractFilter(null)
+                    setUiCustomer(v || null)
+                    setUiContract(null)
 
                     if (v?.id) {
                       getInvoiceDropdowns({ customer_id: v.id })
@@ -977,10 +962,10 @@ const InvoiceListPageFullContent = () => {
               <Grid item xs={12} sm={6} md={3} mb={2}>
                 <CustomAutocomplete
                   options={contractOptions}
-                  value={contractFilter || null}
+                  value={uiContract || null}
                   getOptionLabel={opt => opt?.label || ''}
                   isOptionEqualToValue={(a, b) => a?.id === b?.id}
-                  onChange={(_, v) => setContractFilter(v || null)}
+                  onChange={(_, v) => setUiContract(v || null)}
                   renderOption={(props, option) => (
                     <li {...props} key={option.id}>
                       {option.label}
@@ -990,6 +975,8 @@ const InvoiceListPageFullContent = () => {
                 />
               </Grid>
             </Grid>
+
+            <Divider />
 
             {/* SEARCH + ENTRIES */}
             <Box display='flex' justifyContent='space-between' alignItems='center' gap={2} mt={4}>
@@ -1009,10 +996,9 @@ const InvoiceListPageFullContent = () => {
               <CustomTextField
                 size='small'
                 placeholder='Search invoice, contract, customer...'
-                value={searchText}
+                value={uiSearch}
                 onChange={e => {
-                  setSearchText(e.target.value)
-                  setPagination(p => ({ ...p, pageIndex: 0 }))
+                  setUiSearch(e.target.value)
                 }}
                 sx={{ width: 360 }}
                 slotProps={{

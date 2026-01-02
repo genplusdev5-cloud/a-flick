@@ -97,16 +97,29 @@ const ContractStatusPageContent = () => {
   const { canAccess } = usePermission()
   const [rows, setRows] = useState([])
   const [rowCount, setRowCount] = useState(0)
-  const [searchText, setSearchText] = useState('')
-  const [dateFilter, setDateFilter] = useState({ start: null, end: null })
+  // -- UI (TEMPORARY) FILTER STATES --
+  const [uiSearchText, setUiSearchText] = useState('')
+  const [uiDateFilter, setUiDateFilter] = useState({ start: null, end: null })
+  const [uiFilterByDate, setUiFilterByDate] = useState(false)
+  const [uiOrigin, setUiOrigin] = useState(null)
+  const [uiCustomer, setUiCustomer] = useState(null)
+  const [uiContractType, setUiContractType] = useState(null)
+  const [uiInvoiceFrequency, setUiInvoiceFrequency] = useState(null)
+  const [uiContractStatus, setUiContractStatus] = useState(null)
+  const [uiRenewal, setUiRenewal] = useState(null)
 
-  const [filterByDate, setFilterByDate] = useState(false)
-  const [originFilter, setOriginFilter] = useState(null)
-  const [customerFilter, setCustomerFilter] = useState(null)
-  const [contractTypeFilter, setContractTypeFilter] = useState(null)
-  const [invoiceFrequencyFilter, setInvoiceFrequencyFilter] = useState(null)
-  const [contractStatusFilter, setContractStatusFilter] = useState(null)
-  const [renewalFilter, setRenewalFilter] = useState(null)
+  // -- APPLIED (PERSISTENT) FILTER STATES --
+  const [appliedFilters, setAppliedFilters] = useState({
+    searchText: '',
+    filterByDate: false,
+    dateRange: { start: null, end: null },
+    origin: null,
+    customer: null,
+    contractType: null,
+    invoiceFrequency: null,
+    contractStatus: null,
+    renewal: null
+  })
 
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
   const [loading, setLoading] = useState(false)
@@ -127,25 +140,23 @@ const ContractStatusPageContent = () => {
 
   const loadData = async () => {
     setLoading(true)
-    console.log('🟡 Invoice Filter Object →', invoiceFrequencyFilter)
+    console.log('🟡 Invoice Filter Object →', appliedFilters.invoiceFrequency)
 
     try {
       // 1️⃣ CALL API WITH FILTERS + PAGINATION
       const params = {}
 
-      if (originFilter?.value) params.company_id = originFilter.value
-      if (customerFilter?.value) params.customer_id = customerFilter.value
-      if (contractTypeFilter?.value) params.contract_type = contractTypeFilter.value
-      if (invoiceFrequencyFilter?.value) params.billing_frequency_id = invoiceFrequencyFilter.value
-      if (contractStatusFilter?.value) params.contract_status = contractStatusFilter.value
-      if (renewalFilter?.value) params.is_renewed = renewalFilter.value === 'Renewed' ? true : false
+      if (appliedFilters.origin?.value) params.company_id = appliedFilters.origin.value
+      if (appliedFilters.customer?.value) params.customer_id = appliedFilters.customer.value
+      if (appliedFilters.contractType?.value) params.contract_type = appliedFilters.contractType.value
+      if (appliedFilters.invoiceFrequency?.value) params.billing_frequency_id = appliedFilters.invoiceFrequency.value
+      if (appliedFilters.contractStatus?.value) params.contract_status = appliedFilters.contractStatus.value
+      if (appliedFilters.renewal?.value)
+        params.is_renewed = appliedFilters.renewal.value === 'Renewed' ? true : false
 
-      if (filterByDate && dateFilter.start && dateFilter.end) {
-        params.from_date = dateFilter.start.toISOString().split('T')[0]
-        params.to_date = dateFilter.end.toISOString().split('T')[0]
-      } else {
-        delete params.from_date
-        delete params.to_date
+      if (appliedFilters.filterByDate && appliedFilters.dateRange.start && appliedFilters.dateRange.end) {
+        params.from_date = appliedFilters.dateRange.start.toISOString().split('T')[0]
+        params.to_date = appliedFilters.dateRange.end.toISOString().split('T')[0]
       }
 
       params.page = pagination.pageIndex + 1
@@ -247,28 +258,9 @@ const ContractStatusPageContent = () => {
     }
   }
 
-  // STEP 2: Filter change aana page 1 ku po
-  // When filters change -> Reset to first page + load
-  useEffect(() => {
-    setPagination(prev => ({ ...prev, pageIndex: 0 }))
-    loadData()
-  }, [
-    searchText,
-    filterByDate,
-    dateFilter.start,
-    dateFilter.end,
-    originFilter,
-    customerFilter,
-    contractTypeFilter,
-    invoiceFrequencyFilter,
-    contractStatusFilter,
-    renewalFilter
-  ])
-
-  // When pagination changes -> load
   useEffect(() => {
     loadData()
-  }, [pagination.pageIndex, pagination.pageSize])
+  }, [pagination.pageIndex, pagination.pageSize, appliedFilters])
 
   useEffect(() => {
     const fetchDropdowns = async () => {
@@ -573,10 +565,19 @@ const ContractStatusPageContent = () => {
                     />
                   }
                   disabled={loading}
-                  onClick={async () => {
-                    setLoading(true)
-                    await loadData(true)
-                    setTimeout(() => setLoading(false), 600)
+                  onClick={() => {
+                    setPagination(p => ({ ...p, pageIndex: 0 }))
+                    setAppliedFilters({
+                      searchText: uiSearchText,
+                      filterByDate: uiFilterByDate,
+                      dateRange: uiDateFilter,
+                      origin: uiOrigin,
+                      customer: uiCustomer,
+                      contractType: uiContractType,
+                      invoiceFrequency: uiInvoiceFrequency,
+                      contractStatus: uiContractStatus,
+                      renewal: uiRenewal
+                    })
                   }}
                   sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
                 >
@@ -648,31 +649,17 @@ const ContractStatusPageContent = () => {
                 {/* 👈 FIX is here */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                   <Checkbox
-                    checked={filterByDate}
+                    checked={uiFilterByDate}
                     onChange={e => {
                       const checked = e.target.checked
-                      setFilterByDate(checked)
+                      setUiFilterByDate(checked)
 
                       if (checked) {
                         const today = new Date()
                         const onlyDate = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-
-                        const updatedRange = {
-                          start: onlyDate,
-                          end: onlyDate
-                        }
-
-                        setDateFilter(updatedRange)
-
-                        // 👇 THIS IS MISSING EARLIER → Force API call
-                        setTimeout(() => {
-                          loadData()
-                        }, 0)
+                        setUiDateFilter({ start: onlyDate, end: onlyDate })
                       } else {
-                        setDateFilter({ start: null, end: null })
-                        setTimeout(() => {
-                          loadData()
-                        }, 0)
+                        setUiDateFilter({ start: null, end: null })
                       }
                     }}
                     size='small'
@@ -682,21 +669,21 @@ const ContractStatusPageContent = () => {
                 </Box>
                 <AppReactDatepicker
                   selectsRange
-                  startDate={dateFilter?.start || null}
-                  endDate={dateFilter?.end || null}
+                  startDate={uiDateFilter?.start || null}
+                  endDate={uiDateFilter?.end || null}
                   onChange={dates => {
                     const [start, end] = dates
-                    setDateFilter({ start, end })
+                    setUiDateFilter({ start, end })
                   }}
                   shouldCloseOnSelect={false}
-                  disabled={!filterByDate}
+                  disabled={!uiFilterByDate}
                   popperProps={{ strategy: 'fixed' }}
                   popperPlacement='bottom-start'
                   customInput={
                     <TextField
                       fullWidth
                       size='small'
-                      disabled={!filterByDate}
+                      disabled={!uiFilterByDate}
                       sx={{ width: 220, bgcolor: '#fff' }}
                       placeholder='Select Date Range'
                     />
@@ -704,12 +691,12 @@ const ContractStatusPageContent = () => {
                 />
               </Box>
 
-              {/* Origin */}
+               {/* Origin */}
               <GlobalAutocomplete
                 label='Origin'
                 options={originOptions}
-                value={originFilter}
-                onChange={v => setOriginFilter(v)}
+                value={uiOrigin}
+                onChange={v => setUiOrigin(v)}
                 sx={{ width: 200 }}
               />
 
@@ -717,8 +704,8 @@ const ContractStatusPageContent = () => {
               <GlobalAutocomplete
                 label='Customer'
                 options={customerOptions}
-                value={customerFilter}
-                onChange={v => setCustomerFilter(v)}
+                value={uiCustomer}
+                onChange={v => setUiCustomer(v)}
                 sx={{ width: 200 }}
               />
 
@@ -726,8 +713,8 @@ const ContractStatusPageContent = () => {
               <GlobalAutocomplete
                 label='Contract Type'
                 options={contractTypeOptions}
-                value={contractTypeFilter}
-                onChange={v => setContractTypeFilter(v)}
+                value={uiContractType}
+                onChange={v => setUiContractType(v)}
                 sx={{ width: 200 }}
               />
 
@@ -735,8 +722,8 @@ const ContractStatusPageContent = () => {
               <GlobalAutocomplete
                 label='Invoice Frequency'
                 options={invoiceOptions}
-                value={invoiceFrequencyFilter}
-                onChange={v => setInvoiceFrequencyFilter(v)}
+                value={uiInvoiceFrequency}
+                onChange={v => setUiInvoiceFrequency(v)}
                 sx={{ width: 200 }}
               />
 
@@ -744,8 +731,8 @@ const ContractStatusPageContent = () => {
               <GlobalAutocomplete
                 label='Contract Status'
                 options={contractStatusOptions}
-                value={contractStatusFilter}
-                onChange={v => setContractStatusFilter(v)}
+                value={uiContractStatus}
+                onChange={v => setUiContractStatus(v)}
                 sx={{ width: 200 }}
               />
 
@@ -753,8 +740,8 @@ const ContractStatusPageContent = () => {
               <GlobalAutocomplete
                 label='New / Renewed'
                 options={renewalOptions}
-                value={renewalFilter}
-                onChange={v => setRenewalFilter(v)}
+                value={uiRenewal}
+                onChange={v => setUiRenewal(v)}
                 sx={{ width: 200 }}
               />
             </Box>
@@ -822,10 +809,9 @@ const ContractStatusPageContent = () => {
 
               {/* RIGHT SIDE — Search */}
               <DebouncedInput
-                value={searchText}
+                value={uiSearchText}
                 onChange={v => {
-                  setSearchText(String(v))
-                  setPagination(p => ({ ...p, pageIndex: 0 }))
+                  setUiSearchText(String(v))
                 }}
                 placeholder='Search any field...'
                 sx={{ width: 350 }}
