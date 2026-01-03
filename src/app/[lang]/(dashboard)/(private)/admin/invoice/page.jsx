@@ -579,10 +579,17 @@ const InvoiceListPageFullContent = () => {
                 </IconButton>
               )}
 
-              {/* PRINT */}
+                  {/* PRINT */}
               <IconButton size='small' onClick={() => handlePrint(invoice)}>
                 <i className='tabler-printer text-purple-600 text-base' />
               </IconButton>
+              
+               {/* VIEW */}
+              <Link href={`/admin/invoice/${invoice.id}`} passHref>
+                <IconButton size='small'>
+                    <i className='tabler-eye text-blue-500 text-base' />
+                </IconButton>
+              </Link>
             </div>
           )
         }

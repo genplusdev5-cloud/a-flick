@@ -35,6 +35,7 @@ import TablePaginationComponent from '@/components/TablePaginationComponent'
 
 import { getTicketReportList } from '@/api/service_request/report'
 import { getReportDropdowns } from '@/api/service_request/report'
+import { getTicketDetails } from '@/api/ticket/details'
 
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
@@ -59,9 +60,7 @@ import SummaryCards from '@/components/common/SummaryCards'
 import {
   useReactTable,
   getCoreRowModel,
-  getFilteredRowModel,
   getSortedRowModel,
-  getPaginationRowModel,
   createColumnHelper,
   flexRender
 } from '@tanstack/react-table'
@@ -120,6 +119,7 @@ const ServiceRequestPageContent = () => {
   const [uiAppointment, setUiAppointment] = useState('')
   const [uiSearch, setUiSearch] = useState('')
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
+  const [editDialog, setEditDialog] = useState({ open: false, row: null, details: null, loading: false })
 
   // -- APPLIED FILTER STATES (Triggers API) --
   const [appliedFilters, setAppliedFilters] = useState({
@@ -205,6 +205,20 @@ const ServiceRequestPageContent = () => {
     loadReportDropdownData()
   }, [])
 
+  const handleEdit = async row => {
+    setEditDialog({ open: true, row, details: null, loading: true })
+    try {
+      const details = await getTicketDetails(row.id)
+      // EXTRACT DATA SAFELY
+      const actualData = details?.data || details
+      setEditDialog(prev => ({ ...prev, details: actualData, loading: false }))
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'Failed to load ticket details')
+      setEditDialog(prev => ({ ...prev, loading: false }))
+    }
+  }
+
   const confirmDelete = async () => {
     try {
       const id = deleteDialog.row?.id
@@ -256,9 +270,9 @@ const ServiceRequestPageContent = () => {
               }}
             >
               {/* 👁 VIEW */}
-              <IconButton size='small' onClick={() => router.push(`/admin/contracts/${item.id}/view`)}>
+              {/* <IconButton size='small' onClick={() => router.push(`/admin/contracts/${item.id}/view`)}>
                 <i className='tabler-eye text-gray-600 text-[18px]' />
-              </IconButton>
+              </IconButton> */}
 
               {/* ✏ EDIT */}
               {canAccess('Service Request', 'update') && (
@@ -536,13 +550,17 @@ const ServiceRequestPageContent = () => {
   const table = useReactTable({
     data: rows,
     columns,
+
     manualPagination: true,
     pageCount: Math.ceil(rowCount / pagination.pageSize),
-    state: { globalFilter: appliedFilters.search, pagination },
-    onGlobalFilterChange: (val) => setAppliedFilters(prev => ({ ...prev, search: val })),
+
+    state: {
+      pagination
+    },
+
     onPaginationChange: setPagination,
+
     getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel()
   })
 
@@ -673,7 +691,9 @@ const ServiceRequestPageContent = () => {
           >
             <Box sx={{ display: 'flex', flexDirection: 'column' }}>
               <FormControlLabel
-                control={<Checkbox checked={uiEnableDateFilter} onChange={e => setUiEnableDateFilter(e.target.checked)} />}
+                control={
+                  <Checkbox checked={uiEnableDateFilter} onChange={e => setUiEnableDateFilter(e.target.checked)} />
+                }
                 label='Date Filter'
                 sx={{ mb: -0.5 }}
               />
@@ -962,7 +982,7 @@ const ServiceRequestPageContent = () => {
           <DialogCloseButton
             onClick={() => setDeleteDialog({ open: false, row: null })}
             disableRipple
-            sx={{ position: 'absolute', right: 1, top: 1 }}
+            sx={{ position: 'absolute', right: 3, top: 2 }}
           >
             <i className='tabler-x' />
           </DialogCloseButton>
@@ -993,6 +1013,266 @@ const ServiceRequestPageContent = () => {
           >
             Delete
           </GlobalButton>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog
+        onClose={() => setEditDialog({ open: false, row: null })}
+        aria-labelledby='edit-dialog-title'
+        open={editDialog.open}
+        maxWidth='xl'
+        fullWidth
+        scroll='paper'
+        closeAfterTransition={false}
+        PaperProps={{ sx: { overflow: 'visible' } }}
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Typography variant='h5' component='span' fontWeight={600}>
+            Service Request Details
+          </Typography>
+          <DialogCloseButton onClick={() => setEditDialog({ open: false, row: null })} disableRipple>
+            <i className='tabler-x' />
+          </DialogCloseButton>
+        </DialogTitle>
+        <DialogContent dividers sx={{ p: 6 }}>
+          {editDialog.loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+              <ProgressCircularCustomization size={40} />
+            </Box>
+          ) : editDialog.details ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, pt: 2 }}>
+              {/* SECTION 1: DATES & TIMES */}
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3 }}>
+                <CustomTextField
+                  fullWidth
+                  label='Scheduled Date'
+                  value={editDialog.details.schedule_date || ''}
+                  InputProps={{ readOnly: true }}
+                />
+                <CustomTextField
+                  fullWidth
+                  label='Start Time'
+                  value={editDialog.details.schedule_start_time || ''}
+                  InputProps={{ readOnly: true }}
+                />
+                <CustomTextField
+                  fullWidth
+                  label='End Time'
+                  value={editDialog.details.schedule_end_time || ''}
+                  InputProps={{ readOnly: true }}
+                />
+
+                <CustomTextField
+                  fullWidth
+                  label='Appointment Date'
+                  value={editDialog.details.ticket_date || ''}
+                  InputProps={{ readOnly: true }}
+                />
+                <CustomTextField
+                  fullWidth
+                  label='Start Time'
+                  value={editDialog.details.start_time || ''}
+                  InputProps={{ readOnly: true }}
+                />
+                <CustomTextField
+                  fullWidth
+                  label='End Time'
+                  value={editDialog.details.end_time || ''}
+                  InputProps={{ readOnly: true }}
+                />
+
+                <CustomTextField
+                  fullWidth
+                  label='Actual Start Time'
+                  value={editDialog.details.actual_start_time || ''}
+                  InputProps={{ readOnly: true }}
+                />
+                <CustomTextField
+                  fullWidth
+                  label='Actual End Time'
+                  value={editDialog.details.actual_end_time || ''}
+                  InputProps={{ readOnly: true }}
+                />
+                <CustomTextField
+                  fullWidth
+                  label='Appointment Status'
+                  value={editDialog.details.ticket_status || ''}
+                  InputProps={{ readOnly: true }}
+                />
+              </Box>
+
+              {/* SECTION 2: STATUS & TYPE */}
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3 }}>
+                <CustomTextField
+                  fullWidth
+                  multiline
+                  rows={2}
+                  label='Action'
+                  value={editDialog.details.action || ''}
+                  InputProps={{ readOnly: true }}
+                />
+                <CustomTextField
+                  fullWidth
+                  multiline
+                  rows={2}
+                  label='Findings'
+                  value={editDialog.details.finding || ''}
+                  InputProps={{ readOnly: true }}
+                />
+                <CustomTextField
+                  fullWidth
+                  multiline
+                  rows={2}
+                  label='Recommendation'
+                  value={editDialog.details.recommendation || ''}
+                  InputProps={{ readOnly: true }}
+                />
+              </Box>
+
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3 }}>
+                <CustomTextField
+                  fullWidth
+                  label='Call Type'
+                  value={editDialog.details.ticket_type || ''}
+                  InputProps={{ readOnly: true }}
+                />
+                <CustomTextField
+                  fullWidth
+                  multiline
+                  rows={2}
+                  label='Special note for Technician (this service)'
+                  value={editDialog.details.instructions || ''}
+                  InputProps={{ readOnly: true }}
+                />
+              </Box>
+
+              {/* SECTION 3: REMARKS */}
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3 }}>
+                <CustomTextField
+                  fullWidth
+                  multiline
+                  rows={2}
+                  label='Appointment Remarks (this service)'
+                  value={editDialog.details.remarks || ''}
+                  InputProps={{ readOnly: true }}
+                />
+                <Box /> {/* Spacer */}
+                <CustomTextField
+                  fullWidth
+                  multiline
+                  rows={2}
+                  label='Appointment Remarks (From Contract)'
+                  value={editDialog.details.contract_remarks || ''}
+                  InputProps={{ readOnly: true }}
+                />
+                <CustomTextField
+                  fullWidth
+                  multiline
+                  rows={2}
+                  label='Technician Remarks (From Contract)'
+                  value={editDialog.details.contract_tech_remarks || ''} // Check field name if possible
+                  InputProps={{ readOnly: true }}
+                />
+              </Box>
+
+              <Divider />
+
+              {/* SECTION 4: PEST DETAILS TABLE */}
+              <Box>
+                <Typography variant='h6' sx={{ mb: 2, fontWeight: 600 }}>
+                  PEST DETAILS
+                </Typography>
+                <Box sx={{ overflowX: 'auto', border: '1px solid #eee', borderRadius: 1 }}>
+                  <table className={styles.table} style={{ minWidth: '100%' }}>
+                    <thead style={{ background: '#f9f9f9' }}>
+                      <tr>
+                        <th style={{ padding: '8px' }}>ID</th>
+                        <th style={{ padding: '8px' }}>Pest</th>
+                        <th style={{ padding: '8px' }}>Frequency</th>
+                        <th style={{ padding: '8px' }}>Pest Value</th>
+                        <th style={{ padding: '8px' }}>Purpose</th>
+                        <th style={{ padding: '8px' }}>Count</th>
+                        <th style={{ padding: '8px' }}>Level</th>
+                        <th style={{ padding: '8px' }}>Chemicals</th>
+                        <th style={{ padding: '8px' }}>Work Time(Hrs)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(editDialog.details.ref_job_pests || []).length > 0 ? (
+                        editDialog.details.ref_job_pests.map((pest, idx) => (
+                          <tr key={idx} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                            <td style={{ padding: '8px' }}>{idx + 1}</td>
+                            <td style={{ padding: '8px' }}>{pest.pest_name}</td>
+                            <td style={{ padding: '8px' }}>{pest.frequency}</td>
+                            <td style={{ padding: '8px' }}>{pest.pest_value}</td>
+                            <td style={{ padding: '8px' }}>{pest.purpose}</td>
+                            <td style={{ padding: '8px' }}>{pest.pest_count}</td>
+                            <td style={{ padding: '8px' }}>{pest.infestation_level}</td>
+                            <td style={{ padding: '8px' }}>
+                              {pest.ref_job_chemical?.map(c => c.chemical_name).join(', ') || ''}
+                            </td>
+                            <td style={{ padding: '8px' }}>{pest.time_spent}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={9} style={{ padding: '12px', textAlign: 'center' }}>
+                            No pest details found
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </Box>
+              </Box>
+
+              {/* SECTION 5: TECHNICIAN DETAILS TABLE */}
+              <Box>
+                <Typography variant='h6' sx={{ mb: 2, fontWeight: 600 }}>
+                  TECHNICIAN DETAILS
+                </Typography>
+                <Box sx={{ overflowX: 'auto', border: '1px solid #eee', borderRadius: 1 }}>
+                  <table className={styles.table} style={{ minWidth: '100%' }}>
+                    <thead style={{ background: '#f9f9f9' }}>
+                      <tr>
+                        <th style={{ padding: '8px' }}>ID</th>
+                        <th style={{ padding: '8px' }}>Technician</th>
+                        <th style={{ padding: '8px' }}>Productivity</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(editDialog.details.job_allocations || []).length > 0 ? (
+                        editDialog.details.job_allocations.map((tech, idx) => (
+                          <tr key={idx} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                            <td style={{ padding: '8px' }}>{idx + 1}</td>
+                            <td style={{ padding: '8px' }}>{tech.employee_name}</td>
+                            <td style={{ padding: '8px' }}>{tech.productivity_value || tech.productivity}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={3} style={{ padding: '12px', textAlign: 'center' }}>
+                            No technician details found
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </Box>
+              </Box>
+            </Box>
+          ) : (
+            <Typography sx={{ p: 4, textAlign: 'center' }}>No details available</Typography>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 6 }}>
+          <Button onClick={() => setEditDialog({ open: false, row: null })} variant='tonal' color='secondary'>
+            Close
+          </Button>
+          <Button onClick={() => setEditDialog({ open: false, row: null })} variant='contained'>
+            Save Changes
+          </Button>
         </DialogActions>
       </Dialog>
     </StickyListLayout>

@@ -5,7 +5,7 @@ import api from '@/utils/axiosInstance'
 // 👉 Ticket Report List API
 export const getTicketReportList = async (params = {}) => {
   const response = await api.get('/ticket-report/', { params })
-  return response.data.data // Only data return
+  return response.data // Return safe response
 }
 
 // 👉 Report Dropdown (Customer-wise Contract Fetch)
