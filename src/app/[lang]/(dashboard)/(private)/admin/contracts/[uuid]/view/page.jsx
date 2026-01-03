@@ -1,7 +1,8 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { getContractDetails } from '@/api/contract' // <-- Create this API if not exists
+import { decodeId, isValidEncodedId } from '@/utils/urlEncoder'
 import AgreementPDF from '@/components/pdf/AgreementPDF'
 import SchedulePDF from '@/components/pdf/SchedulePDF'
 import { printSchedule } from '@/helpers/printSchedule'
@@ -58,36 +59,69 @@ export default function Project() {
   const agreementRef = useRef()
 
   const { uuid } = useParams()
+  const router = useRouter()
   const [contract, setContract] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [contractId, setContractId] = useState(null)
+
+  // Decode the Base64 encoded ID
+  useEffect(() => {
+    if (!uuid) {
+      router.push('/404')
+      return
+    }
+
+    // Validate and decode the Base64 ID
+    if (!isValidEncodedId(uuid)) {
+      console.error('Invalid encoded contract ID:', uuid)
+      router.push('/404')
+      return
+    }
+
+    const decodedId = decodeId(uuid)
+    console.log('🔓 Base64 Decoding:', { encoded: uuid, decoded: decodedId })
+    
+    if (!decodedId) {
+      router.push('/404')
+      return
+    }
+
+    setContractId(decodedId)
+  }, [uuid, router])
 
   useEffect(() => {
     const loadData = async () => {
+      if (!contractId) return
+
+      console.log('🔍 Decoded Contract ID:', contractId, 'Type:', typeof contractId)
+
       try {
-        const res = await getContractDetails(uuid)
+        const res = await getContractDetails(contractId)
         setContract(res)
       } catch (err) {
         console.error('Error loading contract:', err)
+        // If API returns 404 or unauthorized, redirect
+        if (err.response?.status === 404 || err.response?.status === 401) {
+          router.push('/404')
+        }
       } finally {
         setLoading(false)
       }
     }
 
-    if (uuid) loadData()
-  }, [uuid])
+    loadData()
+  }, [contractId, router])
 
   const loadContractData = async () => {
+    if (!contractId) return
+
     try {
-      const res = await getContractDetails(uuid)
+      const res = await getContractDetails(contractId)
       setContract(res)
     } catch (err) {
       console.error('Error loading contract:', err)
     }
   }
-
-  useEffect(() => {
-    if (uuid) loadContractData()
-  }, [uuid])
 
   // or 'pest'
 
@@ -131,11 +165,11 @@ export default function Project() {
   // ================= AGREEMENT PRINT FUNCTION =================
   // ================= AGREEMENT PRINT FUNCTION =================
   const handleAgreementPrint = async () => {
-    if (!contract?.id) return
+    if (!contractId) return
 
     // 1. Load Agreement API
     const { getAgreementPDF } = await import('@/api/contract/agreement')
-    const data = await getAgreementPDF(contract.id)
+    const data = await getAgreementPDF(contractId)
 
     // 2. Set the data so AgreementPDF will render
     setAgreementData(data)
@@ -171,10 +205,10 @@ export default function Project() {
   }
 
   const handleSchedulePrint = async () => {
-    if (!contract?.id) return
+    if (!contractId) return
 
     const { getSchedulePDF } = await import('@/api/contract/schedulepdf')
-    const data = await getSchedulePDF(contract.id)
+    const data = await getSchedulePDF(contractId)
 
     setScheduleData(data)
 
@@ -554,7 +588,7 @@ export default function Project() {
         }}
       >
         <TerminateDrawer
-          contractId={contract?.id}
+          contractId={contractId}
           onClose={() => setOpenTerminate(false)}
           reload={() => console.log('Reload contract after termination')}
         />
@@ -567,7 +601,7 @@ export default function Project() {
         PaperProps={{ sx: { width: 380, p: 3 } }}
       >
         <HoldDrawer
-          contractId={contract?.id}
+          contractId={contractId}
           onClose={() => setOpenHold(false)}
           reload={() => console.log('Reload contract after hold')}
         />
@@ -579,7 +613,7 @@ export default function Project() {
         onClose={() => setOpenRenew(false)}
         PaperProps={{ sx: { width: 380, p: 3 } }}
       >
-        <RenewDrawer contractId={contract?.id} onClose={() => setOpenRenew(false)} reload={loadContractData} />
+        <RenewDrawer contractId={contractId} onClose={() => setOpenRenew(false)} reload={loadContractData} />
       </Drawer>
     </>
   )

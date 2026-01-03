@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { openDB } from 'idb'
+import { format } from 'date-fns'
 import {
   Box,
   Button,
@@ -25,7 +26,8 @@ import {
   TextField,
   FormControl,
   CircularProgress,
-  InputAdornment
+  InputAdornment,
+  Checkbox
 } from '@mui/material'
 
 import PermissionGuard from '@/components/auth/PermissionGuard'
@@ -35,6 +37,8 @@ import { getCustomerList, deleteCustomer, getCustomerSummary } from '@/api/custo
 import { getCustomerOrigin } from '@/api/customer/origin'
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
+import GlobalDateRange from '@/components/common/GlobalDateRange'
+import GlobalTextField from '@/components/common/GlobalTextField'
 import { getCompanyList } from '@/api/company'
 
 import TableChartIcon from '@mui/icons-material/TableChart'
@@ -113,10 +117,14 @@ const CustomersPageContent = () => {
   const [filterMyob, setFilterMyob] = useState(null)
   const [companyOptions, setCompanyOptions] = useState([])
   const [sorting, setSorting] = useState([])
+  const [uiDateFilter, setUiDateFilter] = useState(false)
+  const [uiDateRange, setUiDateRange] = useState([null, null])
 
   const [appliedSearchText, setAppliedSearchText] = useState('')
   const [appliedFilterOrigin, setAppliedFilterOrigin] = useState(null)
   const [appliedFilterMyob, setAppliedFilterMyob] = useState(null)
+  const [appliedDateFilter, setAppliedDateFilter] = useState(false)
+  const [appliedDateRange, setAppliedDateRange] = useState([null, null])
 
   // Sync pagination state to URL search params
   const isFirstRender = useRef(true)
@@ -125,6 +133,8 @@ const CustomersPageContent = () => {
     setAppliedSearchText(searchText)
     setAppliedFilterOrigin(filterOrigin)
     setAppliedFilterMyob(filterMyob)
+    setAppliedDateFilter(uiDateFilter)
+    setAppliedDateRange(uiDateRange)
 
     setPagination(p => ({
       ...p,
@@ -139,6 +149,14 @@ const CustomersPageContent = () => {
         page: pagination.pageIndex + 1,
         page_size: pagination.pageSize,
         search: appliedSearchText.trim()
+      }
+
+      // Date range
+      if (appliedDateFilter && appliedDateRange[0]) {
+        params.from_date = format(appliedDateRange[0], 'yyyy-MM-dd')
+        if (appliedDateRange[1]) {
+          params.to_date = format(appliedDateRange[1], 'yyyy-MM-dd')
+        }
       }
 
       if (appliedFilterOrigin?.id) {
@@ -176,7 +194,7 @@ const CustomersPageContent = () => {
     } finally {
       setLoading(false)
     }
-  }, [pagination.pageIndex, pagination.pageSize, appliedSearchText, appliedFilterOrigin, appliedFilterMyob, originMap])
+  }, [pagination.pageIndex, pagination.pageSize, appliedSearchText, appliedFilterOrigin, appliedFilterMyob, appliedDateFilter, appliedDateRange, originMap])
 
   useEffect(() => {
     const loadCompanies = async () => {
@@ -185,7 +203,7 @@ const CustomersPageContent = () => {
         const mapped = list.map(c => ({
           id: c.id,
           label: c.name,
-          value: c.name
+          value: c.id  // ✅ Use ID for value to match API expectations
         }))
         setCompanyOptions(mapped)
       } catch (err) {
@@ -559,17 +577,6 @@ const CustomersPageContent = () => {
               <Typography variant='h5' fontWeight={600}>
                 Customer List
               </Typography>
-
-              <GlobalButton
-                variant='contained'
-                color='primary'
-                startIcon={<RefreshIcon />}
-                disabled={loading}
-                onClick={handleRefresh}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-              >
-                Refresh
-              </GlobalButton>
             </Box>
           }
           action={
@@ -664,72 +671,126 @@ const CustomersPageContent = () => {
             </Box>
           )}
 
+          {/* --- Row 2: Filters --- */}
           <Box
             sx={{
-              mb: 3,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 2,
+              mb: 2,
+              flexWrap: 'wrap'
+            }}
+          >
+            {/* Date Filter with Checkbox */}
+            <Box sx={{ width: 220 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                <Checkbox
+                  checked={uiDateFilter}
+                  onChange={e => {
+                    setUiDateFilter(e.target.checked)
+                    if (!e.target.checked) {
+                      setUiDateRange([null, null])
+                    } else {
+                      const today = new Date()
+                      setUiDateRange([today, today])
+                    }
+                  }}
+                  size='small'
+                />
+                <Typography sx={{ fontWeight: 500, fontSize: '0.875rem' }}>Date Filter</Typography>
+              </Box>
+
+              <GlobalDateRange
+                start={uiDateRange[0]}
+                end={uiDateRange[1]}
+                onSelectRange={({ start, end }) => setUiDateRange([start, end])}
+                disabled={!uiDateFilter}
+                size='small'
+              />
+            </Box>
+
+            {/* Origin */}
+            <Box sx={{ width: 220 }}>
+              <GlobalAutocomplete
+                label='Origin'
+                placeholder='Select Origin'
+                options={companyOptions}
+                value={filterOrigin}
+                getOptionLabel={opt => opt?.label || ''}
+                isOptionEqualToValue={(a, b) => a?.id === b?.id}
+                onChange={val => {
+                  setFilterOrigin(val)
+                }}
+              />
+            </Box>
+
+            {/* MYOB Status */}
+            <Box sx={{ width: 220 }}>
+              <GlobalAutocomplete
+                label='MYOB Status'
+                placeholder='Select'
+                options={[
+                  { id: 1, label: 'Exported', value: 'Exported' },
+                  { id: 2, label: 'Not Exported', value: 'Not Exported' }
+                ]}
+                value={filterMyob}
+                getOptionLabel={opt => opt?.label || ''}
+                isOptionEqualToValue={(a, b) => a?.id === b?.id}
+                onChange={val => {
+                  setFilterMyob(val)
+                }}
+              />
+            </Box>
+
+            {/* Refresh Button */}
+            <GlobalButton
+              variant='contained'
+              color='primary'
+              startIcon={
+                <RefreshIcon
+                  sx={{
+                    animation: loading ? 'spin 1s linear infinite' : 'none',
+                    '@keyframes spin': {
+                      '0%': { transform: 'rotate(0deg)' },
+                      '100%': { transform: 'rotate(360deg)' }
+                    }
+                  }}
+                />
+              }
+              disabled={loading}
+              onClick={handleRefresh}
+              sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+            >
+              {loading ? 'Refreshing...' : 'Refresh'}
+            </GlobalButton>
+          </Box>
+
+          <Divider sx={{ mb: 3 }} />
+
+          {/* --- Row 3: Pages & Search --- */}
+          <Box
+            sx={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              flexWrap: 'nowrap',
-              gap: 2,
-              flexShrink: 0
+              mb: 3
             }}
           >
-            {/* LEFT SIDE FILTERS */}
-            <Box
-              sx={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-end',
-                gap: 2,
-                flexWrap: 'nowrap'
-              }}
-            >
-              {/* Entries Select */}
-              <FormControl size='small' sx={{ width: 140 }}>
-                <Select
-                  value={pagination.pageSize}
-                  onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
-                >
-                  {[25, 50, 75, 100].map(s => (
-                    <MenuItem key={s} value={s}>
-                      {s} entries
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+            {/* Entries per page */}
+            <FormControl size='small' sx={{ width: 140 }}>
+              <Select
+                value={pagination.pageSize}
+                onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
+              >
+                {[25, 50, 75, 100].map(s => (
+                  <MenuItem key={s} value={s}>
+                    {s} entries
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
 
-              {/* Origin */}
-              <Box sx={{ width: 200 }}>
-                <GlobalAutocomplete
-                  label='Origin'
-                  placeholder='Select Origin'
-                  options={companyOptions}
-                  value={filterOrigin}
-                  onChange={val => {
-                    setFilterOrigin(val)
-                  }}
-                />
-              </Box>
-
-              {/* MYOB Status */}
-              <Box sx={{ width: 200 }}>
-                <GlobalAutocomplete
-                  label='MYOB Status'
-                  placeholder='Select'
-                  options={[
-                    { id: 1, label: 'Exported', value: 'Exported' },
-                    { id: 2, label: 'Not Exported', value: 'Not Exported' }
-                  ]}
-                  value={filterMyob}
-                  onChange={val => {
-                    setFilterMyob(val)
-                  }}
-                />
-              </Box>
-            </Box>
-
-            {/* SEARCH RIGHT SIDE */}
+            {/* Search */}
             <DebouncedInput
               value={searchText}
               onChange={v => {

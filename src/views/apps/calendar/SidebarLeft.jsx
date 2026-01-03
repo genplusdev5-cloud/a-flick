@@ -100,7 +100,7 @@ const SidebarLeft = ({
               : getFallbackColor(emp?.name)
 
             const isSelected = Array.isArray(selectedEmployees) && selectedEmployees.some(e => e.id === emp.id)
-
+            emp.is_technician = true // mark as technician for calendar filtering
             return (
               <ListItemButton
                 key={emp.id}

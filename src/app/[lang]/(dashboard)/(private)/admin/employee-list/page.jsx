@@ -68,7 +68,6 @@ import StickyListLayout from '@/components/common/StickyListLayout'
 import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 import EmployeeFormDialog from './EmployeeFormDialog'
 
-
 const getEmployees = async () => {
   const db = await openDBInstance()
   return db.getAll(STORE_NAME)
@@ -238,13 +237,6 @@ const EmployeePageContent = () => {
   useEffect(() => {
     loadData()
   }, [pagination.pageIndex, pagination.pageSize, searchText])
-
-  useEffect(() => {
-    const handleFocus = () => loadData()
-    window.addEventListener('focus', handleFocus)
-
-    return () => window.removeEventListener('focus', handleFocus)
-  }, [])
 
   const handleEdit = id => {
     setDialogMode('edit')
@@ -569,30 +561,6 @@ const EmployeePageContent = () => {
               <Typography variant='h5' fontWeight={600}>
                 Employee List
               </Typography>
-
-              <GlobalButton
-                variant='contained'
-                color='primary'
-                startIcon={
-                  <RefreshIcon
-                    sx={{
-                      animation: loading ? 'spin 1s linear infinite' : 'none',
-                      '@keyframes spin': {
-                        '0%': { transform: 'rotate(0deg)' },
-                        '100%': { transform: 'rotate(360deg)' }
-                      }
-                    }}
-                  />
-                }
-                disabled={loading}
-                onClick={async () => {
-                  setPagination(p => ({ ...p, pageIndex: 0 }))
-                  await loadData()
-                }}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-              >
-                {loading ? 'Refreshing...' : 'Refresh'}
-              </GlobalButton>
             </Box>
           }
           action={
@@ -674,7 +642,6 @@ const EmployeePageContent = () => {
 
         <Divider />
 
-        {/* ───────── Filters Section ───────── */}
         <Box
           sx={{
             px: 4,
@@ -738,6 +705,31 @@ const EmployeePageContent = () => {
               setPagination(p => ({ ...p, pageIndex: 0 }))
             }}
           />
+
+          {/* ✅ Refresh – EXACTLY NEXT TO FILTERS */}
+          <GlobalButton
+            variant='contained'
+            color='primary'
+            startIcon={
+              <RefreshIcon
+                sx={{
+                  animation: loading ? 'spin 1s linear infinite' : 'none',
+                  '@keyframes spin': {
+                    '0%': { transform: 'rotate(0deg)' },
+                    '100%': { transform: 'rotate(360deg)' }
+                  }
+                }}
+              />
+            }
+            disabled={loading}
+            onClick={() => {
+              setPagination(p => ({ ...p, pageIndex: 0 }))
+              loadData()
+            }}
+            sx={{ height: 36, textTransform: 'none' }}
+          >
+            {loading ? 'Refreshing...' : 'Refresh'}
+          </GlobalButton>
         </Box>
 
         <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -884,7 +876,7 @@ const EmployeePageContent = () => {
             Are you sure you want to delete <b>{deleteDialog.row?.name}</b>? This action cannot be undone.
           </Typography>
         </DialogContent>
-         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
           <GlobalButton onClick={() => setDeleteDialog({ open: false, row: null })} color='secondary' variant='tonal'>
             Cancel
           </GlobalButton>

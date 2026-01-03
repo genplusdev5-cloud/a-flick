@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import Link from 'next/link'
+import { format } from 'date-fns'
 import {
   Box,
   Button,
@@ -21,7 +22,8 @@ import {
   FormControl,
   Select,
   CircularProgress,
-  InputAdornment
+  InputAdornment,
+  Checkbox
 } from '@mui/material'
 
 import PermissionGuard from '@/components/auth/PermissionGuard'
@@ -31,7 +33,6 @@ import { getContractList, deleteContractApi } from '@/api/contract'
 import api from '@/utils/axiosInstance'
 
 import VisibilityIcon from '@mui/icons-material/Visibility'
-
 
 // Custom Autocomplete + TextField
 import CustomAutocomplete from '@core/components/mui/Autocomplete'
@@ -48,6 +49,7 @@ import GlobalTextField from '@/components/common/GlobalTextField'
 import GlobalTextarea from '@/components/common/GlobalTextarea'
 import GlobalSelect from '@/components/common/GlobalSelect'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
+import GlobalDateRange from '@/components/common/GlobalDateRange'
 import { showToast } from '@/components/common/Toasts'
 
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
@@ -146,13 +148,17 @@ const ContractsPageContent = () => {
   const [uiType, setUiType] = useState(null)
   const [uiStatus, setUiStatus] = useState(null)
   const [uiUuid, setUiUuid] = useState(null)
+  const [uiDateFilter, setUiDateFilter] = useState(false)
+  const [uiDateRange, setUiDateRange] = useState([null, null])
 
   const [appliedFilters, setAppliedFilters] = useState({
     search: '',
     customer: null,
     type: null,
     status: null,
-    uuid: null
+    uuid: null,
+    dateFilter: false,
+    dateRange: [null, null]
   })
 
   const encodedCustomerId = searchParams.get('customer')
@@ -167,6 +173,14 @@ const ContractsPageContent = () => {
         search: appliedFilters.search
       }
 
+      // Date range
+      if (appliedFilters.dateFilter && appliedFilters.dateRange[0]) {
+        params.from_date = format(appliedFilters.dateRange[0], 'yyyy-MM-dd')
+        if (appliedFilters.dateRange[1]) {
+          params.to_date = format(appliedFilters.dateRange[1], 'yyyy-MM-dd')
+        }
+      }
+
       if (appliedFilters.uuid) params.uuid = appliedFilters.uuid
       if (appliedFilters.customer?.id) params.customer_id = appliedFilters.customer.id
       if (appliedFilters.type?.value) params.contract_type = appliedFilters.type.value
@@ -175,7 +189,8 @@ const ContractsPageContent = () => {
       const res = await getContractList(params)
 
       // Extract results - handle { data: { results: [] } } or { results: [] } or just []
-      const resultsArray = res?.results || res?.data?.results || (Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []))
+      const resultsArray =
+        res?.results || res?.data?.results || (Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [])
 
       const normalized = resultsArray.map((item, index) => ({
         sno: index + 1 + pagination.pageIndex * pagination.pageSize,
@@ -238,8 +253,6 @@ const ContractsPageContent = () => {
       setLoading(false)
     }
   }
-
-
 
   const loadCustomers = async () => {
     try {
@@ -563,7 +576,7 @@ const ContractsPageContent = () => {
     manualPagination: true,
     pageCount: Math.ceil(rowCount / pagination.pageSize),
     state: { globalFilter: appliedFilters.search, pagination },
-    onGlobalFilterChange: (val) => setAppliedFilters(prev => ({ ...prev, search: val })),
+    onGlobalFilterChange: val => setAppliedFilters(prev => ({ ...prev, search: val })),
     onPaginationChange: setPagination,
     globalFilterFn: fuzzyFilter,
     getCoreRowModel: getCoreRowModel(),
@@ -645,175 +658,232 @@ const ContractsPageContent = () => {
       }
     >
       <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-       <CardHeader
-  title={
-    <Box display='flex' alignItems='center' gap={2}>
-      <Typography variant='h5' fontWeight={600}>
-        Contracts List
-      </Typography>
+        <CardHeader
+          title={
+            <Box display='flex' alignItems='center' gap={2}>
+              <Typography variant='h5' fontWeight={600}>
+                Contracts List
+              </Typography>
+            </Box>
+          }
+          action={
+            <Box display='flex' alignItems='center' gap={2}>
+              <GlobalButton
+                color='secondary'
+                endIcon={<ArrowDropDownIcon />}
+                onClick={e => setExportAnchorEl(e.currentTarget)}
+                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+              >
+                Export
+              </GlobalButton>
 
-      <GlobalButton
-        variant='contained'
-        color='primary'
-        startIcon={
-          <RefreshIcon
-            sx={{
-              animation: loading ? 'spin 1s linear infinite' : 'none',
-              '@keyframes spin': {
-                '0%': { transform: 'rotate(0deg)' },
-                '100%': { transform: 'rotate(360deg)' }
-              }
-            }}
-          />
-        }
-        disabled={loading}
-        onClick={() => {
-          setPagination(p => ({ ...p, pageIndex: 0 }))
-          setAppliedFilters({
-            search: uiSearch,
-            customer: uiCustomer,
-            type: uiType,
-            status: uiStatus,
-            uuid: uiUuid
-          })
-        }}
-        sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-      >
-        {loading ? 'Refreshing...' : 'Refresh'}
-      </GlobalButton>
-    </Box>
-  }
-  action={
-    <Box display='flex' alignItems='center' gap={2}>
-      <GlobalButton
-        color='secondary'
-        endIcon={<ArrowDropDownIcon />}
-        onClick={e => setExportAnchorEl(e.currentTarget)}
-        sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-      >
-        Export
-      </GlobalButton>
+              <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportPrint()
+                  }}
+                >
+                  <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
+                </MenuItem>
 
-      <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
-        <MenuItem onClick={() => { setExportAnchorEl(null); exportPrint() }}>
-          <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
-        </MenuItem>
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportCSV()
+                  }}
+                >
+                  <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
+                </MenuItem>
 
-        <MenuItem onClick={() => { setExportAnchorEl(null); exportCSV() }}>
-          <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
-        </MenuItem>
+                <MenuItem
+                  onClick={async () => {
+                    setExportAnchorEl(null)
+                    await exportExcel()
+                  }}
+                >
+                  <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
+                </MenuItem>
 
-        <MenuItem onClick={async () => { setExportAnchorEl(null); await exportExcel() }}>
-          <TableChartIcon fontSize='small' sx={{ mr: 1 }} /> Excel
-        </MenuItem>
+                <MenuItem
+                  onClick={async () => {
+                    setExportAnchorEl(null)
+                    await exportPDF()
+                  }}
+                >
+                  <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
+                </MenuItem>
 
-        <MenuItem onClick={async () => { setExportAnchorEl(null); await exportPDF() }}>
-          <PictureAsPdfIcon fontSize='small' sx={{ mr: 1 }} /> PDF
-        </MenuItem>
+                <MenuItem
+                  onClick={() => {
+                    setExportAnchorEl(null)
+                    exportCopy()
+                  }}
+                >
+                  <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
+                </MenuItem>
+              </Menu>
 
-        <MenuItem onClick={() => { setExportAnchorEl(null); exportCopy() }}>
-          <FileCopyIcon fontSize='small' sx={{ mr: 1 }} /> Copy
-        </MenuItem>
-      </Menu>
-
-      {canAccess('Contracts', 'create') && (
-        <GlobalButton
-          variant='contained'
-          startIcon={<AddIcon />}
-          onClick={() => router.push('/admin/contracts/add')}
-          sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-        >
-          Add Contract
-        </GlobalButton>
-      )}
-    </Box>
-  }
-/>
+              {canAccess('Contracts', 'create') && (
+                <GlobalButton
+                  variant='contained'
+                  startIcon={<AddIcon />}
+                  onClick={() => router.push('/admin/contracts/add')}
+                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                >
+                  Add Contract
+                </GlobalButton>
+              )}
+            </Box>
+          }
+        />
 
         <Divider />
 
         <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {/* --- Row 2: Filters --- */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 2,
+              mb: 2,
+              flexWrap: 'wrap'
+            }}
+          >
+            {/* Date Filter with Checkbox */}
+            <Box sx={{ width: 220 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                <Checkbox
+                  checked={uiDateFilter}
+                  onChange={e => {
+                    setUiDateFilter(e.target.checked)
+                    if (!e.target.checked) {
+                      setUiDateRange([null, null])
+                    } else {
+                      const today = new Date()
+                      setUiDateRange([today, today])
+                    }
+                  }}
+                  size='small'
+                />
+                <Typography sx={{ fontWeight: 500, fontSize: '0.875rem' }}>Date Filter</Typography>
+              </Box>
+
+              <GlobalDateRange
+                start={uiDateRange[0]}
+                end={uiDateRange[1]}
+                onSelectRange={({ start, end }) => setUiDateRange([start, end])}
+                disabled={!uiDateFilter}
+                size='small'
+              />
+            </Box>
+
+            {/* Customer Filter */}
+            <Box sx={{ width: 220 }}>
+              <GlobalAutocomplete
+                fullWidth
+                id='customer-filter'
+                options={customerOptions}
+                getOptionLabel={option => option?.name || ''}
+                value={customerOptions.find(opt => opt.id === uiCustomer?.id) || null}
+                onChange={newVal => setUiCustomer(newVal)}
+                renderInput={params => (
+                  <GlobalTextField {...params} label='Customer' placeholder='Select Customer' size='small' />
+                )}
+              />
+            </Box>
+
+            {/* Contract Type Filter */}
+            <GlobalAutocomplete
+              fullWidth
+              options={CONTRACT_TYPES}
+              getOptionLabel={o => o.label}
+              value={CONTRACT_TYPES.find(v => v.value === uiType) || null}
+              onChange={newValue => {
+                setUiType(newValue?.value || null)
+              }}
+              renderInput={params => (
+                <GlobalTextField {...params} label='Contract Type' placeholder='Select Type' size='small' />
+              )}
+              sx={{ width: 220 }}
+            />
+
+            {/* Contract Status Filter */}
+            <GlobalAutocomplete
+              fullWidth
+              options={CONTRACT_STATUS}
+              getOptionLabel={o => o.label}
+              value={CONTRACT_STATUS.find(s => s.value === uiStatus) || null}
+              onChange={newValue => {
+                setUiStatus(newValue?.value || null)
+              }}
+              renderInput={params => (
+                <GlobalTextField {...params} label='Contract Status' placeholder='Select Status' size='small' />
+              )}
+              sx={{ width: 220 }}
+            />
+
+            {/* Refresh Button */}
+            <GlobalButton
+              variant='contained'
+              color='primary'
+              startIcon={
+                <RefreshIcon
+                  sx={{
+                    animation: loading ? 'spin 1s linear infinite' : 'none',
+                    '@keyframes spin': {
+                      '0%': { transform: 'rotate(0deg)' },
+                      '100%': { transform: 'rotate(360deg)' }
+                    }
+                  }}
+                />
+              }
+              disabled={loading}
+              onClick={() => {
+                setPagination(p => ({ ...p, pageIndex: 0 }))
+                setAppliedFilters({
+                  search: uiSearch,
+                  customer: uiCustomer,
+                  type: uiType,
+                  status: uiStatus,
+                  uuid: uiUuid,
+                  dateFilter: uiDateFilter,
+                  dateRange: uiDateRange
+                })
+              }}
+              sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+            >
+              {loading ? 'Refreshing...' : 'Refresh'}
+            </GlobalButton>
+          </Box>
+
+          <Divider sx={{ mb: 3 }} />
+
+          {/* --- Row 3: Pages & Search --- */}
           <Box
             sx={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              mb: 3,
-              gap: 2,
-              flexWrap: 'nowrap',
-              flexShrink: 0
+              mb: 3
             }}
           >
-            {/* LEFT SIDE FILTERS */}
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'flex-end',
-                gap: 2,
-                flexWrap: 'nowrap'
-              }}
-            >
-              {/* Entries per page */}
-              <FormControl size='small' sx={{ width: 120 }}>
-                <Select
-                  value={pagination.pageSize}
-                  onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
-                >
-                  {[10, 25, 50, 100].map(s => (
-                    <MenuItem key={s} value={s}>
-                      {s} entries
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+            {/* Entries per page */}
+            <FormControl size='small' sx={{ width: 120 }}>
+              <Select
+                value={pagination.pageSize}
+                onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
+              >
+                {[10, 25, 50, 100].map(s => (
+                  <MenuItem key={s} value={s}>
+                    {s} entries
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
 
-              {/* Customer Filter */}
-              <Box sx={{ width: 220 }}>
-                <GlobalAutocomplete
-                  fullWidth
-                  id='customer-filter'
-                  options={customerOptions}
-                  getOptionLabel={option => option?.name || ''}
-                  value={customerOptions.find(opt => opt.id === uiCustomer?.id) || null}
-                  onChange={newVal => setUiCustomer(newVal)}
-                  renderInput={params => (
-                    <GlobalTextField {...params} label='Customer' placeholder='Select Customer' size='small' />
-                  )}
-                />
-              </Box>
-
-              {/* Contract Type Filter */}
-              <GlobalAutocomplete
-                fullWidth
-                options={CONTRACT_TYPES}
-                getOptionLabel={o => o.label}
-                value={CONTRACT_TYPES.find(v => v.value === uiType) || null}
-                onChange={newValue => {
-                  setUiType(newValue?.value || null)
-                }}
-                renderInput={params => (
-                  <GlobalTextField {...params} label='Contract Type' placeholder='Select Type' size='small' />
-                )}
-                sx={{ width: 220 }}
-              />
-
-              {/* Contract Status Filter */}
-              <GlobalAutocomplete
-                fullWidth
-                options={CONTRACT_STATUS}
-                getOptionLabel={o => o.label}
-                value={CONTRACT_STATUS.find(s => s.value === uiStatus) || null}
-                onChange={newValue => {
-                  setUiStatus(newValue?.value || null)
-                }}
-                renderInput={params => (
-                  <GlobalTextField {...params} label='Contract Status' placeholder='Select Status' size='small' />
-                )}
-                sx={{ width: 220 }}
-              />
-            </Box>
-
-            {/* SEARCH RIGHT SIDE */}
+            {/* Link to Search */}
             <DebouncedInput
               value={uiUuid ? `uuid:${uiUuid}` : uiSearch}
               onChange={v => {
@@ -915,7 +985,6 @@ const ContractsPageContent = () => {
             <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
           </Box>
         </Box>
-
       </Card>
 
       <Dialog
@@ -991,7 +1060,6 @@ const ContractsPageContent = () => {
     </StickyListLayout>
   )
 }
-
 
 // Wrapper for RBAC
 export default function ContractsPage() {

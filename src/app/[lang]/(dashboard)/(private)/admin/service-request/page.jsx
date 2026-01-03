@@ -640,29 +640,6 @@ const ServiceRequestPageContent = () => {
               <Typography variant='h5' fontWeight={600}>
                 Service Request
               </Typography>
-
-              <Button
-                variant='contained'
-                startIcon={<RefreshIcon />}
-                onClick={() => {
-                  setPagination({ pageIndex: 0, pageSize: pagination.pageSize })
-                  setAppliedFilters({
-                    enableDate: uiEnableDateFilter,
-                    start: uiStartDate,
-                    end: uiEndDate,
-                    customer: uiCustomer,
-                    contract: uiContract,
-                    technician: uiTechnician,
-                    supervisor: uiSupervisor,
-                    status: uiStatus,
-                    appointment: uiAppointment,
-                    search: uiSearch
-                  })
-                }}
-                sx={{ textTransform: 'none' }}
-              >
-                Refresh
-              </Button>
             </Box>
           }
           action={
@@ -813,6 +790,29 @@ const ServiceRequestPageContent = () => {
                 />
               )}
             />
+
+            <GlobalButton
+              variant='contained'
+              startIcon={<RefreshIcon />}
+              onClick={() => {
+                setPagination({ pageIndex: 0, pageSize: pagination.pageSize })
+                setAppliedFilters({
+                  enableDate: uiEnableDateFilter,
+                  start: uiStartDate,
+                  end: uiEndDate,
+                  customer: uiCustomer,
+                  contract: uiContract,
+                  technician: uiTechnician,
+                  supervisor: uiSupervisor,
+                  status: uiStatus,
+                  appointment: uiAppointment,
+                  search: uiSearch
+                })
+              }}
+              sx={{ textTransform: 'none' }}
+            >
+              Refresh
+            </GlobalButton>
           </Box>
 
           <Divider sx={{ mb: 2 }} />

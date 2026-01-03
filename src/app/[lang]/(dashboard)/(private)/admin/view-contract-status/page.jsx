@@ -32,6 +32,7 @@ import GlobalTextarea from '@/components/common/GlobalTextarea'
 import GlobalSelect from '@/components/common/GlobalSelect'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
 import { showToast } from '@/components/common/Toasts'
+import { encodeId } from '@/utils/urlEncoder'
 
 import { getContractView } from '@/api/contract/viewStatus'
 
@@ -325,7 +326,10 @@ const ContractStatusPageContent = () => {
                 size='small'
                 color='info'
                 sx={{ p: 0.8 }}
-                onClick={() => router.push(`/admin/contracts/${item.id}/view`)}
+                onClick={() => {
+                  const encodedId = encodeId(item.id)
+                  router.push(`/admin/contracts/${encodedId}/view`)
+                }}
               >
                 <i className='tabler-eye' />
               </IconButton>

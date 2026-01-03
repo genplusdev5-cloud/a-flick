@@ -579,15 +579,15 @@ const InvoiceListPageFullContent = () => {
                 </IconButton>
               )}
 
-                  {/* PRINT */}
+              {/* PRINT */}
               <IconButton size='small' onClick={() => handlePrint(invoice)}>
                 <i className='tabler-printer text-purple-600 text-base' />
               </IconButton>
-              
-               {/* VIEW */}
+
+              {/* VIEW */}
               <Link href={`/admin/invoice/${invoice.id}`} passHref>
                 <IconButton size='small'>
-                    <i className='tabler-eye text-blue-500 text-base' />
+                  <i className='tabler-eye text-blue-500 text-base' />
                 </IconButton>
               </Link>
             </div>
@@ -748,35 +748,8 @@ const InvoiceListPageFullContent = () => {
               <Typography variant='h5' sx={{ fontWeight: 600 }}>
                 Invoice List
               </Typography>
-
-              <GlobalButton
-                variant='contained'
-                startIcon={
-                  <RefreshIcon
-                    sx={{
-                      animation: loading ? 'spin 1s linear infinite' : 'none',
-                      '@keyframes spin': {
-                        '0%': { transform: 'rotate(0deg)' },
-                        '100%': { transform: 'rotate(360deg)' }
-                      }
-                    }}
-                  />
-                }
-                disabled={loading}
-                onClick={handleRefresh}
-              >
-                {loading ? 'Refreshing...' : 'Refresh'}
-              </GlobalButton>
             </Box>
           }
-          sx={{
-            pb: 1.5,
-            pt: 4,
-            px: 4,
-            '& .MuiCardHeader-title': {
-              fontWeight: 600
-            }
-          }}
         />
 
         <Divider />
@@ -819,7 +792,7 @@ const InvoiceListPageFullContent = () => {
 
           {/* FILTERS */}
           <Box sx={{ pb: 3, flexShrink: 0 }}>
-            <Grid container spacing={3}>
+            <Grid container spacing={3} alignItems='flex-end'>
               {/* Row 1 */}
               <Grid item xs={12} sm={6} md={3}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -966,7 +939,7 @@ const InvoiceListPageFullContent = () => {
                 />
               </Grid>
 
-              <Grid item xs={12} sm={6} md={3} mb={2}>
+              <Grid item xs={12} sm={6} md={3}>
                 <CustomAutocomplete
                   options={contractOptions}
                   value={uiContract || null}
@@ -980,6 +953,19 @@ const InvoiceListPageFullContent = () => {
                   )}
                   renderInput={params => <CustomTextField {...params} label='Contract' size='small' />}
                 />
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Box sx={{ display: 'flex', alignItems: 'flex-end', height: '100%' }}>
+                  <GlobalButton
+                    fullWidth
+                    variant='contained'
+                    startIcon={<RefreshIcon />}
+                    disabled={loading}
+                    onClick={handleRefresh}
+                  >
+                    Refresh
+                  </GlobalButton>
+                </Box>
               </Grid>
             </Grid>
 
