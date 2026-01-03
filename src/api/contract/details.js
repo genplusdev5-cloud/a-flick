@@ -2,15 +2,22 @@ import api from '@/utils/axiosInstance'
 
 export const getContractDetails = async id => {
   try {
-    // Now accepts numeric ID (decoded from Base64)
-    const url = `contract-details/?uuid=${id}`
-    console.log('📡 API Request URL:', url, 'ID Value:', id, 'ID Type:', typeof id)
+    // Check if the id is a UUID
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
     
-    const res = await api.get(url)
+    const params = isUuid ? { uuid: id } : { id: id }
 
-    return res.data?.data || null // backend returns object
+    console.log('📡 Fetching Contract Details:', { id, isUuid, params })
+    
+    const res = await api.get('contract-details/', { params })
+
+    return res.data?.data || null
   } catch (error) {
-    console.error('❌ getContractDetails API Error:', error)
-    throw error // Re-throw to allow error handling in component
+    console.error('❌ getContractDetails FAILED')
+    console.error('👉 URL:', error.config?.url)
+    console.error('👉 Status:', error.response?.status)
+    console.error('👉 Data:', JSON.stringify(error.response?.data, null, 2))
+    
+    throw error
   }
 }
