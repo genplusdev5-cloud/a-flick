@@ -79,48 +79,7 @@ export default function DashboardList() {
       header: 'S.No',
       enableSorting: false
     }),
-    columnHelper.display({
-      id: 'operate',
-      header: 'Operate',
-      cell: ({ row }) => {
-        const id = row.original.id
-        const encodedId = id ? btoa(id.toString()) : ''
-        const name =
-          row.original.business_name || row.original.billing_name || row.original.customer || row.original.customer_name
 
-        return (
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button
-              variant='contained'
-              size='small'
-              color='primary'
-              onClick={() => router.push(`/admin/contracts?customer_id=${row.original.id}`)}
-              sx={{ fontSize: '0.75rem', padding: '4px 10px', minWidth: 'auto' }}
-            >
-              Contract
-            </Button>
-            <Button
-              variant='contained'
-              size='small'
-              color='secondary'
-              onClick={() => router.push(`/admin/service-request?customer_id=${row.original.id}`)}
-              sx={{ fontSize: '0.75rem', padding: '4px 10px', minWidth: 'auto' }}
-            >
-              Service
-            </Button>
-            <Button
-              variant='contained'
-              size='small'
-              color='info'
-              onClick={() => router.push(`/admin/call-log?customer_id=${row.original.id}`)}
-              sx={{ fontSize: '0.75rem', padding: '4px 10px', minWidth: 'auto' }}
-            >
-              Call Log
-            </Button>
-          </Box>
-        )
-      }
-    }),
     columnHelper.display({
       id: 'actions',
       header: 'Action',
@@ -278,7 +237,7 @@ export default function DashboardList() {
       header: 'Contract Status',
       cell: ({ row }) => {
         const rawStatus = row.original.contract_status || '-'
-        const status = rawStatus.toLowerCase()
+        const status = String(rawStatus).toLowerCase()
 
         const statusColorMap = {
           current: 'success', // 🟢 Green

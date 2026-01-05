@@ -39,6 +39,7 @@ import CustomAutocomplete from '@core/components/mui/Autocomplete'
 import CustomTextField from '@core/components/mui/TextField'
 import { getCustomerNamesForList } from '@/api/contract/listDropdowns'
 
+
 import TableChartIcon from '@mui/icons-material/TableChart'
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
 import FileCopyIcon from '@mui/icons-material/FileCopy'
@@ -422,8 +423,8 @@ const ContractsPageContent = () => {
                   }
                 }}
                 onClick={() => {
-                  const encodedContractId = btoa(item.id.toString())
-                  const encodedCustomerId = btoa(item.customer_id.toString())
+                  const encodedContractId = encodeId(item.id)
+                  const encodedCustomerId = encodeId(item.customer_id)
 
                   router.push(`/en/admin/service-request?customer=${encodedCustomerId}&contract=${encodedContractId}`)
                 }}
@@ -449,8 +450,8 @@ const ContractsPageContent = () => {
                   }
                 }}
                 onClick={() => {
-                  const encodedContractId = btoa(item.id.toString())
-                  const encodedCustomerId = btoa(item.customer_id.toString())
+                  const encodedContractId = encodeId(item.id)
+                  const encodedCustomerId = encodeId(item.customer_id)
 
                   router.push(`/en/admin/invoice?customer=${encodedCustomerId}&contract=${encodedContractId}`)
                 }}

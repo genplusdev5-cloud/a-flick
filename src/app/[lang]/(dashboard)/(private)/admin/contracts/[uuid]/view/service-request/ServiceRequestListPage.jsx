@@ -33,7 +33,7 @@ import TablePaginationComponent from '@/components/TablePaginationComponent'
 import styles from '@core/styles/table.module.css'
 import { showToast } from '@/components/common/Toasts'
 
-export default function ServiceRequestListPage() {
+export default function ServiceRequestListPage({ contractId }) {
   const [rows, setRows] = useState([])
   const [searchText, setSearchText] = useState('')
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 })
@@ -41,8 +41,8 @@ export default function ServiceRequestListPage() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [isEdit, setIsEdit] = useState(false)
   const [formData, setFormData] = useState({ requestDate: '' })
-  const params = useParams()
-  const contractId = params?.uuid || params?.id
+  // const params = useParams()
+  // const contractId = params?.uuid || params?.id
 
   const loadTickets = async () => {
     try {

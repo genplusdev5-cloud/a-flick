@@ -1,8 +1,8 @@
 import api from '@/utils/axiosInstance'
 
-export const getContractDetails = async contractId => {
+export const getContractDetails = async uuid => {
   try {
-    const res = await api.get(`contract-details/?id=${contractId}`)
+    const res = await api.get(`contract-details/?uuid=${uuid}`)
 
     const contract = res.data?.data || null
 

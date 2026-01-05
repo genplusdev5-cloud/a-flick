@@ -58,7 +58,7 @@ export default function PestListPage() {
 
       const formatted = data.map(item => ({
         id: item.id,
-        pest: item.pest_id,
+        pest: item.pest,
         frequency: item.frequency_id,
         chemicals: item.chemical_id || '',
         pestValue: Number(item.pest_value),

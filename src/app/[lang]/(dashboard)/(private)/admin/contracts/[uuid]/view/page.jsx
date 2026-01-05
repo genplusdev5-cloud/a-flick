@@ -1,8 +1,7 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { getContractDetails } from '@/api/contract' // <-- Create this API if not exists
-import { decodeId, isValidEncodedId } from '@/utils/urlEncoder'
+import { getContractDetails } from '@/api/contract'
 import AgreementPDF from '@/components/pdf/AgreementPDF'
 import SchedulePDF from '@/components/pdf/SchedulePDF'
 import { printSchedule } from '@/helpers/printSchedule'
@@ -64,43 +63,29 @@ export default function Project() {
   const [loading, setLoading] = useState(true)
   const [contractId, setContractId] = useState(null)
 
-  // Decode the Base64 encoded ID
-  useEffect(() => {
-    if (!uuid) {
-      router.push('/404')
-      return
-    }
-
-    // Validate and decode the Base64 ID
-    if (!isValidEncodedId(uuid)) {
-      console.error('Invalid encoded contract ID:', uuid)
-      router.push('/404')
-      return
-    }
-
-    const decodedId = decodeId(uuid)
-    console.log('🔓 Base64 Decoding:', { encoded: uuid, decoded: decodedId })
-    
-    if (!decodedId) {
-      router.push('/404')
-      return
-    }
-
-    setContractId(decodedId)
-  }, [uuid, router])
-
+  // Use UUID directly
   useEffect(() => {
     const loadData = async () => {
-      if (!contractId) return
+      if (!uuid) {
+        console.error('❌ Request Failed: UUID is missing')
+        router.push('/404')
+        return
+      }
 
-      console.log('🔍 Decoded Contract ID:', contractId, 'Type:', typeof contractId)
+      console.log('🔍 Load Contract with UUID:', uuid)
+      setLoading(true)
 
       try {
-        const res = await getContractDetails(contractId)
+        const res = await getContractDetails(uuid)
+
+        if (!res) {
+          throw new Error('Contract not found')
+        }
+
         setContract(res)
+        setContractId(res.id) // If needed for other components
       } catch (err) {
         console.error('Error loading contract:', err)
-        // If API returns 404 or unauthorized, redirect
         if (err.response?.status === 404 || err.response?.status === 401) {
           router.push('/404')
         }
@@ -110,7 +95,7 @@ export default function Project() {
     }
 
     loadData()
-  }, [contractId, router])
+  }, [uuid, router])
 
   const loadContractData = async () => {
     if (!contractId) return
@@ -131,31 +116,31 @@ export default function Project() {
         return <TabContentSwiper />
 
       case 'contract':
-        return <ContractViewPage />
+        return <ContractViewPage contract={contract} />
 
       case 'pest':
-        return <PestListPage />
+        return <PestListPage contractId={contractId} />
 
       case 'service-request':
-        return <ServiceRequestListPage />
+        return <ServiceRequestListPage contractId={contractId} />
 
       case 'invoice':
-        return <InvoiceListPage />
+        return <InvoiceListPage contractId={contractId} />
 
       case 'location':
-        return <LocationListPage />
+        return <LocationListPage contractId={contractId} />
 
       case 'file':
-        return <FileManagerListPage />
+        return <FileManagerListPage contractId={contractId} />
 
       case 'call-log':
-        return <CallLogListPage />
+        return <CallLogListPage contractId={contractId} />
 
       case 'todo-list':
-        return <TodoListPage />
+        return <TodoListPage contractId={contractId} />
 
       case 'site-risk':
-        return <SiteRiskPage />
+        return <SiteRiskPage contractId={contractId} />
 
       default:
         return null
