@@ -19,6 +19,7 @@ import {
   Breadcrumbs,
   Chip,
   TextField,
+  FormControlLabel,
   FormControl,
   Select,
   CircularProgress,
@@ -28,6 +29,7 @@ import {
 
 import PermissionGuard from '@/components/auth/PermissionGuard'
 import { usePermission } from '@/hooks/usePermission'
+import PresetDateRangePicker from '@/components/common/PresetDateRangePicker'
 
 import { getContractList, deleteContractApi } from '@/api/contract'
 import api from '@/utils/axiosInstance'
@@ -38,7 +40,6 @@ import VisibilityIcon from '@mui/icons-material/Visibility'
 import CustomAutocomplete from '@core/components/mui/Autocomplete'
 import CustomTextField from '@core/components/mui/TextField'
 import { getCustomerNamesForList } from '@/api/contract/listDropdowns'
-
 
 import TableChartIcon from '@mui/icons-material/TableChart'
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
@@ -746,38 +747,28 @@ const ContractsPageContent = () => {
           <Box
             sx={{
               display: 'flex',
-              alignItems: 'center',
+              alignItems: 'flex-end', // ⭐ KEY FIX
               gap: 2,
-              mb: 2,
-              flexWrap: 'wrap'
+              mb: 3,
+              flexWrap: 'wrap',
+              flexShrink: 0
             }}
           >
             {/* Date Filter with Checkbox */}
-            <Box sx={{ width: 220 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                <Checkbox
-                  checked={uiDateFilter}
-                  onChange={e => {
-                    setUiDateFilter(e.target.checked)
-                    if (!e.target.checked) {
-                      setUiDateRange([null, null])
-                    } else {
-                      const today = new Date()
-                      setUiDateRange([today, today])
-                    }
-                  }}
-                  size='small'
-                />
-                <Typography sx={{ fontWeight: 500, fontSize: '0.875rem' }}>Date Filter</Typography>
-              </Box>
-
-              <GlobalDateRange
-                start={uiDateRange[0]}
-                end={uiDateRange[1]}
-                onSelectRange={({ start, end }) => setUiDateRange([start, end])}
-                disabled={!uiDateFilter}
-                size='small'
+            <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+              <FormControlLabel
+                control={<Checkbox checked={uiDateFilter} onChange={e => setUiDateFilter(e.target.checked)} />}
+                label='Date Filter'
               />
+
+              <Box sx={{ width: 220 }}>
+                <PresetDateRangePicker
+                  start={uiDateRange[0]}
+                  end={uiDateRange[1]}
+                  onSelectRange={({ start, end }) => setUiDateRange([start, end])}
+                  disabled={!uiDateFilter}
+                />
+              </Box>
             </Box>
 
             {/* Customer Filter */}

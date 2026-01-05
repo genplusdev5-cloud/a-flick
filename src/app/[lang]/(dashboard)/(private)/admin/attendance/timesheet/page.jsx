@@ -19,6 +19,7 @@ import {
 
 import StickyListLayout from '@/components/common/StickyListLayout'
 import PermissionGuard from '@/components/auth/PermissionGuard'
+import PresetDateRangePicker from '@/components/common/PresetDateRangePicker'
 
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import GlobalButton from '@/components/common/GlobalButton'
@@ -31,6 +32,9 @@ const AttendanceSummaryPageContent = () => {
   const [supervisor, setSupervisor] = useState('')
   const [technician, setTechnician] = useState('')
   const [otFilter, setOtFilter] = useState('all')
+
+  const [uiDateFilter, setUiDateFilter] = useState(true)
+  const [uiDateRange, setUiDateRange] = useState([null, null])
 
   const [startDate, setStartDate] = useState(new Date())
   const [endDate, setEndDate] = useState(new Date())
@@ -81,12 +85,11 @@ const AttendanceSummaryPageContent = () => {
               />
 
               <Box sx={{ width: 220 }}>
-                <GlobalDateRange
-                  label=''
-                  start={dateRange[0]}
-                  end={dateRange[1]}
-                  onSelectRange={({ start, end }) => setDateRange([start, end])}
-                  disabled={!dateFilter}
+                <PresetDateRangePicker
+                  start={uiDateRange[0]}
+                  end={uiDateRange[1]}
+                  onSelectRange={({ start, end }) => setUiDateRange([start, end])}
+                  disabled={!uiDateFilter}
                 />
               </Box>
             </Box>

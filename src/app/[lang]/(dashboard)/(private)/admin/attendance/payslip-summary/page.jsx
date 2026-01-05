@@ -27,6 +27,7 @@ import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 import SearchIcon from '@mui/icons-material/Search'
 import styles from '@core/styles/table.module.css'
+import PresetDateRangePicker from '@/components/common/PresetDateRangePicker'
 
 import classnames from 'classnames'
 import ChevronRight from '@menu/svg/ChevronRight'
@@ -51,6 +52,9 @@ const TimesoftSummaryReportContent = () => {
   const [dateRange, setDateRange] = useState([null, null])
   const [sorting, setSorting] = useState([])
 
+  const [uiDateFilter, setUiDateFilter] = useState(true)
+  const [uiDateRange, setUiDateRange] = useState([null, null])
+
   useEffect(() => {
     if (!rows.length) return
 
@@ -63,8 +67,18 @@ const TimesoftSummaryReportContent = () => {
   }, [pagination.pageIndex, pagination.pageSize])
 
   const monthsList = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December'
   ]
 
   const columnHelper = createColumnHelper()
@@ -134,17 +148,16 @@ const TimesoftSummaryReportContent = () => {
             {/* Date Filter + Range */}
             <Box sx={{ display: 'flex', flexDirection: 'column' }}>
               <FormControlLabel
-                control={<Checkbox checked={dateFilter} onChange={e => setDateFilter(e.target.checked)} />}
+                control={<Checkbox checked={uiDateFilter} onChange={e => setUiDateFilter(e.target.checked)} />}
                 label='Date Filter'
               />
 
-              <Box sx={{ width: 240 }}>
-                <GlobalDateRange
-                  label=''
-                  start={dateRange[0]}
-                  end={dateRange[1]}
-                  onSelectRange={({ start, end }) => setDateRange([start, end])}
-                  disabled={!dateFilter}
+              <Box sx={{ width: 220 }}>
+                <PresetDateRangePicker
+                  start={uiDateRange[0]}
+                  end={uiDateRange[1]}
+                  onSelectRange={({ start, end }) => setUiDateRange([start, end])}
+                  disabled={!uiDateFilter}
                 />
               </Box>
             </Box>

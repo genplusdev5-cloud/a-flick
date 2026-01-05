@@ -33,6 +33,7 @@ import {
 } from '@mui/material'
 
 import PermissionGuard from '@/components/auth/PermissionGuard'
+import PresetDateRangePicker from '@/components/common/PresetDateRangePicker'
 
 import { getAttendanceList, deleteAttendance } from '@/api/attendance'
 import { getAttendanceById } from '@/api/attendance/details'
@@ -42,7 +43,6 @@ import ProgressCircularCustomization from '@/components/common/ProgressCircularC
 
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
-import GlobalDateRange from '@/components/common/GlobalDateRange'
 
 import PrintIcon from '@mui/icons-material/Print'
 import TableChartIcon from '@mui/icons-material/TableChart'
@@ -68,6 +68,7 @@ import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 import CustomTextField from '@core/components/mui/TextField'
 import { format } from 'date-fns'
 import { showToast } from '@/components/common/Toasts' // ← Idhu add pannu (exact path unakku theriyum)
+import GlobalDateRange from '@/components/common/GlobalDateRange'
 
 // ----------------------------------------------------------
 
@@ -409,13 +410,6 @@ const AttendancePageContent = () => {
               </GlobalButton>
             </Box>
           }
-          sx={{
-            pb: 1.5,
-            pt: 5,
-            px: 10,
-            '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
-            '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
-          }}
         />
 
         <Divider />
@@ -449,10 +443,10 @@ const AttendancePageContent = () => {
                 <FormControlLabel
                   control={<Checkbox checked={uiDateFilter} onChange={e => setUiDateFilter(e.target.checked)} />}
                   label='Date Filter'
-                  sx={{ mb: -0.5 }}
                 />
+
                 <Box sx={{ width: 220 }}>
-                  <GlobalDateRange
+                  <PresetDateRangePicker
                     start={uiDateRange[0]}
                     end={uiDateRange[1]}
                     onSelectRange={({ start, end }) => setUiDateRange([start, end])}

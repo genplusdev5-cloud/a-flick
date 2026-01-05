@@ -41,6 +41,7 @@ import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
 import AddIcon from '@mui/icons-material/Add'
 import GlobalDateRange from '@/components/common/GlobalDateRange'
+import PresetDateRangePicker from '@/components/common/PresetDateRangePicker'
 
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
@@ -659,7 +660,7 @@ const ServiceRequestPageContent = () => {
           <Box
             sx={{
               display: 'flex',
-              alignItems: 'center',
+              alignItems: 'flex-end', // ⭐ KEY FIX
               gap: 2,
               mb: 3,
               flexWrap: 'wrap',
@@ -675,7 +676,7 @@ const ServiceRequestPageContent = () => {
                 sx={{ mb: -0.5 }}
               />
               <Box sx={{ width: 220 }}>
-                <GlobalDateRange
+                <PresetDateRangePicker
                   start={uiStartDate}
                   end={uiEndDate}
                   onSelectRange={({ start, end }) => {

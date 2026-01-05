@@ -24,6 +24,7 @@ import {
 } from '@mui/material'
 
 import PermissionGuard from '@/components/auth/PermissionGuard'
+import PresetDateRangePicker from '@/components/common/PresetDateRangePicker'
 
 // 🔥 Global UI Components (use everywhere)
 import GlobalButton from '@/components/common/GlobalButton'
@@ -152,8 +153,7 @@ const ContractStatusPageContent = () => {
       if (appliedFilters.contractType?.value) params.contract_type = appliedFilters.contractType.value
       if (appliedFilters.invoiceFrequency?.value) params.billing_frequency_id = appliedFilters.invoiceFrequency.value
       if (appliedFilters.contractStatus?.value) params.contract_status = appliedFilters.contractStatus.value
-      if (appliedFilters.renewal?.value)
-        params.is_renewed = appliedFilters.renewal.value === 'Renewed' ? true : false
+      if (appliedFilters.renewal?.value) params.is_renewed = appliedFilters.renewal.value === 'Renewed' ? true : false
 
       if (appliedFilters.filterByDate && appliedFilters.dateRange.start && appliedFilters.dateRange.end) {
         params.from_date = appliedFilters.dateRange.start.toISOString().split('T')[0]
@@ -668,34 +668,19 @@ const ContractStatusPageContent = () => {
                     }}
                     size='small'
                   />
-
                   <Typography sx={{ fontSize: '0.85rem', fontWeight: 500 }}>Date Range</Typography>
                 </Box>
-                <AppReactDatepicker
-                  selectsRange
-                  startDate={uiDateFilter?.start || null}
-                  endDate={uiDateFilter?.end || null}
-                  onChange={dates => {
-                    const [start, end] = dates
+                <PresetDateRangePicker
+                  start={uiDateFilter.start}
+                  end={uiDateFilter.end}
+                  disabled={!uiFilterByDate}
+                  onSelectRange={({ start, end }) => {
                     setUiDateFilter({ start, end })
                   }}
-                  shouldCloseOnSelect={false}
-                  disabled={!uiFilterByDate}
-                  popperProps={{ strategy: 'fixed' }}
-                  popperPlacement='bottom-start'
-                  customInput={
-                    <TextField
-                      fullWidth
-                      size='small'
-                      disabled={!uiFilterByDate}
-                      sx={{ width: 220, bgcolor: '#fff' }}
-                      placeholder='Select Date Range'
-                    />
-                  }
                 />
               </Box>
 
-               {/* Origin */}
+              {/* Origin */}
               <GlobalAutocomplete
                 label='Origin'
                 options={originOptions}

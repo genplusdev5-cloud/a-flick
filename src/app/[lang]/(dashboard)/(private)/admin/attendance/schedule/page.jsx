@@ -44,6 +44,8 @@ import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
 
 import TablePaginationComponent from '@/components/TablePaginationComponent'
+import PresetDateRangePicker from '@/components/common/PresetDateRangePicker'
+
 import styles from '@core/styles/table.module.css'
 
 import { format, addDays } from 'date-fns'
@@ -491,8 +493,7 @@ const AttendanceSchedulePageContent = () => {
                     />
 
                     <Box sx={{ width: 220 }}>
-                      <GlobalDateRange
-                        label=''
+                      <PresetDateRangePicker
                         start={uiDateRange[0]}
                         end={uiDateRange[1]}
                         onSelectRange={({ start, end }) => setUiDateRange([start, end])}

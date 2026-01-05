@@ -25,6 +25,7 @@ import {
   Select,
   TextField,
   FormControl,
+  FormControlLabel,
   CircularProgress,
   InputAdornment,
   Checkbox
@@ -32,6 +33,7 @@ import {
 
 import PermissionGuard from '@/components/auth/PermissionGuard'
 import { usePermission } from '@/hooks/usePermission'
+import PresetDateRangePicker from '@/components/common/PresetDateRangePicker'
 
 import { getCustomerList, deleteCustomer, getCustomerSummary } from '@/api/customer'
 import { getCustomerOrigin } from '@/api/customer/origin'
@@ -194,7 +196,16 @@ const CustomersPageContent = () => {
     } finally {
       setLoading(false)
     }
-  }, [pagination.pageIndex, pagination.pageSize, appliedSearchText, appliedFilterOrigin, appliedFilterMyob, appliedDateFilter, appliedDateRange, originMap])
+  }, [
+    pagination.pageIndex,
+    pagination.pageSize,
+    appliedSearchText,
+    appliedFilterOrigin,
+    appliedFilterMyob,
+    appliedDateFilter,
+    appliedDateRange,
+    originMap
+  ])
 
   useEffect(() => {
     const loadCompanies = async () => {
@@ -203,7 +214,7 @@ const CustomersPageContent = () => {
         const mapped = list.map(c => ({
           id: c.id,
           label: c.name,
-          value: c.id  // ✅ Use ID for value to match API expectations
+          value: c.id // ✅ Use ID for value to match API expectations
         }))
         setCompanyOptions(mapped)
       } catch (err) {
@@ -675,38 +686,28 @@ const CustomersPageContent = () => {
           <Box
             sx={{
               display: 'flex',
-              alignItems: 'center',
+              alignItems: 'flex-end', // ⭐ KEY FIX
               gap: 2,
-              mb: 2,
-              flexWrap: 'wrap'
+              mb: 3,
+              flexWrap: 'wrap',
+              flexShrink: 0
             }}
           >
             {/* Date Filter with Checkbox */}
-            <Box sx={{ width: 220 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                <Checkbox
-                  checked={uiDateFilter}
-                  onChange={e => {
-                    setUiDateFilter(e.target.checked)
-                    if (!e.target.checked) {
-                      setUiDateRange([null, null])
-                    } else {
-                      const today = new Date()
-                      setUiDateRange([today, today])
-                    }
-                  }}
-                  size='small'
-                />
-                <Typography sx={{ fontWeight: 500, fontSize: '0.875rem' }}>Date Filter</Typography>
-              </Box>
-
-              <GlobalDateRange
-                start={uiDateRange[0]}
-                end={uiDateRange[1]}
-                onSelectRange={({ start, end }) => setUiDateRange([start, end])}
-                disabled={!uiDateFilter}
-                size='small'
+            <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+              <FormControlLabel
+                control={<Checkbox checked={uiDateFilter} onChange={e => setUiDateFilter(e.target.checked)} />}
+                label='Date Filter'
               />
+
+              <Box sx={{ width: 220 }}>
+                <PresetDateRangePicker
+                  start={uiDateRange[0]}
+                  end={uiDateRange[1]}
+                  onSelectRange={({ start, end }) => setUiDateRange([start, end])}
+                  disabled={!uiDateFilter}
+                />
+              </Box>
             </Box>
 
             {/* Origin */}

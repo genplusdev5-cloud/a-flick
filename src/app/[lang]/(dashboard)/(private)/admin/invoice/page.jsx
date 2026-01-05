@@ -31,6 +31,7 @@ import SearchIcon from '@mui/icons-material/Search'
 import GlobalDateRange from '@/components/common/GlobalDateRange'
 import { printInvoice } from '@/helpers/printInvoice'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
+import PresetDateRangePicker from '@/components/common/PresetDateRangePicker'
 
 // Table
 import {
@@ -800,6 +801,7 @@ const InvoiceListPageFullContent = () => {
                     checked={uiDateFilter}
                     onChange={e => {
                       setUiDateFilter(e.target.checked)
+
                       if (!e.target.checked) {
                         setUiDateRange([null, null])
                       } else {
@@ -812,12 +814,13 @@ const InvoiceListPageFullContent = () => {
                   <Typography sx={{ mb: 0.5, fontWeight: 500 }}>Date Filter</Typography>
                 </Box>
 
-                <GlobalDateRange
+                <PresetDateRangePicker
                   start={uiDateRange[0]}
                   end={uiDateRange[1]}
-                  onSelectRange={({ start, end }) => setUiDateRange([start, end])}
+                  onSelectRange={({ start, end }) => {
+                    setUiDateRange([start, end])
+                  }}
                   disabled={!uiDateFilter}
-                  size='small'
                 />
               </Grid>
 

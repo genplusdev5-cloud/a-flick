@@ -27,11 +27,11 @@ const serviceRequestsData = [
 
 // Dummy Data for Today Followups
 const followupsData = [
-  { id: 1, customer: 'Acme Corp', createdDate: '2024-01-05', status: 'Open' },
-  { id: 2, customer: 'Wayne Ent', createdDate: '2024-01-05', status: 'Closed' },
-  { id: 3, customer: 'Stark Ind', createdDate: '2024-01-04', status: 'Pending' },
-  { id: 4, customer: 'Cyberdyne', createdDate: '2024-01-03', status: 'Open' },
-  { id: 5, customer: 'Globex', createdDate: '2024-01-02', status: 'Closed' }
+  { id: 1, customer: 'Acme Corp', createdDate: '2024-01-05', status: 'Open', svcRequestNo: 'REQ-001' },
+  { id: 2, customer: 'Wayne Ent', createdDate: '2024-01-05', status: 'Closed', svcRequestNo: 'REQ-002' },
+  { id: 3, customer: 'Stark Ind', createdDate: '2024-01-04', status: 'Pending', svcRequestNo: 'REQ-003' },
+  { id: 4, customer: 'Cyberdyne', createdDate: '2024-01-03', status: 'Open', svcRequestNo: 'REQ-004' },
+  { id: 5, customer: 'Globex', createdDate: '2024-01-02', status: 'Closed', svcRequestNo: 'REQ-005' }
 ]
 
 const StatusChip = ({ status }) => {
@@ -63,7 +63,7 @@ export default function DashboardList() {
               <Table>
                 <TableHead sx={{ bgcolor: 'action.hover' }}>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 600 }}>Request No</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>SVC Request.No</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Technician Name</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
                   </TableRow>
@@ -98,6 +98,7 @@ export default function DashboardList() {
               <Table>
                 <TableHead sx={{ bgcolor: 'action.hover' }}>
                   <TableRow>
+                     <TableCell sx={{ fontWeight: 600 }}>SVC Request.No</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Customer</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Created Date</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
@@ -106,6 +107,7 @@ export default function DashboardList() {
                 <TableBody>
                   {followupsData.map(row => (
                     <TableRow key={row.id} hover>
+                      <TableCell>{row.svcRequestNo}</TableCell>
                       <TableCell>{row.customer}</TableCell>
                       <TableCell>{row.createdDate}</TableCell>
                       <TableCell>
