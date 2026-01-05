@@ -7,4 +7,3 @@ export const addEmployeeLunch = async data => {
   const res = await api.post('employeelunch-add/', form)
   return res.data
 }
-

@@ -194,6 +194,7 @@ const Calendar = ({
     ],
 
     initialView: 'timeGridWeek',
+    allDaySlot: false,
     resources,
     resourceAreaWidth: '200px',
     resourceAreaHeaderContent: 'Employees',

@@ -1,5 +1,5 @@
 import api from '@/utils/axiosInstance'
-import axios from 'axios'
+// import axios from 'axios'
 
 /* ======================================================
    GET DASHBOARD CARDS
@@ -19,55 +19,68 @@ export const getDashboardCards = async () => {
   }
 }
 
+
+// 🔹 Today Service Requests
+export const getTodayServiceRequests = async () => {
+  const res = await api.get('/dashboard-filter/')
+  return res.data
+}
+
+// 🔹 Today Followups (NEW API)
+export const getTodayFollowups = async () => {
+  const res = await api.get('/dashboard-followups')
+  return res.data
+}
+
 /* ======================================================
    GET DASHBOARD TABLE (CUSTOMER / CONTRACT)
 ====================================================== */
-export const getDashboardList = async (
-  type = 'customer',
-  page = 1,
-  pageSize = 25,
-  cancelToken,
-  radioFilter = '',
-  searchText = ''
-) => {
-  try {
-    const params = {
-      type,
-      page,
-      page_size: pageSize
-    }
+// export const getDashboardList = async (
+//   type = 'customer',
+//   page = 1,
+//   pageSize = 25,
+//   cancelToken,
+//   radioFilter = '',
+//   searchText = ''
+// ) => {
+//   try {
+//     const params = {
+//       type,
+//       page,
+//       page_size: pageSize
+//     }
 
-    // Dynamic filter
-    if (radioFilter && searchText) {
-      params[radioFilter] = searchText
-    }
+//     // Dynamic filter
+//     if (radioFilter && searchText) {
+//       params[radioFilter] = searchText
+//     }
 
-    const res = await api.get('dashboard-filter/', {
-      cancelToken,
-      params
-    })
+//     const res = await api.get('dashboard-filter/', {
+//       cancelToken,
+//       params
+//     })
 
-    const results = res?.data?.results
-    const count = res?.data?.count
+//     const results = res?.data?.results
+//     const count = res?.data?.count
 
-    return {
-      status: 'success',
-      table: Array.isArray(results) ? results : [],
-      count: typeof count === 'number' ? count : 0
-    }
-  } catch (err) {
-    // Cancel request is NOT an error
-    if (axios.isCancel(err)) {
-      return { status: 'cancelled', table: [], count: 0 }
-    }
+//     return {
+//       status: 'success',
+//       table: Array.isArray(results) ? results : [],
+//       count: typeof count === 'number' ? count : 0
+//     }
+//   } catch (err) {
+//     // Cancel request is NOT an error
+//     if (axios.isCancel(err)) {
+//       return { status: 'cancelled', table: [], count: 0 }
+//     }
 
-    // FIX: Remove raw error object to avoid "undefined undefined" error
-    console.error('❌ Dashboard List API Error')
+//     // FIX: Remove raw error object to avoid "undefined undefined" error
+//     console.error('❌ Dashboard List API Error')
 
-    return {
-      status: 'failed',
-      table: [],
-      count: 0
-    }
-  }
-}
+//     return {
+//       status: 'failed',
+//       table: [],
+//       count: 0
+//     }
+//   }
+// }
