@@ -38,6 +38,7 @@ import ProgressCircularCustomization from '@/components/common/ProgressCircularC
 import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 import StickyListLayout from '@/components/common/StickyListLayout'
 import GlobalButton from '@/components/common/GlobalButton'
+import PermissionGuard from '@/components/auth/PermissionGuard'
 
 // Debounce
 const DebouncedInput = ({ value: init, onChange, debounce = 400, ...props }) => {
