@@ -146,6 +146,12 @@ export const PERMISSION_ALIASES = {
   'Reports/Pest Trending': 'Pest Trending',
   'Pest Trending': 'Pest Trending',
 
+  // Sales
+  'Sales/Quotation': 'Sales Quotation',
+  'Sales/Proposal Item': 'Proposal Item',
+  'Sales/Proposal_item': 'Proposal Item',
+  'Sales/Quotation_master': 'Sales Quotation',
+
   // Audit
   'Audit/Customer Audit': 'Customer Audit',
   'Customer Audit': 'Customer Audit',

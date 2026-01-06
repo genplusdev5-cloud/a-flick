@@ -33,6 +33,7 @@ import PresetDateRangePicker from '@/components/common/PresetDateRangePicker'
 
 import { getContractList, deleteContractApi } from '@/api/contract'
 import api from '@/utils/axiosInstance'
+import { encodeId, decodeId } from '@/utils/urlEncoder'
 
 import VisibilityIcon from '@mui/icons-material/Visibility'
 
@@ -145,26 +146,52 @@ const ContractsPageContent = () => {
   const [selectedContract, setSelectedContract] = useState(null)
 
   // -- FILTER STATES --
-  const [uiSearch, setUiSearch] = useState('')
+  const [uiSearch, setUiSearch] = useState(searchParams.get('search') || '')
   const [uiCustomer, setUiCustomer] = useState(null)
-  const [uiType, setUiType] = useState(null)
-  const [uiStatus, setUiStatus] = useState(null)
-  const [uiUuid, setUiUuid] = useState(null)
-  const [uiDateFilter, setUiDateFilter] = useState(false)
-  const [uiDateRange, setUiDateRange] = useState([null, null])
+  const [uiType, setUiType] = useState(searchParams.get('type') || null)
+  const [uiStatus, setUiStatus] = useState(searchParams.get('status') || null)
+  const [uiUuid, setUiUuid] = useState(searchParams.get('uuid') || null)
+  const [uiDateFilter, setUiDateFilter] = useState(searchParams.get('dateFilter') === 'true')
+  const [uiDateRange, setUiDateRange] = useState([
+    searchParams.get('from') ? new Date(searchParams.get('from')) : null,
+    searchParams.get('to') ? new Date(searchParams.get('to')) : null
+  ])
 
   const [appliedFilters, setAppliedFilters] = useState({
-    search: '',
+    search: searchParams.get('search') || '',
     customer: null,
-    type: null,
-    status: null,
-    uuid: null,
-    dateFilter: false,
-    dateRange: [null, null]
+    type: searchParams.get('type') || null,
+    status: searchParams.get('status') || null,
+    uuid: searchParams.get('uuid') || null,
+    dateFilter: searchParams.get('dateFilter') === 'true',
+    dateRange: [
+      searchParams.get('from') ? new Date(searchParams.get('from')) : null,
+      searchParams.get('to') ? new Date(searchParams.get('to')) : null
+    ]
   })
 
+  // Sync UI state with applied filters on mount
+  useEffect(() => {
+    // uiSearch, uiType, etc are already initialized from searchParams
+  }, [])
+
+  const updateUrl = filters => {
+    const params = new URLSearchParams()
+    if (filters.search) params.set('search', filters.search)
+    if (filters.customer?.id) params.set('customer', encodeId(filters.customer.id))
+    if (filters.type) params.set('type', filters.type)
+    if (filters.status) params.set('status', filters.status)
+    if (filters.uuid) params.set('uuid', filters.uuid)
+    if (filters.dateFilter) {
+      params.set('dateFilter', 'true')
+      if (filters.dateRange[0]) params.set('from', format(new Date(filters.dateRange[0]), 'yyyy-MM-dd'))
+      if (filters.dateRange[1]) params.set('to', format(new Date(filters.dateRange[1]), 'yyyy-MM-dd'))
+    }
+    router.push(`${pathname}?${params.toString()}`, { scroll: false })
+  }
+
   const encodedCustomerId = searchParams.get('customer')
-  const decodedCustomerId = encodedCustomerId ? parseInt(atob(encodedCustomerId)) : null
+  const decodedCustomerId = encodedCustomerId ? parseInt(decodeId(encodedCustomerId)) : null
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -833,8 +860,7 @@ const ContractsPageContent = () => {
               }
               disabled={loading}
               onClick={() => {
-                setPagination(p => ({ ...p, pageIndex: 0 }))
-                setAppliedFilters({
+                const newFilters = {
                   search: uiSearch,
                   customer: uiCustomer,
                   type: uiType,
@@ -842,7 +868,10 @@ const ContractsPageContent = () => {
                   uuid: uiUuid,
                   dateFilter: uiDateFilter,
                   dateRange: uiDateRange
-                })
+                }
+                setPagination(p => ({ ...p, pageIndex: 0 }))
+                setAppliedFilters(newFilters)
+                updateUrl(newFilters)
               }}
               sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
             >

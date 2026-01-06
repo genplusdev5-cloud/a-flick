@@ -4,9 +4,10 @@ import Pagination from '@mui/material/Pagination'
 import Typography from '@mui/material/Typography'
 
 const TablePaginationComponent = ({ table, totalCount = 0, pagination, setPagination }) => {
-  const pageIndex = pagination.pageIndex
-  const pageSize = pagination.pageSize
-  const totalPages = Math.ceil(totalCount / pageSize)
+  // Defensive checks to prevent crashing if props are missing
+  const pageIndex = pagination?.pageIndex ?? 0
+  const pageSize = pagination?.pageSize ?? 25
+  const totalPages = Math.ceil(totalCount / (pageSize || 1))
 
   return (
     <div className='flex justify-between items-center flex-wrap pli-6 border-bs bs-auto plb-[12.5px] gap-2'>

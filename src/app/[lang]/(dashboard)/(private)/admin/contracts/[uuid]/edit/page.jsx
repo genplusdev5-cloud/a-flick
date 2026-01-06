@@ -1,410 +1,676 @@
-// contracts/[uuid]/view/contract/page.jsx
-
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import {
   Box,
+  Button,
+  Grid,
   Card,
   Typography,
+  Table,
+  TableHead,
+  TableRow,
   Divider,
-  Grid,
-  Tabs,
-  Tab,
-  IconButton
+  TableCell,
+  TableBody,
+  Checkbox,
+  IconButton,
+  FormControlLabel,
+  Dialog,
+  DialogContent
 } from '@mui/material'
 
-import { getContractDetails } from '@/api/contract/details'
-import { getAllDropdowns } from '@/api/contract/dropdowns'
-import { updateContract } from '@/api/contract/update'
-import { showToast } from '@/components/common/Toasts'
+import DeleteIcon from '@mui/icons-material/Delete'
+import EditIcon from '@mui/icons-material/Edit'
+import VisibilityIcon from '@mui/icons-material/Visibility'
 
-// Components
+// 🔥 Global UI Components
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalTextField from '@/components/common/GlobalTextField'
 import GlobalTextarea from '@/components/common/GlobalTextarea'
+import GlobalSelect from '@/components/common/GlobalSelect'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
-import ContractValueDrawer from '@/components/service-pages/contract-actions/ContractValueDrawer'
+import { showToast } from '@/components/common/Toasts'
 
-export default function ContractEditPage() {
+// Layout + Inputs
+import ContentLayout from '@/components/layout/ContentLayout'
+import CustomTextField from '@core/components/mui/TextField'
+import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
+import { Autocomplete } from '@mui/material'
+
+import {
+  getContractDropdowns,
+  updateContract,
+  getContractDates,
+  getInvoiceCount,
+  getPestCount,
+  getInvoiceRemark,
+  getContractDetails
+} from '@/api/contract'
+import { getCustomerDetails } from '@/api/customer'
+
+const autocompleteFields = [
+  { name: 'salesMode', options: ['Confirmed Sales', 'Quotation'] },
+  { name: 'contractType', options: ['Continuous Contract', 'Limited Contract', 'Continuous Job', 'Job', 'Warranty'] },
+  { name: 'paymentTerm', options: ['0 days', '30 days'] },
+  { name: 'salesPerson', options: [] },
+  { name: 'time', options: ['0:05', '0:10', '0:15'] },
+  { name: 'customer', options: [] },
+  { name: 'callType', options: [] },
+  { name: 'industry', options: [] },
+  { name: 'technician', options: [] },
+  { name: 'supervisor', options: [] },
+  { name: 'billingFrequency', options: [] },
+  { name: 'pest', options: [] },
+  { name: 'chemicals', options: [] },
+  { name: 'frequency', options: [] }
+]
+
+export default function EditContractPage() {
   const router = useRouter()
   const { uuid } = useParams()
 
-  const [form, setForm] = useState({})
-  const [loading, setLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState(0)
-  const [openValueDrawer, setOpenValueDrawer] = useState(false)
+  const generateUniqueId = () => Date.now().toString(36) + Math.random().toString(36).substring(2)
+
+  const [dynamicAutocompleteFields, setDynamicAutocompleteFields] = useState(autocompleteFields)
+  const [loading, setLoading] = useState(true)
+
+  const [formData, setFormData] = useState({
+    id: '',
+    salesMode: '',
+    salesModeId: '',
+    contractName: '',
+    contractType: '',
+    contractTypeId: '',
+    coveredLocation: '',
+    contractCode: '',
+    serviceAddress: '',
+    postalCode: '',
+    poNumber: '',
+    poExpiry: null,
+    preferredTime: null,
+    reportEmail: '',
+    contactPerson: '',
+    sitePhone: '',
+    mobile: '',
+    callType: '',
+    callTypeId: '',
+    groupCode: '',
+    startDate: null,
+    endDate: null,
+    reminderDate: null,
+    customer: '',
+    customerId: '',
+    industry: '',
+    industryId: '',
+    contractValue: '',
+    technician: '',
+    technicianId: '',
+    paymentTerm: '',
+    paymentTermId: '',
+    salesPerson: '',
+    salesPersonId: '',
+    supervisor: '',
+    supervisorId: '',
+    billingFrequency: '',
+    billingFrequencyId: '',
+    invoiceCount: '',
+    invoiceRemarks: [],
+    latitude: '',
+    longitude: '',
+    file: null,
+    uploadedFileName: '',
+    uploadedFileURL: '',
+    billingRemarks: '',
+    agreement1: '',
+    agreement2: '',
+    technicianRemarks: '',
+    appointmentRemarks: ''
+  })
+
+  const [currentPestItem, setCurrentPestItem] = useState({
+    pest: '',
+    pestId: '',
+    frequency: '',
+    frequencyId: '',
+    pestCount: '',
+    pestValue: '',
+    total: '',
+    time: '',
+    chemicals: '',
+    chemicalId: '',
+    noOfItems: ''
+  })
+
+  const [pestItems, setPestItems] = useState([])
+  const [editingItemId, setEditingItemId] = useState(null)
+  const [reportEmailError, setReportEmailError] = useState(false)
+  const [isDragOver, setIsDragOver] = useState(false)
+  const [openDialog, setOpenDialog] = useState(false)
+  const [copyCustomerAddress, setCopyCustomerAddress] = useState(false)
 
   const [dropdowns, setDropdowns] = useState({
     customers: [],
     callTypes: [],
-    billingFreq: [],
-    serviceFreq: [],
+    industries: [],
+    technicians: [],
+    supervisors: [],
+    salesPersons: [],
+    billingFrequencies: [],
+    serviceFrequencies: [],
     pests: [],
-    chemicals: [],
-    employees: []
+    chemicals: []
   })
 
-  // -----------------------------
-  // Helpers
-  // -----------------------------
-  const setVal = (name, value) => setForm(prev => ({ ...prev, [name]: value }))
-  const handleTabChange = (event, newValue) => setActiveTab(newValue)
-  const toggleValueDrawer = () => setOpenValueDrawer(prev => !prev)
+  const refs = autocompleteFields.reduce((acc, f) => {
+    acc[f.name + 'Ref'] = useRef(null)
+    acc[f.name + 'InputRef'] = useRef(null)
+    return acc
+  }, {})
 
-  const handleAutoChange = name => (...args) => {
-    const value = args[args.length - 1]
-    setVal(name, value)
-  }
-
-  const mapContractType = type => {
-    if (!type) return ''
-    const val = typeof type === 'string' ? type : type.name || type.label || type.contract_type || ''
-    if (!val || typeof val !== 'string') return ''
-    const lower = val.toLowerCase()
-    if (lower === 'limited contract') return 'limited_contract'
-    if (lower === 'continuous contract') return 'continuous_contract'
-    if (lower === 'warranty') return 'warranty'
-    return val
-  }
-
-  const formatDateToYMD = date => {
-    if (!date || date === '') return null
-    const str = String(date).trim()
-    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str
-    if (str.includes('T')) return str.split('T')[0]
-    if (/^\d{2}-\d{2}-\d{4}$/.test(str)) {
-      const [dd, mm, yyyy] = str.split('-')
-      return `${yyyy}-${mm}-${dd}`
-    }
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) {
-      const [dd, mm, yyyy] = str.split('/')
-      return `${yyyy}-${mm}-${dd}`
-    }
-    return null
-  }
-
-  // -----------------------------
-  // Load Contract
-  // -----------------------------
-  useEffect(() => {
-    const loadContract = async () => {
-      if (!uuid) return
-      try {
-        const data = await getContractDetails(uuid)
-        if (data) {
-          setForm({
-            id: data.id,
-            salesModel: data.sales_mode || '',
-            client: { id: data.customer_id, name: data.customer },
-            contractType: data.contract_type || '',
-            contractCode: data.contract_code || '',
-            status: data.contract_status || '',
-            serviceAddress: data.service_address || '',
-            postal: data.postal_address || '',
-            coverage: data.covered_location || '',
-            poNumber: data.po_number || '',
-            poDueDate: data.po_expiry_date || '',
-            preferredTime: data.preferred_time || '',
-            reportEmail: data.report_email || '',
-            contactName: data.contact_person_name || '',
-            contactPhone: data.phone || '',
-            callType: data.call_type_id || '',
-            cellPhone: data.mobile || '',
-            grouping: data.grouping_code || '',
-            startDate: data.start_date || '',
-            endDate: data.end_date || '',
-            reminderDate: data.reminder_date || '',
-            industry: data.service_frequency_id || '',
-            serviceStartDate: data.commencement_date || '',
-            technicians: data.technician_id ? [data.technician_id] : [],
-            paymentTerms: data.billing_term || '',
-            accountCode: data.account_item_id || '',
-            salesPerson: data.sales_person_id || '',
-            director: data.supervisor_id || '',
-            latitude: data.latitude || '',
-            longitude: data.longitude || '',
-            invoiceRemarks: data.invoice_remarks || '',
-            invoiceFrequency: data.billing_frequency_id || '',
-            billingRemarks: data.billing_remarks || '',
-            techNotes: data.technician_remarks || '',
-            appointmentNotes: data.appointment_remarks || '',
-            agree1: data.agreement_add_1 || '',
-            agree2: data.agreement_add_2 || '',
-            amount: data.contract_value || '',
-            floorPlanName: data.floor_plan || ''
-          })
-        }
-      } catch (err) {
-        console.error(err)
-        showToast('error', 'Failed to load contract details')
-      }
-    }
-    loadContract()
-  }, [uuid])
-
-  // -----------------------------
-  // Load Dropdowns
-  // -----------------------------
-  useEffect(() => {
-    const loadDropdowns = async () => {
-      try {
-        const data = (await getAllDropdowns()) || {}
-        setDropdowns({
-          customers: data.customers || [],
-          callTypes: data.callTypes || data.call_types || [],
-          billingFreq: data.billingFreq || data.billing_freq || [],
-          serviceFreq: data.serviceFreq || data.service_freq || [],
-          pests: data.pests || [],
-          chemicals: data.chemicals || [],
-          employees: data.employees || []
-        })
-      } catch (err) {
-        console.error('Failed to load dropdowns', err)
-      }
-    }
-    loadDropdowns()
+  const [autoOpen, setAutoOpen] = useState(() => Object.fromEntries(autocompleteFields.map(f => [f.name, false])))
+  const openStates = useMemo(() => Object.fromEntries(autocompleteFields.map(f => [f.name + 'Open', autoOpen[f.name]])), [autoOpen])
+  
+  const setOpenStates = useMemo(() => {
+    return Object.fromEntries(
+      autocompleteFields.map(f => [
+        f.name + 'SetOpen',
+        value => setAutoOpen(prev => ({ ...prev, [f.name]: value }))
+      ])
+    )
   }, [])
 
-  const employees = dropdowns.employees || []
-  const technicianOptions = employees.filter(e => e.designation === 'Technician')
-  const salesOptions = employees.filter(e => e.designation === 'Sales')
-  const directorOptions = employees.filter(e => e.designation === 'Supervisor' || e.designation === 'Manager')
+  const contractNameRef = useRef(null), coveredLocationRef = useRef(null), contractCodeRef = useRef(null), serviceAddressRef = useRef(null)
+  const postalCodeRef = useRef(null), poNumberRef = useRef(null), poExpiryRef = useRef(null), preferredTimeRef = useRef(null)
+  const reportEmailRef = useRef(null), contactPersonRef = useRef(null), sitePhoneRef = useRef(null), mobileRef = useRef(null)
+  const groupCodeRef = useRef(null), startDateRef = useRef(null), endDateRef = useRef(null), reminderDateRef = useRef(null)
+  const contractValueRef = useRef(null), invoiceCountRef = useRef(null), invoiceRemarksRef = useRef(null), latitudeRef = useRef(null)
+  const longitudeRef = useRef(null), fileInputRef = useRef(null), fileUploadButtonRef = useRef(null)
+  const currentPestCountRef = useRef(null), currentPestValueRef = useRef(null), currentTotalRef = useRef(null)
+  const currentChemicalsRef = useRef(null), currentNoOfItemsRef = useRef(null), addPestButtonRef = useRef(null)
+  const billingRemarksRef = useRef(null), agreement1Ref = useRef(null), agreement2Ref = useRef(null)
+  const technicianRemarksRef = useRef(null), appointmentRemarksRef = useRef(null), closeButtonRef = useRef(null), saveButtonRef = useRef(null)
 
-  const handleSave = async () => {
-    try {
-      setLoading(true)
-      const contractId = form.id
-      if (!contractId) {
-        showToast('error', 'Contract ID missing')
-        return
-      }
+  const focusableElementRefs = [
+    refs.salesModeInputRef, refs.customerInputRef, refs.contractTypeInputRef, contractNameRef, coveredLocationRef, contractCodeRef, 
+    serviceAddressRef, postalCodeRef, poNumberRef, poExpiryRef, preferredTimeRef, reportEmailRef, contactPersonRef, sitePhoneRef, 
+    mobileRef, refs.callTypeInputRef, groupCodeRef, startDateRef, endDateRef, reminderDateRef, refs.industryInputRef, 
+    contractValueRef, refs.technicianInputRef, refs.paymentTermInputRef, refs.salesPersonInputRef, refs.supervisorInputRef, 
+    refs.billingFrequencyInputRef, invoiceCountRef, invoiceRemarksRef, latitudeRef, longitudeRef, fileUploadButtonRef,
+    refs.pestInputRef, refs.frequencyInputRef, currentPestCountRef, currentPestValueRef, currentTotalRef, refs.timeInputRef, 
+    currentChemicalsRef, currentNoOfItemsRef, addPestButtonRef, billingRemarksRef, agreement1Ref, agreement2Ref, 
+    technicianRemarksRef, appointmentRemarksRef, closeButtonRef, saveButtonRef
+  ].filter(ref => ref)
 
-      const payload = {
-        sales_mode: form.salesModel,
-        customer_id: form.client?.id || form.client,
-        contract_type: mapContractType(form.contractType),
-        contract_code: form.contractCode,
-        contract_status: form.status,
-        service_address: form.serviceAddress,
-        postal_address: form.postal,
-        covered_location: form.coverage,
-        po_number: form.poNumber,
-        po_expiry_date: formatDateToYMD(form.poDueDate),
-        preferred_time: form.preferredTime,
-        report_email: form.reportEmail,
-        contact_person_name: form.contactName,
-        phone: form.contactPhone,
-        call_type_id: form.callType?.id || form.callType,
-        mobile: form.cellPhone,
-        grouping_code: form.grouping,
-        start_date: formatDateToYMD(form.startDate),
-        end_date: formatDateToYMD(form.endDate),
-        reminder_date: formatDateToYMD(form.reminderDate),
-        service_frequency_id: form.industry?.id || form.industry,
-        commencement_date: formatDateToYMD(form.serviceStartDate),
-        technician_id: form.technicians?.[0]?.id || form.technicians?.[0] || null,
-        billing_term: form.paymentTerms,
-        account_item_id: parseInt(form.accountCode) || null,
-        sales_person_id: parseInt(form.salesPerson) || null,
-        supervisor_id: parseInt(form.director) || null,
-        latitude: form.latitude ? Number(form.latitude) : 0,
-        longitude: form.longitude ? Number(form.longitude) : 0,
-        invoice_remarks: form.invoiceRemarks,
-        billing_frequency_id: form.invoiceFrequency?.id || form.invoiceFrequency,
-        billing_remarks: form.billingRemarks,
-        technician_remarks: form.techNotes,
-        appointment_remarks: form.appointmentNotes,
-        agreement_add_1: form.agree1,
-        agreement_add_2: form.agree2,
-        contract_value: Number(form.amount)
-      }
-
-      const result = await updateContract(contractId, payload)
-      if (result?.status === 'success') {
-        showToast('success', 'Contract updated successfully!')
-        router.back()
-      } else {
-        showToast('error', result?.message || 'Update failed!')
-      }
-    } catch (err) {
-      console.error('Update error:', err)
-      showToast('error', 'Update Failed')
-    } finally {
+  useEffect(() => {
+    const init = async () => {
+      await loadDropdowns()
+      await loadDetails()
       setLoading(false)
+    }
+    init()
+  }, [uuid])
+
+  const loadDropdowns = async () => {
+    try {
+      const res = await getContractDropdowns()
+      const data = res?.data?.data?.data || {}
+      setDropdowns({
+        customers: data.customer?.name || [],
+        callTypes: data.calltype?.name || [],
+        industries: data.industry?.name || [],
+        technicians: data.technician?.name || [],
+        supervisors: data.supervisor?.name || [],
+        salesPersons: data.sales?.name || [],
+        billingFrequencies: data.billing_frequency?.name || [],
+        serviceFrequencies: data.service_frequency?.name || [],
+        pests: data.pest?.name || [],
+        chemicals: data.chemicals?.name || []
+      })
+    } catch (err) {
+      console.error('❌ Dropdown fetch error:', err)
+      showToast('error', 'Failed to load dropdowns')
     }
   }
 
-  const handleFileChange = e => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setVal('floorPlanName', file.name)
+  const convertTimeToMinutes = str => {
+    if (!str) return 0
+    const [h, m] = str.split(':').map(Number)
+    return h * 60 + m
   }
 
-  return (
-    <Box className='mt-2'>
-      <Card sx={{ p: 3, height: '85vh', display: 'flex', flexDirection: 'column' }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-          <Typography variant='h5' fontWeight={600}>
-            Edit Contract
-          </Typography>
-        </Box>
+  const convertMinutesToTime = mins => {
+    if (!mins) return '0:00'
+    const h = Math.floor(mins / 60)
+    const m = mins % 60
+    return `${h}:${m.toString().padStart(2, '0')}`
+  }
 
-        <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}>
-          <Tab label='Location & Date' />
-          <Tab label='Amount & Remarks' />
-        </Tabs>
+  const parseSafeDate = dStr => {
+    if (!dStr || dStr === '0000-00-00' || dStr === '00-00-0000') return null
+    const d = new Date(dStr)
+    return isNaN(d.getTime()) ? null : d
+  }
 
-        <Box sx={{ overflowY: 'auto', flexGrow: 1, pr: 2 }}>
-          {activeTab === 0 && (
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={4}>
-                <GlobalAutocomplete
-                  label='Sales mode'
-                  options={['Confirmed Sales', 'Quotation']}
-                  value={form.salesModel || ''}
-                  onChange={handleAutoChange('salesModel')}
-                />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <GlobalAutocomplete
-                  label='Customer'
-                  options={dropdowns.customers}
-                  getOptionLabel={opt => opt.name || opt.label || (typeof opt === 'string' ? opt : '')}
-                  value={form.client || null}
-                  onChange={handleAutoChange('client')}
-                />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <GlobalAutocomplete
-                  label='Contract Type'
-                  options={['Limited Contract', 'Continuous Contract', 'Warranty']}
-                  value={form.contractType || ''}
-                  onChange={handleAutoChange('contractType')}
-                />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <GlobalTextField label='Contract Code' value={form.contractCode || ''} onChange={e => setVal('contractCode', e.target.value)} />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <GlobalAutocomplete label='Contract Status' options={['Current', 'Pending', 'Expired', 'Closed']} value={form.status || ''} onChange={handleAutoChange('status')} />
-              </Grid>
-              <Grid item xs={12} md={8}>
-                <GlobalTextField label='Service Address' value={form.serviceAddress || ''} onChange={e => setVal('serviceAddress', e.target.value)} />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <GlobalTextField label='Postal Code' value={form.postal || ''} onChange={e => setVal('postal', e.target.value)} />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <GlobalTextField label='Covered Location' value={form.coverage || ''} onChange={e => setVal('coverage', e.target.value)} />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <GlobalTextField label='PO Number' value={form.poNumber || ''} onChange={e => setVal('poNumber', e.target.value)} />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <GlobalTextField label='PO Expiry Date' placeholder='dd-mm-yyyy' value={form.poDueDate || ''} onChange={e => setVal('poDueDate', e.target.value)} />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <GlobalTextField label='Preferred Time' value={form.preferredTime || ''} onChange={e => setVal('preferredTime', e.target.value)} />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <GlobalTextField label='Report Email' value={form.reportEmail || ''} onChange={e => setVal('reportEmail', e.target.value)} />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <GlobalTextField label='Site Contact Name' value={form.contactName || ''} onChange={e => setVal('contactName', e.target.value)} />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <GlobalTextField label='Site Contact Phone' value={form.contactPhone || ''} onChange={e => setVal('contactPhone', e.target.value)} />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <GlobalAutocomplete label='Call Type' options={dropdowns.callTypes} getOptionLabel={opt => opt.name || opt.label || ''} value={form.callType || ''} onChange={handleAutoChange('callType')} />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <GlobalTextField label='Start Date' placeholder='dd-mm-yyyy' value={form.startDate || ''} onChange={e => setVal('startDate', e.target.value)} />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <GlobalTextField label='End Date' placeholder='dd-mm-yyyy' value={form.endDate || ''} onChange={e => setVal('endDate', e.target.value)} />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <GlobalTextField label='Commencement Date' placeholder='dd-mm-yyyy' value={form.serviceStartDate || ''} onChange={e => setVal('serviceStartDate', e.target.value)} />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <GlobalAutocomplete label='Technicians' multiple options={technicianOptions} getOptionLabel={opt => opt.name || ''} value={form.technicians || []} onChange={handleAutoChange('technicians')} />
-              </Grid>
-            </Grid>
-          )}
+  const parseSafeTime = tStr => {
+    if (!tStr || tStr === '00:00:00' || tStr === '00:00') return null
+    const d = new Date(`1970-01-01T${tStr}`)
+    return isNaN(d.getTime()) ? null : d
+  }
 
-          {activeTab === 1 && (
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={4}>
-                <GlobalAutocomplete label='Payment Term' options={['0 days', '15 days', '30 days', '45 days', '60 days']} value={form.paymentTerms || ''} onChange={handleAutoChange('paymentTerms')} />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <GlobalTextField label='Account Code' value={form.accountCode || ''} onChange={e => setVal('accountCode', e.target.value)} />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <GlobalAutocomplete label='Sales Person' options={salesOptions} getOptionLabel={opt => opt.name || ''} value={form.salesPerson || null} onChange={handleAutoChange('salesPerson')} />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <GlobalAutocomplete label='Supervisor' options={directorOptions} getOptionLabel={opt => opt.name || ''} value={form.director || null} onChange={handleAutoChange('director')} />
-              </Grid>
-              <Grid item xs={12} md={9}>
-                <Box sx={{ display: 'flex', gap: 2 }}>
-                  <GlobalTextarea label='Invoice Remarks' value={form.invoiceRemarks || ''} onChange={e => setVal('invoiceRemarks', e.target.value)} fullWidth />
-                  <GlobalButton variant='contained' onClick={() => showToast('info', 'Refreshed')}>REFRESH</GlobalButton>
-                </Box>
-              </Grid>
-              <Grid item xs={12} md={3}>
-                <GlobalAutocomplete label='Invoice Frequency' options={dropdowns.billingFreq} getOptionLabel={opt => opt.name || opt.label || ''} value={form.invoiceFrequency || ''} onChange={handleAutoChange('invoiceFrequency')} />
-              </Grid>
-              <Grid item xs={12} md={12}>
-                <GlobalTextarea label='Billing Remarks' value={form.billingRemarks || ''} onChange={e => setVal('billingRemarks', e.target.value)} fullWidth />
-              </Grid>
-              <Grid item xs={12} md={12}>
-                <Typography variant='subtitle1' fontWeight={600} sx={{ mb: 1 }}>Contract Value ($)</Typography>
-                <GlobalTextField
-                  fullWidth
-                  value={form.amount ? `$${Number(form.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '$0.00'}
-                  InputProps={{ readOnly: true }}
-                  onClick={toggleValueDrawer}
-                  sx={{ cursor: 'pointer' }}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <GlobalTextarea label='Agreement Add On 1' value={form.agree1 || ''} onChange={e => setVal('agree1', e.target.value)} fullWidth />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <GlobalTextarea label='Agreement Add On 2' value={form.agree2 || ''} onChange={e => setVal('agree2', e.target.value)} fullWidth />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <GlobalTextarea label='Technician Remarks' value={form.techNotes || ''} onChange={e => setVal('techNotes', e.target.value)} fullWidth />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <GlobalTextarea label='Appointment Remarks' value={form.appointmentNotes || ''} onChange={e => setVal('appointmentNotes', e.target.value)} fullWidth />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Typography variant='body2' sx={{ mb: 1 }}>Floor Plan</Typography>
-                <input type='file' onChange={handleFileChange} />
-                <Typography variant='caption'>{form.floorPlanName || 'No file chosen'}</Typography>
-              </Grid>
-            </Grid>
-          )}
+  const loadDetails = async () => {
+    try {
+      const data = await getContractDetails(uuid)
+      if (data) {
+        setFormData(prev => ({
+          ...prev,
+          id: data.id,
+          salesMode: data.sales_mode?.replace(/_/g, ' ')?.replace(/\b\w/g, l => l.toUpperCase()) || '',
+          customerId: data.customer_id,
+          customer: data.customer,
+          contractName: data.name || '',
+          contractType: data.contract_type?.replace(/_/g, ' ')?.replace(/\b\w/g, l => l.toUpperCase()) || '',
+          contractCode: data.contract_code || '',
+          serviceAddress: data.service_address || '',
+          postalCode: data.postal_code || '',
+          coveredLocation: data.covered_location || '',
+          poNumber: data.po_number || '',
+          poExpiry: parseSafeDate(data.po_expiry_date),
+          preferredTime: parseSafeTime(data.preferred_time),
+          reportEmail: data.report_email || '',
+          contactPerson: data.contact_person_name || '',
+          sitePhone: data.phone || '',
+          mobile: data.mobile || '',
+          callTypeId: data.call_type_id,
+          callType: data.call_type || '',
+          groupCode: data.grouping_code || '',
+          startDate: parseSafeDate(data.start_date),
+          endDate: parseSafeDate(data.end_date),
+          reminderDate: parseSafeDate(data.reminder_date),
+          industryId: data.industry_id,
+          industry: data.industry || '',
+          contractValue: data.contract_value || '',
+          technicianId: data.technician_id,
+          technician: data.technician || '',
+          paymentTerm: data.billing_term ? `${data.billing_term} days` : '',
+          salesPersonId: data.sales_person_id,
+          salesPerson: data.sales_person || '',
+          supervisorId: data.supervisor_id,
+          supervisor: data.supervisor || '',
+          billingFrequencyId: data.billing_frequency_id,
+          billingFrequency: data.billing_frequency || '',
+          invoiceCount: data.invoice_count || '',
+          invoiceRemarks: data.invoice_remarks ? data.invoice_remarks.split(',').map(s => s.trim()) : [],
+          latitude: data.latitude || '',
+          longitude: data.longitude || '',
+          billing_remarks: data.billing_remarks || '',
+          agreement1: data.agreement_add_1 || '',
+          agreement2: data.agreement_add_2 || '',
+          technicianRemarks: data.technician_remarks || '',
+          appointmentRemarks: data.appointment_remarks || '',
+          uploadedFileName: data.floor_plan || '',
+        }))
 
-          <Box sx={{ mt: 3, pt: 2, borderTop: 1, borderColor: 'divider', display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-            <GlobalButton color='secondary' onClick={() => router.back()}>Close</GlobalButton>
-            <GlobalButton variant='contained' onClick={handleSave} disabled={loading}>{loading ? 'Saving...' : 'Save'}</GlobalButton>
-          </Box>
-        </Box>
+        if (data.pest_items && Array.isArray(data.pest_items)) {
+          setPestItems(data.pest_items.map(item => ({
+            id: generateUniqueId(),
+            pest: item.pest,
+            pestId: item.pest_id,
+            frequency: item.frequency,
+            frequencyId: item.frequency_id,
+            pestCount: item.no_location,
+            pestValue: item.pest_value,
+            totalValue: item.total_value,
+            workTime: convertMinutesToTime(item.work_time),
+            chemicals: item.chemical_name,
+            chemicalId: item.chemical_id,
+            noOfItems: item.pest_service_count
+          })))
+        }
+      }
+    } catch (err) {
+      console.error('❌ Load details error:', err)
+      showToast('error', 'Failed to load contract details')
+    }
+  }
 
-        <ContractValueDrawer
-          open={openValueDrawer}
-          onClose={toggleValueDrawer}
-          contractId={form.id}
-          initialValue={form.amount || ''}
-          onValueUpdate={val => setVal('amount', val)}
+  const handleChange = e => setFormData({ ...formData, [e.target.name]: e.target.value })
+
+  const handleCurrentPestItemChange = e => {
+    const { name, value } = e.target
+    if (name === 'pestCount' || name === 'pestValue') {
+      const count = name === 'pestCount' ? Number(value || 0) : Number(currentPestItem.pestCount || 0)
+      const val = name === 'pestValue' ? Number(value || 0) : Number(currentPestItem.pestValue || 0)
+      setCurrentPestItem(prev => ({ ...prev, [name]: value, total: (count * val).toString() }))
+      return
+    }
+    setCurrentPestItem(prev => ({ ...prev, [name]: value }))
+  }
+
+  const focusNextElement = useCallback(currentRef => {
+    const currentIndex = focusableElementRefs.findIndex(ref => ref === currentRef)
+    if (currentIndex !== -1) {
+      for (let i = currentIndex + 1; i < focusableElementRefs.length; i++) {
+        const nextRef = focusableElementRefs[i]
+        const nextElement = nextRef.current
+        if (nextElement) {
+          const nextAuto = autocompleteFields.find(field => refs[field.name + 'InputRef'] === nextRef)
+          if (nextAuto) {
+            nextElement.focus()
+            setOpenStates[nextAuto.name + 'SetOpen']?.(true)
+          } else {
+            nextElement.focus()
+          }
+          return
+        }
+      }
+      saveButtonRef.current?.focus()
+    }
+  }, [focusableElementRefs, setOpenStates])
+
+  const handleKeyDown = (e, currentRef, isMultiline = false) => {
+    if (e.key === 'Enter') {
+      if (isMultiline && e.shiftKey) return
+      e.preventDefault()
+      focusNextElement(currentRef)
+    }
+  }
+
+  const handleAutocompleteChange = (name, newValue, currentInputRef) => {
+    const isObj = typeof newValue === 'object' && newValue !== null
+    setFormData(prev => ({ ...prev, [name]: isObj ? newValue.name || '' : newValue, [`${name}Id`]: isObj ? newValue.id || '' : '' }))
+    setOpenStates[name + 'SetOpen']?.(false)
+    focusNextElement(currentInputRef)
+  }
+
+  const handleDateChange = async (name, date, currentInputRef) => {
+    setFormData(prev => ({ ...prev, [name]: date }))
+    if (name === 'startDate' || name === 'endDate') setTimeout(updateInvoiceCount, 0)
+    if (name === 'startDate' && date) {
+      try {
+        const res = await getContractDates({ start_date: date.toISOString().split('T')[0], contract_type: formData.contractType || '', frequency: formData.billingFrequency || '' })
+        if (res?.data?.status === 'success') {
+          setFormData(prev => ({ ...prev, endDate: new Date(res.data.data.end_date), reminderDate: new Date(res.data.data.reminder_date) }))
+        }
+      } catch (e) { console.error(e) }
+    }
+    focusNextElement(currentInputRef)
+  }
+
+  const updateInvoiceCount = async () => {
+    if (!formData.startDate || !formData.endDate || !formData.billingFrequencyId) return
+    try {
+      const res = await getInvoiceCount({ start_date: formData.startDate.toISOString().split('T')[0], end_date: formData.endDate.toISOString().split('T')[0], billing_frequency_id: Number(formData.billingFrequencyId) })
+      if (res?.status === 'success') setFormData(prev => ({ ...prev, invoiceCount: res.data?.invoice_count || 0 }))
+    } catch (e) { console.error(e) }
+  }
+
+  const fetchPestCount = async (pestId, frequencyId) => {
+    if (!formData.startDate || !formData.endDate || !pestId || !frequencyId) return
+    try {
+      const res = await getPestCount({ pest_id: Number(pestId), service_frequency_id: Number(frequencyId), start_date: formData.startDate.toISOString().split('T')[0], end_date: formData.endDate.toISOString().split('T')[0] })
+      if (res?.status === 'success') setCurrentPestItem(prev => ({ ...prev, pestCount: String(res.data?.pest_count || '') }))
+    } catch (e) { console.error(e) }
+  }
+
+  const handleSavePestItem = () => {
+    if (!formData.startDate || !formData.endDate || !currentPestItem.pest || !currentPestItem.frequency) {
+      showToast('warning', 'Valid dates, Pest and Frequency are required!')
+      return
+    }
+    const item = { ...currentPestItem, totalValue: currentPestItem.total || '0', workTime: currentPestItem.time || '0:00' }
+    if (editingItemId) {
+      setPestItems(prev => prev.map(i => i.id === editingItemId ? { ...i, ...item, id: editingItemId } : i))
+      setEditingItemId(null)
+    } else {
+      setPestItems(prev => [...prev, { ...item, id: generateUniqueId() }])
+    }
+    setCurrentPestItem({ pest: '', pestId: '', frequency: '', frequencyId: '', pestCount: '', pestValue: '', total: '', time: '', chemicals: '', chemicalId: '', noOfItems: '' })
+    refs.pestInputRef.current?.focus()
+  }
+
+  const handleDeletePestItem = id => {
+    if (editingItemId === id) setEditingItemId(null)
+    setPestItems(prev => prev.filter(i => i.id !== id))
+  }
+
+  const copyFromCustomer = async customerId => {
+    if (!customerId) return
+    try {
+      const res = await getCustomerDetails(customerId)
+      if (res?.status === 'success') {
+        const c = res.data
+        setFormData(prev => ({
+          ...prev,
+          serviceAddress: c.billing_address || '',
+          postalCode: c.postal_code || '',
+          contactPerson: c.pic_contact_name || '',
+          sitePhone: c.pic_phone || '',
+          mobile: c.mobile_no || '',
+          reportEmail: (c.billing_email || c.pic_email || '').trim()
+        }))
+      }
+    } catch (err) {
+      console.error('❌ Customer copy failed', err)
+      showToast('error', 'Failed to copy customer details')
+    }
+  }
+
+  const handleSubmit = async () => {
+    if (!formData.contractName || !formData.customerId || !formData.startDate || !formData.endDate) {
+      showToast('error', 'Required fields are missing!')
+      return
+    }
+    try {
+      const payload = {
+        id: formData.id,
+        name: formData.contractName,
+        customer_id: Number(formData.customerId),
+        sales_mode: formData.salesMode?.toLowerCase().replace(/\s+/g, '_'),
+        contract_code: formData.contractCode,
+        contract_type: formData.contractType?.toLowerCase().replace(/\s+/g, '_'),
+        service_address: formData.serviceAddress,
+        postal_code: formData.postalCode,
+        covered_location: formData.coveredLocation,
+        po_number: formData.poNumber,
+        po_expiry_date: formData.poExpiry?.toISOString().split('T')[0],
+        preferred_time: formData.preferredTime?.toTimeString().slice(0, 8),
+        report_email: formData.reportEmail,
+        contact_person_name: formData.contactPerson,
+        phone: formData.sitePhone,
+        mobile: formData.mobile,
+        call_type_id: Number(formData.callTypeId),
+        grouping_code: formData.groupCode,
+        start_date: formData.startDate?.toISOString().split('T')[0],
+        end_date: formData.endDate?.toISOString().split('T')[0],
+        reminder_date: formData.reminderDate?.toISOString().split('T')[0],
+        industry_id: Number(formData.industryId),
+        contract_value: Number(formData.contractValue),
+        technician_id: Number(formData.technicianId),
+        billing_term: Number(formData.paymentTerm?.replace(/\D/g, '')),
+        sales_person_id: Number(formData.salesPersonId),
+        supervisor_id: Number(formData.supervisorId),
+        billing_frequency_id: Number(formData.billingFrequencyId),
+        invoice_count: Number(formData.invoiceCount),
+        invoice_remarks: formData.invoiceRemarks.join(', '),
+        latitude: Number(formData.latitude),
+        longitude: Number(formData.longitude),
+        billing_remarks: formData.billingRemarks,
+        agreement_add_1: formData.agreement1,
+        agreement_add_2: formData.agreement2,
+        technician_remarks: formData.technicianRemarks,
+        appointment_remarks: formData.appointmentRemarks,
+        pest_items: pestItems.map(i => ({
+          customer_id: Number(formData.customerId),
+          pest_id: Number(i.pestId),
+          frequency_id: Number(i.frequencyId),
+          chemical_id: Number(i.chemicalId),
+          pest: i.pest,
+          frequency: i.frequency,
+          chemical_name: i.chemicals,
+          no_location: Number(i.pestCount),
+          pest_value: Number(i.pestValue),
+          pest_service_count: Number(i.noOfItems),
+          total_value: Number(i.totalValue),
+          work_time: convertTimeToMinutes(i.workTime)
+        }))
+      }
+      const res = await updateContract(formData.id, payload)
+      if (res?.status === 'success') {
+        showToast('success', 'Contract Updated Successfully!')
+        router.back()
+      } else {
+        showToast('error', res?.message || 'Update failed')
+      }
+    } catch (e) { showToast('error', 'Error while saving') }
+  }
+
+  const renderAuto = ({ name, label, options, md = 3 }) => {
+    const isObj = options.length > 0 && typeof options[0] === 'object'
+    const val = isObj ? options.find(o => o.id === formData[`${name}Id`]) || null : formData[name] || null
+    return (
+      <Grid item xs={12} md={md} key={name}>
+        <Autocomplete
+          options={options}
+          value={val}
+          getOptionLabel={o => typeof o === 'string' ? o : o?.name || ''}
+          open={openStates[name + 'Open']}
+          onOpen={() => setOpenStates[name + 'SetOpen'](true)}
+          onClose={() => setOpenStates[name + 'SetOpen'](false)}
+          onChange={(e, v) => handleAutocompleteChange(name, v || '', refs[name + 'InputRef'])}
+          renderInput={p => <CustomTextField {...p} label={label} inputRef={refs[name + 'InputRef']} />}
+          onKeyDown={e => handleKeyDown(e, refs[name + 'InputRef'])}
         />
+      </Grid>
+    )
+  }
+
+  if (loading) return <Box p={4}>Loading...</Box>
+
+  return (
+    <ContentLayout title="Edit Contract" breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Contracts', href: '/admin/contracts' }, { label: 'Edit' }]}>
+      <Card sx={{ p: 4 }}>
+        <Grid container spacing={4}>
+          {renderAuto({ name: 'salesMode', label: 'Sales Mode', options: ['Confirmed Sales', 'Quotation'] })}
+          {renderAuto({ name: 'customer', label: 'Customer', options: dropdowns.customers })}
+          {renderAuto({ name: 'contractType', label: 'Contract Type', options: ['Limited Contract', 'Continuous Contract', 'Warranty'] })}
+          <Grid item xs={12} md={3}><CustomTextField fullWidth label="Contract Name" name="contractName" value={formData.contractName} onChange={handleChange} inputRef={contractNameRef} onKeyDown={e => handleKeyDown(e, contractNameRef)} /></Grid>
+          <Grid item xs={12} md={3}><CustomTextField fullWidth label="Covered Location" name="coveredLocation" value={formData.coveredLocation} onChange={handleChange} inputRef={coveredLocationRef} onKeyDown={e => handleKeyDown(e, coveredLocationRef)} /></Grid>
+          <Grid item xs={12} md={3}><CustomTextField fullWidth label="Contract Code" name="contractCode" value={formData.contractCode} onChange={handleChange} inputRef={contractCodeRef} onKeyDown={e => handleKeyDown(e, contractCodeRef)} /></Grid>
+          
+          <Grid item xs={12}><Typography variant="h6" mt={2}>Service</Typography><Divider /></Grid>
+          <Grid item xs={12} sx={{ display: 'flex', alignItems: 'center', mb: -1 }}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={copyCustomerAddress}
+                  onChange={async e => {
+                    const checked = e.target.checked
+                    setCopyCustomerAddress(checked)
+                    if (checked && formData.customerId) await copyFromCustomer(formData.customerId)
+                  }}
+                />
+              }
+              label='Copy from Customer'
+            />
+          </Grid>
+          <Grid item xs={12} md={3}><CustomTextField fullWidth label="Service Address" name="serviceAddress" value={formData.serviceAddress} onChange={handleChange} inputRef={serviceAddressRef} onKeyDown={e => handleKeyDown(e, serviceAddressRef)} /></Grid>
+          <Grid item xs={12} md={3}><CustomTextField fullWidth label="Postal Code" name="postalCode" value={formData.postalCode} onChange={handleChange} inputRef={postalCodeRef} onKeyDown={e => handleKeyDown(e, postalCodeRef)} /></Grid>
+          <Grid item xs={12} md={3}><CustomTextField fullWidth label="PO Number" name="poNumber" value={formData.poNumber} onChange={handleChange} inputRef={poNumberRef} onKeyDown={e => handleKeyDown(e, poNumberRef)} /></Grid>
+          <Grid item xs={12} md={3}><AppReactDatepicker selected={formData.poExpiry} onChange={d => handleDateChange('poExpiry', d, poExpiryRef)} customInput={<CustomTextField label="PO Expiry" fullWidth inputRef={poExpiryRef} />} /></Grid>
+          <Grid item xs={12} md={3}><AppReactDatepicker selected={formData.preferredTime} onChange={d => { setFormData(p => ({ ...p, preferredTime: d })); focusNextElement(preferredTimeRef) }} showTimeSelect showTimeSelectOnly timeIntervals={15} dateFormat="h:mm aa" customInput={<CustomTextField label="Preferred Time" fullWidth inputRef={preferredTimeRef} />} /></Grid>
+          <Grid item xs={12} md={3}><CustomTextField fullWidth label="Report Email" name="reportEmail" value={formData.reportEmail} onChange={handleChange} inputRef={reportEmailRef} onKeyDown={e => handleKeyDown(e, reportEmailRef)} /></Grid>
+          <Grid item xs={12} md={3}><CustomTextField fullWidth label="Contact Person" name="contactPerson" value={formData.contactPerson} onChange={handleChange} inputRef={contactPersonRef} onKeyDown={e => handleKeyDown(e, contactPersonRef)} /></Grid>
+          <Grid item xs={12} md={3}><CustomTextField fullWidth label="Site Phone" name="sitePhone" value={formData.sitePhone} onChange={handleChange} inputRef={sitePhoneRef} onKeyDown={e => handleKeyDown(e, sitePhoneRef)} /></Grid>
+          <Grid item xs={12} md={3}><CustomTextField fullWidth label="Mobile" name="mobile" value={formData.mobile} onChange={handleChange} inputRef={mobileRef} onKeyDown={e => handleKeyDown(e, mobileRef)} /></Grid>
+          {renderAuto({ name: 'callType', label: 'Call Type', options: dropdowns.callTypes })}
+          
+          <Grid item xs={12}><Typography variant="h6" mt={2}>Group & Dates</Typography><Divider /></Grid>
+          <Grid item xs={12} md={3}><CustomTextField fullWidth label="Group Code" name="groupCode" value={formData.groupCode} onChange={handleChange} inputRef={groupCodeRef} onKeyDown={e => handleKeyDown(e, groupCodeRef)} /></Grid>
+          <Grid item xs={12} md={3}><AppReactDatepicker selected={formData.startDate} onChange={d => handleDateChange('startDate', d, startDateRef)} customInput={<CustomTextField label="Start Date" fullWidth inputRef={startDateRef} />} /></Grid>
+          <Grid item xs={12} md={3}><AppReactDatepicker selected={formData.endDate} onChange={d => handleDateChange('endDate', d, endDateRef)} minDate={formData.startDate} customInput={<CustomTextField label="End Date" fullWidth inputRef={endDateRef} />} /></Grid>
+          <Grid item xs={12} md={3}><AppReactDatepicker selected={formData.reminderDate} onChange={d => handleDateChange('reminderDate', d, reminderDateRef)} minDate={formData.startDate} maxDate={formData.endDate} customInput={<CustomTextField label="Reminder Date" fullWidth inputRef={reminderDateRef} />} /></Grid>
+          
+          {renderAuto({ name: 'industry', label: 'Industry', options: dropdowns.industries })}
+          <Grid item xs={12} md={3}><CustomTextField fullWidth label="Contract Value" name="contractValue" value={formData.contractValue} onChange={handleChange} inputRef={contractValueRef} onKeyDown={e => handleKeyDown(e, contractValueRef)} /></Grid>
+          {renderAuto({ name: 'technician', label: 'Technician', options: dropdowns.technicians })}
+          {renderAuto({ name: 'paymentTerm', label: 'Payment Term', options: ['0 days', '30 days'] })}
+          {renderAuto({ name: 'salesPerson', label: 'Sales Person', options: dropdowns.salesPersons })}
+          {renderAuto({ name: 'supervisor', label: 'Supervisor', options: dropdowns.supervisors })}
+          
+          <Grid item xs={12}><Typography variant="h6" mt={2}>Billing</Typography><Divider /></Grid>
+          <Grid item xs={12} md={3}>
+            <Autocomplete options={dropdowns.billingFrequencies} getOptionLabel={o => o?.name || ''} value={dropdowns.billingFrequencies.find(o => o.id === formData.billingFrequencyId) || null}
+              onChange={async (e, v) => {
+                setFormData(p => ({ ...p, billingFrequency: v?.name || '', billingFrequencyId: v?.id || '' }))
+                if (v?.id && formData.startDate && formData.endDate) {
+                  const res = await getInvoiceCount({ start_date: formData.startDate.toISOString().split('T')[0], end_date: formData.endDate.toISOString().split('T')[0], billing_frequency_id: Number(v.id) })
+                  if (res?.status === 'success') setFormData(p => ({ ...p, invoiceCount: res.data?.invoice_count || 0 }))
+                }
+              }}
+              renderInput={p => <CustomTextField {...p} label="Billing Frequency" inputRef={refs.billingFrequencyInputRef} />}
+            />
+          </Grid>
+          <Grid item xs={12} md={3}><CustomTextField fullWidth label="No. of Invoice" value={String(formData.invoiceCount)} readOnly /></Grid>
+          <Grid item xs={12} md={6}><Autocomplete multiple freeSolo options={[]} value={formData.invoiceRemarks} onChange={(e, v) => setFormData(p => ({ ...p, invoiceRemarks: v }))} renderInput={p => <CustomTextField {...p} label="Invoice Remarks" />} /></Grid>
+          <Grid item xs={12} md={3}><CustomTextField fullWidth label="Latitude" name="latitude" value={formData.latitude} onChange={handleChange} /></Grid>
+          <Grid item xs={12} md={3}><CustomTextField fullWidth label="Longitude" name="longitude" value={formData.longitude} onChange={handleChange} /></Grid>
+
+          <Grid item xs={12}><Typography variant="h6" mt={2}>Pest Items</Typography><Divider /></Grid>
+          <Grid item xs={12} md={2.4}>
+            <Autocomplete options={dropdowns.pests} getOptionLabel={o => o?.name || ''} value={dropdowns.pests.find(o => o.id === currentPestItem.pestId) || null}
+              onChange={(e, v) => { setCurrentPestItem(p => ({ ...p, pest: v?.name || '', pestId: v?.id || '' })); if (v?.id && currentPestItem.frequencyId) fetchPestCount(v.id, currentPestItem.frequencyId) }}
+              renderInput={p => <CustomTextField {...p} label="Pest" inputRef={refs.pestInputRef} />}
+            />
+          </Grid>
+          <Grid item xs={12} md={2.4}>
+            <Autocomplete options={dropdowns.serviceFrequencies} getOptionLabel={o => o?.name || ''} value={dropdowns.serviceFrequencies.find(o => o.id === currentPestItem.frequencyId) || null}
+              onChange={(e, v) => { setCurrentPestItem(p => ({ ...p, frequency: v?.name || '', frequencyId: v?.id || '' })); if (currentPestItem.pestId && v?.id) fetchPestCount(currentPestItem.pestId, v.id) }}
+              renderInput={p => <CustomTextField {...p} label="Frequency" inputRef={refs.frequencyInputRef} />}
+            />
+          </Grid>
+          <Grid item xs={12} md={2.4}><CustomTextField fullWidth label="Count" value={currentPestItem.pestCount} readOnly /></Grid>
+          <Grid item xs={12} md={2.4}><CustomTextField fullWidth label="Value" name="pestValue" value={currentPestItem.pestValue} onChange={handleCurrentPestItemChange} /></Grid>
+          <Grid item xs={12} md={2.4}><CustomTextField fullWidth label="Total" value={currentPestItem.total} readOnly /></Grid>
+          <Grid item xs={12} md={3}><Autocomplete freeSolo options={['0:05', '0:10']} value={currentPestItem.time} onChange={(e, v) => setCurrentPestItem(p => ({ ...p, time: v || '' }))} renderInput={p => <CustomTextField {...p} label="Time" />} /></Grid>
+          <Grid item xs={12} md={3}><Autocomplete options={dropdowns.chemicals} getOptionLabel={o => o?.name || ''} value={dropdowns.chemicals.find(o => o.id === currentPestItem.chemicalId) || null} onChange={(e, v) => setCurrentPestItem(p => ({ ...p, chemicals: v?.name || '', chemicalId: v?.id || '' }))} renderInput={p => <CustomTextField {...p} label="Chemicals" />} /></Grid>
+          <Grid item xs={12} md={3}><CustomTextField fullWidth label="Items" name="noOfItems" value={currentPestItem.noOfItems} onChange={handleCurrentPestItemChange} /></Grid>
+          <Grid item xs={12} md={3} sx={{ display: 'flex', alignItems: 'flex-end' }}><GlobalButton variant="contained" fullWidth onClick={handleSavePestItem}>{editingItemId ? 'Update' : 'Add'}</GlobalButton></Grid>
+          
+          <Grid item xs={12}>
+            <Box sx={{ overflowX: 'auto', border: '1px solid #ddd', borderRadius: 1 }}>
+              <Table>
+                <TableHead><TableRow><TableCell>#</TableCell><TableCell>Action</TableCell><TableCell>Pest</TableCell><TableCell>Frequency</TableCell><TableCell>Count</TableCell><TableCell>Value</TableCell><TableCell>Total</TableCell><TableCell>Time</TableCell><TableCell>Chemicals</TableCell><TableCell>Items</TableCell></TableRow></TableHead>
+                <TableBody>
+                  {pestItems.map((item, idx) => (
+                    <TableRow key={item.id}>
+                      <TableCell>{idx + 1}</TableCell>
+                      <TableCell>
+                        <IconButton size="small" color="error" onClick={() => handleDeletePestItem(item.id)}><DeleteIcon fontSize="small" /></IconButton>
+                        <IconButton size="small" color="primary" onClick={() => { setEditingItemId(item.id); setCurrentPestItem({ ...item, total: item.totalValue, time: item.workTime }) }}><EditIcon fontSize="small" /></IconButton>
+                      </TableCell>
+                      <TableCell>{item.pest}</TableCell><TableCell>{item.frequency}</TableCell><TableCell>{item.pestCount}</TableCell><TableCell>{item.pestValue}</TableCell><TableCell>{item.totalValue}</TableCell><TableCell>{item.workTime}</TableCell><TableCell>{item.chemicals}</TableCell><TableCell>{item.noOfItems}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Box>
+          </Grid>
+
+          <Grid item xs={12}><Typography variant="h6" mt={2}>Remarks</Typography><Divider /></Grid>
+          <Grid item xs={12} md={4}><CustomTextField multiline rows={2} fullWidth label="Billing Remarks" name="billingRemarks" value={formData.billingRemarks} onChange={handleChange} /></Grid>
+          <Grid item xs={12} md={4}><CustomTextField multiline rows={2} fullWidth label="Agreement 1" name="agreement1" value={formData.agreement1} onChange={handleChange} /></Grid>
+          <Grid item xs={12} md={4}><CustomTextField multiline rows={2} fullWidth label="Agreement 2" name="agreement2" value={formData.agreement2} onChange={handleChange} /></Grid>
+          <Grid item xs={12} md={6}><CustomTextField multiline rows={2} fullWidth label="Technician Remarks" name="technicianRemarks" value={formData.technicianRemarks} onChange={handleChange} /></Grid>
+          <Grid item xs={12} md={6}><CustomTextField multiline rows={2} fullWidth label="Appointment Remarks" name="appointmentRemarks" value={formData.appointmentRemarks} onChange={handleChange} /></Grid>
+
+          <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 4 }}>
+            <GlobalButton color="secondary" onClick={() => router.back()}>Close</GlobalButton>
+            <GlobalButton variant="contained" onClick={handleSubmit}>Save Changes</GlobalButton>
+          </Grid>
+        </Grid>
       </Card>
-    </Box>
+    </ContentLayout>
   )
 }

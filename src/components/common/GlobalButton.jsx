@@ -1,6 +1,7 @@
 'use client'
 
 import Button from '@mui/material/Button'
+import CircularProgress from '@mui/material/CircularProgress'
 
 const GlobalButton = ({
   children,
@@ -8,6 +9,7 @@ const GlobalButton = ({
   variant = 'contained',
   fullWidth = false,
   disabled = false,
+  loading = false, // ✅ Destructure to fix React warning
   startIcon,
   endIcon,
   href,
@@ -20,9 +22,9 @@ const GlobalButton = ({
       variant={variant}
       color={color}
       fullWidth={fullWidth}
-      disabled={disabled}
-      startIcon={startIcon}
-      endIcon={endIcon}
+      disabled={disabled || loading} // ✅ Disable when loading
+      startIcon={loading ? null : startIcon} // ✅ Hide icons when loading
+      endIcon={loading ? null : endIcon}
       href={href}
       onClick={onClick}
       className={className}
@@ -30,11 +32,11 @@ const GlobalButton = ({
         textTransform: 'none',
         fontWeight: 500,
         px: 2.5,
-        height: 36,
+        height: 36
       }}
       {...props}
     >
-      {children}
+      {loading ? <CircularProgress size={20} color='inherit' /> : children}
     </Button>
   )
 }

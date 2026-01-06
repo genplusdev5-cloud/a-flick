@@ -21,7 +21,8 @@ import {
   DialogContent
 } from '@mui/material'
 
-import { useRouter, useSearchParams, useParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
@@ -34,6 +35,7 @@ import GlobalTextarea from '@/components/common/GlobalTextarea'
 import GlobalSelect from '@/components/common/GlobalSelect'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
 import { showToast } from '@/components/common/Toasts'
+import { addProposal } from '@/api/proposal'
 
 // Layout + Inputs (Assuming these paths are correct)
 import ContentLayout from '@/components/layout/ContentLayout'
@@ -49,8 +51,6 @@ import {
   getInvoiceRemark
 } from '@/api/contract'
 import { getCustomerDetails } from '@/api/customer'
-import { getProposalDetails } from '@/api/proposal'
-import { decodeId } from '@/utils/urlEncoder'
 
 // Autocomplete Fields Definition (Unchanged)
 
@@ -73,12 +73,8 @@ const autocompleteFields = [
   { name: 'frequency', options: [] }
 ]
 
-export default function AddContractPage() {
+export default function AddProposalPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const fromProposalId = searchParams.get('from_proposal')
-  const params = useParams()
-  const lang = params.lang
 
   // Helper function to generate a simple unique ID
   const generateUniqueId = () => Date.now().toString(36) + Math.random().toString(36).substring(2)
@@ -169,6 +165,9 @@ export default function AddContractPage() {
   const [openDialog, setOpenDialog] = useState(false) // 💡 NEW: For file dialog
   const [copyCustomerAddress, setCopyCustomerAddress] = useState(false)
 
+  const pathname = usePathname()
+  const lang = pathname.split('/')[1]
+
   const cleanOptions = arr => [...new Set(arr.filter(v => v !== null && v !== undefined && v !== ''))]
 
   const [dropdowns, setDropdowns] = useState({
@@ -183,25 +182,6 @@ export default function AddContractPage() {
     pests: [],
     chemicals: []
   })
-  // 💡 Added robust date/time parsing helpers
-  const parseSafeDate = dStr => {
-    if (!dStr || dStr === '0000-00-00' || dStr === '' || dStr === '0000-00-00 00:00:00') return null
-    const d = new Date(dStr)
-    return isNaN(d.getTime()) ? null : d
-  }
-
-  const parseSafeTime = tStr => {
-    if (!tStr || tStr === '00:00:00' || tStr === '') return null
-    const d = new Date(`1970-01-01T${tStr}`)
-    return isNaN(d.getTime()) ? null : d
-  }
-
-  const convertMinutesToTime = mins => {
-    if (!mins) return '0:00'
-    const h = Math.floor(mins / 60)
-    const m = mins % 60
-    return `${h}:${m < 10 ? '0' : ''}${m}`
-  }
 
   // Dynamic Refs and Open States for Autocomplete (Unchanged)
 
@@ -427,98 +407,6 @@ export default function AddContractPage() {
   useEffect(() => {
     loadDropdowns()
   }, [])
-
-  useEffect(() => {
-    const fetchAndMapProposal = async () => {
-      if (!fromProposalId) return
-
-      try {
-        const decodedId = decodeId(fromProposalId) || fromProposalId
-        const res = await getProposalDetails(decodedId)
-
-        if (res?.status === 'success' || res) {
-          const data = res?.data || res
-
-          setFormData(prev => ({
-            ...prev,
-            salesMode: 'Quotation',
-            salesModeId: '2',
-            contractName: data.name || '',
-            contractType: data.contract_type?.replace(/_/g, ' ')?.replace(/\b\w/g, l => l.toUpperCase()) || '',
-            customerId: data.customer_id,
-            customer: data.customer,
-            contractCode: data.contract_code || '',
-            serviceAddress: data.service_address || '',
-            postalCode: data.postal_code || '',
-            coveredLocation: data.covered_location || '',
-            poNumber: data.po_number || '',
-            poExpiry: parseSafeDate(data.po_expiry_date),
-            preferredTime: parseSafeTime(data.preferred_time),
-            reportEmail: (data.report_email || '').trim(),
-            contactPerson: data.contact_person_name || '',
-            sitePhone: data.phone || '',
-            mobile: data.mobile || '',
-            callTypeId: data.call_type_id,
-            callType: data.call_type || '',
-            groupCode: data.grouping_code || '',
-            startDate: parseSafeDate(data.start_date),
-            endDate: parseSafeDate(data.end_date),
-            reminderDate: parseSafeDate(data.reminder_date),
-            industryId: data.industry_id,
-            industry: data.industry || '',
-            contractValue: data.contract_value || '',
-            technicianId: data.technician_id,
-            technician: data.technician || '',
-            paymentTerm: data.billing_term ? `${data.billing_term} days` : '',
-            salesPersonId: data.sales_person_id,
-            salesPerson: data.sales_person || '',
-            supervisorId: data.supervisor_id,
-            supervisor: data.supervisor || '',
-            billingFrequencyId: data.billing_frequency_id,
-            billingFrequency: data.billing_frequency || '',
-            invoiceCount: data.invoice_count || '',
-            invoiceRemarks: data.invoice_remarks ? data.invoice_remarks.split(',').map(s => s.trim()) : [],
-            latitude: data.latitude || '',
-            longitude: data.longitude || '',
-            billingRemarks: data.billing_remarks || '',
-            agreement1: data.agreement_add_1 || '',
-            agreement2: data.agreement_add_2 || '',
-            technicianRemarks: data.technician_remarks || '',
-            appointmentRemarks: data.appointment_remarks || '',
-            uploadedFileName: data.floor_plan || ''
-          }))
-
-          if (data.pest_items && Array.isArray(data.pest_items)) {
-            setPestItems(
-              data.pest_items.map(item => ({
-                id: generateUniqueId(),
-                pest: item.pest,
-                pestId: item.pest_id,
-                frequency: item.frequency,
-                frequencyId: item.frequency_id,
-                pestCount: item.no_location,
-                pestValue: item.pest_value,
-                totalValue: item.total_value,
-                workTime: convertMinutesToTime(item.work_time),
-                chemicals: item.chemical_name,
-                chemicalId: item.chemical_id,
-                noOfItems: item.pest_service_count
-              }))
-            )
-          }
-
-          showToast('success', 'Proposal details imported successfully! 🎉')
-        }
-      } catch (err) {
-        console.error('❌ Proposal import failed', err)
-        showToast('error', 'Failed to import proposal details')
-      }
-    }
-
-    if (fromProposalId) {
-      fetchAndMapProposal()
-    }
-  }, [fromProposalId])
 
   const loadDropdowns = async () => {
     try {
@@ -941,13 +829,13 @@ export default function AddContractPage() {
 
         name: formData.contractName || '',
         report_email: formData.reportEmail || '',
-        sales_mode: formData.salesMode?.toLowerCase().replace(/\s+/g, '_') || null,
+        sales_mode: formData.salesMode?.toLowerCase().replace(/\s+/g, '_') || '',
         contract_code: formData.contractCode || '',
         covered_location: formData.coveredLocation || '',
         service_address: formData.serviceAddress || '',
         postal_code: formData.postalCode || '',
         po_number: formData.poNumber || '',
-        po_expiry_date: formData.poExpiry?.toISOString().split('T')[0] || null,
+        po_expiry_date: formData.poExpiry?.toISOString().split('T')[0] || '',
         contact_person_name: formData.contactPerson || '',
         phone: formData.sitePhone?.replace(/\s+/g, '') || '',
         mobile: formData.mobile?.replace(/\s+/g, '') || '',
@@ -955,7 +843,7 @@ export default function AddContractPage() {
         preferred_time: formData.preferredTime ? formData.preferredTime.toTimeString().slice(0, 5) + ':00' : '09:00:00',
 
         industry_id: Number(formData.industryId) || null,
-        contract_type: formData.contractType?.toLowerCase().replace(/\s+/g, '_') || null,
+        contract_type: formData.contractType?.toLowerCase() || '',
         commencement_date: formData.startDate?.toISOString().split('T')[0],
         start_date: formData.startDate?.toISOString().split('T')[0],
         end_date: formData.endDate?.toISOString().split('T')[0],
@@ -1003,20 +891,20 @@ export default function AddContractPage() {
       console.log('📌 FINAL PAYLOAD:', payload)
 
       // ------------------------------
-      // 3️⃣ SEND TO BACKEND
+      // 3️⃣ SEND TO BACKEND (SALES QUOTATION)
       // ------------------------------
-      const response = await createContract(payload) // ⭐ MUST BE HERE
+      const response = await addProposal(payload)
 
       // ------------------------------
-      // 4️⃣ SUCCESS → REDIRECT WITH PARAM
+      // 4️⃣ SUCCESS → REDIRECT
       // ------------------------------
-      if (response?.data?.status === 'success') {
-        showToast('success', 'Contract Added Successfully!')
+      if (response?.status === 'success' || response?.data?.status === 'success') {
+        showToast('success', 'Sales Quotation Added Successfully!')
 
         const lang = window.location.pathname.split('/')[1]
 
         setTimeout(() => {
-          router.push(`/${lang}/admin/contracts?newContract=${btoa(JSON.stringify(response.data.data))}`)
+          router.push(`/${lang}/admin/sales-quotation`)
         }, 500)
 
         return
@@ -1026,10 +914,10 @@ export default function AddContractPage() {
       // 5️⃣ FAILED BACKEND RESPONSE
       // ------------------------------
       console.error('❌ Backend Error:', response)
-      showToast('error', response?.data?.message || 'Error while saving contract!')
+      showToast('error', response?.data?.message || 'Error while saving sales quotation!')
     } catch (error) {
       console.error('❌ Submit Error:', error)
-      showToast('error', 'Error while saving contract!')
+      showToast('error', 'Error while saving sales quotation!')
     }
   }
 
@@ -1140,17 +1028,16 @@ export default function AddContractPage() {
     }
   }
 
-  // ----------------------------------------------------------------------
+  // ---------------------------------------------------------------------- 
   // Form Structure (Updated File Upload Section)
   // ----------------------------------------------------------------------
 
   return (
     <ContentLayout
-      title={<Box sx={{ m: 2 }}>{'Add Contract'}</Box>}
       breadcrumbs={[
         { label: 'Dashboard', href: '/' },
-        { label: 'Contracts', href: '/admin/contracts' },
-        { label: 'Add Contract' }
+        { label: 'Sales Quotation', href: '/admin/sales-quotation' },
+        { label: 'Add Sales Quotation' }
       ]}
     >
       <Card sx={{ p: 4, boxShadow: 'none' }} elevation={0}>
@@ -1832,13 +1719,13 @@ export default function AddContractPage() {
                       >
                         <TableCell>{idx + 1}</TableCell>
                         <TableCell>
-                          <IconButton size='small' color='error' onClick={() => handleDelete(item.id)}>
+                          <IconButton size='small' color='error' onClick={() => handleDeletePestItem(item.id)}>
                             <DeleteIcon fontSize='small' />
                           </IconButton>
                           <IconButton
                             size='small'
                             color='primary'
-                            onClick={() => handleEdit(item)}
+                            onClick={() => handleEditPestItem(item)}
                             disabled={editingItemId === item.id}
                           >
                             <EditIcon fontSize='small' />
@@ -1938,7 +1825,7 @@ export default function AddContractPage() {
           >
             <GlobalButton
               color='secondary'
-              onClick={() => router.push(`/${lang}/admin/contracts`)}
+              onClick={() => router.push(`/${lang}/admin/sales-quotation`)}
               ref={closeButtonRef}
             >
               Close

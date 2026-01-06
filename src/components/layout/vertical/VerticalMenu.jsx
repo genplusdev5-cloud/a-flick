@@ -57,6 +57,8 @@ const REPORT_MODULES = [
 
 const AUDIT_MODULES = ['Customer Audit', 'Contracts Audit']
 
+const SALES_MODULES = ['Proposal Item', 'Sales Quotation']
+
 const RenderExpandIcon = ({ open, transitionDuration }) => (
   <StyledVerticalNavExpandIcon open={open} transitionDuration={transitionDuration}>
     <i className='tabler-chevron-right' />
@@ -133,28 +135,64 @@ const VerticalMenu = ({ scrollMenu }) => {
 
         {/* ✅ Master */}
         <PermissionSubMenu label='Master' icon={<i className='tabler-database' />} modules={MASTER_MODULES}>
-          <PermissionItem module='Tax'><MenuItem href={`/${locale}/admin/tax`}>Tax</MenuItem></PermissionItem>
-          <PermissionItem module='Company Origin'><MenuItem href={`/${locale}/admin/company-origin`}>Company Origin</MenuItem></PermissionItem>
-          <PermissionItem module='Service Frequency'><MenuItem href={`/${locale}/admin/service-frequency`}>Service Frequency</MenuItem></PermissionItem>
-          <PermissionItem module='Billing Frequency'><MenuItem href={`/${locale}/admin/billing-frequency`}>Billing Frequency</MenuItem></PermissionItem>
-          <PermissionItem module='Unit Of Measurement'><MenuItem href={`/${locale}/admin/uom`}>Unit Of Measurement</MenuItem></PermissionItem>
-          <PermissionItem module='Call Type'><MenuItem href={`/${locale}/admin/call-type`}>Call Type</MenuItem></PermissionItem>
-          <PermissionItem module='Chemicals'><MenuItem href={`/${locale}/admin/chemicals`}>Chemicals</MenuItem></PermissionItem>
-          <PermissionItem module='Industry'><MenuItem href={`/${locale}/admin/industry`}>Industry</MenuItem></PermissionItem>
-          <PermissionItem module='Holidays'><MenuItem href={`/${locale}/admin/holidays`}>Holidays</MenuItem></PermissionItem>
-          <PermissionItem module='Incident'><MenuItem href={`/${locale}/admin/incident`}>Incident</MenuItem></PermissionItem>
-          <PermissionItem module='Todo Items'><MenuItem href={`/${locale}/admin/todo-items`}>Todo Items</MenuItem></PermissionItem>
-          <PermissionItem module='Site Risk'><MenuItem href={`/${locale}/admin/site-risk`}>Site Risk</MenuItem></PermissionItem>
-          <PermissionItem module='Equipments'><MenuItem href={`/${locale}/admin/equipments`}>Equipments</MenuItem></PermissionItem>
+          <PermissionItem module='Tax'>
+            <MenuItem href={`/${locale}/admin/tax`}>Tax</MenuItem>
+          </PermissionItem>
+          <PermissionItem module='Company Origin'>
+            <MenuItem href={`/${locale}/admin/company-origin`}>Company Origin</MenuItem>
+          </PermissionItem>
+          <PermissionItem module='Service Frequency'>
+            <MenuItem href={`/${locale}/admin/service-frequency`}>Service Frequency</MenuItem>
+          </PermissionItem>
+          <PermissionItem module='Billing Frequency'>
+            <MenuItem href={`/${locale}/admin/billing-frequency`}>Billing Frequency</MenuItem>
+          </PermissionItem>
+          <PermissionItem module='Unit Of Measurement'>
+            <MenuItem href={`/${locale}/admin/uom`}>Unit Of Measurement</MenuItem>
+          </PermissionItem>
+          <PermissionItem module='Call Type'>
+            <MenuItem href={`/${locale}/admin/call-type`}>Call Type</MenuItem>
+          </PermissionItem>
+          <PermissionItem module='Chemicals'>
+            <MenuItem href={`/${locale}/admin/chemicals`}>Chemicals</MenuItem>
+          </PermissionItem>
+          <PermissionItem module='Industry'>
+            <MenuItem href={`/${locale}/admin/industry`}>Industry</MenuItem>
+          </PermissionItem>
+          <PermissionItem module='Holidays'>
+            <MenuItem href={`/${locale}/admin/holidays`}>Holidays</MenuItem>
+          </PermissionItem>
+          <PermissionItem module='Incident'>
+            <MenuItem href={`/${locale}/admin/incident`}>Incident</MenuItem>
+          </PermissionItem>
+          <PermissionItem module='Todo Items'>
+            <MenuItem href={`/${locale}/admin/todo-items`}>Todo Items</MenuItem>
+          </PermissionItem>
+          <PermissionItem module='Site Risk'>
+            <MenuItem href={`/${locale}/admin/site-risk`}>Site Risk</MenuItem>
+          </PermissionItem>
+          <PermissionItem module='Equipments'>
+            <MenuItem href={`/${locale}/admin/equipments`}>Equipments</MenuItem>
+          </PermissionItem>
         </PermissionSubMenu>
 
         {/* ✅ Employee */}
         <PermissionSubMenu label='Employee' icon={<i className='tabler-user' />} modules={EMPLOYEE_MODULES}>
-          <PermissionItem module='Department'><MenuItem href={`/${locale}/admin/department`}>Department</MenuItem></PermissionItem>
-          <PermissionItem module='Designation'><MenuItem href={`/${locale}/admin/designation`}>Designation</MenuItem></PermissionItem>
-          <PermissionItem module='Employee List'><MenuItem href={`/${locale}/admin/employee-list`}>Employee List</MenuItem></PermissionItem>
-          <PermissionItem module='Employee Leave Type'><MenuItem href={`/${locale}/admin/employee-leave-type`}>Employee Leave Type</MenuItem></PermissionItem>
-          <PermissionItem module='User Privilege'><MenuItem href={`/${locale}/admin/user-privilege`}>User Privilege</MenuItem></PermissionItem>
+          <PermissionItem module='Department'>
+            <MenuItem href={`/${locale}/admin/department`}>Department</MenuItem>
+          </PermissionItem>
+          <PermissionItem module='Designation'>
+            <MenuItem href={`/${locale}/admin/designation`}>Designation</MenuItem>
+          </PermissionItem>
+          <PermissionItem module='Employee List'>
+            <MenuItem href={`/${locale}/admin/employee-list`}>Employee List</MenuItem>
+          </PermissionItem>
+          <PermissionItem module='Employee Leave Type'>
+            <MenuItem href={`/${locale}/admin/employee-leave-type`}>Employee Leave Type</MenuItem>
+          </PermissionItem>
+          <PermissionItem module='User Privilege'>
+            <MenuItem href={`/${locale}/admin/user-privilege`}>User Privilege</MenuItem>
+          </PermissionItem>
         </PermissionSubMenu>
 
         {/* Single Items need direct PermissionItem wrapper */}
@@ -200,21 +238,50 @@ const VerticalMenu = ({ scrollMenu }) => {
           </MenuItem>
         </PermissionItem>
 
+        {/* ==================== SALES ==================== */}
+        <PermissionSubMenu label='Sales' icon={<i className='tabler-briefcase' />} modules={SALES_MODULES}>
+          <PermissionItem module='Proposal Item'>
+            <MenuItem href={`/${locale}/admin/proposal-item`}>Proposal Item</MenuItem>
+          </PermissionItem>
+
+          <PermissionItem module='Sales Quotation'>
+            <MenuItem href={`/${locale}/admin/sales-quotation`}>Sales Quotation</MenuItem>
+          </PermissionItem>
+        </PermissionSubMenu>
+
         {/* ✅ Stock Dropdown */}
         <PermissionSubMenu label='Stock' icon={<i className='tabler-package' />} modules={STOCK_MODULES}>
-          <PermissionItem module='Suppliers'><MenuItem href={`/${locale}/admin/suppliers`}>Suppliers</MenuItem></PermissionItem>
-          <PermissionItem module='Material Request'><MenuItem href={`/${locale}/admin/stock/material-request`}>Material Request</MenuItem></PermissionItem>
-          <PermissionItem module='Stock Report'><MenuItem href={`/${locale}/admin/stock/report`}>Stock Report</MenuItem></PermissionItem>
-          <PermissionItem module='Usage Report'><MenuItem href={`/${locale}/admin/stock/usage-report`}>Usage Report</MenuItem></PermissionItem>
+          <PermissionItem module='Suppliers'>
+            <MenuItem href={`/${locale}/admin/suppliers`}>Suppliers</MenuItem>
+          </PermissionItem>
+          <PermissionItem module='Material Request'>
+            <MenuItem href={`/${locale}/admin/stock/material-request`}>Material Request</MenuItem>
+          </PermissionItem>
+          <PermissionItem module='Stock Report'>
+            <MenuItem href={`/${locale}/admin/stock/report`}>Stock Report</MenuItem>
+          </PermissionItem>
+          <PermissionItem module='Usage Report'>
+            <MenuItem href={`/${locale}/admin/stock/usage-report`}>Usage Report</MenuItem>
+          </PermissionItem>
         </PermissionSubMenu>
 
         {/* ✅ Attendance */}
         <PermissionSubMenu label='Attendance' icon={<i className='tabler-user-check' />} modules={ATTENDANCE_MODULES}>
-          <PermissionItem module='Attendance Slots'><MenuItem href={`/${locale}/admin/attendance/slots`}>Slots</MenuItem></PermissionItem>
-          <PermissionItem module='Attendance'><MenuItem href={`/${locale}/admin/attendance/attendance`}>Attendance</MenuItem></PermissionItem>
-          <PermissionItem module='Attendance Schedule'><MenuItem href={`/${locale}/admin/attendance/schedule`}>Schedule</MenuItem></PermissionItem>
-          <PermissionItem module='Attendance Timesheet'><MenuItem href={`/${locale}/admin/attendance/timesheet`}>Attendance Timesheet</MenuItem></PermissionItem>
-          <PermissionItem module='Payslip Summary'><MenuItem href={`/${locale}/admin/attendance/payslip-summary`}>Payslip Summary Report</MenuItem></PermissionItem>
+          <PermissionItem module='Attendance Slots'>
+            <MenuItem href={`/${locale}/admin/attendance/slots`}>Slots</MenuItem>
+          </PermissionItem>
+          <PermissionItem module='Attendance'>
+            <MenuItem href={`/${locale}/admin/attendance/attendance`}>Attendance</MenuItem>
+          </PermissionItem>
+          <PermissionItem module='Attendance Schedule'>
+            <MenuItem href={`/${locale}/admin/attendance/schedule`}>Schedule</MenuItem>
+          </PermissionItem>
+          <PermissionItem module='Attendance Timesheet'>
+            <MenuItem href={`/${locale}/admin/attendance/timesheet`}>Attendance Timesheet</MenuItem>
+          </PermissionItem>
+          <PermissionItem module='Payslip Summary'>
+            <MenuItem href={`/${locale}/admin/attendance/payslip-summary`}>Payslip Summary Report</MenuItem>
+          </PermissionItem>
         </PermissionSubMenu>
 
         <PermissionItem module='View Contract Status'>

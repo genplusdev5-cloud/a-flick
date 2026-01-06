@@ -17,6 +17,8 @@
   },
   "dependencies": {
     "@auth/prisma-adapter": "2.7.4",
+    "@ckeditor/ckeditor5-build-classic": "^44.3.0",
+    "@ckeditor/ckeditor5-react": "^11.0.1",
     "@emoji-mart/data": "1.2.1",
     "@emoji-mart/react": "1.1.1",
     "@emotion/cache": "11.14.0",

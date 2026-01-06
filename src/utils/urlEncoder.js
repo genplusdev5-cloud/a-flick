@@ -67,6 +67,13 @@ export const decodeId = (encodedId) => {
     }
     
     // Decode from Base64
+    // Check if the string is valid Base64 to avoid InvalidCharacterError
+    const base64Regex = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
+    if (!base64Regex.test(base64)) {
+      console.error('❌ String is not valid Base64:', encodedId)
+      return null
+    }
+
     const decoded = atob(base64)
     
     // Return the decoded string (works for both numbers and UUIDs)
