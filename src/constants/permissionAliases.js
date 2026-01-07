@@ -107,6 +107,28 @@ export const PERMISSION_ALIASES = {
   'Operations/Calendar': 'Calendar',
   'Operations/Invoice': 'Invoice',
 
+  // Purchase
+  'Stock/Purchase Order': 'Purchase Order',
+  'Purchase/Purchase Order': 'Purchase Order',
+  'Purchase Order': 'Purchase Order',
+  'Stock/Purchase Inward': 'Purchase Inward',
+  'Purchase/Purchase Inward': 'Purchase Inward',
+  'Purchase Inward': 'Purchase Inward',
+  'Stock/Purchase Return': 'Purchase Return',
+  'Purchase/Purchase Return': 'Purchase Return',
+  'Purchase Return': 'Purchase Return',
+
+  // Transfer
+  'Stock/Transfer Request': 'Transfer Request',
+  'Transfer/Transfer Request': 'Transfer Request',
+  'Transfer Request': 'Transfer Request',
+  'Stock/Transfer In': 'Transfer In',
+  'Transfer/Transfer In': 'Transfer In',
+  'Transfer In': 'Transfer In',
+  'Stock/Transfer Out': 'Transfer Out',
+  'Transfer/Transfer Out': 'Transfer Out',
+  'Transfer Out': 'Transfer Out',
+
   // Stock
   'Stock/Suppliers': 'Suppliers',
   'Stock/Material Request': 'Material Request',
@@ -115,6 +137,10 @@ export const PERMISSION_ALIASES = {
   'Stock Report': 'Stock Report',
   'Stock/Usage Report': 'Usage Report',
   'Usage Report': 'Usage Report',
+  'Stock/Stock Summary': 'Stock Summary',
+  'Stock Summary': 'Stock Summary',
+  'Stock/Material Usage': 'Material Usage',
+  'Material Usage': 'Material Usage',
 
   // Finder
   'Finder/Non Pre-Schedule': 'Non Pre-Schedule',
