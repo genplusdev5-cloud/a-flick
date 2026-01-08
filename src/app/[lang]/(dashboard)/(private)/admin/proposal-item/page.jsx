@@ -289,7 +289,7 @@ const ProposalItemPage = () => {
           </Breadcrumbs>
         }
       >
-        <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <Card sx={{ display: 'flex', flexDirection: 'column', maxHeight: '100%' }}>
           {/* ================= HEADER ================= */}
           <CardHeader
             title={

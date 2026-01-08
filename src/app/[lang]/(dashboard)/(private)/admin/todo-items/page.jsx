@@ -442,7 +442,7 @@ const TodoItemsPageContent = () => {
         </Box>
       }
     >
-      <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
+      <Card sx={{ display: 'flex', flexDirection: 'column', maxHeight: '100%', minHeight: 0, position: 'relative' }}>
         <CardHeader
           title={
             <Box display='flex' alignItems='center' gap={2}>
@@ -638,7 +638,7 @@ const TodoItemsPageContent = () => {
         onClose={toggleDrawer}
         PaperProps={{ sx: { width: 420, boxShadow: '0px 0px 15px rgba(0,0,0,0.08)' } }}
       >
-        <Box sx={{ p: 5, display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <Box sx={{ p: 5, display: 'flex', flexDirection: 'column', maxHeight: '100%' }}>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
             <Typography variant='h5' fontWeight={600}>
               {isEdit ? 'Edit Todo' : 'Add Todo'}

@@ -187,6 +187,19 @@ const ContractsPageContent = () => {
       if (filters.dateRange[0]) params.set('from', format(new Date(filters.dateRange[0]), 'yyyy-MM-dd'))
       if (filters.dateRange[1]) params.set('to', format(new Date(filters.dateRange[1]), 'yyyy-MM-dd'))
     }
+
+    // 🔥 SAVE TO SESSION STORAGE FOR PERSISTENCE
+    const storageObj = {
+      search: filters.search,
+      customer: filters.customer ? { id: filters.customer.id, name: filters.customer.name } : null,
+      type: filters.type,
+      status: filters.status,
+      uuid: filters.uuid,
+      dateFilter: filters.dateFilter,
+      dateRange: filters.dateRange
+    }
+    sessionStorage.setItem('contractFilters', JSON.stringify(storageObj))
+
     router.push(`${pathname}?${params.toString()}`, { scroll: false })
   }
 
@@ -337,6 +350,43 @@ const ContractsPageContent = () => {
   useEffect(() => {
     loadCustomers()
   }, [])
+
+  // 🔥 RESTORE FILTERS FROM SESSION STORAGE ON MOUNT
+  useEffect(() => {
+    // Only restore if there are NO filter params in the URL currently
+    const hasUrlParams = searchParams.get('search') || 
+                         searchParams.get('customer') || 
+                         searchParams.get('type') || 
+                         searchParams.get('status') || 
+                         searchParams.get('dateFilter')
+
+    if (!hasUrlParams) {
+      const saved = sessionStorage.getItem('contractFilters')
+      if (saved) {
+        try {
+          const filters = JSON.parse(saved)
+          
+          // Reconstruct URL params from saved state
+          const params = new URLSearchParams()
+          if (filters.search) params.set('search', filters.search)
+          if (filters.customer?.id) params.set('customer', encodeId(filters.customer.id))
+          if (filters.type) params.set('type', filters.type)
+          if (filters.status) params.set('status', filters.status)
+          if (filters.uuid) params.set('uuid', filters.uuid)
+          if (filters.dateFilter) {
+            params.set('dateFilter', 'true')
+            if (filters.dateRange[0]) params.set('from', format(new Date(filters.dateRange[0]), 'yyyy-MM-dd'))
+            if (filters.dateRange[1]) params.set('to', format(new Date(filters.dateRange[1]), 'yyyy-MM-dd'))
+          }
+
+          // Use replace to avoid extra entry in browser history
+          router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+        } catch (e) {
+          console.error('Failed to parse saved filters:', e)
+        }
+      }
+    }
+  }, [pathname, router])
 
   // Load contracts whenever applied filters / pagination changes
   useEffect(() => {
@@ -686,7 +736,7 @@ const ContractsPageContent = () => {
         </Breadcrumbs>
       }
     >
-      <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+      <Card sx={{ display: 'flex', flexDirection: 'column', maxHeight: '100%', minHeight: 0 }}>
         <CardHeader
           title={
             <Box display='flex' alignItems='center' gap={2}>

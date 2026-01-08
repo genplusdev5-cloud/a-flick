@@ -779,7 +779,7 @@ const UserPrivilegePageContent = () => {
           </Box>
         }
       >
-        <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
+        <Card sx={{ display: 'flex', flexDirection: 'column', maxHeight: '100%', minHeight: 0, position: 'relative' }}>
           <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <Box display='flex' alignItems='center' gap={2} mb={4}>
               <Typography variant='h5' sx={{ fontWeight: 600 }}>

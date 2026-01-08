@@ -634,7 +634,7 @@ const ServiceRequestPageContent = () => {
         </Box>
       }
     >
-      <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
+      <Card sx={{ display: 'flex', flexDirection: 'column', maxHeight: '100%', minHeight: 0, position: 'relative' }}>
         <CardHeader
           title={
             <Box display='flex' alignItems='center' gap={2}>

@@ -120,7 +120,7 @@ export default function ServicePlanDrawer({ open, onClose, contract, pestOptions
         }
       }}
     >
-      <Box sx={{ p: 5, display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <Box sx={{ p: 5, display: 'flex', flexDirection: 'column', maxHeight: '100%' }}>
         <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
           <Typography variant='h5' fontWeight={600}>
             Generate Pre-Booked Service Plan

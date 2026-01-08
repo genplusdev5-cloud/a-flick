@@ -18,7 +18,7 @@ const StickyTableWrapper = ({ children, rowCount = 0 }) => {
   return (
     <div
       className={classnames(styles.table_wrapper, {
-        [styles.table_scroll_10]: rowCount > 10
+        [styles.table_scroll_10]: rowCount >= 10
       })}
     >
       {children}

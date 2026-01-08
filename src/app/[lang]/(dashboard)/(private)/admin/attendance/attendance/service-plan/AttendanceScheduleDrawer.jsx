@@ -109,7 +109,7 @@ export default function AttendanceScheduleDrawer({ open, onClose, attendance, sl
 
   return (
     <Drawer anchor='right' open={open} onClose={onClose} PaperProps={{ sx: { width: 600 } }}>
-      <Box sx={{ p: 4, display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <Box sx={{ p: 4, display: 'flex', flexDirection: 'column', maxHeight: '100%' }}>
         {/* Header */}
         <Box display='flex' justifyContent='space-between' alignItems='center'>
           <Typography variant='h6' fontWeight={600}>

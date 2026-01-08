@@ -265,7 +265,7 @@ const PurchaseReturnPage = () => {
         </Breadcrumbs>
       }
     >
-      <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <Card sx={{ maxHeight: '100%', display: 'flex', flexDirection: 'column' }}>
         {/* HEADER */}
         <CardHeader
           title={

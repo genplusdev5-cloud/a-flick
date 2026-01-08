@@ -741,7 +741,7 @@ const InvoiceListPageFullContent = () => {
         {selectedInvoiceData && <InvoicePDF invoiceData={selectedInvoiceData} />}
       </div>
 
-      <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
+      <Card sx={{ display: 'flex', flexDirection: 'column', maxHeight: '100%', minHeight: 0, position: 'relative' }}>
         {/* ✅ CARD HEADER (STANDARD – SAME AS TAX PAGE) */}
         <CardHeader
           title={
@@ -958,7 +958,7 @@ const InvoiceListPageFullContent = () => {
                 />
               </Grid>
               <Grid item xs={12} sm={6} md={3}>
-                <Box sx={{ display: 'flex', alignItems: 'flex-end', height: '100%' }}>
+                <Box sx={{ display: 'flex', alignItems: 'flex-end', maxHeight: '100%' }}>
                   <GlobalButton
                     fullWidth
                     variant='contained'

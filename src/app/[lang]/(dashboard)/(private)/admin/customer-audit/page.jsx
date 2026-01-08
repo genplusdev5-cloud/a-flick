@@ -86,7 +86,7 @@ const CustomerAuditPageContent = () => {
         </Breadcrumbs>
       }
     >
-      <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+      <Card sx={{ display: 'flex', flexDirection: 'column', maxHeight: '100%', minHeight: 0 }}>
         {/* 🔥 HEADER EXACT LIKE TAX */}
         <CardHeader
           title={

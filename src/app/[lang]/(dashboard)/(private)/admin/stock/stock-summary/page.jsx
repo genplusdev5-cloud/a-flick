@@ -111,7 +111,7 @@ const StockSummaryPage = () => {
         </Breadcrumbs>
       }
     >
-      <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <Card sx={{ maxHeight: '100%', display: 'flex', flexDirection: 'column' }}>
         <CardHeader
           title={<Typography variant='h5' fontWeight={600}>Stock Summary</Typography>}
           action={

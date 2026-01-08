@@ -3,7 +3,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { getContractDetails } from '@/api/contract/details'
 import { updateContractValueApi } from '@/api/contract/icons/contractValueUpdate'
 import ContractValueDrawer from '@/components/service-pages/contract-actions/ContractValueDrawer'
@@ -22,6 +22,7 @@ import { updateContract } from '@/api/contract/update'
 
 export default function ContractViewPage() {
   const [form, setForm] = useState({})
+  const router = useRouter() // 👈 ADD THIS
   const [dropdowns, setDropdowns] = useState({
     customers: [],
     callTypes: [],
@@ -64,6 +65,10 @@ export default function ContractViewPage() {
     if (lower === 'warranty') return 'warranty'
 
     return val
+  }
+
+  const handleClose = () => {
+    router.push('/en/admin/contracts') // 👈 adjust path if needed
   }
 
   const formatDateToYMD = date => {
@@ -328,7 +333,7 @@ export default function ContractViewPage() {
     <Box className='mt-2'>
       <Card
         sx={{
-          p: 3,
+          p: 2, // reduce outer padding
           height: '85vh',
           overflow: 'hidden',
           display: 'flex',
@@ -345,7 +350,14 @@ export default function ContractViewPage() {
         <Divider sx={{ mb: 3 }} />
 
         {/* SCROLL AREA */}
-        <Box sx={{ overflowY: 'auto', flexGrow: 1, pr: 2 }}>
+        <Box
+          sx={{
+            overflowY: 'auto',
+            flexGrow: 1,
+            px: 3, // 👈 left & right padding
+            pb: 2 // 👈 bottom spacing
+          }}
+        >
           <Grid container spacing={3}>
             {/* ========== SECTION 1: BASIC INFO ========== */}
             <Grid item xs={12} md={4}>
@@ -765,9 +777,10 @@ export default function ContractViewPage() {
                   pr: 1 // 👈 LITTLE RIGHT PADDING (OPTIONAL)
                 }}
               >
-                <GlobalButton color='secondary' onClick={() => showToast('info', 'Closed')}>
+                <GlobalButton color='secondary' onClick={handleClose}>
                   Close
                 </GlobalButton>
+
                 <GlobalButton variant='contained' onClick={handleSave}>
                   Save
                 </GlobalButton>

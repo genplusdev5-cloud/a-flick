@@ -117,7 +117,7 @@
 /* 10-row vertical scroll rule */
 /* header height (56px) + 10 rows (10 * 50px) = 556px */
 .table_scroll_10 {
-  max-block-size: 556px;
+  max-block-size: 540px;
 }
 
 /* Sticky Header */

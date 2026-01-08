@@ -536,7 +536,7 @@ const ContractStatusPageContent = () => {
         </Box>
       }
     >
-      <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
+      <Card sx={{ display: 'flex', flexDirection: 'column', maxHeight: '100%', minHeight: 0, position: 'relative' }}>
         <CardHeader
           title={
             <Box
@@ -633,7 +633,7 @@ const ContractStatusPageContent = () => {
             <ProgressCircularCustomization size={60} thickness={5} />
           </Box>
         )}
-        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', maxHeight: '100%', overflow: 'hidden' }}>
           {/* 1. FIXED: Filters & Toolbar */}
           <Box sx={{ p: 4, pb: 2, flexShrink: 0, overflow: 'visible' }}>
             {/* SINGLE ROW FILTER BAR */}
@@ -821,7 +821,7 @@ const ContractStatusPageContent = () => {
 
           {/* 2. FLEXIBLE: Scrollable Table */}
           <Box sx={{ p: 3, flexGrow: 1, minHeight: 0, overflow: 'hidden', position: 'relative' }}>
-            <Box sx={{ height: '100%', overflowY: 'auto' }}>
+            <Box sx={{ maxHeight: '100%', overflowY: 'auto' }}>
               {/* Scrollable Table */}
               <StickyTableWrapper rowCount={rows.length}>
                 <table className={styles.table}>

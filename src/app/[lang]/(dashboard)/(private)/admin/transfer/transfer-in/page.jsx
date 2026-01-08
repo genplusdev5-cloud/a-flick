@@ -219,7 +219,7 @@ const TransferInPage = () => {
         </Breadcrumbs>
       }
     >
-      <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <Card sx={{ display: 'flex', flexDirection: 'column', maxHeight: '100%' }}>
         <CardHeader
           title={<Typography variant='h5'>Transfer In</Typography>}
           action={

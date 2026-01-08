@@ -335,7 +335,7 @@ const MaterialRequestPageContent = () => {
           sx={{
             display: 'flex',
             flexDirection: 'column',
-            height: '100%',
+            maxHeight: '100%',
             minHeight: 0,
             position: 'relative'
           }}

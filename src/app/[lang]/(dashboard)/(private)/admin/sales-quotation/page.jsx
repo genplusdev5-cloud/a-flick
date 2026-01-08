@@ -349,7 +349,7 @@ const SalesQuotationPage = () => {
           </Breadcrumbs>
         }
       >
-        <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+        <Card sx={{ display: 'flex', flexDirection: 'column', maxHeight: '100%', minHeight: 0 }}>
           <CardHeader
             title={
               <Box display='flex' alignItems='center' gap={2}>
