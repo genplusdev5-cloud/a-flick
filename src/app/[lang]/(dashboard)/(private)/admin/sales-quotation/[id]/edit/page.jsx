@@ -18,7 +18,8 @@ import {
   IconButton,
   FormControlLabel,
   Dialog,
-  DialogContent
+  DialogContent,
+  MenuItem // ✅ ADD THIS
 } from '@mui/material'
 
 import DeleteIcon from '@mui/icons-material/Delete'
@@ -60,6 +61,8 @@ const autocompleteFields = [
   { name: 'chemicals', options: [] },
   { name: 'frequency', options: [] }
 ]
+
+const sectionOptions = ['Pests', 'Call Log', 'Proposals']
 
 export default function EditProposalPage() {
   const router = useRouter()
@@ -995,150 +998,6 @@ export default function EditProposalPage() {
 
         <Grid item xs={12}>
           <Typography variant='h6' mt={2}>
-            Pest Items
-          </Typography>
-          <Divider />
-        </Grid>
-        <Grid item xs={12} md={2.4}>
-          <Autocomplete
-            options={dropdowns.pests}
-            getOptionLabel={o => o?.name || ''}
-            value={dropdowns.pests.find(o => o.id === currentPestItem.pestId) || null}
-            renderOption={(props, option) => (
-              <li {...props} key={option.id}>
-                {option.name}
-              </li>
-            )}
-            onChange={(e, v) => {
-              setCurrentPestItem(p => ({ ...p, pest: v?.name || '', pestId: v?.id || '' }))
-              if (v?.id && currentPestItem.frequencyId) fetchPestCount(v.id, currentPestItem.frequencyId)
-            }}
-            renderInput={p => <CustomTextField {...p} label='Pest' inputRef={refs.pestInputRef} />}
-          />
-        </Grid>
-        <Grid item xs={12} md={2.4}>
-          <Autocomplete
-            options={dropdowns.serviceFrequencies}
-            getOptionLabel={o => o?.name || ''}
-            value={dropdowns.serviceFrequencies.find(o => o.id === currentPestItem.frequencyId) || null}
-            renderOption={(props, option) => (
-              <li {...props} key={option.id}>
-                {option.name}
-              </li>
-            )}
-            onChange={(e, v) => {
-              setCurrentPestItem(p => ({ ...p, frequency: v?.name || '', frequencyId: v?.id || '' }))
-              if (currentPestItem.pestId && v?.id) fetchPestCount(currentPestItem.pestId, v.id)
-            }}
-            renderInput={p => <CustomTextField {...p} label='Frequency' inputRef={refs.frequencyInputRef} />}
-          />
-        </Grid>
-        <Grid item xs={12} md={2.4}>
-          <CustomTextField fullWidth label='Count' value={currentPestItem.pestCount} readOnly />
-        </Grid>
-        <Grid item xs={12} md={2.4}>
-          <CustomTextField
-            fullWidth
-            label='Value'
-            name='pestValue'
-            value={currentPestItem.pestValue}
-            onChange={handleCurrentPestItemChange}
-          />
-        </Grid>
-        <Grid item xs={12} md={2.4}>
-          <CustomTextField fullWidth label='Total' value={currentPestItem.total} readOnly />
-        </Grid>
-        <Grid item xs={12} md={3}>
-          <Autocomplete
-            freeSolo
-            options={['0:05', '0:10']}
-            value={currentPestItem.time}
-            onChange={(e, v) => setCurrentPestItem(p => ({ ...p, time: v || '' }))}
-            renderInput={p => <CustomTextField {...p} label='Time' />}
-          />
-        </Grid>
-        <Grid item xs={12} md={3}>
-          <Autocomplete
-            options={dropdowns.chemicals}
-            getOptionLabel={o => o?.name || ''}
-            value={dropdowns.chemicals.find(o => o.id === currentPestItem.chemicalId) || null}
-            renderOption={(props, option) => (
-              <li {...props} key={option.id}>
-                {option.name}
-              </li>
-            )}
-            onChange={(e, v) => setCurrentPestItem(p => ({ ...p, chemicals: v?.name || '', chemicalId: v?.id || '' }))}
-            renderInput={p => <CustomTextField {...p} label='Chemicals' />}
-          />
-        </Grid>
-        <Grid item xs={12} md={3}>
-          <CustomTextField
-            fullWidth
-            label='Items'
-            name='noOfItems'
-            value={currentPestItem.noOfItems}
-            onChange={handleCurrentPestItemChange}
-          />
-        </Grid>
-        <Grid item xs={12} md={3} sx={{ display: 'flex', alignItems: 'flex-end' }}>
-          <GlobalButton variant='contained' fullWidth onClick={handleSavePestItem}>
-            {editingItemId ? 'Update' : 'Add'}
-          </GlobalButton>
-        </Grid>
-
-        <Grid item xs={12}>
-          <Box sx={{ overflowX: 'auto', border: '1px solid #ddd', borderRadius: 1 }}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>#</TableCell>
-                  <TableCell>Action</TableCell>
-                  <TableCell>Pest</TableCell>
-                  <TableCell>Frequency</TableCell>
-                  <TableCell>Count</TableCell>
-                  <TableCell>Value</TableCell>
-                  <TableCell>Total</TableCell>
-                  <TableCell>Time</TableCell>
-                  <TableCell>Chemicals</TableCell>
-                  <TableCell>Items</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {pestItems.map((item, idx) => (
-                  <TableRow key={item.id}>
-                    <TableCell>{idx + 1}</TableCell>
-                    <TableCell>
-                      <IconButton size='small' color='error' onClick={() => handleDeletePestItem(item.id)}>
-                        <DeleteIcon fontSize='small' />
-                      </IconButton>
-                      <IconButton
-                        size='small'
-                        color='primary'
-                        onClick={() => {
-                          setEditingItemId(item.id)
-                          setCurrentPestItem({ ...item, total: item.totalValue, time: item.workTime })
-                        }}
-                      >
-                        <EditIcon fontSize='small' />
-                      </IconButton>
-                    </TableCell>
-                    <TableCell>{item.pest}</TableCell>
-                    <TableCell>{item.frequency}</TableCell>
-                    <TableCell>{item.pestCount}</TableCell>
-                    <TableCell>{item.pestValue}</TableCell>
-                    <TableCell>{item.totalValue}</TableCell>
-                    <TableCell>{item.workTime}</TableCell>
-                    <TableCell>{item.chemicals}</TableCell>
-                    <TableCell>{item.noOfItems}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Box>
-        </Grid>
-
-        <Grid item xs={12}>
-          <Typography variant='h6' mt={2}>
             Remarks
           </Typography>
           <Divider />
@@ -1199,13 +1058,156 @@ export default function EditProposalPage() {
           />
         </Grid>
 
-        <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 4 }}>
+        <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 4 }}>
           <GlobalButton color='secondary' onClick={() => router.back()}>
             Close
           </GlobalButton>
           <GlobalButton variant='contained' onClick={handleSubmit}>
             Save Changes
           </GlobalButton>
+        </Grid>
+
+        <Grid item xs={12} sx={{ mt: 6, mb: 18 }}>
+          <Typography variant='h6'>Contract Value ($)</Typography>
+
+          {/* Edit icon BELOW title */}
+          <IconButton
+            size='small'
+            sx={{ mt: 0.5 }}
+            onClick={() => {
+              // optional: add edit logic later
+              console.log('Edit Contract Value')
+            }}
+          >
+            <EditIcon fontSize='small' />
+          </IconButton>
+
+          <Divider sx={{ mt: 1.5 }} />
+        </Grid>
+
+        {/* ================= PEST DETAILS ================= */}
+        <Grid item xs={12}>
+          {/* Title + Add button */}
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}
+          >
+            <Typography variant='h6'>Pest Details</Typography>
+
+            <Button
+              size='small'
+              variant='contained'
+              onClick={() => refs.pestInputRef.current?.focus()}
+              sx={{ textTransform: 'none' }}
+            >
+              Add New Pest
+            </Button>
+          </Box>
+
+          <Divider sx={{ mt: 1.5, mb: 2 }} />
+        </Grid>
+
+        {/* Pest dropdown */}
+        <Grid item xs={12} md={3}>
+          <Autocomplete
+            options={sectionOptions}
+            value={sectionOptions[0]} // default = Pests
+            onChange={(e, v) => {
+              console.log('Selected section:', v)
+              // later: handle section switch here
+            }}
+            renderInput={params => <CustomTextField {...params} label='Section' />}
+          />
+        </Grid>
+
+        {/* SINGLE DIVIDER (only here) */}
+        <Grid item xs={12}>
+          <Divider sx={{ my: 2 }} />
+        </Grid>
+
+        {/* Page entries + Search */}
+        <Grid item xs={12}>
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              mb: 2
+            }}
+          >
+            {/* LEFT: Page entries */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant='body2'>Show</Typography>
+              <CustomTextField select size='small' value={10} sx={{ width: 80 }}>
+                <MenuItem value={10}>10</MenuItem>
+                <MenuItem value={25}>25</MenuItem>
+                <MenuItem value={50}>50</MenuItem>
+              </CustomTextField>
+              <Typography variant='body2'>entries</Typography>
+            </Box>
+
+            {/* RIGHT: Search */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant='body2'>Search:</Typography>
+              <CustomTextField size='small' />
+            </Box>
+          </Box>
+        </Grid>
+
+        {/* Table */}
+        <Grid item xs={12}>
+          <Box sx={{ overflowX: 'auto', border: '1px solid #ddd', borderRadius: 1 }}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>#</TableCell>
+                  <TableCell>Action</TableCell>
+                  <TableCell>Pest</TableCell>
+                  <TableCell>Frequency</TableCell>
+                  <TableCell>Count</TableCell>
+                  <TableCell>Value</TableCell>
+                  <TableCell>Total</TableCell>
+                  <TableCell>Time</TableCell>
+                  <TableCell>Chemicals</TableCell>
+                  <TableCell>Items</TableCell>
+                </TableRow>
+              </TableHead>
+
+              <TableBody>
+                {pestItems.map((item, idx) => (
+                  <TableRow key={item.id}>
+                    <TableCell>{idx + 1}</TableCell>
+                    <TableCell>
+                      <IconButton size='small' color='error' onClick={() => handleDeletePestItem(item.id)}>
+                        <DeleteIcon fontSize='small' />
+                      </IconButton>
+                      <IconButton
+                        size='small'
+                        color='primary'
+                        onClick={() => {
+                          setEditingItemId(item.id)
+                          setCurrentPestItem({ ...item, total: item.totalValue, time: item.workTime })
+                        }}
+                      >
+                        <EditIcon fontSize='small' />
+                      </IconButton>
+                    </TableCell>
+                    <TableCell>{item.pest}</TableCell>
+                    <TableCell>{item.frequency}</TableCell>
+                    <TableCell>{item.pestCount}</TableCell>
+                    <TableCell>{item.pestValue}</TableCell>
+                    <TableCell>{item.totalValue}</TableCell>
+                    <TableCell>{item.workTime}</TableCell>
+                    <TableCell>{item.chemicals}</TableCell>
+                    <TableCell>{item.noOfItems}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Box>
         </Grid>
       </Grid>
     </ContentLayout>

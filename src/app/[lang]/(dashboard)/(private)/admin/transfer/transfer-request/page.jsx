@@ -2,23 +2,49 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useEffect } from 'react'
+
 import {
   Box,
+  Button,
   Card,
   CardHeader,
   Typography,
-  Breadcrumbs,
   Menu,
   MenuItem,
-  InputAdornment,
-  FormControl,
+  IconButton,
+  Divider,
+  Drawer,
+  Grid,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Breadcrumbs,
+  Chip,
+  TextField,
   Select,
-  Chip
+  FormControl,
+  InputLabel,
+  CircularProgress,
+  FormControlLabel, // ✅ ADD
+  Checkbox, // ✅ ADD
+  InputAdornment // ✅ ALSO REQUIRED (you use it in Search)
 } from '@mui/material'
 
 import StickyListLayout from '@/components/common/StickyListLayout'
+import { useRouter, useParams } from 'next/navigation'
+import classnames from 'classnames'
+import { ChevronRight } from '@mui/icons-material'
+import { showToast } from '@/components/common/Toasts'
+
+import { format } from 'date-fns'
+import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
+import RefreshIcon from '@mui/icons-material/Refresh'
+import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
+
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalTextField from '@/components/common/GlobalTextField'
 
@@ -27,95 +53,424 @@ import AddIcon from '@mui/icons-material/Add'
 import SearchIcon from '@mui/icons-material/Search'
 import PrintIcon from '@mui/icons-material/Print'
 import FileDownloadIcon from '@mui/icons-material/FileDownload'
+import PresetDateRangePicker from '@/components/common/PresetDateRangePicker'
 
-import { useReactTable, getCoreRowModel, flexRender, createColumnHelper } from '@tanstack/react-table'
+import WarningAmberIcon from '@mui/icons-material/WarningAmber'
+
+import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  flexRender,
+  createColumnHelper
+} from '@tanstack/react-table'
+
 import PermissionGuard from '@/components/auth/PermissionGuard'
 
 import styles from '@core/styles/table.module.css'
 
-const DUMMY_ROWS = [
-  {
-    id: 1,
-    transferNo: 'TR-001',
-    transferDate: '06-01-2026',
-    supplyBranch: 'Boys Mobiles B10',
-    quantity: 2,
-    amount: 32000,
-    status: 'Pending'
-  }
+import { getTransferRequestList, deleteTransferRequestTM, deleteTransferRequestTX } from '@/api/transfer_request'
+
+const poStatusOptions = [
+  { id: 1, label: 'Pending', value: 'Pending' },
+  { id: 2, label: 'Approved', value: 'Approved' },
+  { id: 3, label: 'Completed', value: 'Completed' },
+  { id: 4, label: 'Terminated', value: 'Terminated' }
 ]
 
+/* ─────────────────────────────
+   Component
+───────────────────────────── */
 const TransferRequestPage = () => {
   const columnHelper = createColumnHelper()
 
-  const columns = useMemo(
-    () => [
-      columnHelper.accessor('id', { header: 'ID #' }),
-      columnHelper.accessor('transferNo', { header: 'Transfer No' }),
-      columnHelper.accessor('transferDate', { header: 'Transfer Date' }),
-      columnHelper.accessor('supplyBranch', { header: 'Supply Branch' }),
-      columnHelper.accessor('quantity', { header: 'Total Qty' }),
-      columnHelper.accessor('amount', {
-        header: 'Total Amount',
-        cell: i => `₹ ${i.getValue()}`
-      }),
-      columnHelper.accessor('status', {
-        header: 'Status',
-        cell: i => <Chip label={i.getValue()} color='warning' size='small' />
-      })
-    ],
-    []
-  )
+  const router = useRouter()
+  const { lang } = useParams()
 
-  const [rows] = useState(DUMMY_ROWS)
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [totalCount, setTotalCount] = useState(0)
+  const [sorting, setSorting] = useState([])
+
+  const [deleteDialog, setDeleteDialog] = useState({
+    open: false,
+    row: null
+  })
+
+  const [deleteLoading, setDeleteLoading] = useState(false)
+
+  // UI Date Filter
+  const [uiDateFilter, setUiDateFilter] = useState(false)
+
+  // Date Range (start, end)
+  const [uiDateRange, setUiDateRange] = useState([null, null])
+
+  // Filter dropdown options
+  const [originOptions, setOriginOptions] = useState([])
+  const [supplierOptions, setSupplierOptions] = useState([])
+
+  // Selected filter values (UI State)
+  const [filterOrigin, setFilterOrigin] = useState(null)
+  const [filterSupplier, setFilterSupplier] = useState(null)
+  const [filterStatus, setFilterStatus] = useState(null)
+
+  // Applied filter values (Actual filter used for fetching)
+  const [appliedFilterOrigin, setAppliedFilterOrigin] = useState(null)
+  const [appliedFilterSupplier, setAppliedFilterSupplier] = useState(null)
+  const [appliedFilterStatus, setAppliedFilterStatus] = useState(null)
+  const [appliedDateFilter, setAppliedDateFilter] = useState(false)
+  const [appliedDateRange, setAppliedDateRange] = useState([null, null])
+
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor('sno', {
+        header: 'S.No',
+        enableSorting: true
+      }),
+
+      columnHelper.display({
+        id: 'actions',
+        header: 'Action',
+        enableSorting: false,
+        cell: info => {
+          const rowData = info.row.original
+
+          return (
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              {/* <IconButton size='small' color='primary'>
+                <i className='tabler-eye' />
+              </IconButton> */}
+
+              <IconButton
+                size='small'
+                color='primary'
+                onClick={() =>
+                  router.push(
+                    `/${lang}/admin/transfer/transfer-request/update/${btoa(rowData.id)}?type=${rowData.recordType || 'tm'}`
+                  )
+                }
+              >
+                <i className='tabler-edit' />
+              </IconButton>
+
+              <IconButton
+                size='small'
+                color='error'
+                onClick={() =>
+                  setDeleteDialog({
+                    open: true,
+                    row: rowData
+                  })
+                }
+              >
+                <i className='tabler-trash' />
+              </IconButton>
+            </Box>
+          )
+        }
+      }),
+
+      columnHelper.accessor('origin', {
+        header: 'Origin'
+      }),
+
+      columnHelper.accessor('poNo', {
+        header: 'Transfer No.'
+      }),
+
+      columnHelper.accessor('poDate', {
+        header: 'PO Date',
+        cell: info => (info.getValue() ? format(new Date(info.getValue()), 'dd/MM/yyyy') : '-')
+      }),
+
+      columnHelper.accessor('supplierName', {
+        header: 'Supplier Name'
+      }),
+
+      columnHelper.accessor('contactEmail', {
+        header: 'Contact Email'
+      }),
+
+      columnHelper.accessor('contactPhone', {
+        header: 'Contact Phone'
+      }),
+
+      columnHelper.accessor('remarks', {
+        header: 'Remarks'
+      }),
+
+      columnHelper.accessor('status', {
+        header: 'Status',
+        cell: info => (
+          <Chip
+            label={info.getValue()}
+            color={info.getValue() === 'Active' || info.getValue() === 'Pending' ? 'success' : 'error'}
+            size='small'
+            sx={{ fontWeight: 600, color: '#fff', borderRadius: '6px' }}
+          />
+        )
+      })
+    ],
+    [router, lang]
+  )
 
   const table = useReactTable({
     data: rows,
     columns,
-    getCoreRowModel: getCoreRowModel()
+    state: {
+      sorting
+    },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel()
   })
+
+  useEffect(() => {
+    fetchTransferRequests()
+  }, [pagination.pageIndex, pagination.pageSize])
+
+  const confirmDelete = async () => {
+    if (!deleteDialog.row?.id) return
+
+    try {
+      setDeleteLoading(true)
+
+      const type = deleteDialog.row.recordType || 'tm'
+
+      if (type === 'tm') {
+        await deleteTransferRequestTM(deleteDialog.row.id)
+      } else {
+        await deleteTransferRequestTX(deleteDialog.row.id)
+      }
+
+      showToast('Transfer Request deleted successfully', 'delete')
+
+      setDeleteDialog({ open: false, row: null })
+      fetchTransferRequests()
+    } catch (error) {
+      showToast(error?.response?.data?.message || 'Failed to delete transfer request', 'error')
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
+  const fetchTransferRequests = async () => {
+    try {
+      setLoading(true)
+
+      const res = await getTransferRequestList({
+        page: pagination.pageIndex + 1,
+        page_size: pagination.pageSize
+      })
+
+      setTotalCount(res?.count || 0)
+
+      const mappedRows = (res?.data?.results || []).map((item, index) => ({
+        sno: pagination.pageIndex * pagination.pageSize + (index + 1),
+        id: item.id,
+
+        origin: item.from_company || '-',
+        supplierName: item.to_company || '-',
+
+        contactEmail: item?.contact_email || '-',
+        contactPhone: item?.contact_phone || '-',
+
+        poNo: item.transfer_no,
+        poDate: item.transfer_date,
+        remarks: item.remarks || '-',
+        status: item.status,
+        recordType: item.record_type || 'tm'
+      }))
+
+      setRows(mappedRows)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleApplyFilters = () => {
+    setPagination(prev => ({ ...prev, pageIndex: 0 }))
+    fetchTransferRequests()
+  }
 
   return (
     <StickyListLayout
       header={
         <Breadcrumbs sx={{ mb: 2 }}>
-          <Link href='/'>Dashboard</Link>
-          <Typography>Transfer Request</Typography>
+          <Link href='/' style={{ textDecoration: 'none' }}>
+            Dashboard
+          </Link>
+          <Typography color='text.primary'>Transfer Request</Typography>
         </Breadcrumbs>
       }
     >
       <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+        {/* HEADER */}
         <CardHeader
-          title={<Typography variant='h5'>Transfer Request</Typography>}
+          title={
+            <Typography variant='h5' fontWeight={600}>
+              Transfer Request
+            </Typography>
+          }
           action={
             <Box display='flex' gap={2}>
+              {/* Export */}
               <GlobalButton
                 color='secondary'
                 endIcon={<ArrowDropDownIcon />}
                 onClick={e => setExportAnchorEl(e.currentTarget)}
+                sx={{ height: 36 }}
               >
                 Export
               </GlobalButton>
 
               <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
                 <MenuItem>
-                  <PrintIcon sx={{ mr: 1 }} /> Print
+                  <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
                 </MenuItem>
                 <MenuItem>
-                  <FileDownloadIcon sx={{ mr: 1 }} /> CSV
+                  <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
                 </MenuItem>
               </Menu>
 
-              <GlobalButton variant='contained' startIcon={<AddIcon />}>
+              {/* ADD */}
+              <GlobalButton
+                variant='contained'
+                startIcon={<AddIcon />}
+                onClick={() => router.push(`/admin/transfer/transfer-request/add`)}
+              >
                 Add Transfer Request
               </GlobalButton>
             </Box>
           }
         />
 
-        <Box sx={{ px: 4, py: 3, display: 'flex', gap: 2 }}>
+        <Divider />
+
+        {/* FILTERS (Customer style) */}
+        <Box
+          sx={{
+            px: 4,
+            py: 3,
+            display: 'flex',
+            alignItems: 'flex-end',
+            gap: 2,
+            flexWrap: 'wrap'
+          }}
+        >
+          {/* --- Row 2: Filters --- */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'flex-end',
+              gap: 2,
+              mb: 3,
+              flexWrap: 'wrap',
+              flexShrink: 0
+            }}
+          >
+            {/* Date Filter with Checkbox */}
+            <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+              <FormControlLabel
+                control={<Checkbox checked={uiDateFilter} onChange={e => setUiDateFilter(e.target.checked)} />}
+                label='Date Filter'
+              />
+
+              <Box sx={{ width: 220 }}>
+                <PresetDateRangePicker
+                  start={uiDateRange[0]}
+                  end={uiDateRange[1]}
+                  onSelectRange={({ start, end }) => setUiDateRange([start, end])}
+                  disabled={!uiDateFilter}
+                />
+              </Box>
+            </Box>
+
+            {/* Origin */}
+            <Box sx={{ width: 220 }}>
+              <GlobalAutocomplete
+                label='Origin'
+                placeholder='Select Origin'
+                options={originOptions}
+                value={filterOrigin}
+                onChange={val => setFilterOrigin(val)}
+              />
+            </Box>
+
+            {/* Status */}
+            <Box sx={{ width: 220 }}>
+              <GlobalAutocomplete
+                label='PO Status'
+                placeholder='Select'
+                options={poStatusOptions}
+                value={filterStatus}
+                onChange={val => setFilterStatus(val)}
+              />
+            </Box>
+
+            {/* Supplier */}
+            <Box sx={{ width: 220 }}>
+              <GlobalAutocomplete
+                label='Supplier'
+                placeholder='Select Supplier'
+                options={supplierOptions}
+                value={filterSupplier}
+                onChange={val => setFilterSupplier(val)}
+              />
+            </Box>
+
+            {/* Refresh */}
+            <GlobalButton
+              variant='contained'
+              color='primary'
+              startIcon={<RefreshIcon />}
+              sx={{ height: 36 }}
+              onClick={handleApplyFilters}
+            >
+              Refresh
+            </GlobalButton>
+          </Box>
+        </Box>
+
+        <Divider sx={{ mb: 4 }} />
+
+        {/* PAGE SIZE + SEARCH (Customer style) */}
+        <Box
+          sx={{
+            px: 4,
+            mb: 3,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 2,
+            flexWrap: 'wrap'
+          }}
+        >
+          {/* LEFT — Page entries */}
+          <FormControl size='small' sx={{ width: 140 }}>
+            <Select
+              value={pagination.pageSize}
+              onChange={e =>
+                setPagination(p => ({
+                  ...p,
+                  pageSize: Number(e.target.value),
+                  pageIndex: 0
+                }))
+              }
+            >
+              {[25, 50, 75, 100].map(s => (
+                <MenuItem key={s} value={s}>
+                  {s} entries
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {/* RIGHT — Search */}
           <GlobalTextField
             size='small'
             placeholder='Search Transfer No'
@@ -126,14 +481,11 @@ const TransferRequestPage = () => {
                 </InputAdornment>
               )
             }}
+            sx={{ width: 320 }}
           />
-          <FormControl size='small' sx={{ width: 200 }}>
-            <Select value=''>
-              <MenuItem value=''>Supply Branch</MenuItem>
-            </Select>
-          </FormControl>
         </Box>
 
+        {/* TABLE */}
         <Box sx={{ flexGrow: 1, px: 4 }}>
           <StickyTableWrapper rowCount={rows.length}>
             <table className={styles.table}>
@@ -141,26 +493,114 @@ const TransferRequestPage = () => {
                 {table.getHeaderGroups().map(hg => (
                   <tr key={hg.id}>
                     {hg.headers.map(h => (
-                      <th key={h.id}>{flexRender(h.column.columnDef.header, h.getContext())}</th>
+                      <th key={h.id}>
+                        <div
+                          className={classnames({
+                            'flex items-center gap-1': true,
+                            'cursor-pointer select-none': h.column.getCanSort()
+                          })}
+                          onClick={h.column.getToggleSortingHandler()}
+                        >
+                          {flexRender(h.column.columnDef.header, h.getContext())}
+
+                          {{
+                            asc: <ChevronRight className='-rotate-90 text-sm' />,
+                            desc: <ChevronRight className='rotate-90 text-sm' />
+                          }[h.column.getIsSorted()] ?? null}
+                        </div>
+                      </th>
                     ))}
                   </tr>
                 ))}
               </thead>
+
               <tbody>
-                {table.getRowModel().rows.map(row => (
-                  <tr key={row.id}>
-                    {row.getVisibleCells().map(cell => (
-                      <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
-                    ))}
+                {loading ? (
+                  <tr>
+                    <td colSpan={columns.length} style={{ textAlign: 'center', padding: 24 }}>
+                      Loading...
+                    </td>
                   </tr>
-                ))}
+                ) : table.getRowModel().rows.length ? (
+                  table.getRowModel().rows.map(row => (
+                    <tr key={row.id}>
+                      {row.getVisibleCells().map(cell => (
+                        <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                      ))}
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={columns.length} className='text-center'>
+                      No data found
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </StickyTableWrapper>
         </Box>
 
+        <Dialog
+          onClose={() => setDeleteDialog({ open: false, row: null })}
+          aria-labelledby='customized-dialog-title'
+          open={deleteDialog.open}
+          closeAfterTransition={false}
+          PaperProps={{
+            sx: {
+              overflow: 'visible',
+              width: 420,
+              borderRadius: 1,
+              textAlign: 'center'
+            }
+          }}
+        >
+          {/* 🔴 Title with Warning Icon */}
+          <DialogTitle
+            id='customized-dialog-title'
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 1,
+              color: 'error.main',
+              fontWeight: 700,
+              pb: 1,
+              position: 'relative'
+            }}
+          >
+            <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
+            Confirm Delete
+            <DialogCloseButton onClick={() => setDeleteDialog({ open: false, row: null })} disableRipple>
+              <i className='tabler-x' />
+            </DialogCloseButton>
+          </DialogTitle>
+
+          {/* Centered text */}
+          <DialogContent sx={{ px: 5, pt: 1 }}>
+            <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
+              Are you sure you want to delete{' '}
+              <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.poNo || 'this transfer request'}</strong>
+              ?
+              <br />
+              This action cannot be undone.
+            </Typography>
+          </DialogContent>
+
+          {/* Centered buttons */}
+          <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+            <GlobalButton color='secondary' onClick={() => setDeleteDialog({ open: false, row: null })}>
+              Cancel
+            </GlobalButton>
+            <GlobalButton onClick={confirmDelete} variant='contained' color='error' disabled={deleteLoading}>
+              {deleteLoading ? 'Deleting...' : 'Delete'}
+            </GlobalButton>
+          </DialogActions>
+        </Dialog>
+
+        {/* PAGINATION */}
         <Box sx={{ px: 4, py: 2 }}>
-          <TablePaginationComponent totalCount={rows.length} pagination={pagination} setPagination={setPagination} />
+          <TablePaginationComponent totalCount={totalCount} pagination={pagination} setPagination={setPagination} />
         </Box>
       </Card>
     </StickyListLayout>

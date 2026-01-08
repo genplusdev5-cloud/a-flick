@@ -1,98 +1,226 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+
 import {
   Box,
   Card,
   CardHeader,
   Typography,
-  Breadcrumbs,
   Menu,
   MenuItem,
-  InputAdornment,
+  Divider,
+  Breadcrumbs,
+  Chip,
   FormControl,
   Select,
-  Chip
+  InputAdornment,
+  FormControlLabel,
+  Checkbox,
+  IconButton
 } from '@mui/material'
 
 import StickyListLayout from '@/components/common/StickyListLayout'
 import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 
+import { getTransferOutList, deleteTmTransferOut, deleteTxTransferOut } from '@/api/transfer_out'
+
+import { getPurchaseFilters } from '@/api/purchase_inward'
+
+import { format } from 'date-fns'
+
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalTextField from '@/components/common/GlobalTextField'
+import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
+import PresetDateRangePicker from '@/components/common/PresetDateRangePicker'
 
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import AddIcon from '@mui/icons-material/Add'
 import SearchIcon from '@mui/icons-material/Search'
 import PrintIcon from '@mui/icons-material/Print'
 import FileDownloadIcon from '@mui/icons-material/FileDownload'
+import RefreshIcon from '@mui/icons-material/Refresh'
+import { ChevronRight } from '@mui/icons-material'
 
 import {
   useReactTable,
   getCoreRowModel,
+  getSortedRowModel,
   flexRender,
   createColumnHelper
 } from '@tanstack/react-table'
 
 import PermissionGuard from '@/components/auth/PermissionGuard'
-
+import classnames from 'classnames'
 import styles from '@core/styles/table.module.css'
 
-/* ─────────────────────────────
-   Dummy Data
-───────────────────────────── */
-const DUMMY_ROWS = [
-  {
-    id: 1,
-    transferNo: 'TO-001',
-    transferDate: '03-01-2026',
-    supplyBranch: 'Genplus Innovations',
-    quantity: 2,
-    amount: 32172,
-    status: 'Dispatched'
-  }
+/* ───────────────────────────── */
+
+const statusOptions = [
+  { label: 'Pending', value: 'Pending' },
+  { label: 'Completed', value: 'Completed' }
 ]
 
 const TransferOutPage = () => {
+  const router = useRouter()
   const columnHelper = createColumnHelper()
 
+  const [originOptions, setOriginOptions] = useState([])
+  const [supplierOptions, setSupplierOptions] = useState([])
+
+  const [searchText, setSearchText] = useState('')
+  const [selectedStatus, setSelectedStatus] = useState(null)
+
+  const [selectedOrigin, setSelectedOrigin] = useState(null)
+  const [selectedSupplier, setSelectedSupplier] = useState(null)
+
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [totalCount, setTotalCount] = useState(0)
+
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
+  const [sorting, setSorting] = useState([])
+  const [exportAnchorEl, setExportAnchorEl] = useState(null)
+
+  const [uiDateFilter, setUiDateFilter] = useState(false)
+  const [uiDateRange, setUiDateRange] = useState([null, null])
+
+  /* ───────── FETCH FILTERS ───────── */
+  const fetchPurchaseFilters = async () => {
+    const res = await getPurchaseFilters()
+
+    setOriginOptions(
+      res?.data?.company?.name?.map(i => ({
+        label: i.name,
+        value: i.id
+      })) || []
+    )
+
+    setSupplierOptions(
+      res?.data?.supplier?.name?.map(i => ({
+        label: i.name,
+        value: i.id
+      })) || []
+    )
+  }
+
+  useEffect(() => {
+    fetchPurchaseFilters()
+  }, [])
+
+  /* ───────── FETCH LIST ───────── */
+  const fetchTransferOutList = async () => {
+    try {
+      setLoading(true)
+
+      const res = await getTransferOutList({
+        page: pagination.pageIndex + 1,
+        page_size: pagination.pageSize,
+        search: searchText || undefined,
+        status: selectedStatus?.value,
+        origin: selectedOrigin?.value,
+        supplier: selectedSupplier?.value,
+        start_date: uiDateFilter ? uiDateRange[0] : undefined,
+        end_date: uiDateFilter ? uiDateRange[1] : undefined
+      })
+
+      setTotalCount(res?.data?.count || 0)
+
+      const mapped =
+        res?.data?.results?.map((item, index) => ({
+          sno: pagination.pageIndex * pagination.pageSize + index + 1,
+          id: item.id,
+          origin: item.company,
+          transferNo: item.num_series,
+          transferDate: item.transfer_date ? format(new Date(item.transfer_date), 'dd/MM/yyyy') : '-',
+          supplierName: item.supplier,
+          contactEmail: item?.supplier_details?.email || '-',
+          contactPhone: item?.supplier_details?.phone || '-',
+          remarks: item.remarks || '-',
+          status: item.transfer_status,
+          recordType: item.year === new Date().getFullYear() ? 'tm' : 'tx'
+        })) || []
+
+      setRows(mapped)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchTransferOutList()
+  }, [
+    pagination.pageIndex,
+    pagination.pageSize,
+    selectedOrigin,
+    selectedSupplier,
+    selectedStatus,
+    searchText,
+    uiDateFilter,
+    uiDateRange
+  ])
+
+  /* ───────── DELETE ───────── */
+  const handleDelete = async row => {
+    if (row.recordType === 'tm') {
+      await deleteTmTransferOut(row.id)
+    } else {
+      await deleteTxTransferOut(row.id)
+    }
+
+    fetchTransferOutList()
+  }
+
+  /* ───────── TABLE ───────── */
   const columns = useMemo(
     () => [
-      columnHelper.accessor('id', {
-        header: 'ID #'
+      columnHelper.accessor('sno', { header: 'S.No' }),
+
+      columnHelper.display({
+        id: 'action',
+        header: 'Action',
+        cell: info => {
+          const row = info.row.original
+
+          return (
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <IconButton
+                size='small'
+                color='primary'
+                onClick={() =>
+                  router.push(`/admin/transfer/transfer-out/update/${btoa(row.id)}?type=${row.recordType}`)
+                }
+              >
+                <i className='tabler-edit' />
+              </IconButton>
+
+              <IconButton size='small' color='error' onClick={() => handleDelete(row)}>
+                <i className='tabler-trash' />
+              </IconButton>
+            </Box>
+          )
+        }
       }),
 
-      columnHelper.accessor('transferNo', {
-        header: 'Transfer No'
-      }),
-
-      columnHelper.accessor('transferDate', {
-        header: 'Transfer Date'
-      }),
-
-      columnHelper.accessor('supplyBranch', {
-        header: 'Supply Branch'
-      }),
-
-      columnHelper.accessor('quantity', {
-        header: 'Total Quantity'
-      }),
-
-      columnHelper.accessor('amount', {
-        header: 'Total Amount',
-        cell: info => `₹ ${info.getValue()}`
-      }),
+      columnHelper.accessor('origin', { header: 'Origin' }),
+      columnHelper.accessor('transferNo', { header: 'Transfer No' }),
+      columnHelper.accessor('transferDate', { header: 'Transfer Date' }),
+      columnHelper.accessor('supplierName', { header: 'Supplier Name' }),
+      columnHelper.accessor('contactEmail', { header: 'Contact Email' }),
+      columnHelper.accessor('contactPhone', { header: 'Contact Phone' }),
+      columnHelper.accessor('remarks', { header: 'Remarks' }),
 
       columnHelper.accessor('status', {
         header: 'Status',
         cell: info => (
           <Chip
             label={info.getValue()}
-            color='info'
+            color={info.getValue() === 'Completed' ? 'success' : 'warning'}
             size='small'
-            sx={{ fontWeight: 600 }}
+            sx={{ color: '#fff', fontWeight: 600 }}
           />
         )
       })
@@ -100,77 +228,154 @@ const TransferOutPage = () => {
     []
   )
 
-  const [rows] = useState(DUMMY_ROWS)
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
-  const [exportAnchorEl, setExportAnchorEl] = useState(null)
-
   const table = useReactTable({
     data: rows,
     columns,
-    getCoreRowModel: getCoreRowModel()
+    state: { sorting },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel()
   })
 
   return (
     <StickyListLayout
       header={
-        <Breadcrumbs sx={{ mb: 2 }}>
-          <Link href='/' style={{ textDecoration: 'none' }}>
-            Dashboard
-          </Link>
+        <Breadcrumbs>
+          <Link href='/'>Dashboard</Link>
           <Typography color='text.primary'>Transfer Out</Typography>
         </Breadcrumbs>
       }
     >
-      <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-        {/* HEADER */}
+      <Card>
         <CardHeader
-          title={
-            <Typography variant='h5' fontWeight={600}>
-              Transfer Out
-            </Typography>
-          }
+          title='Transfer Out'
           action={
-            <Box display='flex' gap={2}>
-              {/* Export */}
-              <GlobalButton
-                color='secondary'
-                endIcon={<ArrowDropDownIcon />}
-                onClick={e => setExportAnchorEl(e.currentTarget)}
-                sx={{ height: 36 }}
-              >
-                Export
-              </GlobalButton>
-
-              <Menu
-                anchorEl={exportAnchorEl}
-                open={Boolean(exportAnchorEl)}
-                onClose={() => setExportAnchorEl(null)}
-              >
-                <MenuItem>
-                  <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
-                </MenuItem>
-                <MenuItem>
-                  <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
-                </MenuItem>
-              </Menu>
-
-              {/* ADD */}
-              <GlobalButton
-                variant='contained'
-                startIcon={<AddIcon />}
-                sx={{ height: 36 }}
-              >
-                Add Transfer Out
-              </GlobalButton>
-            </Box>
+            <GlobalButton startIcon={<AddIcon />} onClick={() => router.push('/admin/transfer/transfer-out/add')}>
+              Add Transfer Out
+            </GlobalButton>
           }
         />
 
+        <Divider />
+
         {/* FILTERS */}
-        <Box sx={{ px: 4, py: 3, display: 'flex', gap: 2 }}>
+
+        {/* FILTERS */}
+        <Box
+          sx={{
+            px: 4,
+            py: 3,
+            display: 'flex',
+            alignItems: 'flex-end',
+            gap: 2,
+            flexWrap: 'wrap'
+          }}
+        >
+          {/* Date Filter */}
+          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+            <FormControlLabel
+              control={<Checkbox checked={uiDateFilter} onChange={e => setUiDateFilter(e.target.checked)} />}
+              label='Date Filter'
+              sx={{ mb: 0.5 }}
+            />
+
+            <Box sx={{ width: 220 }}>
+              <PresetDateRangePicker
+                start={uiDateRange[0]}
+                end={uiDateRange[1]}
+                disabled={!uiDateFilter}
+                onSelectRange={({ start, end }) => setUiDateRange([start, end])}
+              />
+            </Box>
+          </Box>
+
+          {/* Origin */}
+          <Box sx={{ width: 220 }}>
+            <GlobalAutocomplete
+              label='Origin'
+              options={originOptions}
+              value={selectedOrigin}
+              onChange={(_, v) => {
+                setSelectedOrigin(v)
+                setPagination(p => ({ ...p, pageIndex: 0 }))
+              }}
+            />
+          </Box>
+
+          {/* Status */}
+          <Box sx={{ width: 220 }}>
+            <GlobalAutocomplete
+              label='Status'
+              options={statusOptions}
+              value={selectedStatus}
+              onChange={(_, v) => {
+                setSelectedStatus(v)
+                setPagination(p => ({ ...p, pageIndex: 0 }))
+              }}
+            />
+          </Box>
+
+          {/* Supplier */}
+          <Box sx={{ width: 220 }}>
+            <GlobalAutocomplete
+              label='Supplier'
+              options={supplierOptions}
+              value={selectedSupplier}
+              onChange={(_, v) => {
+                setSelectedSupplier(v)
+                setPagination(p => ({ ...p, pageIndex: 0 }))
+              }}
+            />
+          </Box>
+
+          {/* Refresh */}
+          <GlobalButton
+            startIcon={<RefreshIcon />}
+            onClick={() => {
+              setSelectedOrigin(null)
+              setSelectedSupplier(null)
+              setSelectedStatus(null)
+              setSearchText('')
+              setUiDateFilter(false)
+              setUiDateRange([null, null])
+              setPagination(p => ({ ...p, pageIndex: 0 }))
+            }}
+          >
+            Refresh
+          </GlobalButton>
+        </Box>
+
+        <Divider sx={{ mb: 3 }} />
+
+        <Box sx={{ px: 4, mb: 3, display: 'flex', justifyContent: 'space-between' }}>
+          <FormControl size='small' sx={{ width: 140 }}>
+            <Select
+              value={pagination.pageSize}
+              onChange={e =>
+                setPagination(p => ({
+                  ...p,
+                  pageSize: +e.target.value,
+                  pageIndex: 0
+                }))
+              }
+            >
+              {[25, 50, 75, 100].map(v => (
+                <MenuItem key={v} value={v}>
+                  {v} entries
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
           <GlobalTextField
             size='small'
             placeholder='Search Transfer No'
+            value={searchText}
+            onChange={e => {
+              setSearchText(e.target.value)
+              setPagination(p => ({ ...p, pageIndex: 0 }))
+            }}
+            sx={{ width: 320 }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position='start'>
@@ -178,18 +383,13 @@ const TransferOutPage = () => {
                 </InputAdornment>
               )
             }}
-            sx={{ width: 250 }}
           />
-
-          <FormControl size='small' sx={{ width: 200 }}>
-            <Select value=''>
-              <MenuItem value=''>Supply Branch</MenuItem>
-            </Select>
-          </FormControl>
         </Box>
 
+        {/* SAME FILTER UI – WORKING */}
+
         {/* TABLE */}
-        <Box sx={{ flexGrow: 1, px: 4 }}>
+        <Box sx={{ px: 4 }}>
           <StickyTableWrapper rowCount={rows.length}>
             <table className={styles.table}>
               <thead>
@@ -197,7 +397,19 @@ const TransferOutPage = () => {
                   <tr key={hg.id}>
                     {hg.headers.map(h => (
                       <th key={h.id}>
-                        {flexRender(h.column.columnDef.header, h.getContext())}
+                        <div
+                          className={classnames({
+                            'flex items-center gap-1': true,
+                            'cursor-pointer': h.column.getCanSort()
+                          })}
+                          onClick={h.column.getToggleSortingHandler()}
+                        >
+                          {flexRender(h.column.columnDef.header, h.getContext())}
+                          {{
+                            asc: <ChevronRight className='-rotate-90' />,
+                            desc: <ChevronRight className='rotate-90' />
+                          }[h.column.getIsSorted()] ?? null}
+                        </div>
                       </th>
                     ))}
                   </tr>
@@ -205,19 +417,23 @@ const TransferOutPage = () => {
               </thead>
 
               <tbody>
-                {table.getRowModel().rows.length ? (
+                {loading ? (
+                  <tr>
+                    <td colSpan={columns.length} align='center'>
+                      Loading...
+                    </td>
+                  </tr>
+                ) : table.getRowModel().rows.length ? (
                   table.getRowModel().rows.map(row => (
                     <tr key={row.id}>
                       {row.getVisibleCells().map(cell => (
-                        <td key={cell.id}>
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </td>
+                        <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
                       ))}
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={columns.length} className='text-center'>
+                    <td colSpan={columns.length} align='center'>
                       No data found
                     </td>
                   </tr>
@@ -227,14 +443,7 @@ const TransferOutPage = () => {
           </StickyTableWrapper>
         </Box>
 
-        {/* PAGINATION */}
-        <Box sx={{ px: 4, py: 2 }}>
-          <TablePaginationComponent
-            totalCount={rows.length}
-            pagination={pagination}
-            setPagination={setPagination}
-          />
-        </Box>
+        <TablePaginationComponent totalCount={totalCount} pagination={pagination} setPagination={setPagination} />
       </Card>
     </StickyListLayout>
   )
