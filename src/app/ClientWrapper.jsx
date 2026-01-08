@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect } from 'react'
-import { GlobalToastContainer } from '@/components/common/Toasts'
 import ClientOnly from '@/components/common/ClientOnly'
 import runOneSignal from '@/utils/OneSignalInit'
 

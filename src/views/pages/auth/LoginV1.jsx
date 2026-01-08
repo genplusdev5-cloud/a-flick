@@ -28,6 +28,7 @@ import themeConfig from '@configs/themeConfig'
 
 // ✅ Custom Utils
 import { loginUser } from '@/api/auth/login'
+import { showToast } from '@/components/common/Toasts'
 
 const LoginV1 = () => {
   const router = useRouter()
@@ -61,16 +62,22 @@ const LoginV1 = () => {
       const res = await loginUser(data.email, data.password)
 
       if (res.status === 'success') {
+        showToast('success', 'Login successful! Welcome back.')
+
         // ✅ Give small delay to ensure token is saved before redirect
         setTimeout(() => {
           router.push('/en/admin/dashboards')
         }, 400)
       } else {
-        setErrorMsg(res.message || 'Login failed. Please try again.')
+        const msg = res.message || 'Login failed. Please try again.'
+        setErrorMsg(msg)
+        showToast('error', msg)
       }
     } catch (error) {
       console.error('Login error:', error)
-      setErrorMsg(error.message || 'Invalid credentials or network error.')
+      const msg = error.message || 'Invalid credentials or network error.'
+      setErrorMsg(msg)
+      showToast('error', msg)
     } finally {
       setLoading(false)
     }

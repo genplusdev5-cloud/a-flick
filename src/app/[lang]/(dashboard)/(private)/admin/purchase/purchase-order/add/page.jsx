@@ -175,7 +175,7 @@ const AddPurchaseOrderPage = () => {
         po_date: format(poDate, 'yyyy-MM-dd'),
         supplier_id: supplier.id,
         remarks,
-        items: items.map(item => ({
+        order_items: items.map(item => ({
           chemical_id: item.chemicalId,
           uom_id: item.uomId,
           quantity: Number(item.quantity),

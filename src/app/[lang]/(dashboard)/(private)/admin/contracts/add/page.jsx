@@ -651,6 +651,16 @@ export default function AddContractPage() {
     return h * 60 + m
   }
 
+  // Helper to convert file to Base64
+  const fileToBase64 = file => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.readAsDataURL(file)
+      reader.onload = () => resolve(reader.result)
+      reader.onerror = error => reject(error)
+    })
+  }
+
   // Autocomplete input change handler (Unchanged)
   const handleAutocompleteInputChange = (name, options, newValue, reason) => {
     if (reason === 'input' && !options.includes(newValue) && !autocompleteFields.find(f => f.name === name).freeSolo) {
@@ -932,8 +942,20 @@ export default function AddContractPage() {
 
     try {
       // ------------------------------
-      // 2️⃣ BUILD PAYLOAD
+      // 2️⃣ BUILD JSON PAYLOAD & HANDLE FILE
       // ------------------------------
+      
+      let base64File = ''
+      if (formData.file) {
+        try {
+          base64File = await fileToBase64(formData.file)
+        } catch (err) {
+          console.error('File conversion failed:', err)
+          showToast('error', 'Failed to process the uploaded file.')
+          return
+        }
+      }
+
       const payload = {
         parent_id: 0,
         level: 1,
@@ -983,6 +1005,9 @@ export default function AddContractPage() {
         appointment_remarks: formData.appointmentRemarks || '',
         technician_remarks: formData.technicianRemarks || '',
 
+        // ✅ Add File (Floor Plan) - Base64 String
+        floor_plan: base64File || '',
+
         pest_items: pestItems.map(item => ({
           customer_id: Number(formData.customerId) || null,
           pest_id: Number(item.pestId) || null,
@@ -1005,7 +1030,7 @@ export default function AddContractPage() {
       // ------------------------------
       // 3️⃣ SEND TO BACKEND
       // ------------------------------
-      const response = await createContract(payload) // ⭐ MUST BE HERE
+      const response = await createContract(payload) // ⭐ JSON Payload
 
       // ------------------------------
       // 4️⃣ SUCCESS → REDIRECT WITH PARAM

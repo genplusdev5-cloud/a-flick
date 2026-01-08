@@ -132,7 +132,8 @@ const EditPurchaseOrderPage = () => {
           if (foundSupplier) setSupplier(foundSupplier)
         }
 
-        const itemsList = details.po_chemicals || details.items || details.purchase_order_chemicals || []
+        const itemsList =
+          details.order_items || details.po_chemicals || details.items || details.purchase_order_chemicals || []
         const mappedItems = itemsList.map(item => ({
           id: item.id,
           chemical: item.chemical_name || item.item_name || '',
@@ -206,7 +207,7 @@ const EditPurchaseOrderPage = () => {
         po_date: format(poDate, 'yyyy-MM-dd'),
         supplier_id: supplier.id,
         remarks,
-        items: items.map(item => ({
+        order_items: items.map(item => ({
           chemical_id: item.chemicalId,
           uom_id: item.uomId,
           quantity: Number(item.quantity),

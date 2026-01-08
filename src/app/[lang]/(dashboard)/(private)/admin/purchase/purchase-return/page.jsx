@@ -222,7 +222,7 @@ const PurchaseReturnPage = () => {
       }),
 
       columnHelper.accessor('origin', { header: 'Origin' }),
-      columnHelper.accessor('returnNo', { header: 'Return No.' }),
+      columnHelper.accessor('returnNo', { header: 'Return .No' }),
       columnHelper.accessor('returnDate', { header: 'Return Date' }),
       columnHelper.accessor('supplierName', { header: 'Supplier Name' }),
       columnHelper.accessor('contactEmail', { header: 'Contact Email' }),
