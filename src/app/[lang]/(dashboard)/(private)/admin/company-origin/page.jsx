@@ -331,15 +331,15 @@ const CompanyOriginListContent = () => {
               )}
             </Box>
           }
-           sx={{
-              pb: 1.5,
-              pt: 5,
-              px: 10,
-              '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
-              '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
-            }}
+          sx={{
+            pb: 1.5,
+            pt: 5,
+            px: 10,
+            '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
+            '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
+          }}
         />
-         <Divider />
+        <Divider />
 
         {/* Loading Overlay */}
         {loading && (
@@ -485,10 +485,20 @@ const CompanyOriginListContent = () => {
         </DialogContent>
 
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3 }}>
-          <GlobalButton color='secondary' onClick={() => setDeleteDialog({ open: false, row: null })}>
+          <GlobalButton
+            color='secondary'
+            onClick={() => setDeleteDialog({ open: false, row: null })}
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+          >
             Cancel
           </GlobalButton>
-          <GlobalButton variant='contained' color='error' onClick={confirmDelete}>
+          <GlobalButton
+            variant='contained'
+            color='error'
+            onClick={confirmDelete}
+            disabled={loading}
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+          >
             Delete
           </GlobalButton>
         </DialogActions>

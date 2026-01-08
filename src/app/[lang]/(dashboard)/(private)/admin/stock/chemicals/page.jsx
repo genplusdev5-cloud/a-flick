@@ -28,7 +28,6 @@ import {
   InputAdornment
 } from '@mui/material'
 
-import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
@@ -530,27 +529,6 @@ export default function ChemicalsPage() {
           </Box>
 
           <Box sx={{ position: 'relative' }}>
-            {loading && (
-              <Box
-                sx={{
-                  position: 'absolute',
-                  inset: 0,
-                  bgcolor: 'rgba(255,255,255,0.7)',
-                  backdropFilter: 'blur(2px)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 10
-                }}
-              >
-                <Box textAlign='center'>
-                  <ProgressCircularCustomization size={60} thickness={5} />
-                  <Typography mt={2} fontWeight={600} color='primary'>
-                    Loading Chemicals...
-                  </Typography>
-                </Box>
-              </Box>
-            )}
 
             <div className='overflow-x-auto'>
               <table className={styles.table}>

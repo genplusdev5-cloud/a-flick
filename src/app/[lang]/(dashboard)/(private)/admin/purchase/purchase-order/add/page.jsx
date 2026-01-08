@@ -50,9 +50,6 @@ const AddPurchaseOrderPage = () => {
   const [chemicalOptions, setChemicalOptions] = useState([])
   const [uomOptions, setUomOptions] = useState([])
 
-  // Loading states
-  const [initLoading, setInitLoading] = useState(false)
-  const [saveLoading, setSaveLoading] = useState(false)
 
   // Header fields
   const [origin, setOrigin] = useState(null)
@@ -72,7 +69,6 @@ const AddPurchaseOrderPage = () => {
   useEffect(() => {
     const fetchOptions = async () => {
       try {
-        setInitLoading(true)
         const [purchaseRes, materialRes] = await Promise.all([getPurchaseFilters(), getMaterialRequestDropdowns()])
 
         // Parse Purchase Filters (Company/Origin, Supplier)
@@ -118,7 +114,6 @@ const AddPurchaseOrderPage = () => {
         console.error('Failed to fetch dropdowns', err)
         showToast('error', 'Failed to load dropdown data')
       } finally {
-        setInitLoading(false)
       }
     }
 
@@ -175,7 +170,6 @@ const AddPurchaseOrderPage = () => {
     }
 
     try {
-      setSaveLoading(true)
       const payload = {
         company_id: origin.id,
         po_date: format(poDate, 'yyyy-MM-dd'),
@@ -196,7 +190,6 @@ const AddPurchaseOrderPage = () => {
       console.error('Failed to save Purchase Order', err)
       showToast('error', err?.response?.data?.message || 'Failed to save Purchase Order')
     } finally {
-      setSaveLoading(false)
     }
   }
 
@@ -227,24 +220,6 @@ const AddPurchaseOrderPage = () => {
 
         {/* HEADER FORM */}
         <Box px={4} py={3} position='relative'>
-          {initLoading && (
-            <Box
-              sx={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                bgcolor: 'rgba(255,255,255,0.7)',
-                zIndex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <CircularProgress size={40} />
-            </Box>
-          )}
 
           <Grid container spacing={3}>
             <Grid item xs={12} md={4}>
@@ -366,8 +341,8 @@ const AddPurchaseOrderPage = () => {
           <GlobalButton color='secondary' onClick={() => router.push(`/${lang}/admin/purchase/purchase-order`)}>
             Close
           </GlobalButton>
-          <GlobalButton variant='contained' onClick={handleSave} disabled={saveLoading}>
-            {saveLoading ? 'Saving...' : 'Save'}
+          <GlobalButton variant='contained' onClick={handleSave}>
+            Save
           </GlobalButton>
         </Box>
       </Card>

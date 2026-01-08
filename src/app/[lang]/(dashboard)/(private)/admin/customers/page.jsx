@@ -665,22 +665,6 @@ const CustomersPageContent = () => {
         <Divider />
 
         <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          {loading && (
-            <Box
-              sx={{
-                position: 'absolute',
-                inset: 0,
-                bgcolor: 'rgba(255,255,255,0.8)',
-                backdropFilter: 'blur(2px)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 20
-              }}
-            >
-              <ProgressCircularCustomization size={60} thickness={5} />
-            </Box>
-          )}
 
           {/* --- Row 2: Filters --- */}
           <Box
@@ -915,7 +899,6 @@ const CustomersPageContent = () => {
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
           <GlobalButton
             onClick={() => setDeleteDialog({ open: false })}
-            variant='tonal'
             color='secondary'
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
           >
@@ -925,9 +908,10 @@ const CustomersPageContent = () => {
             onClick={confirmDelete}
             variant='contained'
             color='error'
+            disabled={loading}
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
           >
-            Delete
+            {loading ? 'Deleting...' : 'Delete'}
           </GlobalButton>
         </DialogActions>
       </Dialog>

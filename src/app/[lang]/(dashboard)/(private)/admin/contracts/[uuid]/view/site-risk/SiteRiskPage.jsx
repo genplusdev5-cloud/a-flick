@@ -9,6 +9,8 @@ import { Box, Card, Typography, Chip, Divider } from '@mui/material'
 import CustomAutocomplete from '@core/components/mui/Autocomplete'
 import CustomTextField from '@core/components/mui/TextField'
 import GlobalButton from '@/components/common/GlobalButton'
+import DialogCloseButton from '@components/dialogs/DialogCloseButton'
+
 
 // Example risk options (replace later with API if needed)
 const riskOptions = [

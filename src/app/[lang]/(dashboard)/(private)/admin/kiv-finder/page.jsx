@@ -43,7 +43,6 @@ import { useRouter } from 'next/navigation'
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalTextField from '@/components/common/GlobalTextField'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
-import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import { showToast } from '@/components/common/Toasts'
 
@@ -423,22 +422,6 @@ const KivFinderPageContent = () => {
           />
 
           <Divider />
-          {loading && (
-            <Box
-              sx={{
-                position: 'absolute',
-                inset: 0,
-                bgcolor: 'rgba(255,255,255,0.8)',
-                backdropFilter: 'blur(2px)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 10
-              }}
-            >
-              <ProgressCircularCustomization size={60} thickness={5} />
-            </Box>
-          )}
           <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             {/* FILTERS */}
             <Box sx={{ mb: 4, flexShrink: 0 }}>

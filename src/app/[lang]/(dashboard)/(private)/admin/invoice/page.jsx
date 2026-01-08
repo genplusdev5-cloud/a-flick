@@ -30,7 +30,6 @@ import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
 import GlobalDateRange from '@/components/common/GlobalDateRange'
 import { printInvoice } from '@/helpers/printInvoice'
-import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import PresetDateRangePicker from '@/components/common/PresetDateRangePicker'
 
 // Table
@@ -757,39 +756,6 @@ const InvoiceListPageFullContent = () => {
 
         {/* FILTERS */}
         <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          {loading && (
-            <Box
-              sx={{
-                position: 'absolute',
-                inset: 0,
-                bgcolor: 'rgba(255,255,255,0.7)',
-                backdropFilter: 'blur(3px)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexDirection: 'column',
-                zIndex: 200,
-                animation: 'fadeIn 0.3s ease-in-out',
-                '@keyframes fadeIn': {
-                  from: { opacity: 0 },
-                  to: { opacity: 1 }
-                }
-              }}
-            >
-              <ProgressCircularCustomization size={70} thickness={5} />
-              <Typography
-                mt={2}
-                sx={{
-                  color: 'primary.main',
-                  fontWeight: 600,
-                  fontSize: '1.05rem',
-                  letterSpacing: 0.3
-                }}
-              >
-                Loading Invoices...
-              </Typography>
-            </Box>
-          )}
 
           {/* FILTERS */}
           <Box sx={{ pb: 3, flexShrink: 0 }}>

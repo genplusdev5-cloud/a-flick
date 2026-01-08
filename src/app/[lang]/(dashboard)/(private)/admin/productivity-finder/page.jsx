@@ -34,7 +34,6 @@ import FileCopyIcon from '@mui/icons-material/FileCopy'
 
 import { showToast } from '@/components/common/Toasts'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
-import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 import StickyListLayout from '@/components/common/StickyListLayout'
 import GlobalButton from '@/components/common/GlobalButton'
@@ -430,22 +429,6 @@ const ProductivityReportPage = () => {
         <Divider />
 
         <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          {loading && (
-            <Box
-              sx={{
-                position: 'absolute',
-                inset: 0,
-                bgcolor: 'rgba(255,255,255,0.8)',
-                backdropFilter: 'blur(2px)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 10
-              }}
-            >
-              <ProgressCircularCustomization size={60} thickness={5} />
-            </Box>
-          )}
 
           {/* Filters */}
           <Box

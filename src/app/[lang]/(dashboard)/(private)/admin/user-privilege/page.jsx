@@ -52,7 +52,6 @@ import { getPaginationRowModel } from '@tanstack/react-table'
 import FileCopyIcon from '@mui/icons-material/FileCopy'
 import CustomTextFieldWrapper from '@/components/common/CustomTextField'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
-import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import EditIcon from '@mui/icons-material/Edit'
@@ -753,22 +752,6 @@ const UserPrivilegePageContent = () => {
       <StickyListLayout
         header={
           <Box sx={{ mb: 2 }}>
-            {loading && (
-              <Box
-                sx={{
-                  position: 'fixed',
-                  inset: 0,
-                  bgcolor: 'rgba(255,255,255,0.8)',
-                  backdropFilter: 'blur(2px)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 9999
-                }}
-              >
-                <ProgressCircularCustomization size={60} thickness={5} />
-              </Box>
-            )}
 
             <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
               <Link underline='hover' color='inherit' href='/'>

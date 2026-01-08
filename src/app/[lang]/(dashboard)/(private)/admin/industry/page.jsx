@@ -670,31 +670,69 @@ const IndustryPageContent = () => {
 
       <Dialog
         onClose={() => setDeleteDialog({ open: false, row: null })}
+        aria-labelledby='customized-dialog-title'
         open={deleteDialog.open}
-        PaperProps={{ sx: { width: 420, borderRadius: 1, textAlign: 'center' } }}
+        closeAfterTransition={false}
+        PaperProps={{
+          sx: {
+            overflow: 'visible',
+            width: 420,
+            borderRadius: 1,
+            textAlign: 'center'
+          }
+        }}
       >
+        {/* 🔴 Title with Warning Icon + Close Button */}
         <DialogTitle
-          sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'error.main', fontWeight: 700 }}
+          id='customized-dialog-title'
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1,
+            color: 'error.main',
+            fontWeight: 700,
+            pb: 1,
+            position: 'relative'
+          }}
         >
-          <WarningAmberIcon color='error' sx={{ fontSize: 26, mr: 1 }} />
+          <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
           Confirm Delete
+          {/* ❌ TOP-RIGHT CLOSE ICON */}
+          <DialogCloseButton onClick={() => setDeleteDialog({ open: false, row: null })} disableRipple>
+            <i className='tabler-x' />
+          </DialogCloseButton>
         </DialogTitle>
+
+        {/* Content */}
         <DialogContent sx={{ px: 5, pt: 1 }}>
           <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
-            Are you sure you want to delete <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name}</strong>? This
-            action cannot be undone.
+            Are you sure you want to delete{' '}
+            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name || 'this Industry'}</strong>
+            ?
+            <br />
+            This action cannot be undone.
           </Typography>
         </DialogContent>
-        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3 }}>
+
+        {/* Footer */}
+        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
           <GlobalButton
-            onClick={() => setDeleteDialog({ open: false, row: null })}
             color='secondary'
-            sx={{ minWidth: 100 }}
+            onClick={() => setDeleteDialog({ open: false, row: null })}
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
           >
             Cancel
           </GlobalButton>
-          <GlobalButton onClick={confirmDelete} variant='contained' color='error' sx={{ minWidth: 100 }}>
-            Delete
+
+          <GlobalButton
+            onClick={confirmDelete}
+            variant='contained'
+            color='error'
+            disabled={loading}
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+          >
+            {loading ? 'Deleting...' : 'Delete'}
           </GlobalButton>
         </DialogActions>
       </Dialog>

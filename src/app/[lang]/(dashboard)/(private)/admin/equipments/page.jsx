@@ -32,7 +32,6 @@ import { equipmentsSchema } from '@/validations/equipments.schema'
 import { addEquipment, getEquipmentList, getEquipmentDetails, updateEquipment, deleteEquipment } from '@/api/equipments'
 
 import { showToast } from '@/components/common/Toasts'
-import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import CloseIcon from '@mui/icons-material/Close'
@@ -465,22 +464,6 @@ const EquipmentsPageContent = () => {
           }}
         />
         <Divider />
-        {loading && (
-          <Box
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              bgcolor: 'rgba(255,255,255,0.8)',
-              backdropFilter: 'blur(2px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 10
-            }}
-          >
-            <ProgressCircularCustomization size={60} thickness={5} />
-          </Box>
-        )}
 
         <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <Box
@@ -667,34 +650,70 @@ const EquipmentsPageContent = () => {
           </form>
         </Box>
       </Drawer>
-
       <Dialog
         onClose={() => setDeleteDialog({ open: false, row: null })}
         open={deleteDialog.open}
-        PaperProps={{ sx: { width: 420, borderRadius: 1, textAlign: 'center' } }}
+        closeAfterTransition={false}
+        PaperProps={{
+          sx: {
+            width: 420,
+            borderRadius: 1,
+            textAlign: 'center',
+            position: 'relative',
+            overflow: 'visible'
+          }
+        }}
       >
+        {/* 🔴 TITLE + CLOSE BUTTON */}
         <DialogTitle
-          sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'error.main', fontWeight: 700 }}
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1,
+            color: 'error.main',
+            fontWeight: 700,
+            pb: 1,
+            position: 'relative'
+          }}
         >
-          <WarningAmberIcon color='error' sx={{ fontSize: 26, mr: 1 }} />
+          <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
           Confirm Delete
+          {/* ❌ SAME DELETE DIALOG CLOSE BUTTON */}
+          <DialogCloseButton onClick={() => setDeleteDialog({ open: false, row: null })} disableRipple>
+            <i className='tabler-x' />
+          </DialogCloseButton>
         </DialogTitle>
+
+        {/* CONTENT */}
         <DialogContent sx={{ px: 5, pt: 1 }}>
           <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
-            Are you sure you want to delete <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name}</strong>? This
-            action cannot be undone.
+            Are you sure you want to delete{' '}
+            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name || 'this equipment'}</strong>
+            ?
+            <br />
+            This action cannot be undone.
           </Typography>
         </DialogContent>
-        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3 }}>
+
+        {/* ACTIONS */}
+        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
           <GlobalButton
             onClick={() => setDeleteDialog({ open: false, row: null })}
             color='secondary'
-            sx={{ minWidth: 100 }}
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
           >
             Cancel
           </GlobalButton>
-          <GlobalButton onClick={confirmDelete} variant='contained' color='error' sx={{ minWidth: 100 }}>
-            Delete
+
+          <GlobalButton
+            onClick={confirmDelete}
+            variant='contained'
+            color='error'
+            disabled={loading}
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+          >
+            {loading ? 'Deleting...' : 'Delete'}
           </GlobalButton>
         </DialogActions>
       </Dialog>

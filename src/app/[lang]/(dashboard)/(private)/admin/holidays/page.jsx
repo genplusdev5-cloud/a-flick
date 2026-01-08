@@ -28,11 +28,11 @@ import {
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { holidaysSchema } from '@/validations/holidays.schema'
+import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 
 import { getHolidaysList, addHoliday, updateHoliday, deleteHoliday, getHolidayDetails } from '@/api/holidays'
 
 import { showToast } from '@/components/common/Toasts'
-import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import CloseIcon from '@mui/icons-material/Close'
@@ -145,21 +145,23 @@ const HolidaysPageContent = () => {
       const dataArray = result?.data || []
 
       if (result.success || Array.isArray(dataArray)) {
-         const formatted = dataArray.map((item, idx) => ({
-             sno: idx + 1,
-             id: item.id,
-             name: item.name || '-',
-             date: item.date || '-',
-             year: item.year || '-',
-             is_active: item.is_active,
-             status: item.is_active === 1 ? 'Active' : 'Inactive'
-         })).sort((a,b) => (b.id - a.id))
+        const formatted = dataArray
+          .map((item, idx) => ({
+            sno: idx + 1,
+            id: item.id,
+            name: item.name || '-',
+            date: item.date || '-',
+            year: item.year || '-',
+            is_active: item.is_active,
+            status: item.is_active === 1 ? 'Active' : 'Inactive'
+          }))
+          .sort((a, b) => b.id - a.id)
 
-         setRows(formatted)
-         setRowCount(formatted.length)
+        setRows(formatted)
+        setRowCount(formatted.length)
       } else {
-         showToast('error', result.message || 'Failed to load holidays')
-         setRows([])
+        showToast('error', result.message || 'Failed to load holidays')
+        setRows([])
       }
     } catch (err) {
       console.error(err)
@@ -175,8 +177,8 @@ const HolidaysPageContent = () => {
 
   // Drawer
   const toggleDrawer = () => {
-     setCloseReason('manual')
-     setDrawerOpen(p => !p)
+    setCloseReason('manual')
+    setDrawerOpen(p => !p)
   }
 
   const handleAdd = () => {
@@ -184,63 +186,63 @@ const HolidaysPageContent = () => {
     setEditId(null)
 
     if (unsavedAddData) {
-       reset(unsavedAddData)
+      reset(unsavedAddData)
     } else {
-       reset({
-          name: '',
-          date: '',
-          year: '',
-          status: 1
-       })
+      reset({
+        name: '',
+        date: '',
+        year: '',
+        status: 1
+      })
     }
     setCloseReason(null)
     setDrawerOpen(true)
   }
 
-  const handleEdit = async (row) => {
+  const handleEdit = async row => {
     setIsEdit(true)
     setEditId(row.id)
     setLoading(true)
     try {
-       const result = await getHolidayDetails(row.id)
-       if (result.success && result.data) {
-          const data = result.data
+      const result = await getHolidayDetails(row.id)
+      if (result.success && result.data) {
+        const data = result.data
 
-          let formattedDate = ''
-          if (data.date) {
-            if (data.date.includes('/')) {
-              formattedDate = data.date.replace(/\//g, '-')
-            } else if (data.date.includes('-')) {
-              const parts = data.date.split('-')
-              if (parts[0].length === 2) {
-                 formattedDate = `${parts[2]}-${parts[1]}-${parts[0]}`
-              } else {
-                 formattedDate = data.date
-              }
+        let formattedDate = ''
+        if (data.date) {
+          if (data.date.includes('/')) {
+            formattedDate = data.date.replace(/\//g, '-')
+          } else if (data.date.includes('-')) {
+            const parts = data.date.split('-')
+            if (parts[0].length === 2) {
+              formattedDate = `${parts[2]}-${parts[1]}-${parts[0]}`
+            } else {
+              formattedDate = data.date
             }
           }
+        }
 
-          reset({
-            name: data.name || '',
-            date: formattedDate,
-            year: data.year ? String(data.year) : '',
-            status: data.is_active ?? 1
-          })
-       } else {
-          reset({
-             name: row.name !== '-' ? row.name : '',
-             date: row.date !== '-' ? row.date : '',
-             year: row.year !== '-' ? row.year : '',
-             status: row.is_active
-          })
-       }
-       setCloseReason(null)
-       setDrawerOpen(true)
+        reset({
+          name: data.name || '',
+          date: formattedDate,
+          year: data.year ? String(data.year) : '',
+          status: data.is_active ?? 1
+        })
+      } else {
+        reset({
+          name: row.name !== '-' ? row.name : '',
+          date: row.date !== '-' ? row.date : '',
+          year: row.year !== '-' ? row.year : '',
+          status: row.is_active
+        })
+      }
+      setCloseReason(null)
+      setDrawerOpen(true)
     } catch (err) {
-       console.error(err)
-       showToast('error', 'Failed to fetch details')
+      console.error(err)
+      showToast('error', 'Failed to fetch details')
     } finally {
-       setLoading(false)
+      setLoading(false)
     }
   }
 
@@ -249,14 +251,12 @@ const HolidaysPageContent = () => {
     setDrawerOpen(false)
   }
 
-  const onSubmit = async (data) => {
+  const onSubmit = async data => {
     // Duplicate Check
-    const duplicate = rows.find(
-       r => r.name.trim().toLowerCase() === data.name.trim().toLowerCase() && r.id !== editId
-    )
+    const duplicate = rows.find(r => r.name.trim().toLowerCase() === data.name.trim().toLowerCase() && r.id !== editId)
     if (duplicate) {
-       showToast('warning', 'This holiday name already exists')
-       return
+      showToast('warning', 'This holiday name already exists')
+      return
     }
 
     setLoading(true)
@@ -264,7 +264,7 @@ const HolidaysPageContent = () => {
       // Calculate Year from Date
       let year = data.year
       if (!year && data.date) {
-         year = data.date.split('-')[0]
+        year = data.date.split('-')[0]
       }
 
       const payload = {
@@ -304,11 +304,11 @@ const HolidaysPageContent = () => {
         showToast('error', result.message)
       }
     } catch (err) {
-       console.error(err)
-       showToast('error', 'Failed to delete Holiday')
+      console.error(err)
+      showToast('error', 'Failed to delete Holiday')
     } finally {
-       setLoading(false)
-       setDeleteDialog({ open: false, row: null })
+      setLoading(false)
+      setDeleteDialog({ open: false, row: null })
     }
   }
 
@@ -392,10 +392,7 @@ const HolidaysPageContent = () => {
   const exportOpen = Boolean(exportAnchorEl)
   const exportCSV = () => {
     const headers = ['S.No', 'Holiday Name', 'Date', 'Year', 'Status']
-    const csv = [
-      headers.join(','),
-      ...rows.map(r => [r.sno, r.name, r.date, r.year, r.status].join(','))
-    ].join('\n')
+    const csv = [headers.join(','), ...rows.map(r => [r.sno, r.name, r.date, r.year, r.status].join(','))].join('\n')
     const link = document.createElement('a')
     link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
     link.download = 'Holidays.csv'
@@ -416,174 +413,213 @@ const HolidaysPageContent = () => {
       header={
         <Box sx={{ mb: 2 }}>
           <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
-            <Link underline='hover' color='inherit' href='/'>Home</Link>
+            <Link underline='hover' color='inherit' href='/'>
+              Home
+            </Link>
             <Typography color='text.primary'>Holidays</Typography>
           </Breadcrumbs>
         </Box>
       }
     >
       <Card sx={{ display: 'flex', flexDirection: 'column', maxHeight: '100%', minHeight: 0, position: 'relative' }}>
-         <CardHeader
-           title={
-             <Box display='flex' alignItems='center' gap={2}>
-               <Typography variant='h5' sx={{ fontWeight: 600 }}>Holidays</Typography>
-               <GlobalButton
-                 variant='contained'
-                 color='primary'
-                 startIcon={<RefreshIcon sx={{ animation: loading ? 'spin 1s linear infinite' : 'none', '@keyframes spin': { '0%': { transform: 'rotate(0deg)' }, '100%': { transform: 'rotate(360deg)' } } }} />}
-                 disabled={loading}
-                 onClick={async () => {
-                   setLoading(true)
-                   setPagination(prev => ({ ...prev, pageSize: 25, pageIndex: 0 }))
-                   await loadData()
-                   setTimeout(() => setLoading(false), 500)
-                 }}
-                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-               >
-                 {loading ? 'Refreshing...' : 'Refresh'}
-               </GlobalButton>
-             </Box>
-           }
-           action={
-             <Box display='flex' alignItems='center' gap={2}>
-               <GlobalButton
-                 color='secondary'
-                 endIcon={<ArrowDropDownIcon />}
-                 onClick={e => setExportAnchorEl(e.currentTarget)}
-                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-               >
-                 Export
-               </GlobalButton>
-               <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
-                 <MenuItem onClick={exportCSV}><FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV</MenuItem>
-                 <MenuItem onClick={exportPrint}><PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print</MenuItem>
-               </Menu>
-               {canAccess('Holidays', 'create') && (
-                 <GlobalButton
-                   variant='contained'
-                   startIcon={<AddIcon />}
-                   onClick={handleAdd}
-                   sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-                 >
-                   Add Holiday
-                 </GlobalButton>
-               )}
-             </Box>
-           }
-           sx={{
-             pb: 1.5,
-             pt: 5,
-             px: 10,
-             '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
-             '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
-           }}
-         />
-         <Divider />
-         {loading && (
-           <Box
-             sx={{
-               position: 'absolute',
-               inset: 0,
-               bgcolor: 'rgba(255,255,255,0.8)',
-               backdropFilter: 'blur(2px)',
-               display: 'flex',
-               alignItems: 'center',
-               justifyContent: 'center',
-               zIndex: 10
-             }}
-           >
-             <ProgressCircularCustomization size={60} thickness={5} />
-           </Box>
-         )}
+        <CardHeader
+          title={
+            <Box display='flex' alignItems='center' gap={2}>
+              <Typography variant='h5' sx={{ fontWeight: 600 }}>
+                Holidays
+              </Typography>
+              <GlobalButton
+                variant='contained'
+                color='primary'
+                startIcon={
+                  <RefreshIcon
+                    sx={{
+                      animation: loading ? 'spin 1s linear infinite' : 'none',
+                      '@keyframes spin': {
+                        '0%': { transform: 'rotate(0deg)' },
+                        '100%': { transform: 'rotate(360deg)' }
+                      }
+                    }}
+                  />
+                }
+                disabled={loading}
+                onClick={async () => {
+                  setLoading(true)
+                  setPagination(prev => ({ ...prev, pageSize: 25, pageIndex: 0 }))
+                  await loadData()
+                  setTimeout(() => setLoading(false), 500)
+                }}
+                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+              >
+                {loading ? 'Refreshing...' : 'Refresh'}
+              </GlobalButton>
+            </Box>
+          }
+          action={
+            <Box display='flex' alignItems='center' gap={2}>
+              <GlobalButton
+                color='secondary'
+                endIcon={<ArrowDropDownIcon />}
+                onClick={e => setExportAnchorEl(e.currentTarget)}
+                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+              >
+                Export
+              </GlobalButton>
+              <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
+                <MenuItem onClick={exportCSV}>
+                  <FileDownloadIcon fontSize='small' sx={{ mr: 1 }} /> CSV
+                </MenuItem>
+                <MenuItem onClick={exportPrint}>
+                  <PrintIcon fontSize='small' sx={{ mr: 1 }} /> Print
+                </MenuItem>
+              </Menu>
+              {canAccess('Holidays', 'create') && (
+                <GlobalButton
+                  variant='contained'
+                  startIcon={<AddIcon />}
+                  onClick={handleAdd}
+                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                >
+                  Add Holiday
+                </GlobalButton>
+              )}
+            </Box>
+          }
+          sx={{
+            pb: 1.5,
+            pt: 5,
+            px: 10,
+            '& .MuiCardHeader-action': { m: 0, alignItems: 'center' },
+            '& .MuiCardHeader-title': { fontWeight: 600, fontSize: '1.125rem' }
+          }}
+        />
+        <Divider />
 
-         <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, flexShrink: 0 }}>
-               <FormControl size='small' sx={{ width: 140 }}>
-                 <Select value={pagination.pageSize} onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}>
-                   {[25, 50, 75, 100].map(s => <MenuItem key={s} value={s}>{s} entries</MenuItem>)}
-                 </Select>
-               </FormControl>
-               <DebouncedInput
-                 value={searchText}
-                 onChange={v => { setSearchText(String(v)); setPagination(p => ({ ...p, pageIndex: 0 })) }}
-                 placeholder='Search name, date, year...'
-                 sx={{ width: 360 }}
-                 variant='outlined'
-                 size='small'
-                 slotProps={{ input: { startAdornment: (<InputAdornment position='start'><SearchIcon /></InputAdornment>) } }}
-               />
-            </Box>
+        <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <Box
+            sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, flexShrink: 0 }}
+          >
+            <FormControl size='small' sx={{ width: 140 }}>
+              <Select
+                value={pagination.pageSize}
+                onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
+              >
+                {[25, 50, 75, 100].map(s => (
+                  <MenuItem key={s} value={s}>
+                    {s} entries
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <DebouncedInput
+              value={searchText}
+              onChange={v => {
+                setSearchText(String(v))
+                setPagination(p => ({ ...p, pageIndex: 0 }))
+              }}
+              placeholder='Search name, date, year...'
+              sx={{ width: 360 }}
+              variant='outlined'
+              size='small'
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position='start'>
+                      <SearchIcon />
+                    </InputAdornment>
+                  )
+                }
+              }}
+            />
+          </Box>
 
-            <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-               <StickyTableWrapper rowCount={rows.length}>
-                  <table className={styles.table}>
-                     <thead>
-                       {table.getHeaderGroups().map(hg => (
-                         <tr key={hg.id}>
-                           {hg.headers.map(h => (
-                             <th key={h.id}>
-                               <div className={classnames({'flex items-center': h.column.getIsSorted(), 'cursor-pointer select-none': h.column.getCanSort()})} onClick={h.column.getToggleSortingHandler()}>
-                                  {flexRender(h.column.columnDef.header, h.getContext())}
-                                  {{ asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />, desc: <ChevronRight fontSize='1.25rem' className='rotate-90' /> }[h.column.getIsSorted()] ?? null}
-                               </div>
-                             </th>
-                           ))}
-                         </tr>
-                       ))}
-                     </thead>
-                     <tbody>
-                       {rows.length ? (
-                          table.getRowModel().rows.map(row => (
-                            <tr key={row.id}>
-                               {row.getVisibleCells().map(cell => (
-                                  <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
-                               ))}
-                            </tr>
-                          ))
-                       ) : (
-                          <tr><td colSpan={columns.length} className='text-center py-4'>No data available</td></tr>
-                       )}
-                     </tbody>
-                  </table>
-               </StickyTableWrapper>
-            </Box>
-            <Box sx={{ mt: 'auto', flexShrink: 0 }}>
-               <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
-            </Box>
-         </Box>
+          <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            <StickyTableWrapper rowCount={rows.length}>
+              <table className={styles.table}>
+                <thead>
+                  {table.getHeaderGroups().map(hg => (
+                    <tr key={hg.id}>
+                      {hg.headers.map(h => (
+                        <th key={h.id}>
+                          <div
+                            className={classnames({
+                              'flex items-center': h.column.getIsSorted(),
+                              'cursor-pointer select-none': h.column.getCanSort()
+                            })}
+                            onClick={h.column.getToggleSortingHandler()}
+                          >
+                            {flexRender(h.column.columnDef.header, h.getContext())}
+                            {{
+                              asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
+                              desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
+                            }[h.column.getIsSorted()] ?? null}
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  ))}
+                </thead>
+                <tbody>
+                  {rows.length ? (
+                    table.getRowModel().rows.map(row => (
+                      <tr key={row.id}>
+                        {row.getVisibleCells().map(cell => (
+                          <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                        ))}
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={columns.length} className='text-center py-4'>
+                        No data available
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </StickyTableWrapper>
+          </Box>
+          <Box sx={{ mt: 'auto', flexShrink: 0 }}>
+            <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+          </Box>
+        </Box>
       </Card>
 
       {/* Drawer */}
       <Drawer
-         anchor='right'
-         open={drawerOpen}
-         onClose={toggleDrawer}
-         PaperProps={{ sx: { width: 420, boxShadow: '0px 0px 15px rgba(0,0,0,0.08)' } }}
+        anchor='right'
+        open={drawerOpen}
+        onClose={toggleDrawer}
+        PaperProps={{ sx: { width: 420, boxShadow: '0px 0px 15px rgba(0,0,0,0.08)' } }}
       >
-         <Box sx={{ p: 5, display: 'flex', flexDirection: 'column', maxHeight: '100%' }}>
-            <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
-               <Typography variant='h5' fontWeight={600}>{isEdit ? 'Edit Holiday' : 'Add Holiday'}</Typography>
-               <IconButton onClick={toggleDrawer} size='small'><CloseIcon /></IconButton>
-            </Box>
-            <Divider sx={{ mb: 3 }} />
+        <Box sx={{ p: 5, display: 'flex', flexDirection: 'column', maxHeight: '100%' }}>
+          <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
+            <Typography variant='h5' fontWeight={600}>
+              {isEdit ? 'Edit Holiday' : 'Add Holiday'}
+            </Typography>
+            <IconButton onClick={toggleDrawer} size='small'>
+              <CloseIcon />
+            </IconButton>
+          </Box>
+          <Divider sx={{ mb: 3 }} />
 
-            <form onSubmit={hookSubmit(onSubmit)} style={{ flexGrow: 1 }}>
-               <Grid container spacing={3}>
-                  {/* Name */}
-                  <Grid item xs={12}>
-                     <Controller
-                        name="name"
-                        control={control}
-                        render={({ field }) => (
-                           <GlobalTextField
-                             {...field}
-                             label="Name"
-                             fullWidth
-                             required
-                             error={!!errors.name}
-                             helperText={errors.name?.message}
-                             onChange={(e) => field.onChange(e.target.value.replace(/[^a-zA-Z\s]/g, ''))}
-                              sx={{
+          <form onSubmit={hookSubmit(onSubmit)} style={{ flexGrow: 1 }}>
+            <Grid container spacing={3}>
+              {/* Name */}
+              <Grid item xs={12}>
+                <Controller
+                  name='name'
+                  control={control}
+                  render={({ field }) => (
+                    <GlobalTextField
+                      {...field}
+                      label='Name'
+                      fullWidth
+                      required
+                      error={!!errors.name}
+                      helperText={errors.name?.message}
+                      onChange={e => field.onChange(e.target.value.replace(/[^a-zA-Z\s]/g, ''))}
+                      sx={{
                         '& .MuiFormLabel-asterisk': {
                           color: '#e91e63 !important',
                           fontWeight: 700
@@ -592,99 +628,150 @@ const HolidaysPageContent = () => {
                           color: 'inherit'
                         }
                       }}
-                           />
-                        )}
-                     />
-                  </Grid>
-
-                  {/* Date */}
-                  <Grid item xs={12}>
-                     <Controller
-                        name="date"
-                        control={control}
-                        render={({ field }) => (
-                           <AppReactDatepicker
-                              selected={field.value ? new Date(field.value) : null}
-                              onChange={(date) => {
-                                 if (date) {
-                                    const formatted = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`
-                                    field.onChange(formatted)
-                                 } else {
-                                    field.onChange('')
-                                 }
-                              }}
-                              placeholderText="Select Date"
-                              customInput={
-                                <CustomTextFieldWrapper
-                                    label="Date"
-                                    fullWidth
-                                    error={!!errors.date}
-                                    helperText={errors.date?.message}
-                                    InputProps={{
-                                       endAdornment: (
-                                         <InputAdornment position='end'>
-                                           <CalendarTodayIcon />
-                                         </InputAdornment>
-                                       )
-                                     }}
-                                />
-                              }
-                           />
-                        )}
-                     />
-                  </Grid>
-
-                  {/* Status */}
-                  {isEdit && (
-                     <Grid item xs={12}>
-                        <Controller
-                           name="status"
-                           control={control}
-                           render={({ field }) => (
-                               <GlobalSelect
-                                  label="Status"
-                                  value={field.value === 1 ? 'Active' : 'Inactive'}
-                                  onChange={(e) => field.onChange(e.target.value === 'Active' ? 1 : 0)}
-                                  options={[
-                                      { value: 'Active', label: 'Active' },
-                                      { value: 'Inactive', label: 'Inactive' }
-                                  ]}
-                                  fullWidth
-                               />
-                           )}
-                        />
-                     </Grid>
+                    />
                   )}
-               </Grid>
+                />
+              </Grid>
 
-               {/* Footer */}
-               <Box mt={4} display='flex' gap={2}>
-                 <GlobalButton color='secondary' fullWidth onClick={handleCancel} disabled={loading}>Cancel</GlobalButton>
-                 <GlobalButton type='submit' variant='contained' fullWidth disabled={loading}>
-                   {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
-                 </GlobalButton>
-               </Box>
-            </form>
-         </Box>
+              {/* Date */}
+              <Grid item xs={12}>
+                <Controller
+                  name='date'
+                  control={control}
+                  render={({ field }) => (
+                    <AppReactDatepicker
+                      selected={field.value ? new Date(field.value) : null}
+                      onChange={date => {
+                        if (date) {
+                          const formatted = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+                          field.onChange(formatted)
+                        } else {
+                          field.onChange('')
+                        }
+                      }}
+                      placeholderText='Select Date'
+                      customInput={
+                        <CustomTextFieldWrapper
+                          label='Date'
+                          fullWidth
+                          error={!!errors.date}
+                          helperText={errors.date?.message}
+                          InputProps={{
+                            endAdornment: (
+                              <InputAdornment position='end'>
+                                <CalendarTodayIcon />
+                              </InputAdornment>
+                            )
+                          }}
+                        />
+                      }
+                    />
+                  )}
+                />
+              </Grid>
+
+              {/* Status */}
+              {isEdit && (
+                <Grid item xs={12}>
+                  <Controller
+                    name='status'
+                    control={control}
+                    render={({ field }) => (
+                      <GlobalSelect
+                        label='Status'
+                        value={field.value === 1 ? 'Active' : 'Inactive'}
+                        onChange={e => field.onChange(e.target.value === 'Active' ? 1 : 0)}
+                        options={[
+                          { value: 'Active', label: 'Active' },
+                          { value: 'Inactive', label: 'Inactive' }
+                        ]}
+                        fullWidth
+                      />
+                    )}
+                  />
+                </Grid>
+              )}
+            </Grid>
+
+            {/* Footer */}
+            <Box mt={4} display='flex' gap={2}>
+              <GlobalButton color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
+                Cancel
+              </GlobalButton>
+              <GlobalButton type='submit' variant='contained' fullWidth disabled={loading}>
+                {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
+              </GlobalButton>
+            </Box>
+          </form>
+        </Box>
       </Drawer>
 
       <Dialog
         onClose={() => setDeleteDialog({ open: false, row: null })}
+        aria-labelledby='customized-dialog-title'
         open={deleteDialog.open}
-        PaperProps={{ sx: { width: 420, borderRadius: 1, textAlign: 'center' } }}
+        closeAfterTransition={false}
+        PaperProps={{
+          sx: {
+            overflow: 'visible',
+            width: 420,
+            borderRadius: 1,
+            textAlign: 'center'
+          }
+        }}
       >
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'error.main', fontWeight: 700 }}>
-          <WarningAmberIcon color='error' sx={{ fontSize: 26, mr: 1 }} />
+        {/* 🔴 Title with Warning Icon + Close Button */}
+        <DialogTitle
+          id='customized-dialog-title'
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1,
+            color: 'error.main',
+            fontWeight: 700,
+            pb: 1,
+            position: 'relative'
+          }}
+        >
+          <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
           Confirm Delete
+          {/* ❌ TOP-RIGHT CLOSE ICON */}
+          <DialogCloseButton onClick={() => setDeleteDialog({ open: false, row: null })} disableRipple>
+            <i className='tabler-x' />
+          </DialogCloseButton>
         </DialogTitle>
+
+        {/* Content */}
         <DialogContent sx={{ px: 5, pt: 1 }}>
-           <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
-             Are you sure you want to delete <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name}</strong>? This action cannot be undone.
-           </Typography>
+          <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
+            Are you sure you want to delete{' '}
+            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name || 'this Holiday'}</strong>
+            ?
+            <br />
+            This action cannot be undone.
+          </Typography>
         </DialogContent>
-        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3 }}>
-           <GlobalButton onClick={() => setDeleteDialog({ open: false, row: null })} color='secondary' sx={{ minWidth: 100 }}>Cancel</GlobalButton>
-           <GlobalButton onClick={confirmDelete} variant='contained' color='error' sx={{ minWidth: 100 }}>Delete</GlobalButton>
+
+        {/* Footer */}
+        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+          <GlobalButton
+            color='secondary'
+            onClick={() => setDeleteDialog({ open: false, row: null })}
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+          >
+            Cancel
+          </GlobalButton>
+
+          <GlobalButton
+            onClick={confirmDelete}
+            variant='contained'
+            color='error'
+            disabled={loading}
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+          >
+            {loading ? 'Deleting...' : 'Delete'}
+          </GlobalButton>
         </DialogActions>
       </Dialog>
     </StickyListLayout>

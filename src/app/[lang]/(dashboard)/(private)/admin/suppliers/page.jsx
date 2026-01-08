@@ -33,7 +33,6 @@ import { usePermission } from '@/hooks/usePermission'
 
 import { getSupplierList, addSupplier, updateSupplier, getSupplierDetails, deleteSupplier } from '@/api/supplier'
 
-import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import EditIcon from '@mui/icons-material/Edit'
@@ -558,24 +557,6 @@ const SupplierPageContent = () => {
 
         <Divider />
 
-        {loading && (
-          <Box
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              bgcolor: 'rgba(255,255,255,0.7)',
-              backdropFilter: 'blur(2px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 10
-            }}
-          >
-            <Box textAlign='center'>
-              <ProgressCircularCustomization size={60} thickness={5} />
-            </Box>
-          </Box>
-        )}
 
         <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <Box

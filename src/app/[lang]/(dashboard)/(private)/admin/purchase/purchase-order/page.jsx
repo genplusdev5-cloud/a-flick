@@ -655,11 +655,21 @@ const PurchaseOrderPage = () => {
 
           {/* Centered buttons */}
           <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-            <GlobalButton color='secondary' onClick={() => setDeleteDialog({ open: false, row: null })}>
+            <GlobalButton
+              color='secondary'
+              onClick={() => setDeleteDialog({ open: false, row: null })}
+              sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+            >
               Cancel
             </GlobalButton>
-            <GlobalButton onClick={confirmDelete} variant='contained' color='error' disabled={deleteLoading}>
-              {deleteLoading ? 'Deleting...' : 'Delete'}
+            <GlobalButton
+              onClick={confirmDelete}
+              variant='contained'
+              color='error'
+              disabled={loading}
+              sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+            >
+              {loading ? 'Deleting...' : 'Delete'}
             </GlobalButton>
           </DialogActions>
         </Dialog>

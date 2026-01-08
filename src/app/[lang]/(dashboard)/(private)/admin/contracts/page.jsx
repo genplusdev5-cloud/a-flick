@@ -354,18 +354,19 @@ const ContractsPageContent = () => {
   // 🔥 RESTORE FILTERS FROM SESSION STORAGE ON MOUNT
   useEffect(() => {
     // Only restore if there are NO filter params in the URL currently
-    const hasUrlParams = searchParams.get('search') || 
-                         searchParams.get('customer') || 
-                         searchParams.get('type') || 
-                         searchParams.get('status') || 
-                         searchParams.get('dateFilter')
+    const hasUrlParams =
+      searchParams.get('search') ||
+      searchParams.get('customer') ||
+      searchParams.get('type') ||
+      searchParams.get('status') ||
+      searchParams.get('dateFilter')
 
     if (!hasUrlParams) {
       const saved = sessionStorage.getItem('contractFilters')
       if (saved) {
         try {
           const filters = JSON.parse(saved)
-          
+
           // Reconstruct URL params from saved state
           const params = new URLSearchParams()
           if (filters.search) params.set('search', filters.search)
@@ -439,11 +440,11 @@ const ContractsPageContent = () => {
               </IconButton>
 
               {/* ✏ EDIT */}
-              {canAccess('Contracts', 'update') && (
+              {/* {canAccess('Contracts', 'update') && (
                 <IconButton size='small' color='primary' onClick={() => handleEdit(item)}>
                   <i className='tabler-edit' />
                 </IconButton>
-              )}
+              )} */}
 
               {/* 📅 SCHEDULE */}
               <IconButton size='small' onClick={() => openPlanDrawer(item)}>
@@ -1115,9 +1116,10 @@ const ContractsPageContent = () => {
             onClick={confirmDelete}
             variant='contained'
             color='error'
+            disabled={loading}
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
           >
-            Delete
+            {loading ? 'Deleting...' : 'Delete'}
           </GlobalButton>
         </DialogActions>
       </Dialog>

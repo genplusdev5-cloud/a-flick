@@ -617,22 +617,6 @@ const ContractStatusPageContent = () => {
           }}
         />
         <Divider />
-        {loading && (
-          <Box
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              bgcolor: 'rgba(255,255,255,0.8)',
-              backdropFilter: 'blur(2px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 10
-            }}
-          >
-            <ProgressCircularCustomization size={60} thickness={5} />
-          </Box>
-        )}
         <Box sx={{ display: 'flex', flexDirection: 'column', maxHeight: '100%', overflow: 'hidden' }}>
           {/* 1. FIXED: Filters & Toolbar */}
           <Box sx={{ p: 4, pb: 2, flexShrink: 0, overflow: 'visible' }}>

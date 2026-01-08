@@ -1,4 +1,6 @@
 import axios from 'axios'
+import { store } from '@/redux-store'
+import { setLoading } from '@/redux-store/slices/loading'
 
 // Base URL from .env file
 let baseURL = process.env.NEXT_PUBLIC_API_URL
@@ -21,19 +23,36 @@ api.interceptors.request.use(config => {
 // Token attach interceptor
 api.interceptors.request.use(
   config => {
+    // Show loader for all requests unless explicitly disabled
+    if (config.showLoader !== false) {
+      store.dispatch(setLoading(true))
+    }
+
     if (typeof window !== 'undefined') {
       const token = localStorage.getItem('access_token')
       if (token) config.headers.Authorization = `Bearer ${token}`
     }
     return config
   },
-  error => Promise.reject(error)
+  error => {
+    store.dispatch(setLoading(false))
+    return Promise.reject(error)
+  }
 )
 
 // Response interceptor (token refresh)
 api.interceptors.response.use(
-  res => res,
+  res => {
+    if (res.config.showLoader !== false) {
+      store.dispatch(setLoading(false))
+    }
+    return res
+  },
   async err => {
+    if (err.config?.showLoader !== false) {
+      store.dispatch(setLoading(false))
+    }
+
     const original = err.config
     if (err.response?.status === 401 && !original._retry) {
       original._retry = true

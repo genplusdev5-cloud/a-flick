@@ -877,11 +877,21 @@ const EmployeePageContent = () => {
           </Typography>
         </DialogContent>
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-          <GlobalButton onClick={() => setDeleteDialog({ open: false, row: null })} color='secondary' variant='tonal'>
+          <GlobalButton
+            onClick={() => setDeleteDialog({ open: false, row: null })}
+            color='secondary'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+          >
             Cancel
           </GlobalButton>
-          <GlobalButton onClick={confirmDelete} color='error' variant='contained'>
-            Delete
+          <GlobalButton
+            onClick={confirmDelete}
+            color='error'
+            variant='contained'
+            disabled={loading}
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+          >
+            {loading ? 'Deleting...' : 'Delete'}
           </GlobalButton>
         </DialogActions>
       </Dialog>

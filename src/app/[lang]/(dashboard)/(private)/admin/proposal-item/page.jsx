@@ -576,9 +576,10 @@ const ProposalItemPage = () => {
                   onClick={confirmDelete}
                   variant='contained'
                   color='error'
+                  disabled={loading}
                   sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
                 >
-                  Delete
+                  {loading ? 'Deleting...' : 'Delete'}
                 </GlobalButton>
               </DialogActions>
             </Dialog>

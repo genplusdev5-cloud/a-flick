@@ -58,9 +58,6 @@ const EditPurchaseInwardPage = () => {
   const [chemicalOptions, setChemicalOptions] = useState([])
   const [uomOptions, setUomOptions] = useState([])
 
-  // Loading states
-  const [initLoading, setInitLoading] = useState(false)
-  const [saveLoading, setSaveLoading] = useState(false)
 
   // Header fields
   const [origin, setOrigin] = useState(null)
@@ -87,7 +84,6 @@ const EditPurchaseInwardPage = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setInitLoading(true)
 
         const [purchaseRes, materialRes, detailsRes] = await Promise.all([
           getPurchaseFilters(),
@@ -181,7 +177,6 @@ const EditPurchaseInwardPage = () => {
         console.error(err)
         showToast('error', 'Failed to load purchase inward data')
       } finally {
-        setInitLoading(false)
       }
     }
 
@@ -233,7 +228,6 @@ const EditPurchaseInwardPage = () => {
     }
 
     try {
-      setSaveLoading(true)
       const payload = {
         company_id: origin.id,
         inward_date: format(poDate, 'yyyy-MM-dd'),
@@ -257,7 +251,6 @@ const EditPurchaseInwardPage = () => {
       console.error('Failed to update Purchase Order', err)
       showToast('error', err?.response?.data?.message || 'Failed to update Purchase Order')
     } finally {
-      setSaveLoading(false)
     }
   }
 
@@ -287,24 +280,6 @@ const EditPurchaseInwardPage = () => {
 
         {/* HEADER FORM */}
         <Box px={4} py={3} position='relative'>
-          {initLoading && (
-            <Box
-              sx={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                bgcolor: 'rgba(255,255,255,0.7)',
-                zIndex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <CircularProgress size={40} />
-            </Box>
-          )}
 
           <Grid container spacing={3}>
             <Grid item xs={12} md={4}>
@@ -430,8 +405,8 @@ const EditPurchaseInwardPage = () => {
           <GlobalButton color='secondary' onClick={() => router.push(`/${lang}/admin/purchase/purchase-inward`)}>
             Cancel
           </GlobalButton>
-          <GlobalButton variant='contained' onClick={handleUpdate} disabled={saveLoading}>
-            {saveLoading ? 'Updating...' : 'Update'}
+          <GlobalButton variant='contained' onClick={handleUpdate}>
+            Update
           </GlobalButton>
         </Box>
       </Card>

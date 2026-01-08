@@ -49,7 +49,6 @@ import TablePaginationComponent from '@/components/TablePaginationComponent'
 import StickyListLayout from '@/components/common/StickyListLayout'
 import GlobalButton from '@/components/common/GlobalButton'
 import { showToast } from '@/components/common/Toasts'
-import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import { IconButton, Chip } from '@mui/material'
 
 // ✅ APIs
@@ -356,7 +355,6 @@ const SalesQuotationPage = () => {
                 <Typography variant='h5' fontWeight={600}>
                   Sales Quotation
                 </Typography>
-
               </Box>
             }
             action={
@@ -401,22 +399,6 @@ const SalesQuotationPage = () => {
           <Divider />
 
           <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            {loading && (
-              <Box
-                sx={{
-                  position: 'absolute',
-                  inset: 0,
-                  bgcolor: 'rgba(255,255,255,0.7)',
-                  backdropFilter: 'blur(2px)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 20
-                }}
-              >
-                <ProgressCircularCustomization size={60} thickness={5} />
-              </Box>
-            )}
 
             {/* ================= FILTERS ================= */}
             <Box
@@ -507,23 +489,23 @@ const SalesQuotationPage = () => {
                   onChange={val => setFilters({ ...filters, customer: val?.value || '' })}
                 />
               </Box>
-               <GlobalButton
-                  startIcon={
-                    <RefreshIcon
-                      sx={{
-                        animation: loading ? 'spin 1s linear infinite' : 'none',
-                        '@keyframes spin': {
-                          '0%': { transform: 'rotate(0deg)' },
-                          '100%': { transform: 'rotate(360deg)' }
-                        }
-                      }}
-                    />
-                  }
-                  disabled={loading}
-                  onClick={handleRefresh}
-                >
-                  {loading ? 'Refreshing...' : 'Refresh'}
-                </GlobalButton>
+              <GlobalButton
+                startIcon={
+                  <RefreshIcon
+                    sx={{
+                      animation: loading ? 'spin 1s linear infinite' : 'none',
+                      '@keyframes spin': {
+                        '0%': { transform: 'rotate(0deg)' },
+                        '100%': { transform: 'rotate(360deg)' }
+                      }
+                    }}
+                  />
+                }
+                disabled={loading}
+                onClick={handleRefresh}
+              >
+                {loading ? 'Refreshing...' : 'Refresh'}
+              </GlobalButton>
             </Box>
 
             <Divider sx={{ mb: 4 }} />
@@ -665,12 +647,22 @@ const SalesQuotationPage = () => {
               </DialogContent>
 
               <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-                <GlobalButton onClick={() => setDeleteDialog({ open: false, row: null })} color='secondary'>
+                <GlobalButton
+                  onClick={() => setDeleteDialog({ open: false, row: null })}
+                  color='secondary'
+                  sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+                >
                   Cancel
                 </GlobalButton>
 
-                <GlobalButton onClick={confirmDelete} variant='contained' color='error'>
-                  Delete
+                <GlobalButton
+                  onClick={confirmDelete}
+                  variant='contained'
+                  color='error'
+                  disabled={loading}
+                  sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+                >
+                  {loading ? 'Deleting...' : 'Delete'}
                 </GlobalButton>
               </DialogActions>
             </Dialog>

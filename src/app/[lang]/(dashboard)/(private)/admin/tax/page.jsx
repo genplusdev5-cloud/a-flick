@@ -32,7 +32,6 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { taxSchema } from '@/validations/tax.schema'
 
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
-import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import EditIcon from '@mui/icons-material/Edit'
@@ -592,22 +591,6 @@ const TaxPageContent = () => {
           <Divider />
 
           <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            {loading && (
-              <Box
-                sx={{
-                  position: 'absolute',
-                  inset: 0,
-                  bgcolor: 'rgba(255,255,255,0.7)',
-                  backdropFilter: 'blur(2px)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 20
-                }}
-              >
-                <ProgressCircularCustomization size={60} thickness={5} />
-              </Box>
-            )}
 
             <Box
               sx={{
@@ -861,10 +844,20 @@ const TaxPageContent = () => {
 
           {/* Centered buttons */}
           <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-            <GlobalButton color='secondary' onClick={() => setDeleteDialog({ open: false, row: null })}>
+            <GlobalButton
+              color='secondary'
+              onClick={() => setDeleteDialog({ open: false, row: null })}
+              sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+            >
               Cancel
             </GlobalButton>
-            <GlobalButton onClick={confirmDelete} variant='contained' color='error' disabled={loading}>
+            <GlobalButton
+              onClick={confirmDelete}
+              variant='contained'
+              color='error'
+              disabled={loading}
+              sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+            >
               {loading ? 'Deleting...' : 'Delete'}
             </GlobalButton>
           </DialogActions>

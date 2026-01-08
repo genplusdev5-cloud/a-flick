@@ -277,8 +277,8 @@ const ServiceRequestPageContent = () => {
 
               {/* ✏ EDIT */}
               {canAccess('Service Request', 'update') && (
-                <IconButton size='small' onClick={() => handleEdit(item)}>
-                  <i className='tabler-edit text-blue-600 text-[18px]' />
+                <IconButton size='small' color='primary' onClick={() => handleEdit(item)}>
+                  <i className='tabler-edit ' />
                 </IconButton>
               )}
 
@@ -883,22 +883,6 @@ const ServiceRequestPageContent = () => {
           </Box>
 
           <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-            {loading && (
-              <Box
-                sx={{
-                  position: 'absolute',
-                  inset: 0,
-                  bgcolor: 'rgba(255,255,255,0.7)',
-                  backdropFilter: 'blur(2px)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 10
-                }}
-              >
-                <ProgressCircularCustomization size={60} thickness={5} />
-              </Box>
-            )}
 
             <StickyTableWrapper rowCount={rows.length}>
               <table className={styles.table}>
@@ -1010,9 +994,10 @@ const ServiceRequestPageContent = () => {
             onClick={confirmDelete}
             variant='contained'
             color='error'
+            disabled={loading}
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
           >
-            Delete
+            {loading ? 'Deleting...' : 'Delete'}
           </GlobalButton>
         </DialogActions>
       </Dialog>

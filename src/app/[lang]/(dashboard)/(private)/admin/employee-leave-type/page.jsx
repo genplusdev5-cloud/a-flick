@@ -29,7 +29,6 @@ import {
 
 import { addLeaveType, getLeaveTypeList, updateLeaveType, deleteLeaveType } from '@/api/leaveType'
 
-import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import EditIcon from '@mui/icons-material/Edit'
@@ -116,7 +115,7 @@ const EmployeeLeaveTypePageContent = () => {
   const [loading, setLoading] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
-  
+
   // Draft State
   const [unsavedAddData, setUnsavedAddData] = useState(null)
   const [closeReason, setCloseReason] = useState(null)
@@ -170,19 +169,19 @@ const EmployeeLeaveTypePageContent = () => {
   useEffect(() => {
     if (!drawerOpen) {
       if (closeReason === 'save' || closeReason === 'cancel') {
-         // Explicitly cleared → Clear draft
-         setUnsavedAddData(null)
-         // Reset form to default (clean state)
-         reset({
-           leaveCode: '',
-           name: '',
-           description: '',
-           status: 1
-         })
+        // Explicitly cleared → Clear draft
+        setUnsavedAddData(null)
+        // Reset form to default (clean state)
+        reset({
+          leaveCode: '',
+          name: '',
+          description: '',
+          status: 1
+        })
       } else if (!isEdit) {
-         // Manual Close in Add Mode → Save Draft
-         const currentValues = getValues()
-         setUnsavedAddData(currentValues)
+        // Manual Close in Add Mode → Save Draft
+        const currentValues = getValues()
+        setUnsavedAddData(currentValues)
       }
     }
   }, [drawerOpen])
@@ -261,22 +260,20 @@ const EmployeeLeaveTypePageContent = () => {
     }
   }
 
-  const onSubmit = async (data) => {
+  const onSubmit = async data => {
     // 🔍 Duplicate Check (Name)
-    const isDuplicate = rows.some(r =>
-      r.name.toLowerCase() === data.name.trim().toLowerCase() &&
-      r.id !== (isEdit ? data.id : -1)
+    const isDuplicate = rows.some(
+      r => r.name.toLowerCase() === data.name.trim().toLowerCase() && r.id !== (isEdit ? data.id : -1)
     )
 
     if (isDuplicate) {
       showToast('error', 'Leave Type name already exists')
       return
     }
-    
+
     // 🔍 Duplicate Check (Code)
-    const isDuplicateCode = rows.some(r =>
-      r.leaveCode.toLowerCase() === data.leaveCode.trim().toLowerCase() &&
-      r.id !== (isEdit ? data.id : -1)
+    const isDuplicateCode = rows.some(
+      r => r.leaveCode.toLowerCase() === data.leaveCode.trim().toLowerCase() && r.id !== (isEdit ? data.id : -1)
     )
 
     if (isDuplicateCode) {
@@ -303,7 +300,7 @@ const EmployeeLeaveTypePageContent = () => {
         await addLeaveType(payload)
         showToast('success', 'Leave Type added successfully!')
       }
-      
+
       setCloseReason('save')
       setDrawerOpen(false)
       await loadData()
@@ -556,22 +553,6 @@ const EmployeeLeaveTypePageContent = () => {
             </Box>
           }
         />
-        {loading && (
-          <Box
-            sx={{
-              position: 'fixed',
-              inset: 0,
-              bgcolor: 'rgba(255,255,255,0.8)',
-              backdropFilter: 'blur(2px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 9999
-            }}
-          >
-            <ProgressCircularCustomization size={60} thickness={5} />
-          </Box>
-        )}
 
         <Divider />
         <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -620,52 +601,52 @@ const EmployeeLeaveTypePageContent = () => {
           </Box>
           <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
             <StickyTableWrapper rowCount={rows.length}>
-          <table className={styles.table}>
-            <thead>
-              {table.getHeaderGroups().map(hg => (
-                <tr key={hg.id}>
-                  {hg.headers.map(h => (
-                    <th key={h.id}>
-                      <div
-                        className={classnames({
-                          'flex items-center': h.column.getIsSorted(),
-                          'cursor-pointer select-none': h.column.getCanSort()
-                        })}
-                        onClick={h.column.getToggleSortingHandler()}
-                      >
-                        {flexRender(h.column.columnDef.header, h.getContext())}
-                        {{
-                          asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
-                          desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
-                        }[h.column.getIsSorted()] ?? null}
-                      </div>
-                    </th>
+              <table className={styles.table}>
+                <thead>
+                  {table.getHeaderGroups().map(hg => (
+                    <tr key={hg.id}>
+                      {hg.headers.map(h => (
+                        <th key={h.id}>
+                          <div
+                            className={classnames({
+                              'flex items-center': h.column.getIsSorted(),
+                              'cursor-pointer select-none': h.column.getCanSort()
+                            })}
+                            onClick={h.column.getToggleSortingHandler()}
+                          >
+                            {flexRender(h.column.columnDef.header, h.getContext())}
+                            {{
+                              asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
+                              desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
+                            }[h.column.getIsSorted()] ?? null}
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
                   ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody>
-              {rows.length ? (
-                table.getRowModel().rows.map(row => (
-                  <tr key={row.id}>
-                    {row.getVisibleCells().map(cell => (
-                      <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
-                    ))}
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={columns.length} className='text-center py-4'>
-                    No data available
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                </thead>
+                <tbody>
+                  {rows.length ? (
+                    table.getRowModel().rows.map(row => (
+                      <tr key={row.id}>
+                        {row.getVisibleCells().map(cell => (
+                          <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                        ))}
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={columns.length} className='text-center py-4'>
+                        No data available
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </StickyTableWrapper>
           </Box>
           <Box sx={{ mt: 'auto', flexShrink: 0 }}>
-             <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+            <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
           </Box>
         </Box>
       </Card>
@@ -694,7 +675,7 @@ const EmployeeLeaveTypePageContent = () => {
               {/* Leave Code */}
               <Grid item xs={12}>
                 <Controller
-                  name="leaveCode"
+                  name='leaveCode'
                   control={control}
                   render={({ field }) => (
                     <GlobalTextField
@@ -707,11 +688,11 @@ const EmployeeLeaveTypePageContent = () => {
                       helperText={errors.leaveCode?.message}
                       sx={{
                         '& .MuiFormLabel-asterisk': {
-                           color: '#e91e63 !important',
-                           fontWeight: 700
+                          color: '#e91e63 !important',
+                          fontWeight: 700
                         },
                         '& .MuiInputLabel-root.Mui-required': {
-                           color: 'inherit'
+                          color: 'inherit'
                         }
                       }}
                     />
@@ -722,7 +703,7 @@ const EmployeeLeaveTypePageContent = () => {
               {/* Leave Name */}
               <Grid item xs={12}>
                 <Controller
-                  name="name"
+                  name='name'
                   control={control}
                   render={({ field }) => (
                     <GlobalTextField
@@ -735,11 +716,11 @@ const EmployeeLeaveTypePageContent = () => {
                       helperText={errors.name?.message}
                       sx={{
                         '& .MuiFormLabel-asterisk': {
-                           color: '#e91e63 !important',
-                           fontWeight: 700
+                          color: '#e91e63 !important',
+                          fontWeight: 700
                         },
                         '& .MuiInputLabel-root.Mui-required': {
-                           color: 'inherit'
+                          color: 'inherit'
                         }
                       }}
                     />
@@ -750,7 +731,7 @@ const EmployeeLeaveTypePageContent = () => {
               {/* Optional: Add Description */}
               <Grid item xs={12}>
                 <Controller
-                  name="description"
+                  name='description'
                   control={control}
                   render={({ field }) => (
                     <GlobalTextarea
@@ -767,17 +748,17 @@ const EmployeeLeaveTypePageContent = () => {
               {isEdit && (
                 <Grid item xs={12}>
                   <Controller
-                    name="status"
+                    name='status'
                     control={control}
                     render={({ field }) => (
-                       <GlobalSelect
-                         {...field}
-                         label='Status'
-                         options={[
-                           { value: 1, label: 'Active' },
-                           { value: 0, label: 'Inactive' }
-                         ]}
-                       />
+                      <GlobalSelect
+                        {...field}
+                        label='Status'
+                        options={[
+                          { value: 1, label: 'Active' },
+                          { value: 0, label: 'Inactive' }
+                        ]}
+                      />
                     )}
                   />
                 </Grid>
@@ -851,7 +832,6 @@ const EmployeeLeaveTypePageContent = () => {
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
           <GlobalButton
             onClick={() => setDeleteDialog({ open: false, row: null })}
-            variant='tonal'
             color='secondary'
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
           >
@@ -860,10 +840,11 @@ const EmployeeLeaveTypePageContent = () => {
           <GlobalButton
             onClick={confirmDelete}
             variant='contained'
+            disabled={loading}
             color='error'
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
           >
-            Delete
+            {loading ? 'Deleting...' : 'Delete'}
           </GlobalButton>
         </DialogActions>
       </Dialog>
@@ -874,7 +855,7 @@ const EmployeeLeaveTypePageContent = () => {
 // Wrapper for RBAC
 export default function EmployeeLeaveTypePage() {
   return (
-    <PermissionGuard permission="Employee Leave Type">
+    <PermissionGuard permission='Employee Leave Type'>
       <EmployeeLeaveTypePageContent />
     </PermissionGuard>
   )

@@ -28,7 +28,6 @@ import {
 import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 import StickyListLayout from '@/components/common/StickyListLayout'
 import PermissionGuard from '@/components/auth/PermissionGuard'
-import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
 import AddIcon from '@mui/icons-material/Add'
@@ -406,22 +405,6 @@ const MaterialRequestPageContent = () => {
 
           <Divider />
 
-          {loading && (
-            <Box
-              sx={{
-                position: 'absolute',
-                inset: 0,
-                bgcolor: 'rgba(255,255,255,0.8)',
-                backdropFilter: 'blur(2px)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 10
-              }}
-            >
-              <ProgressCircularCustomization size={60} thickness={5} />
-            </Box>
-          )}
           <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             {/* Filters */}
             <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 2, mb: 3, flexWrap: 'nowrap', flexShrink: 0 }}>
