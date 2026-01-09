@@ -638,9 +638,11 @@ const HolidaysPageContent = () => {
                 <Controller
                   name='date'
                   control={control}
+
                   render={({ field }) => (
                     <AppReactDatepicker
                       selected={field.value ? new Date(field.value) : null}
+                      required
                       onChange={date => {
                         if (date) {
                           const formatted = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
@@ -649,6 +651,8 @@ const HolidaysPageContent = () => {
                           field.onChange('')
                         }
                       }}
+
+
                       placeholderText='Select Date'
                       customInput={
                         <CustomTextFieldWrapper
@@ -663,6 +667,16 @@ const HolidaysPageContent = () => {
                               </InputAdornment>
                             )
                           }}
+
+                           sx={{
+                        '& .MuiFormLabel-asterisk': {
+                          color: '#e91e63 !important',
+                          fontWeight: 700
+                        },
+                        '& .MuiInputLabel-root.Mui-required': {
+                          color: 'inherit'
+                        }
+                      }}
                         />
                       }
                     />

@@ -31,6 +31,7 @@ import { chemicalsSchema } from '@/validations/chemicals.schema'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 
 import { getChemicalsList, addChemical, updateChemical, deleteChemical, getChemicalDetails } from '@/api/chemicals'
+import { getUomList } from '@/api/uom'
 
 import { showToast } from '@/components/common/Toasts'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
@@ -122,6 +123,12 @@ const ChemicalsPageContent = () => {
     }
   })
 
+  // Image Dialog State
+  const [imgDialogOpen, setImgDialogOpen] = useState(false)
+  const [imgUrl, setImgUrl] = useState('')
+
+  const [uoms, setUoms] = useState([])
+
   // 🔹 Effect: Handle Drawer Closing Logic
   useEffect(() => {
     if (!drawerOpen) {
@@ -145,6 +152,18 @@ const ChemicalsPageContent = () => {
     }
   }, [drawerOpen])
 
+  const loadUoms = async () => {
+    try {
+      const res = await getUomList()
+      if (res?.success) {
+        const uomData = res.data?.results || (Array.isArray(res.data) ? res.data : [])
+        setUoms(uomData)
+      }
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
   // Load Data
   const loadData = async () => {
     setLoading(true)
@@ -159,6 +178,7 @@ const ChemicalsPageContent = () => {
             id: item.id,
             name: item.name || '-',
             unit: item.uom || '-',
+            unit_id: item.uom_id || item.uom, // Store ID if available
             dosage: item.unit_value || '-',
             ingredients: item.description || '-',
             file: item.file_name || '-',
@@ -183,6 +203,7 @@ const ChemicalsPageContent = () => {
 
   useEffect(() => {
     loadData()
+    loadUoms()
   }, [pagination.pageIndex, pagination.pageSize, searchText])
 
   // Drawer
@@ -225,8 +246,8 @@ const ChemicalsPageContent = () => {
         const data = result.data
         reset({
           name: data.name || '',
-          unit: data.uom || '',
-          dosage: data.unit_value || '',
+          unit: data.uom_id || '',
+          dosage: String(data.unit_value || ''),
           ingredients: data.description || '',
           status: data.is_active ?? 1
         })
@@ -235,8 +256,8 @@ const ChemicalsPageContent = () => {
         // Fallback to row data
         reset({
           name: row.name !== '-' ? row.name : '',
-          unit: row.unit !== '-' ? row.unit : '',
-          dosage: row.dosage !== '-' ? row.dosage : '',
+          unit: row.unit_id || '',
+          dosage: row.dosage !== '-' ? String(row.dosage) : '',
           ingredients: row.ingredients !== '-' ? row.ingredients : '',
           status: row.is_active
         })
@@ -282,7 +303,8 @@ const ChemicalsPageContent = () => {
         description: data.ingredients,
         uom: data.unit,
         unit_value: data.dosage,
-        is_active: data.status
+        is_active: data.status,
+        status: 1
       }
 
       // Handle file
@@ -376,19 +398,56 @@ const ChemicalsPageContent = () => {
         )
       }),
       columnHelper.accessor('name', { header: 'Chemical Name' }),
-      columnHelper.accessor('unit', { header: 'Unit' }),
+      columnHelper.accessor('unit', {
+        header: 'Unit',
+        cell: info => {
+          const val = info.getValue()
+          const matched = uoms.find(u => u.id === val || u.name === val)
+          return matched?.name || val || '-'
+        }
+      }),
       columnHelper.accessor('dosage', { header: 'Dosage' }),
       columnHelper.accessor('ingredients', { header: 'Ingredients' }),
       columnHelper.accessor('file', {
         header: 'File',
-        cell: info => (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <UploadFileIcon fontSize='small' color='action' />
-            <Typography variant='body2' noWrap>
-              {info.getValue() !== '-' ? info.getValue() : '—'}
-            </Typography>
-          </Box>
-        )
+        cell: info => {
+          const val = info.getValue()
+          if (val && val !== '-') {
+            return (
+              <Box
+                sx={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: '4px',
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                  border: '1px solid #eee'
+                }}
+                onClick={() => {
+                  setImgUrl(val)
+                  setImgDialogOpen(true)
+                }}
+              >
+                <img
+                  src={val}
+                  alt='chemical'
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={e => {
+                    e.target.style.display = 'none'
+                  }}
+                />
+              </Box>
+            )
+          }
+          return (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <UploadFileIcon fontSize='small' color='disabled' />
+              <Typography variant='body2' color='text.disabled'>
+                —
+              </Typography>
+            </Box>
+          )
+        }
       }),
       columnHelper.accessor('status', {
         header: 'Status',
@@ -396,9 +455,8 @@ const ChemicalsPageContent = () => {
           <Chip
             label={info.getValue() === 'Active' ? 'Active' : 'Inactive'}
             size='small'
+            color={info.getValue() === 'Active' ? 'success' : 'error'}
             sx={{
-              color: '#fff',
-              bgcolor: info.getValue() === 'Active' ? 'success.main' : 'error.main',
               fontWeight: 600,
               borderRadius: '6px',
               px: 1.5
@@ -670,7 +728,12 @@ const ChemicalsPageContent = () => {
           </Box>
           <Divider sx={{ mb: 3 }} />
 
-          <form onSubmit={hookSubmit(onSubmit)} style={{ flexGrow: 1 }}>
+          <form
+            onSubmit={hookSubmit(onSubmit, err => {
+              console.error('Validation Errors:', err)
+            })}
+            style={{ flexGrow: 1 }}
+          >
             <Grid container spacing={3}>
               {/* Name */}
               <Grid item xs={12}>
@@ -705,22 +768,34 @@ const ChemicalsPageContent = () => {
                 <Controller
                   name='unit'
                   control={control}
-                  render={({ field }) => (
-                    <GlobalAutocomplete
-                      {...field}
-                      value={field.value}
-                      onChange={(e, val) => field.onChange(val?.value || val || '')}
-                      options={[
-                        { label: 'kg', value: 'kg' },
-                        { label: 'litre', value: 'litre' },
-                        { label: 'bottle', value: 'bottle' },
-                        { label: 'pkt', value: 'pkt' },
-                        { label: 'box', value: 'box' }
-                      ]}
-                      label='Unit'
-                      fullWidth
-                    />
-                  )}
+                  shouldUnregister={false}
+                  render={({ field }) => {
+                    // 🔥 Convert ID → normalized object expected by GlobalAutocomplete
+                    const selectedUnit =
+                      Array.isArray(uoms) && field.value ? uoms.find(u => String(u.id) === String(field.value)) : null
+
+                    return (
+                      <GlobalAutocomplete
+                        label='Unit'
+                        options={uoms}
+                        value={
+                          selectedUnit
+                            ? {
+                                ...selectedUnit,
+                                label: selectedUnit.name,
+                                value: selectedUnit.id
+                              }
+                            : null
+                        }
+                        onChange={val => field.onChange(val?.value ? String(val.value) : '')}
+                        disableClearable
+                        onBlur={field.onBlur}
+                        error={!!errors.unit}
+                        helperText={errors.unit?.message}
+                        fullWidth
+                      />
+                    )
+                  }}
                 />
               </Grid>
 
@@ -732,6 +807,8 @@ const ChemicalsPageContent = () => {
                   render={({ field }) => (
                     <GlobalTextField
                       {...field}
+                      value={field.value ?? ''}
+                      onChange={e => field.onChange(String(e.target.value).replace(/\D/g, ''))}
                       label='Dosage'
                       fullWidth
                       required
@@ -956,6 +1033,41 @@ const ChemicalsPageContent = () => {
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
           >
             {loading ? 'Deleting...' : 'Delete'}
+          </GlobalButton>
+        </DialogActions>
+      </Dialog>
+
+      {/* 🖼️ Image View Dialog */}
+      <Dialog
+        onClose={() => setImgDialogOpen(false)}
+        aria-labelledby='image-view-title'
+        open={imgDialogOpen}
+        closeAfterTransition={false}
+        maxWidth='md'
+        PaperProps={{ sx: { overflow: 'visible' } }}
+      >
+        <DialogTitle id='image-view-title'>
+          <Typography variant='h5' component='span'>
+            Chemical Image
+          </Typography>
+          <DialogCloseButton onClick={() => setImgDialogOpen(false)} disableRipple>
+            <i className='tabler-x' />
+          </DialogCloseButton>
+        </DialogTitle>
+        <DialogContent sx={{ p: 0, display: 'flex', justifyContent: 'center', bgcolor: '#f8f8f8' }}>
+          {imgUrl ? (
+            <img
+              src={imgUrl}
+              alt='Chemical Full View'
+              style={{ maxWidth: '100%', maxHeight: '70vh', display: 'block' }}
+            />
+          ) : (
+            <Typography sx={{ p: 10 }}>No image available</Typography>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center', pb: 4 }}>
+          <GlobalButton onClick={() => setImgDialogOpen(false)} variant='tonal' color='secondary'>
+            Close
           </GlobalButton>
         </DialogActions>
       </Dialog>

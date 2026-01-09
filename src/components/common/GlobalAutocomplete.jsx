@@ -11,6 +11,8 @@ const GlobalAutocomplete = ({
   onChange = () => {},
   getOptionLabel,
   isOptionEqualToValue,
+  error,
+  helperText,
   ...props
 }) => {
   // ⭐ Normalize all options to { label, value }
@@ -84,7 +86,13 @@ const GlobalAutocomplete = ({
       )}
       onChange={(event, newValue) => onChange(newValue || null)}
       renderInput={params => (
-        <CustomTextField {...params} label={label} placeholder={placeholder || label} />
+        <CustomTextField
+          {...params}
+          label={label}
+          placeholder={placeholder || label}
+          error={error}
+          helperText={helperText}
+        />
       )}
       {...props}
     />

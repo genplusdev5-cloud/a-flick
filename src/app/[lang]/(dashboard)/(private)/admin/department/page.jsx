@@ -307,7 +307,8 @@ const DepartmentPageContent = () => {
         id: isEdit ? data.id : undefined, // Only send ID if edit
         name: data.name,
         description: data.description,
-        is_active: data.status === 'Active' || data.status === 1 ? 1 : 0
+        is_active: data.status === 'Active' || data.status === 1 ? 1 : 0,
+        status: 1
       }
 
       const result = isEdit ? await updateDepartment(payload) : await addDepartment(payload)

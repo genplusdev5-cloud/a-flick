@@ -232,7 +232,8 @@ const CallTypePageContent = () => {
         name: data.name,
         description: data.description || null,
         sort_order: data.sortOrder || 0,
-        is_active: data.status
+        is_active: data.status,
+        status: 1
       }
 
       const result = isEdit ? await updateCallType(payload) : await addCallType(payload)
@@ -578,7 +579,7 @@ const CallTypePageContent = () => {
         <Box sx={{ p: 5, display: 'flex', flexDirection: 'column', maxHeight: '100%' }}>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
             <Typography variant='h5' fontWeight={600}>
-              {isEdit ? 'Edit Call Type' : 'Add Call Type'}
+              {isEdit ? 'Update Call Type' : 'Add Call Type'}
             </Typography>
             <IconButton onClick={toggleDrawer} size='small'>
               <CloseIcon />

@@ -305,7 +305,8 @@ const DesignationPageContent = () => {
         id: isEdit ? data.id : undefined,
         name: data.name,
         description: data.description,
-        is_active: data.status === 'Active' || data.status === 1 ? 1 : 0
+        is_active: data.status === 'Active' || data.status === 1 ? 1 : 0,
+        status: 1
       }
 
       const result = isEdit ? await updateDesignation(payload) : await addDesignation(payload)

@@ -245,7 +245,7 @@ const UnitOfMeasurementPageContent = () => {
         uom_purchase: data.uomPurchase,
         conversion: data.conversion, // API handles conversion appropriately (likely string or int)
         is_active: data.status,
-        status: data.status
+        status: 1
       }
 
       const res = isEdit ? await updateUom(payload) : await addUom(payload)
@@ -314,10 +314,10 @@ const UnitOfMeasurementPageContent = () => {
         )
       }),
       columnHelper.accessor('name', { header: 'UOM Name' }),
-      columnHelper.accessor('uomStore', { header: 'Store UOM' }),
-      columnHelper.accessor('uomPurchase', { header: 'Purchase UOM' }),
-      columnHelper.accessor('conversion', { header: 'Conversion' }),
-      columnHelper.accessor('description', { header: 'Description' }),
+      // columnHelper.accessor('uomStore', { header: 'Store UOM' }),
+      // columnHelper.accessor('uomPurchase', { header: 'Purchase UOM' }),
+      // columnHelper.accessor('conversion', { header: 'Conversion' }),
+      // columnHelper.accessor('description', { header: 'Description' }),
       columnHelper.accessor('status', {
         header: 'Status',
         cell: info => (
@@ -574,7 +574,7 @@ const UnitOfMeasurementPageContent = () => {
         <Box sx={{ p: 5, display: 'flex', flexDirection: 'column', maxHeight: '100%' }}>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
             <Typography variant='h5' fontWeight={600}>
-              {isEdit ? 'Edit UOM' : 'Add UOM'}
+              {isEdit ? 'Update UOM' : 'Add UOM'}
             </Typography>
             <IconButton onClick={toggleDrawer} size='small'>
               <CloseIcon />
@@ -613,7 +613,7 @@ const UnitOfMeasurementPageContent = () => {
               </Grid>
 
               {/* UOM Store */}
-              <Grid item xs={12}>
+              {/* <Grid item xs={12}>
                 <Controller
                   name='uomStore'
                   control={control}
@@ -638,10 +638,10 @@ const UnitOfMeasurementPageContent = () => {
                     />
                   )}
                 />
-              </Grid>
+              </Grid> */}
 
               {/* UOM Purchase */}
-              <Grid item xs={12}>
+              {/* <Grid item xs={12}>
                 <Controller
                   name='uomPurchase'
                   control={control}
@@ -666,10 +666,10 @@ const UnitOfMeasurementPageContent = () => {
                     />
                   )}
                 />
-              </Grid>
+              </Grid> */}
 
               {/* Conversion */}
-              <Grid item xs={12}>
+              {/* <Grid item xs={12}>
                 <Controller
                   name='conversion'
                   control={control}
@@ -695,10 +695,10 @@ const UnitOfMeasurementPageContent = () => {
                     />
                   )}
                 />
-              </Grid>
+              </Grid> */}
 
               {/* Description */}
-              <Grid item xs={12}>
+              {/* <Grid item xs={12}>
                 <Controller
                   name='description'
                   control={control}
@@ -706,7 +706,7 @@ const UnitOfMeasurementPageContent = () => {
                     <GlobalTextarea {...field} label='Description' placeholder='Description' minRows={3} />
                   )}
                 />
-              </Grid>
+              </Grid> */}
 
               {/* Status */}
               {isEdit && (

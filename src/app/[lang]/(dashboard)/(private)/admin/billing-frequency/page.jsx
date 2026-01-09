@@ -283,7 +283,7 @@ const BillingFrequencyPageContent = () => {
         sort_order: Number(data.sortOrder),
         description: data.description,
         is_active: data.status,
-        status: data.status,
+        status: 1,
         is_billing: 1
       }
 
@@ -739,6 +739,11 @@ const BillingFrequencyPageContent = () => {
                       fullWidth
                       error={!!errors.backlogAge}
                       helperText={errors.backlogAge?.message}
+                      onChange={e => field.onChange(e.target.value.replace(/\D/g, ''))} // 🔥 INT ONLY
+                      inputProps={{
+                        inputMode: 'numeric',
+                        pattern: '[0-9]*'
+                      }}
                       sx={{
                         '& .MuiFormLabel-asterisk': {
                           color: '#e91e63 !important',

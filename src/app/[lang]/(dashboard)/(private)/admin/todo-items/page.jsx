@@ -264,7 +264,7 @@ const TodoItemsPageContent = () => {
         name: data.title,
         description: '', // Optional in schema/payload?
         is_active: data.status,
-        status: data.status
+        status: 1
       }
 
       const result = isEdit ? await updateTodo(payload) : await addTodo(payload)

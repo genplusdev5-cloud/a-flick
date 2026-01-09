@@ -310,7 +310,7 @@ const ServiceFrequencyPageContent = () => {
         sort_order: data.sortOrder,
         description: data.description,
         is_active: data.status,
-        status: data.status
+        status: 1
       }
 
       // If displayFrequency is separate, include it, but usually mapped to name

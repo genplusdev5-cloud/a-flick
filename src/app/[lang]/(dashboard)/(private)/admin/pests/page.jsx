@@ -317,6 +317,7 @@ const PestPageContent = () => {
         pest_value: mainFormData.value,
         description: mainFormData.description,
         is_active: mainFormData.status === 'Active' ? 1 : 0, // ✅ convert status to integer
+        status: 1, // ✅ standardized status
         user_role: mainFormData.user_role || 'Admin'
       }
 
@@ -436,7 +437,8 @@ const PestPageContent = () => {
       const payload = {
         name: subFormData.name,
         pest_id: selectedPestId, // ✅ correct key name
-        is_active: subFormData.status === 'Active' ? 1 : 0
+        is_active: subFormData.status === 'Active' ? 1 : 0,
+        status: 1 // ✅ standardized status
       }
 
       let res

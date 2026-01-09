@@ -242,7 +242,8 @@ const EquipmentsPageContent = () => {
       const payload = {
         name: data.name,
         description: data.description || null,
-        is_active: data.status
+        is_active: data.status,
+        status: 1
       }
 
       const result = isEdit ? await updateEquipment({ ...payload, id: editId }) : await addEquipment(payload)
