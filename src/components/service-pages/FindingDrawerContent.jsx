@@ -335,7 +335,6 @@ export default function FindingDrawerContent({ pestId }) {
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
           <GlobalButton
             onClick={() => setOpenDelete(false)}
-            variant='tonal'
             color='secondary'
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
           >

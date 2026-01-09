@@ -142,8 +142,8 @@ const EmployeeLeavePageContent = () => {
     leaveType: '',
     leave_date: new Date(),
     to_date: new Date(),
-    start_time: '', // must be ''
-    end_time: '', // must be ''
+    start_time: '00:00',
+    end_time: '00:00',
     from_ampm: 'AM',
     to_ampm: 'PM',
     status: 'Pending',
@@ -207,8 +207,8 @@ const EmployeeLeavePageContent = () => {
       leaveType: '',
       leave_date: new Date(),
       to_date: new Date(),
-      start_time: '',
-      end_time: '',
+      start_time: '00:00',
+      end_time: '00:00',
       from_ampm: 'AM',
       to_ampm: 'PM',
       status: 'Pending',
@@ -258,6 +258,7 @@ const EmployeeLeavePageContent = () => {
         from_ampm: String(formData.from_ampm || 'AM').trim(),
         to_ampm: String(formData.to_ampm || 'PM').trim(),
         is_approved: formData.status === 'Approved' ? 1 : formData.status === 'Rejected' ? 0 : null,
+        remarks: formData.description || '',
         is_active: 1,
         status: 1,
         created_by: 1,
@@ -409,11 +410,11 @@ const EmployeeLeavePageContent = () => {
         leaveType: data.leave_type_id || data.leave_type || '', // ✅ ID or name fallback
         leave_date: data.leave_date ? new Date(data.leave_date) : new Date(), // ✅ date fix
         to_date: data.to_date ? new Date(data.to_date) : new Date(),
-        start_time: data.start_time || '', // ✅ start time
-        end_time: data.end_time || '', // ✅ end time
+        start_time: data.start_time || '00:00', // ✅ start time
+        end_time: data.end_time || '00:00', // ✅ end time
         from_ampm: data.from_ampm || 'AM',
         to_ampm: data.to_ampm || 'PM',
-        description: data.description || '',
+        description: data.remarks || data.description || '',
         status: data.is_approved === 1 ? 'Approved' : data.is_approved === 0 ? 'Rejected' : 'Pending'
       })
 
@@ -633,7 +634,7 @@ const EmployeeLeavePageContent = () => {
           title={
             <Box display='flex' alignItems='center' gap={2}>
               <Typography variant='h5' sx={{ fontWeight: 600 }}>
-                Leave
+                Employee Leave
               </Typography>
               <GlobalButton
                 variant='contained'
@@ -795,54 +796,54 @@ const EmployeeLeavePageContent = () => {
           </Box>
           <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
             <StickyTableWrapper rowCount={rows.length}>
-          <table className={styles.table}>
-            <thead>
-              {table.getHeaderGroups().map(hg => (
-                <tr key={hg.id}>
-                  {hg.headers.map(h => (
-                    <th key={h.id}>
-                      <div
-                        className={classnames({
-                          'flex items-center': h.column.getIsSorted(),
-                          'cursor-pointer select-none': h.column.getCanSort()
-                        })}
-                        onClick={h.column.getToggleSortingHandler()}
-                      >
-                        {flexRender(h.column.columnDef.header, h.getContext())}
-                        {{
-                          asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
-                          desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
-                        }[h.column.getIsSorted()] ?? null}
-                      </div>
-                    </th>
+              <table className={styles.table}>
+                <thead>
+                  {table.getHeaderGroups().map(hg => (
+                    <tr key={hg.id}>
+                      {hg.headers.map(h => (
+                        <th key={h.id}>
+                          <div
+                            className={classnames({
+                              'flex items-center': h.column.getIsSorted(),
+                              'cursor-pointer select-none': h.column.getCanSort()
+                            })}
+                            onClick={h.column.getToggleSortingHandler()}
+                          >
+                            {flexRender(h.column.columnDef.header, h.getContext())}
+                            {{
+                              asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
+                              desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
+                            }[h.column.getIsSorted()] ?? null}
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
                   ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody>
-              {rows.length ? (
-                table.getRowModel().rows.map(row => (
-                  <tr key={row.original.id + '_' + row.original.sno}>
-                    {row.getVisibleCells().map(cell => (
-                      <td key={cell.column.id + '_' + row.original.id + '_' + row.index}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </thead>
+                <tbody>
+                  {rows.length ? (
+                    table.getRowModel().rows.map(row => (
+                      <tr key={row.original.id + '_' + row.original.sno}>
+                        {row.getVisibleCells().map(cell => (
+                          <td key={cell.column.id + '_' + row.original.id + '_' + row.index}>
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={columns.length} className='text-center py-4'>
+                        No leave requests found
                       </td>
-                    ))}
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={columns.length} className='text-center py-4'>
-                    No leave requests found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </StickyTableWrapper>
           </Box>
           <Box sx={{ mt: 'auto', flexShrink: 0 }}>
-             <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+            <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
           </Box>
         </Box>
       </Card>
@@ -857,6 +858,7 @@ const EmployeeLeavePageContent = () => {
         <Box sx={{ p: 5, display: 'flex', flexDirection: 'column', maxHeight: '100%' }}>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
             <Typography variant='h5' fontWeight={600}>
+              {isEdit ? 'Update Employee Leave' : 'Add Employee Leave'}
             </Typography>
             <IconButton onClick={() => setDrawerOpen(false)} size='small'>
               <CloseIcon />
@@ -945,13 +947,21 @@ const EmployeeLeavePageContent = () => {
                       timeIntervals={15}
                       selected={formData.start_time ? new Date(`1970-01-01T${formData.start_time}`) : new Date()}
                       onChange={time => {
-                        const formattedTime = time
-                          ? new Date(time).toLocaleTimeString('en-GB', {
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })
-                          : ''
-                        handleFieldChange('start_time', formattedTime)
+                        if (!time) {
+                          handleFieldChange('start_time', '')
+                          return
+                        }
+                        const date = new Date(time)
+                        const formattedTime = date.toLocaleTimeString('en-GB', {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })
+                        const ampm = date.getHours() >= 12 ? 'PM' : 'AM'
+                        setFormData(prev => ({
+                          ...prev,
+                          start_time: formattedTime,
+                          from_ampm: ampm
+                        }))
                       }}
                       dateFormat='h:mm aa'
                       customInput={<GlobalTextField fullWidth label='Time' />}
@@ -982,13 +992,21 @@ const EmployeeLeavePageContent = () => {
                       timeIntervals={15}
                       selected={formData.end_time ? new Date(`1970-01-01T${formData.end_time}`) : new Date()}
                       onChange={time => {
-                        const formattedTime = time
-                          ? new Date(time).toLocaleTimeString('en-GB', {
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })
-                          : ''
-                        handleFieldChange('end_time', formattedTime)
+                        if (!time) {
+                          handleFieldChange('end_time', '')
+                          return
+                        }
+                        const date = new Date(time)
+                        const formattedTime = date.toLocaleTimeString('en-GB', {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })
+                        const ampm = date.getHours() >= 12 ? 'PM' : 'AM'
+                        setFormData(prev => ({
+                          ...prev,
+                          end_time: formattedTime,
+                          to_ampm: ampm
+                        }))
                       }}
                       dateFormat='h:mm aa'
                       customInput={<GlobalTextField fullWidth label='Time' />}
@@ -1113,7 +1131,7 @@ const EmployeeLeavePageContent = () => {
 // Wrapper for RBAC
 export default function EmployeeLeavePage() {
   return (
-    <PermissionGuard permission="Employee Leaves">
+    <PermissionGuard permission='Employee Leaves'>
       <EmployeeLeavePageContent />
     </PermissionGuard>
   )

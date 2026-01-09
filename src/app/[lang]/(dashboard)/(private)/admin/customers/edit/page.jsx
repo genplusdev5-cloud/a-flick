@@ -2,6 +2,8 @@
 
 import { getCustomerDetails, updateCustomer, deleteCustomerContact } from '@/api/customer'
 import { getCustomerOrigin } from '@/api/customer/origin'
+import { getAllDropdowns } from '@/api/contract/dropdowns'
+import { getAllEmployees } from '@/api/employee'
 
 import { useState, useEffect, useRef } from 'react'
 import { Box, Button, Grid, Typography, Card, IconButton, Divider } from '@mui/material'
@@ -80,9 +82,15 @@ export default function EditCustomerPage() {
   const [editingContact, setEditingContact] = useState(null)
   const [miniEmailError, setMiniEmailError] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [notFound, setNotFound] = useState(false)
   const [originMap, setOriginMap] = useState({})
   const [originOptions, setOriginOptions] = useState([])
+
+  const [dropdowns, setDropdowns] = useState({
+    employees: [],
+    industries: []
+  })
 
   // REFS FOR FOCUS
   const originRef = useRef(null)
@@ -109,9 +117,13 @@ export default function EditCustomerPage() {
   useEffect(() => {
     const loadOrigins = async () => {
       try {
-        const res = await getCustomerOrigin()
-        const list = res?.data || []
+        const [originRes, dropData, empData] = await Promise.all([
+          getCustomerOrigin(),
+          getAllDropdowns(),
+          getAllEmployees()
+        ])
 
+        const list = originRes?.data || []
         const map = {}
         const options = list.map(o => {
           map[o.id] = o.name
@@ -120,8 +132,13 @@ export default function EditCustomerPage() {
 
         setOriginMap(map)
         setOriginOptions(options)
+
+        setDropdowns({
+          employees: empData.map(e => ({ label: e.name, value: e.id })),
+          industries: dropData.industries || []
+        })
       } catch (err) {
-        console.error('Origin load failed', err)
+        console.error('Dropdown load failed', err)
       }
     }
 
@@ -174,8 +191,15 @@ export default function EditCustomerPage() {
           remarks2: data.description || ''
         })
 
-        setContacts(data.contact || [])
-        setTimeout(() => originRef.current?.querySelector('input')?.focus(), 200)
+        setContacts(
+          (data.contact || []).map(c => ({
+            id: c.id,
+            miniName: c.name || '',
+            miniEmail: c.email || '',
+            miniPhone: c.phone || ''
+          }))
+        )
+        setTimeout(() => originRef.current?.focus(), 200)
       } catch (err) {
         console.error(err)
         setNotFound(true)
@@ -211,7 +235,7 @@ export default function EditCustomerPage() {
   const handleEnterFocus = (e, nextRef) => {
     if (e.key === 'Enter') {
       e.preventDefault()
-      nextRef.current?.querySelector('input')?.focus()
+      nextRef.current?.focus()
     }
   }
 
@@ -274,6 +298,8 @@ export default function EditCustomerPage() {
   const handleFinalCancel = () => router.push('/admin/customers')
 
   const handleFinalSave = async () => {
+    if (saving) return
+    setSaving(true)
     const formatDate = d => (d ? new Date(d).toISOString().split('T')[0] : null)
 
     const payload = {
@@ -285,24 +311,32 @@ export default function EditCustomerPage() {
       commence_date: formatDate(formData.commenceDate),
       pic_contact_name: formData.picName,
       pic_email: formData.picEmail,
-      pic_phone: formData.picPhone,
+      pic_phone: formData.picPhone ? formData.picPhone.replace(/\D/g, '') : '',
       billing_contact_name: formData.billingName,
       billing_email: formData.billingEmail,
-      billing_phone: formData.billingPhone,
+      billing_phone: formData.billingPhone ? formData.billingPhone.replace(/\D/g, '') : '',
       city: formData.city,
       postal_code: formData.postalCode,
-      payment_term: formData.paymentTerms ? Number(formData.paymentTerms) : null,
+      payment_term: formData.paymentTerms || null,
       sales_person_id: formData.salesperson ? Number(formData.salesperson) : null,
       billing_address: formData.billingAddress,
       email: formData.loginEmail,
       password: formData.password,
       short_description: formData.remarks1,
       description: formData.remarks2,
-      contact: contacts.map(c => ({
-        name: c.miniName,
-        email: c.miniEmail,
-        phone: c.miniPhone
-      }))
+      contact_update: contacts.map(c => {
+        const contactObj = {
+          customer_id: editCustomerId,
+          name: c.miniName,
+          email: c.miniEmail,
+          phone: c.miniPhone ? c.miniPhone.replace(/\D/g, '') : ''
+        }
+        // Include ID if it's a valid DB ID and not a timestamp (Max Int32)
+        if (c.id && c.id < 2147483647) {
+          contactObj.id = c.id
+        }
+        return contactObj
+      })
     }
 
     try {
@@ -317,6 +351,8 @@ export default function EditCustomerPage() {
     } catch (err) {
       console.error(err)
       showToast('error', 'Error saving customer')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -367,11 +403,11 @@ export default function EditCustomerPage() {
       {/* LEFT: Customer Details */}
       <Grid item xs={12} md={8}>
         <ContentLayout
-          title={<Box sx={{ m: 2 }}>Edit Customer Details</Box>}
+          title={<Box sx={{ m: 2 }}>Update Customer Details</Box>}
           breadcrumbs={[
             { label: 'Home', href: '/' },
             { label: 'Customer', href: '/admin/customers' },
-            { label: 'Edit Customer' }
+            { label: 'Update Customer' }
           ]}
         >
           <Card sx={{ p: 4, boxShadow: 'none' }}>
@@ -578,11 +614,11 @@ export default function EditCustomerPage() {
                       { value: 'Yearly', label: 'Yearly' }
                     ].find(o => o.value === formData.paymentTerms) || null
                   }
-                  onChange={opt => setFormData(prev => ({ ...prev, paymentTerms: opt?.value || '' }))}
                   options={[
                     { value: 'Monthly', label: 'Monthly' },
                     { value: 'Yearly', label: 'Yearly' }
                   ]}
+                  onChange={opt => setFormData(prev => ({ ...prev, paymentTerms: opt?.value || '' }))}
                 />
               </Grid>
 
@@ -592,12 +628,12 @@ export default function EditCustomerPage() {
                   ref={salespersonRef}
                   fullWidth
                   label='Sales Person'
-                  value={formData.salesperson}
-                  onChange={e => {
-                    setFormData(prev => ({ ...prev, salesperson: e.target.value }))
+                  value={dropdowns.employees.find(e => e.value === formData.salesperson) || null}
+                  options={dropdowns.employees}
+                  onChange={opt => {
+                    setFormData(prev => ({ ...prev, salesperson: opt?.value || '' }))
                     loginEmailRef.current?.querySelector('input')?.focus()
                   }}
-                  options={['Employee 1', 'Employee 2'].map(v => ({ value: v, label: v }))}
                 />
               </Grid>
 
@@ -720,7 +756,7 @@ export default function EditCustomerPage() {
 
                 <Box mt={3} display='flex' gap={2}>
                   {editingContact && (
-                    <GlobalButton variant='outlined' color='secondary' fullWidth onClick={handleCancelEdit}>
+                    <GlobalButton color='secondary' fullWidth onClick={handleCancelEdit}>
                       Cancel
                     </GlobalButton>
                   )}
@@ -777,11 +813,11 @@ export default function EditCustomerPage() {
 
                 <Divider sx={{ mt: 4 }} />
                 <Box mt={2} p={2} display='flex' gap={2} justifyContent='flex-end'>
-                  <GlobalButton variant='outlined' onClick={handleFinalCancel}>
+                  <GlobalButton color='secondary' onClick={handleFinalCancel} disabled={saving}>
                     Cancel
                   </GlobalButton>
-                  <GlobalButton variant='contained' onClick={handleFinalSave}>
-                    Update Customer
+                  <GlobalButton variant='contained' onClick={handleFinalSave} disabled={saving}>
+                    {saving ? 'Updating...' : 'Update Customer'}
                   </GlobalButton>
                 </Box>
               </Card>

@@ -292,7 +292,9 @@ export default function PestChemicalsDrawerContent({ pestId }) {
             onClick={() => setOpenDelete(false)}
             disableRipple
             sx={{ position: 'absolute', right: 1, top: 1 }}
-          />
+          >
+            <i className='tabler-x' />
+          </DialogCloseButton>
         </DialogTitle>
 
         <DialogContent sx={{ px: 5, pt: 1 }}>
@@ -306,13 +308,22 @@ export default function PestChemicalsDrawerContent({ pestId }) {
         </DialogContent>
 
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-          <Button variant='tonal' color='secondary' onClick={() => setOpenDelete(false)}>
+          <GlobalButton
+            color='secondary'
+            onClick={() => setOpenDelete(false)}
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+          >
             Cancel
-          </Button>
+          </GlobalButton>
 
-          <Button variant='contained' color='error' onClick={confirmDelete}>
+          <GlobalButton
+            variant='contained'
+            color='error'
+            onClick={confirmDelete}
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+          >
             Delete
-          </Button>
+          </GlobalButton>
         </DialogActions>
       </Dialog>
     </Box>

@@ -8,6 +8,8 @@ import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
 
 import { getCustomerOrigin } from '@/api/customer/origin'
+import { getAllDropdowns } from '@/api/contract/dropdowns'
+import { getAllEmployees } from '@/api/employee'
 import { showToast } from '@/components/common/Toasts'
 
 // 🔥 Global UI Components (use everywhere)
@@ -73,6 +75,7 @@ export default function AddCustomerPage() {
   const [editingContact, setEditingContact] = useState(null)
   const [miniEmailError, setMiniEmailError] = useState(false)
   const [loginEmailError, setLoginEmailError] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
 
   // REFS FOR FOCUS
   const companyPrefixRef = useRef(null)
@@ -116,32 +119,13 @@ export default function AddCustomerPage() {
   useEffect(() => {
     const loadDropdowns = async () => {
       try {
-        const data = await getAllDropdowns()
+        const [dropData, empData] = await Promise.all([getAllDropdowns(), getAllEmployees()])
 
-        const safeArray = val => {
-          if (!val) return []
-          if (Array.isArray(val)) return val
-          if (val.name && Array.isArray(val.name)) return val.name
-          if (val.results && Array.isArray(val.results)) return val.results
-          return []
-        }
-
-        setDropdowns({
-          employees: safeArray(data.employee?.name),
-          customers: safeArray(data.customer?.name),
-          industries: safeArray(data.industry?.name),
-
-          callTypes: safeArray(data.calltype?.name),
-
-          billingFreq: safeArray(data.billingfrequency?.name),
-          serviceFreq: safeArray(data.servicefrequency?.name),
-
-          pests: safeArray(data.pest?.name),
-          chemicals: safeArray(data.chemicals?.name),
-          uom: safeArray(data.uom?.name),
-
-          supplier: safeArray(data.supplier?.name)
-        })
+        setDropdowns(prev => ({
+          ...prev,
+          employees: empData.map(e => ({ label: e.name, value: e.id })),
+          industries: dropData.industries || []
+        }))
       } catch (error) {
         console.error('Dropdown load error:', error)
       }
@@ -193,10 +177,10 @@ export default function AddCustomerPage() {
     }
   }
 
-  const handleEnterFocus = (e, nextFieldName) => {
+  const handleEnterFocus = (e, nextRef) => {
     if (e.key === 'Enter') {
       e.preventDefault()
-      document.querySelector(`[name="${nextFieldName}"]`)?.focus()
+      nextRef.current?.focus()
     }
   }
 
@@ -252,6 +236,8 @@ export default function AddCustomerPage() {
   const handleFinalCancel = () => router.push('/admin/customers')
 
   const handleFinalSave = async () => {
+    if (isSaving) return
+    setIsSaving(true)
     const formatDate = d => d.toISOString().split('T')[0]
 
     const payload = {
@@ -263,15 +249,15 @@ export default function AddCustomerPage() {
       commence_date: formatDate(formData.commenceDate),
       pic_contact_name: formData.picName,
       pic_email: formData.picEmail,
-      pic_phone: formData.picPhone,
+      pic_phone: formData.picPhone ? formData.picPhone.replace(/\D/g, '') : '',
       billing_contact_name: formData.billingName,
       billing_email: formData.billingEmail,
-      billing_phone: formData.billingPhone,
+      billing_phone: formData.billingPhone ? formData.billingPhone.replace(/\D/g, '') : '',
       city: formData.city,
       state: formData.state || '',
       postal_code: formData.postalCode,
-      payment_term: Number(formData.paymentTerms),
-      sales_person_id: Number(formData.salesperson),
+      payment_term: formData.paymentTerms || null,
+      sales_person_id: formData.salesperson ? Number(formData.salesperson) : null,
       billing_address: formData.billingAddress,
       email: formData.loginEmail,
       password: formData.password,
@@ -280,7 +266,7 @@ export default function AddCustomerPage() {
       contact: contacts.map(c => ({
         name: c.miniName,
         email: c.miniEmail,
-        phone: c.miniPhone
+        phone: c.miniPhone ? c.miniPhone.replace(/\D/g, '') : ''
       }))
     }
 
@@ -296,6 +282,8 @@ export default function AddCustomerPage() {
     } catch (err) {
       console.error(err)
       showToast('error', 'Error creating customer')
+    } finally {
+      setIsSaving(false)
     }
   }
   const contactManualColumns = [
@@ -340,12 +328,12 @@ export default function AddCustomerPage() {
                 <GlobalAutocomplete
                   fullWidth
                   label='Origin'
-                  value={formData.origin}
+                  value={originOptions.find(o => o.value === formData.origin) || null}
                   options={originOptions}
                   onChange={newValue =>
                     setFormData(prev => ({
                       ...prev,
-                      origin: newValue?.value ?? '' // use object directly
+                      origin: newValue?.value ?? ''
                     }))
                   }
                 />
@@ -534,9 +522,17 @@ export default function AddCustomerPage() {
                 <GlobalAutocomplete
                   fullWidth
                   label='Payment Terms'
-                  value={formData.paymentTerms}
-                  options={['Monthly', 'Yearly'].map(v => ({ value: v, label: v }))}
-                  onChange={(_, option) => setFormData(prev => ({ ...prev, paymentTerms: option?.value || '' }))}
+                  value={
+                    [
+                      { value: 'Monthly', label: 'Monthly' },
+                      { value: 'Yearly', label: 'Yearly' }
+                    ].find(o => o.value === formData.paymentTerms) || null
+                  }
+                  options={[
+                    { value: 'Monthly', label: 'Monthly' },
+                    { value: 'Yearly', label: 'Yearly' }
+                  ]}
+                  onChange={option => setFormData(prev => ({ ...prev, paymentTerms: option?.value || '' }))}
                 />
               </Grid>
 
@@ -545,9 +541,9 @@ export default function AddCustomerPage() {
                 <GlobalAutocomplete
                   fullWidth
                   label='Sales Person'
-                  value={formData.salesperson}
-                  options={['Employee 1', 'Employee 2'].map(v => ({ value: v, label: v }))}
-                  onChange={(_, option) => setFormData(prev => ({ ...prev, salesperson: option?.value || '' }))}
+                  value={dropdowns.employees.find(e => e.value === formData.salesperson) || null}
+                  options={dropdowns.employees}
+                  onChange={option => setFormData(prev => ({ ...prev, salesperson: option?.value || '' }))}
                 />
               </Grid>
 
@@ -677,7 +673,7 @@ export default function AddCustomerPage() {
 
                 <Box mt={3} display='flex' gap={2}>
                   {editingContact && (
-                    <GlobalButton variant='outlined' color='secondary' fullWidth onClick={handleCancelEdit}>
+                    <GlobalButton  color='secondary' fullWidth onClick={handleCancelEdit}>
                       Cancel
                     </GlobalButton>
                   )}
@@ -736,8 +732,8 @@ export default function AddCustomerPage() {
                   <GlobalButton color='secondary' onClick={handleFinalCancel}>
                     Cancel
                   </GlobalButton>
-                  <GlobalButton variant='contained' onClick={handleFinalSave}>
-                    {isEditMode ? 'Update Customer' : 'Save'}
+                  <GlobalButton variant='contained' onClick={handleFinalSave} disabled={isSaving}>
+                    {isEditMode ? 'Update Customer' : isSaving ? 'Saving...' : 'Save'}
                   </GlobalButton>
                 </Box>
               </Box>

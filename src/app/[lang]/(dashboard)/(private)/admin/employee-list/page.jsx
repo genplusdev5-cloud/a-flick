@@ -87,37 +87,6 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
 import PermissionGuard from '@/components/auth/PermissionGuard'
 import { usePermission } from '@/hooks/usePermission'
 
-const departmentOptions = [
-  { id: 'hr', label: 'HR' },
-  { id: 'sales', label: 'Sales' },
-  { id: 'tech', label: 'Technical' },
-  { id: 'accounts', label: 'Accounts' }
-]
-
-const designationOptions = [
-  { id: 'manager', label: 'Manager' },
-  { id: 'executive', label: 'Executive' },
-  { id: 'technician', label: 'Technician' }
-]
-
-const userRoleOptions = [
-  { id: 'admin', label: 'Admin' },
-  { id: 'employee', label: 'Employee' },
-  { id: 'supervisor', label: 'Supervisor' }
-]
-
-const supervisorOptions = [
-  { id: 1, label: 'Ravi' },
-  { id: 2, label: 'Kumar' },
-  { id: 3, label: 'John' }
-]
-
-// ───────────────────────────────────────────
-// Component
-// ───────────────────────────────────────────
-// ───────────────────────────────────────────
-// Component
-// ───────────────────────────────────────────
 const EmployeePageContent = () => {
   const { canAccess } = usePermission()
   const searchParams = useSearchParams()
@@ -126,6 +95,12 @@ const EmployeePageContent = () => {
   const [designation, setDesignation] = useState(null)
   const [userRole, setUserRole] = useState(null)
   const [supervisor, setSupervisor] = useState(null)
+
+  // Filter options
+  const [departmentOptions, setDepartmentOptions] = useState([])
+  const [designationOptions, setDesignationOptions] = useState([])
+  const [userRoleOptions, setUserRoleOptions] = useState([])
+  const [supervisorOptions, setSupervisorOptions] = useState([])
 
   // Initialize pagination from URL search params
   const initialPageIndex = searchParams.get('pageIndex') ? Number(searchParams.get('pageIndex')) : 0
@@ -136,12 +111,47 @@ const EmployeePageContent = () => {
   const [searchText, setSearchText] = useState('')
   const [pagination, setPagination] = useState({ pageIndex: initialPageIndex, pageSize: initialPageSize })
   const [loading, setLoading] = useState(false)
+  const [filterLoading, setFilterLoading] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
 
   const [openEmployeeDialog, setOpenEmployeeDialog] = useState(false)
   const [dialogMode, setDialogMode] = useState('add')
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(null)
+
+  // Load Filter Options
+  useEffect(() => {
+    const loadFilters = async () => {
+      setFilterLoading(true)
+      try {
+        const [deptRes, desigRes, roleRes, superRes] = await Promise.all([
+          import('@/api/departments/list').then(m => m.getDepartmentList()),
+          import('@/api/designations/list').then(m => m.getDesignationList()),
+          import('@/api/userRole/list').then(m => m.getUserRoleList()),
+          import('@/api/employee').then(m => m.getSupervisorList())
+        ])
+
+        const extract = res => {
+          if (res?.data?.data?.results) return res.data.data.results
+          if (res?.data?.results) return res.data.results
+          if (Array.isArray(res?.data)) return res.data
+          return []
+        }
+
+        const sanitize = list => list.map(item => ({ id: item.id, label: item.name || '-' }))
+
+        setDepartmentOptions(sanitize(extract(deptRes)))
+        setDesignationOptions(sanitize(extract(desigRes)))
+        setUserRoleOptions(sanitize(extract(roleRes)))
+        setSupervisorOptions(extract(superRes).map(x => ({ id: x.id, label: x.name || '-' })))
+      } catch (error) {
+        console.error('❌ Filter fetch failed:', error)
+      } finally {
+        setFilterLoading(false)
+      }
+    }
+    loadFilters()
+  }, [])
 
   const loadData = useCallback(async () => {
     setLoading(true)

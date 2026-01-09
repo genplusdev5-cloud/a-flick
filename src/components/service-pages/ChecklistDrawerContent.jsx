@@ -286,11 +286,13 @@ export default function ChecklistDrawerContent({ pestId }) {
         >
           <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
           Confirm Delete
-          <DialogCloseButton
+              <DialogCloseButton
             onClick={() => setOpenDelete(false)}
             disableRipple
             sx={{ position: 'absolute', right: 1, top: 1 }}
-          />
+          >
+            <i className='tabler-x' />
+          </DialogCloseButton>
         </DialogTitle>
 
         <DialogContent sx={{ px: 5, pt: 1 }}>
@@ -304,11 +306,20 @@ export default function ChecklistDrawerContent({ pestId }) {
         </DialogContent>
 
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-          <GlobalButton variant='tonal' color='secondary' onClick={() => setOpenDelete(false)}>
+          <GlobalButton
+            color='secondary'
+            onClick={() => setOpenDelete(false)}
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+          >
             Cancel
           </GlobalButton>
 
-          <GlobalButton variant='contained' color='error' onClick={confirmDelete}>
+          <GlobalButton
+            variant='contained'
+            color='error'
+            onClick={confirmDelete}
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+          >
             Delete
           </GlobalButton>
         </DialogActions>

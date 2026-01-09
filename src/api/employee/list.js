@@ -1,11 +1,12 @@
 import api from '@/utils/axiosInstance'
 
-export const getEmployeeList = async (limit = 25, page = 1, search = '') => {
+export const getEmployeeList = async (limit = 25, page = 1, search = '', filters = {}) => {
   const response = await api.get('employee-list/', {
     params: {
-      page_size: limit, // ✅ backend expects page_size
-      page, // optional if backend uses it
-      search
+      page_size: limit,
+      page,
+      search,
+      ...filters
     }
   })
 

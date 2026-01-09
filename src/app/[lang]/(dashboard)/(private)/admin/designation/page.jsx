@@ -121,7 +121,8 @@ const DesignationPageContent = () => {
   const [loading, setLoading] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
-  
+  const [editId, setEditId] = useState(null)
+
   // Draft State
   const [unsavedAddData, setUnsavedAddData] = useState(null)
   const [closeReason, setCloseReason] = useState(null)
@@ -217,12 +218,14 @@ const DesignationPageContent = () => {
   // 🔹 Cancel drawer + reset form
   const handleCancel = () => {
     setCloseReason('cancel')
+    setEditId(null)
     setDrawerOpen(false)
   }
 
   // 🔹 Updated Add handler with unsaved data restore
   const handleAdd = () => {
     setIsEdit(false)
+    setEditId(null)
     if (unsavedAddData) {
       reset(unsavedAddData)
     } else {
@@ -239,6 +242,7 @@ const DesignationPageContent = () => {
   const handleEdit = async row => {
     try {
       setIsEdit(true)
+      setEditId(row.id)
       setLoading(true)
 
       const result = await getDesignationDetails(row.id)
@@ -287,12 +291,9 @@ const DesignationPageContent = () => {
     }
   }
 
-  const onSubmit = async (data) => {
+  const onSubmit = async data => {
     // 🔍 Duplicate Check (Client-Side)
-    const isDuplicate = rows.some(r =>
-      r.name.toLowerCase() === data.name.trim().toLowerCase() &&
-      r.id !== (isEdit ? data.id : -1)
-    )
+    const isDuplicate = rows.some(r => r.name.toLowerCase() === data.name.trim().toLowerCase() && r.id !== editId)
 
     if (isDuplicate) {
       showToast('error', 'Designation name already exists')
@@ -302,7 +303,7 @@ const DesignationPageContent = () => {
     setLoading(true)
     try {
       const payload = {
-        id: isEdit ? data.id : undefined,
+        id: isEdit ? editId : undefined,
         name: data.name,
         description: data.description,
         is_active: data.status === 'Active' || data.status === 1 ? 1 : 0,
@@ -603,252 +604,249 @@ const DesignationPageContent = () => {
               </Select>
             </FormControl>
 
-          <DebouncedInput
-            value={searchText}
-            onChange={v => {
-              setSearchText(String(v))
-              setPagination(p => ({ ...p, pageIndex: 0 }))
-            }}
-            placeholder='Search name, description...'
-            sx={{ width: 360 }}
-            variant='outlined'
-            size='small'
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position='start'>
-                    <SearchIcon />
-                  </InputAdornment>
-                )
-              }
-            }}
-          />
-        </Box>
+            <DebouncedInput
+              value={searchText}
+              onChange={v => {
+                setSearchText(String(v))
+                setPagination(p => ({ ...p, pageIndex: 0 }))
+              }}
+              placeholder='Search name, description...'
+              sx={{ width: 360 }}
+              variant='outlined'
+              size='small'
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position='start'>
+                      <SearchIcon />
+                    </InputAdornment>
+                  )
+                }
+              }}
+            />
+          </Box>
 
-        <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-          <StickyTableWrapper rowCount={rows.length}>
-            <table className={styles.table}>
-              <thead>
-                {table.getHeaderGroups().map(hg => (
-                  <tr key={hg.id}>
-                    {hg.headers.map(h => (
-                      <th key={h.id}>
-                        <div
-                          className={classnames({
-                            'flex items-center': h.column.getIsSorted(),
-                            'cursor-pointer select-none': h.column.getCanSort()
-                          })}
-                          onClick={h.column.getToggleSortingHandler()}
-                        >
-                          {flexRender(h.column.columnDef.header, h.getContext())}
-                          {{
-                            asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
-                            desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
-                          }[h.column.getIsSorted()] ?? null}
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                ))}
-              </thead>
-              <tbody>
-                {rows.length ? (
-                  table.getRowModel().rows.map(row => (
-                    <tr key={row.id}>
-                      {row.getVisibleCells().map(cell => (
-                        <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+          <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            <StickyTableWrapper rowCount={rows.length}>
+              <table className={styles.table}>
+                <thead>
+                  {table.getHeaderGroups().map(hg => (
+                    <tr key={hg.id}>
+                      {hg.headers.map(h => (
+                        <th key={h.id}>
+                          <div
+                            className={classnames({
+                              'flex items-center': h.column.getIsSorted(),
+                              'cursor-pointer select-none': h.column.getCanSort()
+                            })}
+                            onClick={h.column.getToggleSortingHandler()}
+                          >
+                            {flexRender(h.column.columnDef.header, h.getContext())}
+                            {{
+                              asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
+                              desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
+                            }[h.column.getIsSorted()] ?? null}
+                          </div>
+                        </th>
                       ))}
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={columns.length} className='text-center py-4'>
-                      No data available
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </StickyTableWrapper>
+                  ))}
+                </thead>
+                <tbody>
+                  {rows.length ? (
+                    table.getRowModel().rows.map(row => (
+                      <tr key={row.id}>
+                        {row.getVisibleCells().map(cell => (
+                          <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                        ))}
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={columns.length} className='text-center py-4'>
+                        No data available
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </StickyTableWrapper>
+          </Box>
+
+          <Box sx={{ mt: 'auto', flexShrink: 0 }}>
+            <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+          </Box>
         </Box>
+      </Card>
 
-        <Box sx={{ mt: 'auto', flexShrink: 0 }}>
-          <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
-        </Box>
-      </Box>
-    </Card>
+      {/* Drawer */}
+      <Drawer
+        anchor='right'
+        open={drawerOpen}
+        onClose={toggleDrawer}
+        PaperProps={{ sx: { width: 420, boxShadow: '0px 0px 15px rgba(0,0,0,0.08)' } }}
+      >
+        <Box sx={{ p: 5, display: 'flex', flexDirection: 'column', maxHeight: '100%' }}>
+          <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
+            <Typography variant='h5' fontWeight={600}>
+              {isEdit ? 'Update Designation' : 'Add Designation'}
+            </Typography>
+            <IconButton onClick={toggleDrawer} size='small'>
+              <CloseIcon />
+            </IconButton>
+          </Box>
 
-    {/* Drawer */}
-    <Drawer
-      anchor='right'
-      open={drawerOpen}
-      onClose={toggleDrawer}
-      PaperProps={{ sx: { width: 420, boxShadow: '0px 0px 15px rgba(0,0,0,0.08)' } }}
-    >
-      <Box sx={{ p: 5, display: 'flex', flexDirection: 'column', maxHeight: '100%' }}>
-        <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
-          <Typography variant='h5' fontWeight={600}>
-            {isEdit ? 'Edit Designation' : 'Add Designation'}
-          </Typography>
-          <IconButton onClick={toggleDrawer} size='small'>
-            <CloseIcon />
-          </IconButton>
-        </Box>
+          <Divider sx={{ mb: 3 }} />
 
-        <Divider sx={{ mb: 3 }} />
-
-        <form onSubmit={hookSubmit(onSubmit)} style={{ flexGrow: 1 }}>
-          <Grid container spacing={3}>
-            {/* Designation Name */}
-            <Grid item xs={12}>
-              <Controller
-                name="name"
-                control={control}
-                render={({ field }) => (
-                  <GlobalTextField
-                    {...field}
-                    fullWidth
-                    required
-                    label='Name'
-                    placeholder='Enter designation name'
-                    error={!!errors.name}
-                    helperText={errors.name?.message}
-                    sx={{
-                      '& .MuiFormLabel-asterisk': {
-                        color: '#e91e63 !important',
-                        fontWeight: 700
-                      },
-                      '& .MuiInputLabel-root.Mui-required': {
-                        color: 'inherit'
-                      }
-                    }}
-                  />
-                )}
-              />
-            </Grid>
-
-            {/* Description */}
-            <Grid item xs={12}>
-              <Controller
-                name="description"
-                control={control}
-                render={({ field }) => (
-                  <GlobalTextarea
-                    {...field}
-                    label='Description'
-                    placeholder='Enter designation description...'
-                    rows={3}
-                  />
-                )}
-              />
-            </Grid>
-
-            {/* Status (Edit only) */}
-            {isEdit && (
+          <form onSubmit={hookSubmit(onSubmit)} style={{ flexGrow: 1 }}>
+            <Grid container spacing={3}>
+              {/* Designation Name */}
               <Grid item xs={12}>
                 <Controller
-                  name="status"
+                  name='name'
                   control={control}
                   render={({ field }) => (
-                     <GlobalSelect
-                       {...field}
-                       label='Status'
-                       options={[
-                         { value: 1, label: 'Active' },
-                         { value: 0, label: 'Inactive' }
-                       ]}
-                     />
+                    <GlobalTextField
+                      {...field}
+                      fullWidth
+                      required
+                      label='Name'
+                      placeholder='Enter designation name'
+                      error={!!errors.name}
+                      helperText={errors.name?.message}
+                      sx={{
+                        '& .MuiFormLabel-asterisk': {
+                          color: '#e91e63 !important',
+                          fontWeight: 700
+                        },
+                        '& .MuiInputLabel-root.Mui-required': {
+                          color: 'inherit'
+                        }
+                      }}
+                    />
                   )}
                 />
               </Grid>
-            )}
-          </Grid>
 
-          {/* Footer Buttons */}
-          <Box mt={4} display='flex' gap={2}>
-            <GlobalButton color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
-              Cancel
-            </GlobalButton>
+              {/* Description */}
+              <Grid item xs={12}>
+                <Controller
+                  name='description'
+                  control={control}
+                  render={({ field }) => (
+                    <GlobalTextarea
+                      {...field}
+                      label='Description'
+                      placeholder='Enter designation description...'
+                      rows={3}
+                    />
+                  )}
+                />
+              </Grid>
 
-            <GlobalButton type='submit' variant='contained' fullWidth disabled={loading}>
-              {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
-            </GlobalButton>
-          </Box>
-        </form>
-      </Box>
-    </Drawer>
+              {/* Status (Edit only) */}
+              {isEdit && (
+                <Grid item xs={12}>
+                  <Controller
+                    name='status'
+                    control={control}
+                    render={({ field }) => (
+                      <GlobalSelect
+                        label='Status'
+                        value={field.value === 1 ? 'Active' : 'Inactive'}
+                        onChange={e => field.onChange(e.target.value === 'Active' ? 1 : 0)}
+                      />
+                    )}
+                  />
+                </Grid>
+              )}
+            </Grid>
 
-    <Dialog
-      onClose={() => setDeleteDialog({ open: false, row: null })}
-      aria-labelledby='customized-dialog-title'
-      open={deleteDialog.open}
-      closeAfterTransition={false}
-      PaperProps={{
-        sx: {
-          overflow: 'visible',
-          width: 420,
-          borderRadius: 1,
-          textAlign: 'center'
-        }
-      }}
-    >
-      <DialogTitle
-        id='customized-dialog-title'
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 1,
-          color: 'error.main',
-          fontWeight: 700,
-          pb: 1,
-          position: 'relative'
+            {/* Footer Buttons */}
+            <Box mt={4} display='flex' gap={2}>
+              <GlobalButton color='secondary' fullWidth onClick={handleCancel} disabled={loading}>
+                Cancel
+              </GlobalButton>
+
+              <GlobalButton type='submit' variant='contained' fullWidth disabled={loading}>
+                {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
+              </GlobalButton>
+            </Box>
+          </form>
+        </Box>
+      </Drawer>
+
+      <Dialog
+        onClose={() => setDeleteDialog({ open: false, row: null })}
+        aria-labelledby='customized-dialog-title'
+        open={deleteDialog.open}
+        closeAfterTransition={false}
+        PaperProps={{
+          sx: {
+            overflow: 'visible',
+            width: 420,
+            borderRadius: 1,
+            textAlign: 'center'
+          }
         }}
       >
-        <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
-        Confirm Delete
-        <DialogCloseButton
-          onClick={() => setDeleteDialog({ open: false, row: null })}
-          disableRipple
-          sx={{ position: 'absolute', right: 1, top: 1 }}
+        <DialogTitle
+          id='customized-dialog-title'
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1,
+            color: 'error.main',
+            fontWeight: 700,
+            pb: 1,
+            position: 'relative'
+          }}
         >
-          <i className='tabler-x' />
-        </DialogCloseButton>
-      </DialogTitle>
-      <DialogContent sx={{ px: 5, pt: 1 }}>
-        <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
-          Are you sure you want to delete <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name || 'this designation'}</strong>?
-          <br />
-          This action cannot be undone.
-        </Typography>
-      </DialogContent>
-      <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
-        <GlobalButton
-          onClick={() => setDeleteDialog({ open: false, row: null })}
-          color='secondary'
-          sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
-        >
-          Cancel
-        </GlobalButton>
-        <GlobalButton
-          onClick={confirmDelete}
-          variant='contained'
-          color='error'
-          sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
-        >
-          Delete
-        </GlobalButton>
-      </DialogActions>
-    </Dialog>
-  </StickyListLayout>
+          <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
+          Confirm Delete
+          <DialogCloseButton
+            onClick={() => setDeleteDialog({ open: false, row: null })}
+            disableRipple
+            sx={{ position: 'absolute', right: 1, top: 1 }}
+          >
+            <i className='tabler-x' />
+          </DialogCloseButton>
+        </DialogTitle>
+        <DialogContent sx={{ px: 5, pt: 1 }}>
+          <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
+            Are you sure you want to delete{' '}
+            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.name || 'this designation'}</strong>?
+            <br />
+            This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+          <GlobalButton
+            onClick={() => setDeleteDialog({ open: false, row: null })}
+            color='secondary'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+          >
+            Cancel
+          </GlobalButton>
+          <GlobalButton
+            onClick={confirmDelete}
+            variant='contained'
+            color='error'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+          >
+            Delete
+          </GlobalButton>
+        </DialogActions>
+      </Dialog>
+    </StickyListLayout>
   )
 }
-
 
 // Wrapper for RBAC
 export default function DesignationPage() {
   return (
-    <PermissionGuard permission="Designation">
+    <PermissionGuard permission='Designation'>
       <DesignationPageContent />
     </PermissionGuard>
   )

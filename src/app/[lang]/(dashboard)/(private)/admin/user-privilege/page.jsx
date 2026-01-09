@@ -89,6 +89,7 @@ import PermissionGuard from '@/components/auth/PermissionGuard'
 import DebugPermissions from '@/components/DebugPermissions'
 import { usePermission } from '@/hooks/usePermission'
 import { showToast } from '@/components/common/Toasts'
+import GlobalButton from '@/components/common/GlobalButton'
 
 // Debounced Input
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
@@ -752,7 +753,6 @@ const UserPrivilegePageContent = () => {
       <StickyListLayout
         header={
           <Box sx={{ mb: 2 }}>
-
             <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
               <Link underline='hover' color='inherit' href='/'>
                 Home
@@ -989,12 +989,11 @@ const UserPrivilegePageContent = () => {
         </Card>
 
         {/* Drawer */}
-        {/* Drawer */}
         <Drawer anchor='right' open={drawerOpen} onClose={toggleDrawer}>
           <Box sx={{ p: 5, width: 420 }}>
             <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
               <Typography variant='h5' fontWeight={600}>
-                {isEdit ? 'Edit Module' : 'Add New Module'}
+                {isEdit ? 'Edit User Role' : 'Add New User Role'}
               </Typography>
               <IconButton onClick={toggleDrawer}>
                 <CloseIcon />
@@ -1029,12 +1028,12 @@ const UserPrivilegePageContent = () => {
               </Grid>
 
               <Box mt={4} display='flex' gap={2}>
-                <Button type='submit' variant='contained' fullWidth disabled={loading}>
-                  {loading ? 'Saving...' : isEdit ? 'Update' : 'Save'}
-                </Button>
-                <Button variant='outlined' fullWidth onClick={toggleDrawer}>
+                <GlobalButton color='secondary' variant='contained' fullWidth onClick={toggleDrawer}>
                   Cancel
-                </Button>
+                </GlobalButton>
+                <GlobalButton type='submit' variant='contained' fullWidth disabled={loading}>
+                  {loading ? 'Saving...' : isEdit ? 'Update' : 'Save'}
+                </GlobalButton>
               </Box>
             </form>
           </Box>

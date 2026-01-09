@@ -115,6 +115,7 @@ const EmployeeLeaveTypePageContent = () => {
   const [loading, setLoading] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
+  const [editId, setEditId] = useState(null)
 
   // Draft State
   const [unsavedAddData, setUnsavedAddData] = useState(null)
@@ -152,7 +153,8 @@ const EmployeeLeaveTypePageContent = () => {
         id: item.id,
         leaveCode: item.leave_code || '',
         name: item.name || '',
-        is_active: item.is_active === 1 ? 1 : 0
+        is_active: item.is_active === 1 ? 1 : 0,
+        statusLabel: item.is_active === 1 ? 'Active' : 'Inactive'
       }))
 
       setRows(normalized)
@@ -205,6 +207,7 @@ const EmployeeLeaveTypePageContent = () => {
   // 🔹 Updated Add handler with unsaved data restore
   const handleAdd = () => {
     setIsEdit(false)
+    setEditId(null)
     if (unsavedAddData) {
       reset(unsavedAddData)
     } else {
@@ -222,8 +225,8 @@ const EmployeeLeaveTypePageContent = () => {
   // 🔹 Edit Handler
   const handleEdit = row => {
     setIsEdit(true)
+    setEditId(row.id)
     reset({
-      id: row.id,
       leaveCode: row.leaveCode || '',
       name: row.name || '',
       status: row.is_active // 1 or 0
@@ -262,9 +265,7 @@ const EmployeeLeaveTypePageContent = () => {
 
   const onSubmit = async data => {
     // 🔍 Duplicate Check (Name)
-    const isDuplicate = rows.some(
-      r => r.name.toLowerCase() === data.name.trim().toLowerCase() && r.id !== (isEdit ? data.id : -1)
-    )
+    const isDuplicate = rows.some(r => r.name.toLowerCase() === data.name.trim().toLowerCase() && r.id !== editId)
 
     if (isDuplicate) {
       showToast('error', 'Leave Type name already exists')
@@ -273,7 +274,7 @@ const EmployeeLeaveTypePageContent = () => {
 
     // 🔍 Duplicate Check (Code)
     const isDuplicateCode = rows.some(
-      r => r.leaveCode.toLowerCase() === data.leaveCode.trim().toLowerCase() && r.id !== (isEdit ? data.id : -1)
+      r => r.leaveCode.toLowerCase() === data.leaveCode.trim().toLowerCase() && r.id !== editId
     )
 
     if (isDuplicateCode) {
@@ -284,10 +285,10 @@ const EmployeeLeaveTypePageContent = () => {
     setLoading(true)
     try {
       const payload = {
-        id: isEdit ? data.id : undefined,
+        id: isEdit ? editId : undefined,
         leave_code: data.leaveCode,
         name: data.name,
-        is_active: data.status === 'Active' || data.status === 1 ? 1 : 0,
+        is_active: Number(data.status) === 1 || data.status === 'Active' ? 1 : 0,
         status: 1
       }
 
@@ -395,7 +396,7 @@ const EmployeeLeaveTypePageContent = () => {
     const csv = [
       headers.join(','),
       ...rows.map(r =>
-        [r.sno, `"${r.leaveCode.replace(/"/g, '""')}"`, `"${r.name.replace(/"/g, '""')}"`, r.status].join(',')
+        [r.sno, `"${r.leaveCode.replace(/"/g, '""')}"`, `"${r.name.replace(/"/g, '""')}"`, r.statusLabel].join(',')
       )
     ].join('\n')
     const link = document.createElement('a')
@@ -419,7 +420,7 @@ const EmployeeLeaveTypePageContent = () => {
       <th>S.No</th><th>Leave Code</th><th>Name</th><th>Status</th>
       </tr></thead><tbody>
       ${rows
-        .map(r => `<tr><td>${r.sno}</td><td>${r.leaveCode}</td><td>${r.name}</td><td>${r.status}</td></tr>`)
+        .map(r => `<tr><td>${r.sno}</td><td>${r.leaveCode}</td><td>${r.name}</td><td>${r.statusLabel}</td></tr>`)
         .join('')}
       </tbody></table></body></html>`
     w.document.write(html)
@@ -661,7 +662,7 @@ const EmployeeLeaveTypePageContent = () => {
         <Box sx={{ p: 5, display: 'flex', flexDirection: 'column', maxHeight: '100%' }}>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
             <Typography variant='h5' fontWeight={600}>
-              {isEdit ? 'Edit Leave Type' : 'Add Leave Type'}
+              {isEdit ? 'Update Leave Type' : 'Add Leave Type'}
             </Typography>
             <IconButton onClick={toggleDrawer} size='small'>
               <CloseIcon />
@@ -729,7 +730,7 @@ const EmployeeLeaveTypePageContent = () => {
               </Grid>
 
               {/* Optional: Add Description */}
-              <Grid item xs={12}>
+              {/* <Grid item xs={12}>
                 <Controller
                   name='description'
                   control={control}
@@ -742,7 +743,7 @@ const EmployeeLeaveTypePageContent = () => {
                     />
                   )}
                 />
-              </Grid>
+              </Grid> */}
 
               {/* Status (Only for Edit Mode) */}
               {isEdit && (
