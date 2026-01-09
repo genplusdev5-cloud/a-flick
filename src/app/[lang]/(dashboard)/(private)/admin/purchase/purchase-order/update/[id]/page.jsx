@@ -28,6 +28,7 @@ import CustomTextField from '@core/components/mui/TextField'
 
 import DeleteIcon from '@mui/icons-material/Delete'
 import AddIcon from '@mui/icons-material/Add'
+import EditIcon from '@mui/icons-material/Edit'
 
 import styles from '@core/styles/table.module.css'
 import { getPurchaseFilters, getPurchaseOrderDetails, updatePurchaseOrder } from '@/api/purchase_order'
@@ -64,6 +65,7 @@ const EditPurchaseOrderPage = () => {
   const [uom, setUom] = useState(null)
   const [quantity, setQuantity] = useState('')
   const [rate, setRate] = useState('')
+  const [editId, setEditId] = useState(null)
 
   const [items, setItems] = useState([])
 
@@ -136,10 +138,10 @@ const EditPurchaseOrderPage = () => {
           details.order_items || details.po_chemicals || details.items || details.purchase_order_chemicals || []
         const mappedItems = itemsList.map(item => ({
           id: item.id,
-          chemical: item.chemical_name || item.item_name || '',
-          chemicalId: item.chemical_id || item.item_id,
-          uom: item.uom_name || item.uom,
-          uomId: item.uom_id,
+          chemical: item.chemical_name || item.item_name || item.chemical?.name || '',
+          chemicalId: item.chemical_id || item.item_id || item.chemical?.id,
+          uom: item.uom_name || item.uom || item.uom_details?.name,
+          uomId: item.uom_id || item.uom_details?.id,
           quantity: item.quantity,
           rate: item.unit_rate || item.rate,
           amount: (item.quantity || 0) * (item.unit_rate || item.rate || 0)
@@ -158,6 +160,14 @@ const EditPurchaseOrderPage = () => {
     }
   }, [decodedId])
 
+  const handleEditItem = row => {
+    setEditId(row.id)
+    setChemical({ label: row.chemical, id: row.chemicalId })
+    setUom({ label: row.uom, id: row.uomId })
+    setQuantity(row.quantity)
+    setRate(row.rate)
+  }
+
   const amount = useMemo(() => {
     const q = Number(quantity)
     const r = Number(rate)
@@ -170,19 +180,40 @@ const EditPurchaseOrderPage = () => {
       return
     }
 
-    setItems(prev => [
-      ...prev,
-      {
-        id: Date.now(),
-        chemical: chemical.label,
-        chemicalId: chemical.id,
-        uom: uom.label,
-        uomId: uom.id,
-        quantity,
-        rate,
-        amount
-      }
-    ])
+    if (editId) {
+      // Update existing item
+      setItems(prev =>
+        prev.map(item =>
+          item.id === editId
+            ? {
+                ...item,
+                chemical: chemical.label,
+                chemicalId: chemical.id,
+                uom: uom.label,
+                uomId: uom.id,
+                quantity,
+                rate,
+                amount
+              }
+            : item
+        )
+      )
+      setEditId(null)
+    } else {
+      setItems(prev => [
+        ...prev,
+        {
+          id: Date.now(),
+          chemical: chemical.label,
+          chemicalId: chemical.id,
+          uom: uom.label,
+          uomId: uom.id,
+          quantity,
+          rate,
+          amount
+        }
+      ])
+    }
 
     setChemical(null)
     setUom(null)
@@ -208,6 +239,7 @@ const EditPurchaseOrderPage = () => {
         supplier_id: supplier.id,
         remarks,
         order_items: items.map(item => ({
+          id: String(item.id).length > 10 ? null : item.id,
           chemical_id: item.chemicalId,
           uom_id: item.uomId,
           quantity: Number(item.quantity),
@@ -316,7 +348,12 @@ const EditPurchaseOrderPage = () => {
             </Grid>
 
             <Grid item xs={12} md={2}>
-              <GlobalTextField label='Quantity' type='number' value={quantity} onChange={setQuantity} />
+              <GlobalTextField
+                label='Quantity'
+                type='number'
+                value={quantity}
+                onChange={e => setQuantity(e.target.value)}
+              />
             </Grid>
 
             <Grid item xs={12} md={2}>
@@ -328,8 +365,13 @@ const EditPurchaseOrderPage = () => {
             </Grid>
 
             <Grid item xs={12} md={1}>
-              <GlobalButton variant='contained' startIcon={<AddIcon />} onClick={handleAddItem}>
-                Add
+              <GlobalButton
+                variant='contained'
+                color={editId ? 'info' : 'primary'}
+                startIcon={editId ? <EditIcon /> : <AddIcon />}
+                onClick={handleAddItem}
+              >
+                {editId ? 'Update' : 'Add'}
               </GlobalButton>
             </Grid>
           </Grid>
@@ -342,11 +384,17 @@ const EditPurchaseOrderPage = () => {
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>Chemical</th>
-                  <th>UOM</th>
-                  <th align='right'>Quantity</th>
-                  <th align='right'>Rate</th>
-                  <th align='right'>Amount</th>
+                  <th style={{ width: '25%' }}>Chemical</th>
+                  <th style={{ width: '15%' }}>UOM</th>
+                  <th align='right' style={{ width: '15%' }}>
+                    Quantity
+                  </th>
+                  <th align='right' style={{ width: '15%' }}>
+                    Rate
+                  </th>
+                  <th align='right' style={{ width: '15%' }}>
+                    Amount
+                  </th>
                   <th align='center'>Action</th>
                 </tr>
               </thead>
@@ -362,6 +410,9 @@ const EditPurchaseOrderPage = () => {
                       <td align='right'>{row.rate}</td>
                       <td align='right'>{row.amount}</td>
                       <td align='center'>
+                        <IconButton size='small' color='primary' onClick={() => handleEditItem(row)}>
+                          <EditIcon fontSize='small' />
+                        </IconButton>
                         <IconButton size='small' color='error' onClick={() => handleRemoveItem(row.id)}>
                           <DeleteIcon fontSize='small' />
                         </IconButton>

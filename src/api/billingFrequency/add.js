@@ -4,16 +4,17 @@ import api from '@/utils/axiosInstance'
 export const addBillingFrequency = async payload => {
   // ✅ Use payload.name directly (handleSubmit already builds it correctly)
   const body = {
-    name: payload.name || '', // ✅ correct key
-    frequency: payload.frequency || null,
-    times: payload.times || null,
-    frequency_code: payload.frequency_code || '',
-    frequency_count: payload.frequency_count || '0',
-    backlog_age: payload.backlog_age || '0',
-    sort_order: payload.sort_order || '0',
+    name: payload.name || payload.billingFrequency || '',
+    billing_frequency: payload.name || payload.billingFrequency || '', // Fallback for backend error messages
+    frequency: payload.frequency || payload.incrementType || null,
+    times: payload.times?.toString() || payload.noOfIncrements?.toString() || null,
+    frequency_code: payload.frequency_code || payload.frequencyCode || '',
+    frequency_count: payload.frequency_count || payload.noOfIncrements?.toString() || '0',
+    backlog_age: payload.backlog_age || payload.backlogAge?.toString() || '0',
+    sort_order: payload.sort_order || payload.sortOrder?.toString() || '0',
     description: payload.description || '',
-    is_active: payload.is_active || 1,
-    is_billing: 1, // ✅ important flag
+    is_active: payload.is_active === 1 || payload.is_active === 'Active' || payload.status === 1 ? 1 : 0,
+    is_billing: 1,
     status: 1
   }
 

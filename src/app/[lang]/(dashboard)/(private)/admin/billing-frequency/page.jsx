@@ -231,31 +231,20 @@ const BillingFrequencyPageContent = () => {
 
     try {
       // Try to get details, fallback to row
-      let data = row
       const res = await getBillingFrequencyDetails(row.id)
-      if (res?.data) {
-        data = {
-          billingFrequency: res.data.name,
-          incrementType: res.data.frequency,
-          noOfIncrements: res.data.times,
-          backlogAge: res.data.backlog_age,
-          frequencyCode: res.data.frequency_code,
-          sortOrder: res.data.sort_order,
-          description: res.data.description,
-          status: res.data.is_active
-        }
-      }
+      const data = res?.data || row
 
       reset({
-        billingFrequency: data.billingFrequency || data.name || '',
-        incrementType: data.incrementType || data.frequency || '',
-        noOfIncrements: String(data.noOfIncrements || data.times || ''),
-        backlogAge: String(data.backlogAge || data.backlog_age || ''),
-        frequencyCode: data.frequencyCode || data.frequency_code || '',
-        sortOrder: String(data.sortOrder || data.sort_order || ''),
+        billingFrequency: data.name || data.billingFrequency || '',
+        incrementType: data.frequency || data.incrementType || '',
+        noOfIncrements: String(data.times || data.noOfIncrements || ''),
+        backlogAge: String(data.backlog_age || data.backlogAge || ''),
+        frequencyCode: data.frequency_code || data.frequencyCode || '',
+        sortOrder: String(data.sort_order || data.sortOrder || ''),
         description: data.description || '',
-        status: data.status === 'Active' || data.is_active === 1 ? 1 : 0
+        status: data.is_active ?? (data.status === 'Active' ? 1 : 0)
       })
+
       setCloseReason(null)
       setDrawerOpen(true)
     } catch (err) {
@@ -294,6 +283,7 @@ const BillingFrequencyPageContent = () => {
         sort_order: Number(data.sortOrder),
         description: data.description,
         is_active: data.status,
+        status: data.status,
         is_billing: 1
       }
 
@@ -643,7 +633,7 @@ const BillingFrequencyPageContent = () => {
         <Box sx={{ p: 5, display: 'flex', flexDirection: 'column', maxHeight: '100%' }}>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
             <Typography variant='h5' fontWeight={600}>
-              {isEdit ? 'Edit Frequency' : 'Add Frequency'}
+              {isEdit ? 'Update Frequency' : 'Add Frequency'}
             </Typography>
             <IconButton onClick={toggleDrawer} size='small'>
               <CloseIcon />
@@ -692,7 +682,7 @@ const BillingFrequencyPageContent = () => {
                       placeholder='Select Increment Type'
                       {...field}
                       value={field.value}
-                      onChange={e => field.onChange(e.target.value)}
+                      onChange={val => field.onChange(val?.value || val)}
                       options={[
                         { value: 'Year', label: 'Year' },
                         { value: 'Month', label: 'Month' },

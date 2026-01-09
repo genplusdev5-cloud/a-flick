@@ -29,6 +29,7 @@ import CustomTextField from '@core/components/mui/TextField'
 
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
+import EditIcon from '@mui/icons-material/Edit'
 
 import styles from '@core/styles/table.module.css'
 
@@ -70,6 +71,7 @@ const EditTransferOutPage = () => {
   const [uom, setUom] = useState(null)
   const [quantity, setQuantity] = useState('')
   const [rate, setRate] = useState('')
+  const [editId, setEditId] = useState(null)
 
   const [items, setItems] = useState([])
 
@@ -146,15 +148,15 @@ const EditTransferOutPage = () => {
         setSupplier(suppliers.find(s => s.id === d.supplier_id) || null)
 
         setItems(
-          (d.transfer_items || []).map(item => ({
+          (d.transfer_items || d.items || []).map(item => ({
             id: item.id,
-            chemical: item.chemical_name,
-            chemicalId: item.chemical_id,
-            uom: item.uom_name,
-            uomId: item.uom_id,
-            quantity: item.transfer_quantity,
-            rate: item.unit_rate,
-            amount: item.transfer_quantity * item.unit_rate
+            chemical: item.chemical_name || item.item_name || item.chemical?.name || '',
+            chemicalId: item.chemical_id || item.item_id || item.chemical?.id,
+            uom: item.uom_name || item.uom?.name || item.uom_details?.name || item.uom,
+            uomId: item.uom_id || item.uom?.id || item.uom_details?.id,
+            quantity: item.transfer_quantity || item.quantity,
+            rate: item.unit_rate || item.rate,
+            amount: (item.transfer_quantity || item.quantity) * (item.unit_rate || item.rate)
           }))
         )
       } catch (err) {
@@ -166,6 +168,14 @@ const EditTransferOutPage = () => {
 
     if (decodedId) fetchData()
   }, [decodedId, type])
+
+  const handleEditItem = row => {
+    setEditId(row.id)
+    setChemical({ label: row.chemical, id: row.chemicalId })
+    setUom({ label: row.uom, id: row.uomId })
+    setQuantity(row.quantity)
+    setRate(row.rate)
+  }
 
   /* ───── AMOUNT ───── */
 
@@ -183,19 +193,39 @@ const EditTransferOutPage = () => {
       return
     }
 
-    setItems(prev => [
-      ...prev,
-      {
-        id: Date.now(),
-        chemical: chemical.label,
-        chemicalId: chemical.id,
-        uom: uom.label,
-        uomId: uom.id,
-        quantity,
-        rate,
-        amount
-      }
-    ])
+    if (editId) {
+      setItems(prev =>
+        prev.map(item =>
+          item.id === editId
+            ? {
+                ...item,
+                chemical: chemical.label,
+                chemicalId: chemical.id,
+                uom: uom.label,
+                uomId: uom.id,
+                quantity,
+                rate,
+                amount
+              }
+            : item
+        )
+      )
+      setEditId(null)
+    } else {
+      setItems(prev => [
+        ...prev,
+        {
+          id: Date.now(),
+          chemical: chemical.label,
+          chemicalId: chemical.id,
+          uom: uom.label,
+          uomId: uom.id,
+          quantity,
+          rate,
+          amount
+        }
+      ])
+    }
 
     setChemical(null)
     setUom(null)
@@ -224,6 +254,7 @@ const EditTransferOutPage = () => {
         transfer_date: format(transferDate, 'yyyy-MM-dd'),
         remarks,
         transfer_items: items.map(i => ({
+          id: String(i.id).length > 10 ? null : i.id,
           chemical_id: i.chemicalId,
           uom_id: i.uomId,
           transfer_quantity: Number(i.quantity),
@@ -331,8 +362,13 @@ const EditTransferOutPage = () => {
             </Grid>
 
             <Grid item md={1}>
-              <GlobalButton startIcon={<AddIcon />} onClick={handleAddItem}>
-                Add
+              <GlobalButton
+                variant='contained'
+                color={editId ? 'info' : 'primary'}
+                startIcon={editId ? <EditIcon /> : <AddIcon />}
+                onClick={handleAddItem}
+              >
+                {editId ? 'Update' : 'Add'}
               </GlobalButton>
             </Grid>
           </Grid>
@@ -344,13 +380,19 @@ const EditTransferOutPage = () => {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>Chemical</th>
-                  <th>UOM</th>
-                  <th align='right'>Qty</th>
-                  <th align='right'>Rate</th>
-                  <th align='right'>Amount</th>
-                  <th />
+                  <th>ID</th>
+                  <th style={{ width: '25%' }}>Chemical</th>
+                  <th style={{ width: '15%' }}>UOM</th>
+                  <th align='right' style={{ width: '15%' }}>
+                    Qty
+                  </th>
+                  <th align='right' style={{ width: '15%' }}>
+                    Rate
+                  </th>
+                  <th align='right' style={{ width: '15%' }}>
+                    Amount
+                  </th>
+                  <th align='center'>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -364,7 +406,10 @@ const EditTransferOutPage = () => {
                       <td align='right'>{r.rate}</td>
                       <td align='right'>{r.amount}</td>
                       <td align='center'>
-                        <IconButton color='error' onClick={() => handleRemoveItem(r.id)}>
+                        <IconButton size='small' color='primary' onClick={() => handleEditItem(r)}>
+                          <EditIcon fontSize='small' />
+                        </IconButton>
+                        <IconButton size='small' color='error' onClick={() => handleRemoveItem(r.id)}>
                           <DeleteIcon fontSize='small' />
                         </IconButton>
                       </td>

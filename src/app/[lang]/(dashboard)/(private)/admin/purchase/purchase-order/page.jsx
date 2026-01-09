@@ -85,6 +85,13 @@ const poStatusOptions = [
   { id: 4, label: 'Terminated', value: 'Terminated' }
 ]
 
+const poStatusColorMap = {
+  Pending: 'warning',
+  Approved: 'info',
+  Completed: 'success',
+  Terminated: 'error'
+}
+
 /* ─────────────────────────────
    Component
 ───────────────────────────── */
@@ -245,10 +252,16 @@ const PurchaseOrderPage = () => {
         header: 'Status',
         cell: info => (
           <Chip
-            label={info.getValue()}
-            color={info.getValue() === 'Active' || info.getValue() === 'Pending' ? 'success' : 'error'}
+            label={info.getValue() || '-'}
+            color={poStatusColorMap[info.getValue()] || 'default'}
             size='small'
-            sx={{ fontWeight: 600, color: '#fff', borderRadius: '6px' }}
+            sx={{
+              fontWeight: 600,
+              color: '#fff',
+              borderRadius: '6px',
+              minWidth: 90,
+              textAlign: 'center'
+            }}
           />
         )
       })

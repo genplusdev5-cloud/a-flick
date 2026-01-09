@@ -69,7 +69,7 @@ import PermissionGuard from '@/components/auth/PermissionGuard'
 
 import styles from '@core/styles/table.module.css'
 
-import { getTransferRequestList, deleteTransferRequestTM, deleteTransferRequestTX } from '@/api/transfer_request'
+import { getTransferRequestList, deleteTransferRequestTM, deleteTransferRequestTX, getTransferFilters } from '@/api/transfer_request'
 
 const poStatusOptions = [
   { id: 1, label: 'Pending', value: 'Pending' },
@@ -122,6 +122,7 @@ const TransferRequestPage = () => {
   const [appliedFilterStatus, setAppliedFilterStatus] = useState(null)
   const [appliedDateFilter, setAppliedDateFilter] = useState(false)
   const [appliedDateRange, setAppliedDateRange] = useState([null, null])
+  const [searchTerm, setSearchTerm] = useState('')
 
   const columns = useMemo(
     () => [
@@ -229,7 +230,37 @@ const TransferRequestPage = () => {
 
   useEffect(() => {
     fetchTransferRequests()
-  }, [pagination.pageIndex, pagination.pageSize])
+  }, [pagination.pageIndex, pagination.pageSize, appliedFilterOrigin, appliedFilterSupplier, appliedFilterStatus, appliedDateFilter, appliedDateRange, searchTerm])
+
+  useEffect(() => {
+    const fetchFilters = async () => {
+      try {
+        const res = await getTransferFilters()
+        
+        const hunt = (obj, key) => {
+          if (!obj || typeof obj !== 'object') return null
+          if (obj[key]) return obj[key]
+          for (const k in obj) {
+            const found = hunt(obj[k], key)
+            if (found) return found
+          }
+          return null
+        }
+
+        const compData = hunt(res, 'company')
+        const suppData = hunt(res, 'supplier')
+
+        const origins = compData?.name?.map(item => ({ label: item.name, value: item.name, id: item.id })) || []
+        const suppliers = suppData?.name?.map(item => ({ label: item.name, value: item.name, id: item.id })) || []
+        
+        setOriginOptions(origins)
+        setSupplierOptions(suppliers)
+      } catch (err) {
+        console.error('Failed to fetch filters', err)
+      }
+    }
+    fetchFilters()
+  }, [])
 
   const confirmDelete = async () => {
     if (!deleteDialog.row?.id) return
@@ -237,19 +268,14 @@ const TransferRequestPage = () => {
     try {
       setDeleteLoading(true)
 
-      const type = deleteDialog.row.recordType || 'tm'
-
-      if (type === 'tm') {
-        await deleteTransferRequestTM(deleteDialog.row.id)
-      } else {
-        await deleteTransferRequestTX(deleteDialog.row.id)
-      }
+      await deleteTransferRequestTM(deleteDialog.row.id)
 
       showToast('Transfer Request deleted successfully', 'delete')
 
       setDeleteDialog({ open: false, row: null })
       fetchTransferRequests()
     } catch (error) {
+      console.error('Delete failed', error)
       showToast(error?.response?.data?.message || 'Failed to delete transfer request', 'error')
     } finally {
       setDeleteLoading(false)
@@ -260,10 +286,21 @@ const TransferRequestPage = () => {
     try {
       setLoading(true)
 
-      const res = await getTransferRequestList({
+      const params = {
         page: pagination.pageIndex + 1,
-        page_size: pagination.pageSize
-      })
+        page_size: pagination.pageSize,
+        company_id: appliedFilterOrigin?.id,
+        to_company_id: appliedFilterSupplier?.id,
+        status: appliedFilterStatus?.value,
+        search: searchTerm
+      }
+
+      if (appliedDateFilter && appliedDateRange[0] && appliedDateRange[1]) {
+        params.start_date = format(appliedDateRange[0], 'yyyy-MM-dd')
+        params.end_date = format(appliedDateRange[1], 'yyyy-MM-dd')
+      }
+
+      const res = await getTransferRequestList(params)
 
       setTotalCount(res?.count || 0)
 
@@ -281,7 +318,7 @@ const TransferRequestPage = () => {
         poDate: item.transfer_date,
         remarks: item.remarks || '-',
         status: item.status,
-        recordType: item.record_type || 'tm'
+        recordType: 'tm'
       }))
 
       setRows(mappedRows)
@@ -293,8 +330,12 @@ const TransferRequestPage = () => {
   }
 
   const handleApplyFilters = () => {
+    setAppliedFilterOrigin(filterOrigin)
+    setAppliedFilterSupplier(filterSupplier)
+    setAppliedFilterStatus(filterStatus)
+    setAppliedDateFilter(uiDateFilter)
+    setAppliedDateRange(uiDateRange)
     setPagination(prev => ({ ...prev, pageIndex: 0 }))
-    fetchTransferRequests()
   }
 
   return (
@@ -341,7 +382,7 @@ const TransferRequestPage = () => {
               <GlobalButton
                 variant='contained'
                 startIcon={<AddIcon />}
-                onClick={() => router.push(`/admin/transfer/transfer-request/add`)}
+                onClick={() => router.push(`/${lang}/admin/transfer/transfer-request/add`)}
               >
                 Add Transfer Request
               </GlobalButton>
@@ -474,6 +515,11 @@ const TransferRequestPage = () => {
           <GlobalTextField
             size='small'
             placeholder='Search Transfer No'
+            value={searchTerm}
+            onChange={e => {
+              setSearchTerm(e.target.value)
+              setPagination(p => ({ ...p, pageIndex: 0 }))
+            }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position='start'>

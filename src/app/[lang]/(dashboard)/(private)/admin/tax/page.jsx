@@ -591,7 +591,6 @@ const TaxPageContent = () => {
           <Divider />
 
           <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-
             <Box
               sx={{
                 mb: 3,
@@ -713,7 +712,7 @@ const TaxPageContent = () => {
                     control={control}
                     render={({ field }) => (
                       <GlobalTextField
-                        label='Tax Name'
+                        label='Name'
                         placeholder='Enter tax name'
                         {...field}
                         error={!!errors.name}

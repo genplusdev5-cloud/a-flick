@@ -6,6 +6,7 @@ export const updateBillingFrequency = async payload => {
 
   const body = {
     name: payload.name || payload.billingFrequency || '',
+    billing_frequency: payload.name || payload.billingFrequency || '',
     frequency: payload.frequency || payload.incrementType || '',
     times: payload.times || payload.noOfIncrements?.toString() || '0',
     frequency_code: payload.frequency_code || payload.frequencyCode || '',
@@ -13,7 +14,7 @@ export const updateBillingFrequency = async payload => {
     backlog_age: payload.backlog_age || payload.backlogAge?.toString() || '0',
     sort_order: payload.sort_order || payload.sortOrder?.toString() || '0',
     description: payload.description || '',
-    is_active: payload.is_active ?? (payload.status === 'Active' ? 1 : 0),
+    is_active: payload.is_active === 1 || payload.status === 1 || payload.status === 'Active' ? 1 : 0,
     is_billing: 1,
     status: 1
   }

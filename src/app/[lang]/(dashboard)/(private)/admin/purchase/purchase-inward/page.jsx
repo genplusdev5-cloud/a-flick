@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 
 import Link from 'next/link'
 
@@ -15,6 +15,10 @@ import {
   Divider,
   Breadcrumbs,
   Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   FormControl,
   Select,
   InputAdornment,
@@ -27,7 +31,11 @@ import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 import { IconButton } from '@mui/material'
 
-import { getPurchaseInwardList, getPurchaseFilters } from '@/api/purchase_inward'
+import DialogCloseButton from '@components/dialogs/DialogCloseButton'
+import WarningAmberIcon from '@mui/icons-material/WarningAmber'
+import { showToast } from '@/components/common/Toasts'
+
+import { getPurchaseInwardList, getPurchaseFilters, deletePurchaseInward } from '@/api/purchase_inward'
 import { format } from 'date-fns'
 
 import GlobalButton from '@/components/common/GlobalButton'
@@ -81,12 +89,20 @@ const statusOptions = [
 const PurchaseInwardPage = () => {
   const columnHelper = createColumnHelper()
   const router = useRouter()
+  const { lang } = useParams()
 
   const [originOptions, setOriginOptions] = useState([])
   const [supplierOptions, setSupplierOptions] = useState([])
 
   const [selectedOrigin, setSelectedOrigin] = useState(null)
   const [selectedSupplier, setSelectedSupplier] = useState(null)
+
+  const [deleteDialog, setDeleteDialog] = useState({
+    open: false,
+    row: null
+  })
+
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   // STATES
   const [rows, setRows] = useState([])
@@ -104,8 +120,9 @@ const PurchaseInwardPage = () => {
     try {
       const res = await getPurchaseFilters()
 
-      const companyList = res?.data?.company?.name || []
-      const supplierList = res?.data?.supplier?.name || []
+      const purchaseData = res?.data?.data || {}
+      const companyList = purchaseData?.company?.name || []
+      const supplierList = purchaseData?.supplier?.name || []
 
       setOriginOptions(
         companyList.map(item => ({
@@ -122,6 +139,29 @@ const PurchaseInwardPage = () => {
       )
     } catch (err) {
       console.error('Purchase filter error', err)
+    }
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteDialog.row?.id) return
+
+    try {
+      setDeleteLoading(true)
+
+      await deletePurchaseInward({
+        id: deleteDialog.row.id,
+        type: deleteDialog.row.recordType || 'tm'
+      })
+
+      showToast('Purchase Inward deleted successfully', 'delete')
+
+      setDeleteDialog({ open: false, row: null })
+      fetchPurchaseInwardList()
+    } catch (error) {
+      console.error('Delete failed', error)
+      showToast(error?.response?.data?.message || 'Failed to delete purchase inward', 'error')
+    } finally {
+      setDeleteLoading(false)
     }
   }
 
@@ -148,7 +188,8 @@ const PurchaseInwardPage = () => {
       const mappedRows =
         res?.data?.results?.map((item, index) => ({
           sno: pagination.pageIndex * pagination.pageSize + (index + 1),
-          id: item.id,
+          id: Number(item.id),
+
           origin: item.company,
           inwardNo: item.num_series,
           inwardDate: item.inward_date ? format(new Date(item.inward_date), 'dd/MM/yyyy') : '-',
@@ -158,7 +199,7 @@ const PurchaseInwardPage = () => {
           poDetails: item.po_id || '-',
           remarks: item.remarks || '-',
           status: item.inward_status,
-          recordType: item.year === new Date().getFullYear() ? 'tm' : 'tx'
+          recordType: 'tm'
         })) || []
 
       setRows(mappedRows)
@@ -199,7 +240,18 @@ const PurchaseInwardPage = () => {
                 size='small'
                 color='primary'
                 onClick={() => {
-                  router.push(`/admin/purchase/purchase-inward/update/${btoa(rowData.id)}?type=${rowData.recordType}`)
+                  if (!rowData.id) {
+                    console.error('Invalid ID', rowData)
+                    showToast('error', 'Invalid record ID')
+                    return
+                  }
+
+                  const encodedId = btoa(String(rowData.id))
+                  console.log('Navigating to edit:', { id: rowData.id, encodedId, type: rowData.recordType })
+                  
+                  router.push(
+                    `/${lang}/admin/purchase/purchase-inward/update/${encodedId}?type=${rowData.recordType}`
+                  )
                 }}
               >
                 <i className='tabler-edit' />
@@ -208,10 +260,12 @@ const PurchaseInwardPage = () => {
               <IconButton
                 size='small'
                 color='error'
-                onClick={() => {
-                  console.log('DELETE', rowData.id, rowData.recordType)
-                  // delete dialog open pannalam
-                }}
+                onClick={() =>
+                  setDeleteDialog({
+                    open: true,
+                    row: rowData
+                  })
+                }
               >
                 <i className='tabler-trash' />
               </IconButton>
@@ -472,6 +526,75 @@ const PurchaseInwardPage = () => {
             </table>
           </StickyTableWrapper>
         </Box>
+
+        <Dialog
+          onClose={() => setDeleteDialog({ open: false, row: null })}
+          aria-labelledby='customized-dialog-title'
+          open={deleteDialog.open}
+          closeAfterTransition={false}
+          PaperProps={{
+            sx: {
+              overflow: 'visible',
+              width: 420,
+              borderRadius: 1,
+              textAlign: 'center'
+            }
+          }}
+        >
+          {/* 🔴 Title with Warning Icon */}
+          <DialogTitle
+            id='customized-dialog-title'
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 1,
+              color: 'error.main',
+              fontWeight: 700,
+              pb: 1,
+              position: 'relative'
+            }}
+          >
+            <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
+            Confirm Delete
+            {/* ❌ Close Button */}
+            <DialogCloseButton onClick={() => setDeleteDialog({ open: false, row: null })} disableRipple>
+              <i className='tabler-x' />
+            </DialogCloseButton>
+          </DialogTitle>
+
+          {/* Centered text */}
+          <DialogContent sx={{ px: 5, pt: 1 }}>
+            <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
+              Are you sure you want to delete{' '}
+              <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.inwardNo || 'this purchase inward'}</strong>
+              ?
+              <br />
+              This action cannot be undone.
+            </Typography>
+          </DialogContent>
+
+          {/* Centered buttons */}
+          <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+            <GlobalButton
+              color='secondary'
+              onClick={() => setDeleteDialog({ open: false, row: null })}
+              sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+            >
+              Cancel
+            </GlobalButton>
+
+            <GlobalButton
+              onClick={confirmDelete}
+              variant='contained'
+              color='error'
+              disabled={deleteLoading}
+              sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+            >
+              {deleteLoading ? 'Deleting...' : 'Delete'}
+            </GlobalButton>
+          </DialogActions>
+        </Dialog>
 
         {/* PAGINATION */}
         <Box sx={{ px: 4, py: 2 }}>

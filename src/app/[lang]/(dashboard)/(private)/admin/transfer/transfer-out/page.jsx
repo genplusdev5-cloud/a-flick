@@ -14,6 +14,10 @@ import {
   Divider,
   Breadcrumbs,
   Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   FormControl,
   Select,
   InputAdornment,
@@ -25,6 +29,10 @@ import {
 import StickyListLayout from '@/components/common/StickyListLayout'
 import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
+
+import DialogCloseButton from '@components/dialogs/DialogCloseButton'
+import WarningAmberIcon from '@mui/icons-material/WarningAmber'
+import { showToast } from '@/components/common/Toasts'
 
 import { getTransferOutList, deleteTmTransferOut, deleteTxTransferOut } from '@/api/transfer_out'
 
@@ -88,6 +96,13 @@ const TransferOutPage = () => {
   const [uiDateFilter, setUiDateFilter] = useState(false)
   const [uiDateRange, setUiDateRange] = useState([null, null])
 
+  const [deleteDialog, setDeleteDialog] = useState({
+    open: false,
+    row: null
+  })
+
+  const [deleteLoading, setDeleteLoading] = useState(false)
+
   /* ───────── FETCH FILTERS ───────── */
   const fetchPurchaseFilters = async () => {
     const res = await getPurchaseFilters()
@@ -141,7 +156,7 @@ const TransferOutPage = () => {
           contactPhone: item?.supplier_details?.phone || '-',
           remarks: item.remarks || '-',
           status: item.transfer_status,
-          recordType: item.year === new Date().getFullYear() ? 'tm' : 'tx'
+          recordType: 'tm'
         })) || []
 
       setRows(mapped)
@@ -164,14 +179,24 @@ const TransferOutPage = () => {
   ])
 
   /* ───────── DELETE ───────── */
-  const handleDelete = async row => {
-    if (row.recordType === 'tm') {
-      await deleteTmTransferOut(row.id)
-    } else {
-      await deleteTxTransferOut(row.id)
-    }
+  const confirmDelete = async () => {
+    if (!deleteDialog.row?.id) return
 
-    fetchTransferOutList()
+    try {
+      setDeleteLoading(true)
+
+      await deleteTmTransferOut(deleteDialog.row.id)
+
+      showToast('Transfer Out deleted successfully', 'delete')
+
+      setDeleteDialog({ open: false, row: null })
+      fetchTransferOutList()
+    } catch (error) {
+      console.error('Delete failed', error)
+      showToast(error?.response?.data?.message || 'Failed to delete transfer out', 'error')
+    } finally {
+      setDeleteLoading(false)
+    }
   }
 
   /* ───────── TABLE ───────── */
@@ -197,7 +222,16 @@ const TransferOutPage = () => {
                 <i className='tabler-edit' />
               </IconButton>
 
-              <IconButton size='small' color='error' onClick={() => handleDelete(row)}>
+              <IconButton
+                size='small'
+                color='error'
+                onClick={() =>
+                  setDeleteDialog({
+                    open: true,
+                    row: row
+                  })
+                }
+              >
                 <i className='tabler-trash' />
               </IconButton>
             </Box>
@@ -442,6 +476,71 @@ const TransferOutPage = () => {
             </table>
           </StickyTableWrapper>
         </Box>
+
+        <Dialog
+          onClose={() => setDeleteDialog({ open: false, row: null })}
+          aria-labelledby='customized-dialog-title'
+          open={deleteDialog.open}
+          closeAfterTransition={false}
+          PaperProps={{
+            sx: {
+              overflow: 'visible',
+              width: 420,
+              borderRadius: 1,
+              textAlign: 'center'
+            }
+          }}
+        >
+          <DialogTitle
+            id='customized-dialog-title'
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 1,
+              color: 'error.main',
+              fontWeight: 700,
+              pb: 1,
+              position: 'relative'
+            }}
+          >
+            <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
+            Confirm Delete
+            <DialogCloseButton onClick={() => setDeleteDialog({ open: false, row: null })} disableRipple>
+              <i className='tabler-x' />
+            </DialogCloseButton>
+          </DialogTitle>
+
+          <DialogContent sx={{ px: 5, pt: 1 }}>
+            <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
+              Are you sure you want to delete{' '}
+              <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.transferNo || 'this transfer out'}</strong>
+              ?
+              <br />
+              This action cannot be undone.
+            </Typography>
+          </DialogContent>
+
+          <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+            <GlobalButton
+              color='secondary'
+              onClick={() => setDeleteDialog({ open: false, row: null })}
+              sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+            >
+              Cancel
+            </GlobalButton>
+
+            <GlobalButton
+              onClick={confirmDelete}
+              variant='contained'
+              color='error'
+              disabled={deleteLoading}
+              sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+            >
+              {deleteLoading ? 'Deleting...' : 'Delete'}
+            </GlobalButton>
+          </DialogActions>
+        </Dialog>
 
         <TablePaginationComponent totalCount={totalCount} pagination={pagination} setPagination={setPagination} />
       </Card>

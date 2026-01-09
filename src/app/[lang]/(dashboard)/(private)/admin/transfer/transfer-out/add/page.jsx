@@ -18,6 +18,7 @@ import {
 
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
+import EditIcon from '@mui/icons-material/Edit'
 
 import StickyListLayout from '@/components/common/StickyListLayout'
 import GlobalButton from '@/components/common/GlobalButton'
@@ -59,6 +60,8 @@ const AddTransferOutPage = () => {
   const [uom, setUom] = useState(null)
   const [quantity, setQuantity] = useState('')
   const [rate, setRate] = useState('')
+
+  const [editId, setEditId] = useState(null)
 
   const [items, setItems] = useState([])
 
@@ -120,7 +123,16 @@ const AddTransferOutPage = () => {
     }
 
     fetchDropdowns()
+    fetchDropdowns()
   }, [])
+
+  const handleEditItem = row => {
+    setEditId(row.id)
+    setChemical({ label: row.chemical, id: row.chemicalId })
+    setUom({ label: row.uom, id: row.uomId })
+    setQuantity(row.quantity)
+    setRate(row.rate)
+  }
 
   /* ───── DATE INPUT ───── */
 
@@ -145,19 +157,39 @@ const AddTransferOutPage = () => {
       return
     }
 
-    setItems(prev => [
-      ...prev,
-      {
-        id: Date.now(),
-        chemical: chemical.label,
-        chemicalId: chemical.id,
-        uom: uom.label,
-        uomId: uom.id,
-        quantity,
-        rate,
-        amount
-      }
-    ])
+    if (editId) {
+      setItems(prev =>
+        prev.map(item =>
+          item.id === editId
+            ? {
+                ...item,
+                chemical: chemical.label,
+                chemicalId: chemical.id,
+                uom: uom.label,
+                uomId: uom.id,
+                quantity,
+                rate,
+                amount
+              }
+            : item
+        )
+      )
+      setEditId(null)
+    } else {
+      setItems(prev => [
+        ...prev,
+        {
+          id: Date.now(),
+          chemical: chemical.label,
+          chemicalId: chemical.id,
+          uom: uom.label,
+          uomId: uom.id,
+          quantity,
+          rate,
+          amount
+        }
+      ])
+    }
 
     setChemical(null)
     setUom(null)
@@ -295,8 +327,13 @@ const AddTransferOutPage = () => {
             </Grid>
 
             <Grid item md={1}>
-              <GlobalButton startIcon={<AddIcon />} onClick={handleAddItem}>
-                Add
+              <GlobalButton
+                variant='contained'
+                color={editId ? 'info' : 'primary'}
+                startIcon={editId ? <EditIcon /> : <AddIcon />}
+                onClick={handleAddItem}
+              >
+                {editId ? 'Update' : 'Add'}
               </GlobalButton>
             </Grid>
           </Grid>
@@ -308,13 +345,19 @@ const AddTransferOutPage = () => {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>Chemical</th>
-                  <th>UOM</th>
-                  <th align='right'>Qty</th>
-                  <th align='right'>Rate</th>
-                  <th align='right'>Amount</th>
-                  <th />
+                  <th>ID</th>
+                  <th style={{ width: '25%' }}>Chemical</th>
+                  <th style={{ width: '15%' }}>UOM</th>
+                  <th align='right' style={{ width: '15%' }}>
+                    Qty
+                  </th>
+                  <th align='right' style={{ width: '15%' }}>
+                    Rate
+                  </th>
+                  <th align='right' style={{ width: '15%' }}>
+                    Amount
+                  </th>
+                  <th align='center'>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -328,7 +371,10 @@ const AddTransferOutPage = () => {
                       <td align='right'>{r.rate}</td>
                       <td align='right'>{r.amount}</td>
                       <td align='center'>
-                        <IconButton color='error' onClick={() => handleRemoveItem(r.id)}>
+                        <IconButton size='small' color='primary' onClick={() => handleEditItem(r)}>
+                          <EditIcon fontSize='small' />
+                        </IconButton>
+                        <IconButton size='small' color='error' onClick={() => handleRemoveItem(r.id)}>
                           <DeleteIcon fontSize='small' />
                         </IconButton>
                       </td>

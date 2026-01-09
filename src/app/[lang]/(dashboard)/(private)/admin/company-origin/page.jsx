@@ -55,6 +55,7 @@ import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 import StickyListLayout from '@/components/common/StickyListLayout'
 import ChevronRight from '@menu/svg/ChevronRight'
 import { getCompanyList, deleteCompany } from '@/api/company'
+import { encodeId } from '@/utils/urlEncoder'
 import styles from '@core/styles/table.module.css'
 
 // ──────────────────────────────────────────────────────────────
@@ -187,7 +188,7 @@ const CompanyOriginListContent = () => {
               <IconButton
                 size='small'
                 color='primary'
-                onClick={() => router.push(`/admin/company-origin/edit/${info.row.original.id}`)}
+                onClick={() => router.push(`/admin/company-origin/update/${encodeId(info.row.original.id)}`)}
               >
                 <i className='tabler-edit' />
               </IconButton>

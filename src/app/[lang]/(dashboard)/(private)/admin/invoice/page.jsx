@@ -52,7 +52,8 @@ import StickyListLayout from '@/components/common/StickyListLayout'
 import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 
 // API
-import { getInvoiceSummary, getInvoiceDropdowns } from '@/api/invoice' // adjust path if needed
+import { getInvoiceSummary, getInvoiceDropdowns } from '@/api/invoice'
+import { decodeId } from '@/utils/urlEncoder'
 
 import { showToast } from '@/components/common/Toasts'
 import SummaryCards from '@/components/common/SummaryCards'
@@ -62,11 +63,78 @@ import GlobalButton from '@/components/common/GlobalButton'
 
 const columnHelper = createColumnHelper()
 
+const normalizeList = (list, key = 'name') => {
+  if (!Array.isArray(list)) return []
+
+  return list
+    .map(item => ({
+      id: item.id,
+      label: item[key] || item.label || ''
+    }))
+    .filter((item, index, array) => array.findIndex(x => x.id === item.id) === index)
+}
+
+const dedupeById = items => {
+  if (!Array.isArray(items)) return []
+  const seen = new Map()
+  return items.reduce((acc, item) => {
+    const id = item?.id
+    if (id != null && !seen.has(id)) {
+      seen.set(id, true)
+      acc.push({
+        id,
+        label: item.label || item.name || String(id)
+      })
+    }
+    return acc
+  }, [])
+}
+
+const mapInvoice = (inv, dd) => ({
+  id: inv.id,
+  invDate: inv.invoice_date || null,
+  invNo: inv.invoice_number || '-',
+
+  // Fix: invoice_frequency_id is STRING "2", but dropdown id is number
+  invFrequency: dd.billing_frequencies?.find(f => String(f.id) === String(inv.invoice_frequency_id))?.label || '-',
+
+  // service_frequency sometimes null
+  svcFrequency: dd.service_frequencies?.find(f => String(f.id) === String(inv.service_frequency))?.label || '-',
+
+  // These fields are NOT in API → so we use fallback from other data if possible
+  contractCode: inv.contract_code || `CON-${inv.contract_id}` || '-',
+  customerName: inv.customer_name || dd.customers?.find(c => c.id === inv.customer_id)?.label || 'Unknown Customer',
+  billingName: inv.billing_name || inv.customer_name || 'N/A',
+  address: inv.service_address || 'Not Available',
+  cardId: inv.card_id || '-',
+  poNo: inv.po_number || '-',
+  accountItemCode: inv.account_item_code || '-',
+
+  // No.Of Value Services & Last SVC Date → NOT in this API response
+  noOfServices: inv.no_of_services || '-',
+  lastSvcDate: inv.last_service_date || null,
+
+  amount: inv.amount || 0,
+  tax: inv.gst || 0,
+  // Fix: taxAmount column expects this
+  taxAmount: inv.gst || 0,
+
+  total: (inv.amount || 0) + (inv.gst || 0),
+
+  issued: inv.is_issued === 1 || inv.is_issued === true,
+
+  // These are in API but not mapped before
+  contractLevel: dd.contract_levels?.find(cl => String(cl.id) === String(inv.contract_level))?.label || '-',
+
+  invoiceType: inv.invoice_type || '-',
+
+  salesPerson: dd.sales_persons?.find(s => String(s.id) === String(inv.sales_person_id))?.label || '-'
+})
 const InvoiceListPageFullContent = () => {
   const { canAccess } = usePermission()
   const searchParams = useSearchParams()
   // ── Data & Dropdowns ────────────────────────
-  const [data, setData] = useState([])
+  const [rawResults, setRawResults] = useState([])
   const [dropdownData, setDropdownData] = useState({})
 
   // ── UI State ─────────────────────────────────
@@ -91,8 +159,8 @@ const InvoiceListPageFullContent = () => {
   const encodedCustomer = searchParams.get('customer')
   const encodedContract = searchParams.get('contract')
 
-  const decodedCustomerId = encodedCustomer ? Number(atob(encodedCustomer)) : null
-  const decodedContractId = encodedContract ? Number(atob(encodedContract)) : null
+  const decodedCustomerId = useMemo(() => (encodedCustomer ? Number(decodeId(encodedCustomer)) : null), [encodedCustomer])
+  const decodedContractId = useMemo(() => (encodedContract ? Number(decodeId(encodedContract)) : null), [encodedContract])
 
   // ✅ REQUIRED STATES (YOU MISSED THIS)
   const [uiCustomer, setUiCustomer] = useState(null)
@@ -115,41 +183,42 @@ const InvoiceListPageFullContent = () => {
     dateRange: [null, null]
   })
 
-  //CUSTOMER FILTERS
+  // Sync Customer from URL
   useEffect(() => {
     if (!decodedCustomerId || !dropdownData.customers?.length) return
 
     const matchedCustomer = dropdownData.customers.find(c => Number(c.id) === Number(decodedCustomerId))
 
-    if (matchedCustomer) {
+    if (matchedCustomer && appliedFilters.customer?.id !== matchedCustomer.id) {
       setUiCustomer(matchedCustomer)
-      // Also apply initially if it's from URL
       setAppliedFilters(prev => ({ ...prev, customer: matchedCustomer }))
     }
-  }, [decodedCustomerId, dropdownData.customers])
+  }, [decodedCustomerId, dropdownData.customers, appliedFilters.customer])
 
-  //CONTRACT FILTER
-
+  // Sync Contract from URL
   useEffect(() => {
     if (!decodedContractId || !dropdownData.contracts?.length) return
 
     const matchedContract = dropdownData.contracts.find(c => Number(c.id) === Number(decodedContractId))
 
-    if (matchedContract) {
+    if (matchedContract && appliedFilters.contract?.id !== matchedContract.id) {
       setUiContract(matchedContract)
-      // Also apply initially if it's from URL
       setAppliedFilters(prev => ({ ...prev, contract: matchedContract }))
     }
-  }, [decodedContractId, dropdownData.contracts])
+  }, [decodedContractId, dropdownData.contracts, appliedFilters.contract])
 
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
   const [totalCount, setTotalCount] = useState(0)
+  const [summaryData, setSummaryData] = useState([])
+  const [selectedInvoiceData, setSelectedInvoiceData] = useState(null)
   const [customerSpecificContracts, setCustomerSpecificContracts] = useState(null)
 
-  // PDF Preview Invoice Data
-  const [selectedInvoiceData, setSelectedInvoiceData] = useState(null)
-  // ── Pagination ───────────────────────────────
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
-  const [summaryData, setSummaryData] = useState([])
+  const data = useMemo(() => {
+    return rawResults.map((inv, index) => ({
+      sno: index + 1 + pagination.pageIndex * pagination.pageSize,
+      ...mapInvoice(inv, dropdownData)
+    }))
+  }, [rawResults, dropdownData, pagination.pageIndex, pagination.pageSize])
 
   // ───────────────────────────────────────────
   // 🔥 URL Params for Redirection handled in Lazy State Init
@@ -162,21 +231,6 @@ const InvoiceListPageFullContent = () => {
 
       setDropdownData(prev => {
         let normalizedContracts = normalizeList(dd.contract_list?.label, 'label')
-
-        // 🔥 PERSIST URL OPTION (Contract)
-        // We use window.location because searchParams might be stale if inside closure?
-        // Actually searchParams is from top scope 'useSearchParams', it should be fine.
-        const urlContractId = searchParams.get('contract')
-        const urlContractCode = searchParams.get('contractCode')
-        const urlCustId = searchParams.get('customer')
-
-        // Ensure we only add if it belongs to this customer (roughly checked by URL presence)
-        if (urlContractId && urlContractCode) {
-          const exists = normalizedContracts.find(c => String(c.id) === String(urlContractId))
-          if (!exists) {
-            normalizedContracts.push({ id: Number(urlContractId), label: urlContractCode })
-          }
-        }
 
         return {
           ...prev,
@@ -225,83 +279,18 @@ const InvoiceListPageFullContent = () => {
     return params
   }
 
-  const normalizeList = (list, key = 'name') => {
-    if (!Array.isArray(list)) return []
-
-    return list
-      .map(item => ({
-        id: item.id,
-        label: item[key] || item.label || ''
-      }))
-      .filter((item, index, array) => array.findIndex(x => x.id === item.id) === index)
-  }
-
-  // ── DEDUPE FUNCTION (Add this once, above processedDropdowns) ──
-  const dedupeById = items => {
-    if (!Array.isArray(items)) return []
-    const seen = new Map()
-    return items.reduce((acc, item) => {
-      const id = item?.id
-      if (id != null && !seen.has(id)) {
-        seen.set(id, true)
-        acc.push({
-          id,
-          label: item.label || item.name || String(id)
-        })
-      }
-      return acc
-    }, [])
-  }
 
   // ── Load List + Dropdowns ─────────────────────
 
-  const loadEverything = async () => {
-    setLoading(true)
+  // ── Load Dropdowns ──────────────────────────
+  const loadDropdowns = async () => {
     try {
-      const params = buildListParams()
-
-      const [listRes, dropdownRes] = await Promise.all([
-        getInvoiceSummary(params), // ← changed here
-        getInvoiceDropdowns()
-      ])
-
-      const apiData = listRes?.data?.data || {}
-      const results = apiData?.results || []
-      const count = apiData?.count || 0
-
-      // ... rest of the code remains EXACTLY the same (dropdowns, mapping, etc.)
-      // No need to touch anything else!
-
+      const dropdownRes = await getInvoiceDropdowns()
       const ddWrapper = dropdownRes?.data || dropdownRes || {}
       const dd = ddWrapper?.data || {}
 
       let processedCustomers = dedupeById(dd.customer?.label || [])
-
-      // 🔥 PERSIST URL OPTION (Customer)
-      const urlCustId = searchParams.get('customer')
-      const urlCustName = searchParams.get('customerName')
-
-      if (urlCustId && urlCustName) {
-        const exists = processedCustomers.find(c => String(c.id) === String(urlCustId))
-        if (!exists) {
-          processedCustomers.push({ id: Number(urlCustId), label: urlCustName })
-        }
-      }
-
-      let processedContracts = customerSpecificContracts
-        ? customerSpecificContracts
-        : dedupeById(dd.contract_list?.label || [])
-
-      // 🔥 PERSIST URL OPTION (Contract)
-      const urlContractId = searchParams.get('contract')
-      const urlContractCode = searchParams.get('contractCode')
-
-      if (urlContractId && urlContractCode) {
-        const exists = processedContracts.find(c => String(c.id) === String(urlContractId))
-        if (!exists) {
-          processedContracts.push({ id: Number(urlContractId), label: urlContractCode })
-        }
-      }
+      let processedContracts = dedupeById(dd.contract_list?.label || [])
 
       const processedDropdowns = {
         origins: dedupeById(dd.company?.name || []),
@@ -319,17 +308,26 @@ const InvoiceListPageFullContent = () => {
         invoice_types: dedupeById(dd.invoice_type?.name || [])
       }
       setDropdownData(processedDropdowns)
+    } catch (err) {
+      console.error('Failed to load dropdowns:', err)
+    }
+  }
 
-      setData(
-        results.map((inv, index) => ({
-          sno: index + 1 + pagination.pageIndex * pagination.pageSize,
-          ...mapInvoice(inv, processedDropdowns)
-        }))
-      )
+  // ── Load Invoice List ─────────────────────────
+  const fetchInvoiceList = async () => {
+    setLoading(true)
+    try {
+      const params = buildListParams()
+      const listRes = await getInvoiceSummary(params)
 
+      const apiData = listRes?.data?.data || {}
+      const results = apiData?.results || []
+      const count = apiData?.count || 0
+
+      setRawResults(results)
       setTotalCount(count)
 
-      // Calculate summary stats
+      // Summary stats
       const summaryStats = [
         { title: 'Total Invoices', value: count, icon: 'tabler-file-invoice', color: '#7367f0' },
         {
@@ -353,14 +351,21 @@ const InvoiceListPageFullContent = () => {
       ]
       setSummaryData(summaryStats)
     } catch (err) {
-      console.error(err)
+      console.error('Failed to load invoices:', err)
       showToast('error', 'Failed to load invoices')
     } finally {
       setLoading(false)
     }
   }
+
+  // Initial Dropdown Load
   useEffect(() => {
-    loadEverything()
+    loadDropdowns()
+  }, []) // Run once on mount
+
+  // Fetch List when filters/pagination change
+  useEffect(() => {
+    fetchInvoiceList()
   }, [pagination.pageIndex, pagination.pageSize, appliedFilters])
 
   // ── Refresh ───────────────────────────────────
@@ -396,7 +401,7 @@ const InvoiceListPageFullContent = () => {
 
       await updateInvoice(invoice.id, { is_issued: 1 })
       showToast('success', 'Invoice Approved')
-      loadEverything()
+      fetchInvoiceList()
     } catch (err) {
       showToast('error', 'Approval Failed')
     }
@@ -416,7 +421,7 @@ const InvoiceListPageFullContent = () => {
       await deleteInvoice(invoice.id)
 
       showToast('success', 'Invoice deleted')
-      loadEverything()
+      fetchInvoiceList()
     } catch (err) {
       showToast('error', 'Delete failed')
     }
@@ -489,46 +494,6 @@ const InvoiceListPageFullContent = () => {
     pdf.save(`invoice_${Date.now()}.pdf`)
   }
 
-  const mapInvoice = (inv, dd) => ({
-    id: inv.id,
-    invDate: inv.invoice_date || null,
-    invNo: inv.invoice_number || '-',
-
-    // Fix: invoice_frequency_id is STRING "2", but dropdown id is number
-    invFrequency: dd.billing_frequencies?.find(f => String(f.id) === String(inv.invoice_frequency_id))?.label || '-',
-
-    // service_frequency sometimes null
-    svcFrequency: dd.service_frequencies?.find(f => String(f.id) === String(inv.service_frequency))?.label || '-',
-
-    // These fields are NOT in API → so we use fallback from other data if possible
-    contractCode: inv.contract_code || `CON-${inv.contract_id}` || '-',
-    customerName: inv.customer_name || dd.customers?.find(c => c.id === inv.customer_id)?.label || 'Unknown Customer',
-    billingName: inv.billing_name || inv.customer_name || 'N/A',
-    address: inv.service_address || 'Not Available',
-    cardId: inv.card_id || '-',
-    poNo: inv.po_number || '-',
-    accountItemCode: inv.account_item_code || '-',
-
-    // No.Of Value Services & Last SVC Date → NOT in this API response
-    noOfServices: inv.no_of_services || '-',
-    lastSvcDate: inv.last_service_date || null,
-
-    amount: inv.amount || 0,
-    tax: inv.gst || 0,
-    // Fix: taxAmount column expects this
-    taxAmount: inv.gst || 0,
-
-    total: (inv.amount || 0) + (inv.gst || 0),
-
-    issued: inv.is_issued === 1 || inv.is_issued === true,
-
-    // These are in API but not mapped before
-    contractLevel: dd.contract_levels?.find(cl => String(cl.id) === String(inv.contract_level))?.label || '-',
-
-    invoiceType: inv.invoice_type || '-',
-
-    salesPerson: dd.sales_persons?.find(s => String(s.id) === String(inv.sales_person_id))?.label || '-'
-  })
 
   // ── Dropdown options from API (fallback to empty array) ─────
   const originOptions = dropdownData.origins || []

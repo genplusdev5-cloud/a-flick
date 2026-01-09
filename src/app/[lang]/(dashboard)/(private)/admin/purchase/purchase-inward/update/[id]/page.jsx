@@ -28,6 +28,7 @@ import CustomTextField from '@core/components/mui/TextField'
 
 import DeleteIcon from '@mui/icons-material/Delete'
 import AddIcon from '@mui/icons-material/Add'
+import EditIcon from '@mui/icons-material/Edit'
 
 import styles from '@core/styles/table.module.css'
 import { getPurchaseFilters, getPurchaseInwardDetails, updatePurchaseInward } from '@/api/purchase_inward'
@@ -37,19 +38,26 @@ import { showToast } from '@/components/common/Toasts'
 const EditPurchaseInwardPage = () => {
   const router = useRouter()
   const params = useParams()
-  const { lang, id } = params
+  const { lang, id} = params
   const searchParams = useSearchParams()
   const type = searchParams.get('type') || 'tm'
-  const decodedId = useMemo(() => {
-    if (!id) return null
-
-    try {
-      const decoded = atob(id)
-      return Number(decoded)
-    } catch {
-      return Number(id)
+  
+  let decodedId = null
+  try {
+    if (id) {
+      // First URL-decode, then base64-decode
+      const urlDecoded = decodeURIComponent(id)
+      decodedId = atob(urlDecoded)
     }
-  }, [id])
+  } catch (e) {
+    console.error('Failed to decode ID:', id, e)
+    // Try without URL decoding
+    try {
+      decodedId = id ? atob(id) : null
+    } catch {
+      decodedId = id // Final fallback to using ID as-is
+    }
+  }
 
   // Dropdown options
   const [originOptions, setOriginOptions] = useState([])
@@ -58,6 +66,9 @@ const EditPurchaseInwardPage = () => {
   const [chemicalOptions, setChemicalOptions] = useState([])
   const [uomOptions, setUomOptions] = useState([])
 
+  // Loading states
+  const [initLoading, setInitLoading] = useState(false)
+  const [saveLoading, setSaveLoading] = useState(false)
 
   // Header fields
   const [origin, setOrigin] = useState(null)
@@ -72,6 +83,7 @@ const EditPurchaseInwardPage = () => {
   const [uom, setUom] = useState(null)
   const [quantity, setQuantity] = useState('')
   const [rate, setRate] = useState('')
+  const [editId, setEditId] = useState(null)
 
   const [items, setItems] = useState([])
 
@@ -84,15 +96,15 @@ const EditPurchaseInwardPage = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-
+        setInitLoading(true)
         const [purchaseRes, materialRes, detailsRes] = await Promise.all([
           getPurchaseFilters(),
           getMaterialRequestDropdowns(),
           getPurchaseInwardDetails({ id: decodedId, type })
         ])
 
-        // Dropdowns
-        const purchaseData = purchaseRes?.data || {}
+        // --- DROPDOWNS ---
+        const purchaseData = purchaseRes?.data?.data || {}
 
         const origins =
           purchaseData?.company?.name?.map(item => ({
@@ -119,6 +131,7 @@ const EditPurchaseInwardPage = () => {
         setSupplierOptions(suppliers)
         setPurchaseOrderOptions(purchaseOrders)
 
+        // --- MATERIAL DROPDOWNS ---
         const materialData = materialRes?.data || materialRes
 
         setChemicalOptions(
@@ -137,53 +150,53 @@ const EditPurchaseInwardPage = () => {
           })) || []
         )
 
-        // 🔥 Purchase Inward Details
-        const details = detailsRes?.data || {}
+        // --- DETAILS ---
+        const details = detailsRes?.data ?? detailsRes ?? {}
 
-        setPoDate(details.inward_date ? parseISO(details.inward_date) : null)
+        setPoDate(details?.inward_date ? new Date(details.inward_date) : null)
+
         setRemarks(details.remarks || '')
 
-        if (details.company_id) {
-          const o = origins.find(x => x.id === details.company_id)
-          if (o) setOrigin(o)
-        }
+        // ⚠️ IMPORTANT: match AFTER dropdowns ready
+        setOrigin(origins.find(x => x.id === details.company_id) || null)
+        setSupplier(suppliers.find(x => x.id === details.supplier_id) || null)
+        setPurchaseOrder(purchaseOrders.find(x => x.id === details.po_id) || null)
 
-        if (details.supplier_id) {
-          const s = suppliers.find(x => x.id === details.supplier_id)
-          if (s) setSupplier(s)
-        }
-
-        if (details.po_id) {
-          const p = purchaseOrders.find(x => x.id === details.po_id)
-          if (p) setPurchaseOrder(p)
-        }
-
-        // 🔥 Inward items
-        const inwardItems = details.inward_items || details.items || []
+        // --- ITEMS ---
+        const inwardItems = details.inward_items || []
 
         setItems(
           inwardItems.map(item => ({
             id: item.id,
-            chemical: item.chemical_name || item.chemical,
+            chemical: item.chemical_name,
             chemicalId: item.chemical_id,
-            uom: item.uom_name || item.uom,
+            uom: item.uom_name,
             uomId: item.uom_id,
             quantity: item.quantity,
-            rate: item.unit_rate || item.rate,
-            amount: (item.quantity || 0) * (item.unit_rate || item.rate || 0)
+            rate: item.unit_rate,
+            amount: (Number(item.quantity) || 0) * (Number(item.unit_rate) || 0)
           }))
         )
       } catch (err) {
-        console.error(err)
+        console.error('Failed to fetch purchase inward details', err)
         showToast('error', 'Failed to load purchase inward data')
       } finally {
+        setInitLoading(false)
       }
     }
 
-    if (decodedId && !isNaN(decodedId)) {
+    if (decodedId) {
       fetchData()
     }
   }, [decodedId])
+
+  const handleEditItem = row => {
+    setEditId(row.id)
+    setChemical(chemicalOptions.find(c => c.id === row.chemicalId) || null)
+    setUom(uomOptions.find(u => u.id === row.uomId) || null)
+    setQuantity(row.quantity)
+    setRate(row.rate)
+  }
 
   const amount = useMemo(() => {
     const q = Number(quantity)
@@ -197,19 +210,39 @@ const EditPurchaseInwardPage = () => {
       return
     }
 
-    setItems(prev => [
-      ...prev,
-      {
-        id: Date.now(),
-        chemical: chemical.label,
-        chemicalId: chemical.id,
-        uom: uom.label,
-        uomId: uom.id,
-        quantity,
-        rate,
-        amount
-      }
-    ])
+    if (editId) {
+      setItems(prev =>
+        prev.map(item =>
+          item.id === editId
+            ? {
+                ...item,
+                chemical: chemical.label,
+                chemicalId: chemical.id,
+                uom: uom.label,
+                uomId: uom.id,
+                quantity,
+                rate,
+                amount
+              }
+            : item
+        )
+      )
+      setEditId(null)
+    } else {
+      setItems(prev => [
+        ...prev,
+        {
+          id: Date.now(),
+          chemical: chemical.label,
+          chemicalId: chemical.id,
+          uom: uom.label,
+          uomId: uom.id,
+          quantity,
+          rate,
+          amount
+        }
+      ])
+    }
 
     setChemical(null)
     setUom(null)
@@ -235,6 +268,7 @@ const EditPurchaseInwardPage = () => {
         po_id: purchaseOrder?.id || null,
         remarks,
         inward_items: items.map(item => ({
+          id: String(item.id).length > 10 ? null : item.id,
           chemical_id: item.chemicalId,
           uom_id: item.uomId,
           quantity: Number(item.quantity),
@@ -280,7 +314,6 @@ const EditPurchaseInwardPage = () => {
 
         {/* HEADER FORM */}
         <Box px={4} py={3} position='relative'>
-
           <Grid container spacing={3}>
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete label='Origin' options={originOptions} value={origin} onChange={setOrigin} />
@@ -334,11 +367,16 @@ const EditPurchaseInwardPage = () => {
             </Grid>
 
             <Grid item xs={12} md={2}>
-              <GlobalTextField label='Quantity' type='number' value={quantity} onChange={setQuantity} />
+              <GlobalTextField
+                label='Quantity'
+                type='number'
+                value={quantity || ''}
+                onChange={e => setQuantity(e.target.value)}
+              />
             </Grid>
 
             <Grid item xs={12} md={2}>
-              <GlobalTextField label='Rate' type='number' value={rate} onChange={e => setRate(e.target.value)} />
+              <GlobalTextField label='Rate' type='number' value={rate || ''} onChange={e => setRate(e.target.value)} />
             </Grid>
 
             <Grid item xs={12} md={2}>
@@ -346,8 +384,13 @@ const EditPurchaseInwardPage = () => {
             </Grid>
 
             <Grid item xs={12} md={1}>
-              <GlobalButton variant='contained' startIcon={<AddIcon />} onClick={handleAddItem}>
-                Add
+              <GlobalButton
+                variant='contained'
+                color={editId ? 'info' : 'primary'}
+                startIcon={editId ? <EditIcon /> : <AddIcon />}
+                onClick={handleAddItem}
+              >
+                {editId ? 'Update' : 'Add'}
               </GlobalButton>
             </Grid>
           </Grid>
@@ -360,11 +403,17 @@ const EditPurchaseInwardPage = () => {
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>Chemical</th>
-                  <th>UOM</th>
-                  <th align='right'>Quantity</th>
-                  <th align='right'>Rate</th>
-                  <th align='right'>Amount</th>
+                  <th style={{ width: '25%' }}>Chemical</th>
+                  <th style={{ width: '15%' }}>UOM</th>
+                  <th align='right' style={{ width: '15%' }}>
+                    Quantity
+                  </th>
+                  <th align='right' style={{ width: '15%' }}>
+                    Rate
+                  </th>
+                  <th align='right' style={{ width: '15%' }}>
+                    Amount
+                  </th>
                   <th align='center'>Action</th>
                 </tr>
               </thead>
@@ -378,8 +427,11 @@ const EditPurchaseInwardPage = () => {
                       <td>{row.uom}</td>
                       <td align='right'>{row.quantity}</td>
                       <td align='right'>{row.rate}</td>
-                      <td align='right'>{row.amount}</td>
+                      <td align='right'>{isNaN(row.amount) ? '-' : row.amount}</td>
                       <td align='center'>
+                        <IconButton size='small' color='primary' onClick={() => handleEditItem(row)}>
+                          <EditIcon fontSize='small' />
+                        </IconButton>
                         <IconButton size='small' color='error' onClick={() => handleRemoveItem(row.id)}>
                           <DeleteIcon fontSize='small' />
                         </IconButton>

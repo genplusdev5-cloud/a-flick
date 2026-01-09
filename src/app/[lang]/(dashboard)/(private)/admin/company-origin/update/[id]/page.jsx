@@ -28,12 +28,14 @@ import { Autocomplete } from '@mui/material'
 import { getCompanyDetails, updateCompany } from '@/api/company'
 import { useParams, useRouter } from 'next/navigation'
 import { showToast } from '@/components/common/Toasts'
+import { decodeId } from '@/utils/urlEncoder'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export default function CompanyOriginEditPage() {
   const fileInputRef = useRef(null)
-  const { id } = useParams()
+  const { id: encodedId } = useParams()
+  const id = decodeId(encodedId)
   const router = useRouter()
 
   const [formData, setFormData] = useState(null)
@@ -62,7 +64,7 @@ export default function CompanyOriginEditPage() {
         companyName: data.name || '',
         phone: data.phone || '',
         email: data.email || '',
-        taxNumber: data.tax_id || '',
+        taxNumber: data.tax_id ? String(data.tax_id) : '',
         addressLine1: data.address_line_1 || '',
         addressLine2: data.address_line_2 || '',
         city: data.city || '',
@@ -225,14 +227,14 @@ export default function CompanyOriginEditPage() {
           >
             Company Origin
           </Typography>
-          <Typography color='text.primary'>Edit Company</Typography>
+          <Typography color='text.primary'>Update Company</Typography>
         </Breadcrumbs>
       </Box>
 
       <Card sx={{ p: { xs: 4, md: 6 }, borderRadius: 2, boxShadow: 3 }}>
         <Box display='flex' justifyContent='space-between' alignItems='center' mb={5}>
           <Typography variant='h5' fontWeight={600}>
-            Edit Company Origin
+            Update Company Origin
           </Typography>
           <Button
             variant='contained'
@@ -290,7 +292,9 @@ export default function CompanyOriginEditPage() {
           <Grid item xs={12} md={3}>
             <Autocomplete
               options={taxNumberOptions}
-              value={formData.taxNumber || null}
+              value={formData.taxNumber ? String(formData.taxNumber) : null}
+              getOptionLabel={option => String(option || '')}
+              isOptionEqualToValue={(option, value) => String(option) === String(value)}
               onChange={(e, v) => setFormData(prev => ({ ...prev, taxNumber: v || '' }))}
               renderInput={params => <CustomTextField {...params} label='Tax Number' />}
             />
@@ -320,39 +324,55 @@ export default function CompanyOriginEditPage() {
           </Grid>
 
           {/* GL Fields */}
-          {['glContractAccount', 'glJobAccount', 'glContJobAccount', 'glWarrantyAccount'].map(f => (
-            <Grid item xs={12} md={3} key={f}>
+          {[
+            { name: 'glContractAccount', label: 'General Ledger - Contracts' },
+            { name: 'glJobAccount', label: 'General Ledger - Task' },
+            { name: 'glContJobAccount', label: 'General Ledger - Continuous Tasks' },
+            { name: 'glWarrantyAccount', label: 'General Ledger - Warranty' }
+          ].map(f => (
+            <Grid item xs={12} md={3} key={f.name}>
               <CustomTextField
                 fullWidth
-                label={f.replace(/([A-Z])/g, ' $1').trim()}
-                name={f}
-                value={formData[f]}
+                label={f.label}
+                name={f.name}
+                value={formData[f.name] || ''}
                 onChange={handleChange}
               />
             </Grid>
           ))}
 
           {/* Other Fields */}
-          {['uenNumber', 'gstNumber', 'invoicePrefixCode', 'invoiceStartNumber', 'contractPrefixCode'].map(f => (
-            <Grid item xs={12} md={3} key={f}>
+          {[
+            { name: 'uenNumber', label: 'UEN Number' },
+            { name: 'gstNumber', label: 'GST number' },
+            { name: 'invoicePrefixCode', label: 'Invoice prefix' },
+            { name: 'invoiceStartNumber', label: 'Invoice starting number' },
+            { name: 'contractPrefixCode', label: 'Contract prefix' }
+          ].map(f => (
+            <Grid item xs={12} md={3} key={f.name}>
               <CustomTextField
                 fullWidth
-                label={f === 'invoiceStartNumber' ? 'Invoice Start No.' : f.replace(/([A-Z])/g, ' $1').trim()}
-                name={f}
-                value={formData[f]}
-                onChange={f === 'invoiceStartNumber' ? handleInvoiceStartNumberChange : handleChange}
+                label={f.label}
+                name={f.name}
+                value={formData[f.name] || ''}
+                onChange={f.name === 'invoiceStartNumber' ? handleInvoiceStartNumberChange : handleChange}
               />
             </Grid>
           ))}
 
           {/* Bank */}
-          {['bankName', 'bankAccountNumber', 'bankCode', 'swiftCode'].map(f => (
-            <Grid item xs={12} md={3} key={f}>
+          {[
+            { name: 'bankName', label: 'Bank Name' },
+            { name: 'bankAccountNumber', label: 'Bank Account' },
+            { name: 'bankCode', label: 'Bank Code' },
+            { name: 'swiftCode', label: 'SWIFT CODE' }
+          ].map(f => (
+            <Grid item xs={12} md={3} key={f.name}>
               <CustomTextField
                 fullWidth
-                label={f.replace(/([A-Z])/g, ' $1').trim()}
-                name={f}
-                value={formData[f]}
+                label={f.label}
+                name={f.name}
+                value={formData[f.name] || ''}
                 onChange={handleChange}
               />
             </Grid>
@@ -413,9 +433,15 @@ export default function CompanyOriginEditPage() {
         </Grid>
 
         <Box mt={6} display='flex' justifyContent='flex-end' gap={2}>
-          <Button variant='outlined' onClick={loadCompany} disabled={saving}>
+          <Button
+            variant='contained'
+            color='secondary'
+            onClick={() => router.push('/admin/company-origin')}
+            disabled={saving}
+          >
             Cancel
           </Button>
+
           <Button
             variant='contained'
             onClick={handleSave}

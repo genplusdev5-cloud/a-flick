@@ -28,6 +28,7 @@ import CustomTextField from '@core/components/mui/TextField'
 
 import DeleteIcon from '@mui/icons-material/Delete'
 import AddIcon from '@mui/icons-material/Add'
+import EditIcon from '@mui/icons-material/Edit'
 
 import styles from '@core/styles/table.module.css'
 import { getPurchaseFilters } from '@/api/purchase_inward'
@@ -46,10 +47,15 @@ const EditPurchaseReturnPage = () => {
     if (!id) return null
 
     try {
-      const decoded = atob(id)
-      return Number(decoded)
-    } catch {
-      return Number(id)
+      const urlDecoded = decodeURIComponent(id)
+      return Number(atob(urlDecoded))
+    } catch (e) {
+      try {
+        const fixed = id.replace(/-/g, '+').replace(/_/g, '/')
+        return Number(atob(fixed))
+      } catch {
+        return Number(id)
+      }
     }
   }, [id])
 
@@ -77,6 +83,7 @@ const EditPurchaseReturnPage = () => {
   const [uom, setUom] = useState(null)
   const [quantity, setQuantity] = useState('')
   const [rate, setRate] = useState('')
+  const [editId, setEditId] = useState(null)
 
   const [items, setItems] = useState([])
 
@@ -98,7 +105,7 @@ const EditPurchaseReturnPage = () => {
         ])
 
         // Dropdowns
-        const purchaseData = purchaseRes?.data || {}
+        const purchaseData = purchaseRes?.data?.data || {}
 
         const origins =
           purchaseData?.company?.name?.map(item => ({
@@ -144,24 +151,31 @@ const EditPurchaseReturnPage = () => {
         )
 
         // 🔥 Purchase Inward Details
-        const details = detailsRes?.data || {}
+        let details = {}
+        if (detailsRes?.return_items || detailsRes?.items) {
+          details = detailsRes
+        } else if (detailsRes?.data?.return_items || detailsRes?.data?.items) {
+          details = detailsRes.data
+        } else {
+          details = detailsRes?.data?.data || detailsRes?.data || detailsRes || {}
+        }
 
         setReturnDate(details.return_date ? parseISO(details.return_date) : null)
 
         setRemarks(details.remarks || '')
 
         if (details.company_id) {
-          const o = origins.find(x => x.id === details.company_id)
+          const o = origins.find(x => x.id == details.company_id)
           if (o) setOrigin(o)
         }
 
         if (details.supplier_id) {
-          const s = suppliers.find(x => x.id === details.supplier_id)
+          const s = suppliers.find(x => x.id == details.supplier_id)
           if (s) setSupplier(s)
         }
 
         if (details.po_id) {
-          const p = purchaseOrders.find(x => x.id === details.po_id)
+          const p = purchaseOrders.find(x => x.id == details.po_id)
           if (p) setPurchaseOrder(p)
         }
 
@@ -171,13 +185,13 @@ const EditPurchaseReturnPage = () => {
         setItems(
           returnItems.map(item => ({
             id: item.id,
-            chemical: item.chemical_name || item.chemical,
-            chemicalId: item.chemical_id,
-            uom: item.uom_name || item.uom,
-            uomId: item.uom_id,
-            quantity: item.return_quantity,
-            rate: item.unit_rate,
-            amount: item.return_quantity * item.unit_rate
+            chemical: item.chemical_name || item.item_name || item.chemical?.name || '',
+            chemicalId: item.chemical_id || item.item_id || item.chemical?.id,
+            uom: item.uom_name || item.uom?.name || item.uom_details?.name || item.uom,
+            uomId: item.uom_id || item.uom?.id || item.uom_details?.id,
+            quantity: item.return_quantity || item.quantity,
+            rate: item.unit_rate || item.rate,
+            amount: (Number(item.return_quantity) || Number(item.quantity) || 0) * (Number(item.unit_rate) || Number(item.rate) || 0)
           }))
         )
       } catch (err) {
@@ -193,6 +207,14 @@ const EditPurchaseReturnPage = () => {
     }
   }, [decodedId])
 
+  const handleEditItem = row => {
+    setEditId(row.id)
+    setChemical({ label: row.chemical, id: row.chemicalId })
+    setUom({ label: row.uom, id: row.uomId })
+    setQuantity(row.quantity)
+    setRate(row.rate)
+  }
+
   const amount = useMemo(() => {
     const q = Number(quantity)
     const r = Number(rate)
@@ -205,19 +227,39 @@ const EditPurchaseReturnPage = () => {
       return
     }
 
-    setItems(prev => [
-      ...prev,
-      {
-        id: Date.now(),
-        chemical: chemical.label,
-        chemicalId: chemical.id,
-        uom: uom.label,
-        uomId: uom.id,
-        quantity,
-        rate,
-        amount
-      }
-    ])
+    if (editId) {
+      setItems(prev =>
+        prev.map(item =>
+          item.id === editId
+            ? {
+                ...item,
+                chemical: chemical.label,
+                chemicalId: chemical.id,
+                uom: uom.label,
+                uomId: uom.id,
+                quantity,
+                rate,
+                amount
+              }
+            : item
+        )
+      )
+      setEditId(null)
+    } else {
+      setItems(prev => [
+        ...prev,
+        {
+          id: Date.now(),
+          chemical: chemical.label,
+          chemicalId: chemical.id,
+          uom: uom.label,
+          uomId: uom.id,
+          quantity,
+          rate,
+          amount
+        }
+      ])
+    }
 
     setChemical(null)
     setUom(null)
@@ -241,12 +283,18 @@ const EditPurchaseReturnPage = () => {
         company_id: origin.id,
         return_date: format(returnDate, 'yyyy-MM-dd'),
         supplier_id: supplier.id,
+        po_id: purchaseOrder?.id || null,
+        purchase_order_id: purchaseOrder?.id || null,
         remarks,
         return_items: items.map(item => ({
+          id: String(item.id).length > 10 ? null : item.id,
           chemical_id: item.chemicalId,
+          item_id: item.chemicalId,
           uom_id: item.uomId,
           return_quantity: Number(item.quantity),
-          unit_rate: Number(item.rate)
+          quantity: Number(item.quantity),
+          unit_rate: Number(item.rate),
+          rate: Number(item.rate)
         }))
       }
 
@@ -356,11 +404,16 @@ const EditPurchaseReturnPage = () => {
             </Grid>
 
             <Grid item xs={12} md={2}>
-              <GlobalTextField label='Quantity' type='number' value={quantity} onChange={setQuantity} />
+              <GlobalTextField
+                label='Quantity'
+                type='number'
+                value={quantity || ''}
+                onChange={e => setQuantity(e.target.value)}
+              />
             </Grid>
 
             <Grid item xs={12} md={2}>
-              <GlobalTextField label='Rate' type='number' value={rate} onChange={e => setRate(e.target.value)} />
+              <GlobalTextField label='Rate' type='number' value={rate || ''} onChange={e => setRate(e.target.value)} />
             </Grid>
 
             <Grid item xs={12} md={2}>
@@ -368,8 +421,13 @@ const EditPurchaseReturnPage = () => {
             </Grid>
 
             <Grid item xs={12} md={1}>
-              <GlobalButton variant='contained' startIcon={<AddIcon />} onClick={handleAddItem}>
-                Add
+              <GlobalButton
+                variant='contained'
+                color={editId ? 'info' : 'primary'}
+                startIcon={editId ? <EditIcon /> : <AddIcon />}
+                onClick={handleAddItem}
+              >
+                {editId ? 'Update' : 'Add'}
               </GlobalButton>
             </Grid>
           </Grid>
@@ -382,11 +440,17 @@ const EditPurchaseReturnPage = () => {
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>Chemical</th>
-                  <th>UOM</th>
-                  <th align='right'>Quantity</th>
-                  <th align='right'>Rate</th>
-                  <th align='right'>Amount</th>
+                  <th style={{ width: '25%' }}>Chemical</th>
+                  <th style={{ width: '15%' }}>UOM</th>
+                  <th align='right' style={{ width: '15%' }}>
+                    Quantity
+                  </th>
+                  <th align='right' style={{ width: '15%' }}>
+                    Rate
+                  </th>
+                  <th align='right' style={{ width: '15%' }}>
+                    Amount
+                  </th>
                   <th align='center'>Action</th>
                 </tr>
               </thead>
@@ -400,8 +464,11 @@ const EditPurchaseReturnPage = () => {
                       <td>{row.uom}</td>
                       <td align='right'>{row.quantity}</td>
                       <td align='right'>{row.rate}</td>
-                      <td align='right'>{row.amount}</td>
+                      <td align='right'>{isNaN(row.amount) ? '-' : row.amount}</td>
                       <td align='center'>
+                        <IconButton size='small' color='primary' onClick={() => handleEditItem(row)}>
+                          <EditIcon fontSize='small' />
+                        </IconButton>
                         <IconButton size='small' color='error' onClick={() => handleRemoveItem(row.id)}>
                           <DeleteIcon fontSize='small' />
                         </IconButton>

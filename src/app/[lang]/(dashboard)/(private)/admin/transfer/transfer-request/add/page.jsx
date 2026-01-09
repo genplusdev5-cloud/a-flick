@@ -23,6 +23,7 @@ import {
 
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
+import EditIcon from '@mui/icons-material/Edit'
 
 import StickyListLayout from '@/components/common/StickyListLayout'
 import GlobalButton from '@/components/common/GlobalButton'
@@ -33,7 +34,7 @@ import PermissionGuard from '@/components/auth/PermissionGuard'
 import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 import styles from '@core/styles/table.module.css'
 import { addTransferRequest } from '@/api/transfer_request'
-import { getPurchaseFilters } from '@/api/purchase_order'
+import { getTransferFilters } from '@/api/transfer_request'
 import { getMaterialRequestDropdowns } from '@/api/materialRequest/dropdown'
 import { showToast } from '@/components/common/Toasts'
 
@@ -67,6 +68,7 @@ const AddTransferRequestPage = () => {
   const [uom, setUom] = useState(null)
   const [quantity, setQuantity] = useState('')
   const [rate, setRate] = useState('')
+  const [editId, setEditId] = useState(null)
 
   // Items list
   const [items, setItems] = useState([])
@@ -75,37 +77,28 @@ const AddTransferRequestPage = () => {
     const fetchOptions = async () => {
       try {
         setInitLoading(true)
-        const [purchaseRes, materialRes] = await Promise.all([getPurchaseFilters(), getMaterialRequestDropdowns()])
+        const [purchaseRes, materialRes] = await Promise.all([getTransferFilters(), getMaterialRequestDropdowns()])
 
-        // Parse Purchase Filters (Company/Origin, Supplier)
-        const purchaseData = purchaseRes?.data?.data || {}
-        const origins =
-          purchaseData?.company?.name?.map(item => ({
-            label: item.name,
-            value: item.name,
-            id: item.id
-          })) || []
-        const suppliers =
-          purchaseData?.supplier?.name?.map(item => ({
-            label: item.name,
-            value: item.name,
-            id: item.id
-          })) || []
+        // Dropdown Data Hunter
+        const hunt = (obj, key) => {
+          if (!obj || typeof obj !== 'object') return null
+          if (obj[key]) return obj[key]
+          for (const k in obj) {
+            const found = hunt(obj[k], key)
+            if (found) return found
+          }
+          return null
+        }
 
-        // Parse Material Dropdowns (Chemicals, UOM)
-        const materialData = materialRes?.data || materialRes
-        const chemicals =
-          materialData?.chemicals?.name?.map(c => ({
-            label: c.name,
-            value: c.name,
-            id: c.id
-          })) || []
-        const uoms =
-          materialData?.uom?.name?.map(u => ({
-            label: u.name,
-            value: u.name,
-            id: u.id
-          })) || []
+        const pData = hunt(purchaseRes, 'company')
+        const sData = hunt(purchaseRes, 'supplier')
+        const cData = hunt(materialRes, 'chemicals')
+        const uData = hunt(materialRes, 'uom')
+
+        const origins = pData?.name?.map(item => ({ label: item.name, value: item.name, id: item.id })) || []
+        const suppliers = sData?.name?.map(item => ({ label: item.name, value: item.name, id: item.id })) || []
+        const chemicals = cData?.name?.map(c => ({ label: c.name, value: c.name, id: c.id })) || []
+        const uoms = uData?.name?.map(u => ({ label: u.name, value: u.name, id: u.id })) || []
 
         setOriginOptions(origins)
         setSupplierOptions(suppliers)
@@ -127,6 +120,14 @@ const AddTransferRequestPage = () => {
     fetchOptions()
   }, [])
 
+  const handleEditItem = row => {
+    setEditId(row.id)
+    setChemical({ label: row.chemical, id: row.chemicalId })
+    setUom({ label: row.uom, id: row.uomId })
+    setQuantity(row.quantity)
+    setRate(row.rate)
+  }
+
   const PoDateInput = forwardRef(function PoDateInput(props, ref) {
     const { label, value, ...rest } = props
 
@@ -145,19 +146,39 @@ const AddTransferRequestPage = () => {
       return
     }
 
-    setItems(prev => [
-      ...prev,
-      {
-        id: Date.now(),
-        chemical: chemical.label,
-        chemicalId: chemical.id,
-        uom: uom.label,
-        uomId: uom.id,
-        quantity,
-        rate,
-        amount
-      }
-    ])
+    if (editId) {
+      setItems(prev =>
+        prev.map(item =>
+          item.id === editId
+            ? {
+                ...item,
+                chemical: chemical.label,
+                chemicalId: chemical.id,
+                uom: uom.label,
+                uomId: uom.id,
+                quantity,
+                rate,
+                amount
+              }
+            : item
+        )
+      )
+      setEditId(null)
+    } else {
+      setItems(prev => [
+        ...prev,
+        {
+          id: Date.now(),
+          chemical: chemical.label,
+          chemicalId: chemical.id,
+          uom: uom.label,
+          uomId: uom.id,
+          quantity,
+          rate,
+          amount
+        }
+      ])
+    }
 
     // Reset item fields
     setChemical(null)
@@ -180,7 +201,7 @@ const AddTransferRequestPage = () => {
       setSaveLoading(true)
 
       const payload = {
-        from_company_id: fromCompany.id,
+        company_id: fromCompany.id,
         to_company_id: toCompany.id,
         transfer_date: format(transferDate, 'yyyy-MM-dd'),
         remarks,
@@ -321,8 +342,13 @@ const AddTransferRequestPage = () => {
             </Grid>
 
             <Grid item xs={12} md={1}>
-              <GlobalButton variant='contained' startIcon={<AddIcon />} onClick={handleAddItem}>
-                Add
+              <GlobalButton
+                variant='contained'
+                color={editId ? 'info' : 'primary'}
+                startIcon={editId ? <EditIcon /> : <AddIcon />}
+                onClick={handleAddItem}
+              >
+                {editId ? 'Update' : 'Add'}
               </GlobalButton>
             </Grid>
           </Grid>
@@ -335,11 +361,17 @@ const AddTransferRequestPage = () => {
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>Chemical</th>
-                  <th>UOM</th>
-                  <th align='right'>Quantity</th>
-                  <th align='right'>Unit Rate</th>
-                  <th align='right'>Amount</th>
+                  <th style={{ width: '25%' }}>Chemical</th>
+                  <th style={{ width: '15%' }}>UOM</th>
+                  <th align='right' style={{ width: '15%' }}>
+                    Quantity
+                  </th>
+                  <th align='right' style={{ width: '15%' }}>
+                    Unit Rate
+                  </th>
+                  <th align='right' style={{ width: '15%' }}>
+                    Amount
+                  </th>
                   <th align='center'>Action</th>
                 </tr>
               </thead>
@@ -355,6 +387,9 @@ const AddTransferRequestPage = () => {
                       <td align='right'>{row.rate}</td>
                       <td align='right'>{row.amount}</td>
                       <td align='center'>
+                        <IconButton size='small' color='primary' onClick={() => handleEditItem(row)}>
+                          <EditIcon fontSize='small' />
+                        </IconButton>
                         <IconButton size='small' color='error' onClick={() => handleRemoveItem(row.id)}>
                           <DeleteIcon fontSize='small' />
                         </IconButton>

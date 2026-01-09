@@ -17,6 +17,7 @@ import {
 
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
+import EditIcon from '@mui/icons-material/Edit'
 
 import StickyListLayout from '@/components/common/StickyListLayout'
 import GlobalButton from '@/components/common/GlobalButton'
@@ -60,6 +61,7 @@ const AddTransferInPage = () => {
   const [uom, setUom] = useState(null)
   const [quantity, setQuantity] = useState('')
   const [rate, setRate] = useState('')
+  const [editId, setEditId] = useState(null)
 
   const [items, setItems] = useState([])
 
@@ -114,7 +116,16 @@ const AddTransferInPage = () => {
     }
 
     fetchOptions()
+    fetchOptions()
   }, [])
+
+  const handleEditItem = row => {
+    setEditId(row.id)
+    setChemical({ label: row.chemical, id: row.chemicalId })
+    setUom({ label: row.uom, id: row.uomId })
+    setQuantity(row.quantity)
+    setRate(row.rate)
+  }
 
   // Date input
   const DateInput = forwardRef(function DateInput(props, ref) {
@@ -134,19 +145,39 @@ const AddTransferInPage = () => {
       return
     }
 
-    setItems(prev => [
-      ...prev,
-      {
-        id: Date.now(),
-        chemical: chemical.label,
-        chemicalId: chemical.id,
-        uom: uom.label,
-        uomId: uom.id,
-        quantity,
-        rate,
-        amount
-      }
-    ])
+    if (editId) {
+      setItems(prev =>
+        prev.map(item =>
+          item.id === editId
+            ? {
+                ...item,
+                chemical: chemical.label,
+                chemicalId: chemical.id,
+                uom: uom.label,
+                uomId: uom.id,
+                quantity,
+                rate,
+                amount
+              }
+            : item
+        )
+      )
+      setEditId(null)
+    } else {
+      setItems(prev => [
+        ...prev,
+        {
+          id: Date.now(),
+          chemical: chemical.label,
+          chemicalId: chemical.id,
+          uom: uom.label,
+          uomId: uom.id,
+          quantity,
+          rate,
+          amount
+        }
+      ])
+    }
 
     setChemical(null)
     setUom(null)
@@ -256,7 +287,14 @@ const AddTransferInPage = () => {
               <GlobalTextField label='Unit Rate' type='number' value={rate} onChange={e => setRate(e.target.value)} />
             </Grid>
             <Grid item xs={12} md={1}>
-              <GlobalButton startIcon={<AddIcon />} onClick={handleAddItem}>Add</GlobalButton>
+              <GlobalButton
+                variant='contained'
+                color={editId ? 'info' : 'primary'}
+                startIcon={editId ? <EditIcon /> : <AddIcon />}
+                onClick={handleAddItem}
+              >
+                {editId ? 'Update' : 'Add'}
+              </GlobalButton>
             </Grid>
           </Grid>
         </Box>
@@ -267,13 +305,19 @@ const AddTransferInPage = () => {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>Chemical</th>
-                  <th>UOM</th>
-                  <th>Qty</th>
-                  <th>Rate</th>
-                  <th>Amount</th>
-                  <th>Action</th>
+                  <th>ID</th>
+                  <th style={{ width: '25%' }}>Chemical</th>
+                  <th style={{ width: '15%' }}>UOM</th>
+                  <th align='right' style={{ width: '15%' }}>
+                    Quantity
+                  </th>
+                  <th align='right' style={{ width: '15%' }}>
+                    Unit Rate
+                  </th>
+                  <th align='right' style={{ width: '15%' }}>
+                    Amount
+                  </th>
+                  <th align='center'>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -285,9 +329,12 @@ const AddTransferInPage = () => {
                     <td>{i.quantity}</td>
                     <td>{i.rate}</td>
                     <td>{i.amount}</td>
-                    <td>
-                      <IconButton color='error' onClick={() => handleRemoveItem(i.id)}>
-                        <DeleteIcon />
+                    <td align='center'>
+                      <IconButton size='small' color='primary' onClick={() => handleEditItem(i)}>
+                        <EditIcon fontSize='small' />
+                      </IconButton>
+                      <IconButton size='small' color='error' onClick={() => handleRemoveItem(i.id)}>
+                        <DeleteIcon fontSize='small' />
                       </IconButton>
                     </td>
                   </tr>

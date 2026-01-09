@@ -28,10 +28,12 @@ import CustomTextField from '@core/components/mui/TextField'
 
 import DeleteIcon from '@mui/icons-material/Delete'
 import AddIcon from '@mui/icons-material/Add'
+import EditIcon from '@mui/icons-material/Edit'
 
 import styles from '@core/styles/table.module.css'
 import { getPurchaseFilters } from '@/api/purchase_order'
 import { getMaterialRequestDropdowns } from '@/api/materialRequest/dropdown'
+import { getTransferInDetailsTM, updateTransferIn } from '@/api/transfer_in'
 import { showToast } from '@/components/common/Toasts'
 
 const EditTransferInPage = () => {
@@ -69,6 +71,7 @@ const EditTransferInPage = () => {
   const [uom, setUom] = useState(null)
   const [quantity, setQuantity] = useState('')
   const [rate, setRate] = useState('')
+  const [editId, setEditId] = useState(null)
 
   const [items, setItems] = useState([])
 
@@ -85,7 +88,7 @@ const EditTransferInPage = () => {
         const [purchaseRes, materialRes, detailsRes] = await Promise.all([
           getPurchaseFilters(),
           getMaterialRequestDropdowns(),
-          getTransferInDetails({ id: decodedId, type })
+          getTransferInDetailsTM(decodedId)
         ])
 
         // Companies
@@ -135,15 +138,15 @@ const EditTransferInPage = () => {
         }
 
         setItems(
-          (details.transfer_in_items || []).map(item => ({
+          (details.transfer_in_items || details.items || []).map(item => ({
             id: item.id,
-            chemical: item.chemical_name,
-            chemicalId: item.chemical_id,
-            uom: item.uom_name,
-            uomId: item.uom_id,
+            chemical: item.chemical_name || item.item_name || item.chemical?.name || '',
+            chemicalId: item.chemical_id || item.item_id || item.chemical?.id,
+            uom: item.uom_name || item.uom?.name || item.uom_details?.name || item.uom,
+            uomId: item.uom_id || item.uom?.id || item.uom_details?.id,
             quantity: item.quantity,
-            rate: item.unit_rate,
-            amount: item.quantity * item.unit_rate
+            rate: item.unit_rate || item.rate,
+            amount: item.quantity * (item.unit_rate || item.rate)
           }))
         )
       } catch (err) {
@@ -157,6 +160,14 @@ const EditTransferInPage = () => {
     if (decodedId) fetchData()
   }, [decodedId, type])
 
+  const handleEditItem = row => {
+    setEditId(row.id)
+    setChemical({ label: row.chemical, id: row.chemicalId })
+    setUom({ label: row.uom, id: row.uomId })
+    setQuantity(row.quantity)
+    setRate(row.rate)
+  }
+
   const amount = useMemo(() => {
     const q = Number(quantity)
     const r = Number(rate)
@@ -169,19 +180,39 @@ const EditTransferInPage = () => {
       return
     }
 
-    setItems(prev => [
-      ...prev,
-      {
-        id: Date.now(),
-        chemical: chemical.label,
-        chemicalId: chemical.id,
-        uom: uom.label,
-        uomId: uom.id,
-        quantity,
-        rate,
-        amount
-      }
-    ])
+    if (editId) {
+      setItems(prev =>
+        prev.map(item =>
+          item.id === editId
+            ? {
+                ...item,
+                chemical: chemical.label,
+                chemicalId: chemical.id,
+                uom: uom.label,
+                uomId: uom.id,
+                quantity,
+                rate,
+                amount
+              }
+            : item
+        )
+      )
+      setEditId(null)
+    } else {
+      setItems(prev => [
+        ...prev,
+        {
+          id: Date.now(),
+          chemical: chemical.label,
+          chemicalId: chemical.id,
+          uom: uom.label,
+          uomId: uom.id,
+          quantity,
+          rate,
+          amount
+        }
+      ])
+    }
 
     setChemical(null)
     setUom(null)
@@ -208,6 +239,7 @@ const EditTransferInPage = () => {
         transfer_in_date: format(transferDate, 'yyyy-MM-dd'),
         remarks,
         transfer_in_items: items.map(i => ({
+          id: String(i.id).length > 10 ? null : i.id,
           chemical_id: i.chemicalId,
           uom_id: i.uomId,
           quantity: Number(i.quantity),
@@ -313,8 +345,13 @@ const EditTransferInPage = () => {
               <GlobalTextField label='Rate' type='number' value={rate} onChange={e => setRate(e.target.value)} />
             </Grid>
             <Grid item xs={12} md={1}>
-              <GlobalButton startIcon={<AddIcon />} onClick={handleAddItem}>
-                Add
+              <GlobalButton
+                variant='contained'
+                color={editId ? 'info' : 'primary'}
+                startIcon={editId ? <EditIcon /> : <AddIcon />}
+                onClick={handleAddItem}
+              >
+                {editId ? 'Update' : 'Add'}
               </GlobalButton>
             </Grid>
           </Grid>
@@ -326,13 +363,19 @@ const EditTransferInPage = () => {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>Chemical</th>
-                  <th>UOM</th>
-                  <th>Qty</th>
-                  <th>Rate</th>
-                  <th>Amount</th>
-                  <th>Action</th>
+                  <th>ID</th>
+                  <th style={{ width: '25%' }}>Chemical</th>
+                  <th style={{ width: '15%' }}>UOM</th>
+                  <th align='right' style={{ width: '15%' }}>
+                    Quantity
+                  </th>
+                  <th align='right' style={{ width: '15%' }}>
+                    Rate
+                  </th>
+                  <th align='right' style={{ width: '15%' }}>
+                    Amount
+                  </th>
+                  <th align='center'>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -345,9 +388,12 @@ const EditTransferInPage = () => {
                       <td>{i.quantity}</td>
                       <td>{i.rate}</td>
                       <td>{i.amount}</td>
-                      <td>
-                        <IconButton color='error' onClick={() => handleRemoveItem(i.id)}>
-                          <DeleteIcon />
+                      <td align='center'>
+                        <IconButton size='small' color='primary' onClick={() => handleEditItem(i)}>
+                          <EditIcon fontSize='small' />
+                        </IconButton>
+                        <IconButton size='small' color='error' onClick={() => handleRemoveItem(i.id)}>
+                          <DeleteIcon fontSize='small' />
                         </IconButton>
                       </td>
                     </tr>

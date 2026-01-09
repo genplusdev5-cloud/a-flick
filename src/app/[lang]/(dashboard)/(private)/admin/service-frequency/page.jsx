@@ -665,7 +665,7 @@ const ServiceFrequencyPageContent = () => {
         <Box sx={{ p: 5, display: 'flex', flexDirection: 'column', maxHeight: '100%' }}>
           <Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
             <Typography variant='h5' fontWeight={600}>
-              {isEdit ? 'Edit Frequency' : 'Add Frequency'}
+              {isEdit ? 'Update Frequency' : 'Add Frequency'}
             </Typography>
             <IconButton onClick={toggleDrawer} size='small'>
               <CloseIcon />
@@ -713,7 +713,7 @@ const ServiceFrequencyPageContent = () => {
                       label='Increment Type'
                       {...field}
                       value={field.value}
-                      onChange={e => field.onChange(e.target.value)}
+                      onChange={val => field.onChange(val?.value || val)}
                       options={[
                         { value: 'Year', label: 'Year' },
                         { value: 'Month', label: 'Month' },
@@ -779,6 +779,8 @@ const ServiceFrequencyPageContent = () => {
                       fullWidth
                       error={!!errors.backlogAge}
                       helperText={errors.backlogAge?.message}
+                      onChange={e => field.onChange(e.target.value.replace(/\D/g, ''))} // 🔥 ONLY INT
+                      inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
                       sx={{
                         '& .MuiFormLabel-asterisk': {
                           color: '#e91e63 !important',

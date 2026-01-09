@@ -661,7 +661,7 @@ const EmployeePageContent = () => {
             placeholder='Department'
             options={departmentOptions}
             value={department}
-            onChange={(_, value) => {
+            onChange={value => {
               setDepartment(value)
               setPagination(p => ({ ...p, pageIndex: 0 }))
             }}
@@ -674,7 +674,7 @@ const EmployeePageContent = () => {
             placeholder='Designation'
             options={designationOptions}
             value={designation}
-            onChange={(_, value) => {
+            onChange={value => {
               setDesignation(value)
               setPagination(p => ({ ...p, pageIndex: 0 }))
             }}
@@ -687,7 +687,7 @@ const EmployeePageContent = () => {
             placeholder='User Role'
             options={userRoleOptions}
             value={userRole}
-            onChange={(_, value) => {
+            onChange={value => {
               setUserRole(value)
               setPagination(p => ({ ...p, pageIndex: 0 }))
             }}
@@ -700,7 +700,7 @@ const EmployeePageContent = () => {
             placeholder='Supervisor'
             options={supervisorOptions}
             value={supervisor}
-            onChange={(_, value) => {
+            onChange={value => {
               setSupervisor(value)
               setPagination(p => ({ ...p, pageIndex: 0 }))
             }}

@@ -14,6 +14,10 @@ import {
   Divider,
   Breadcrumbs,
   Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   FormControl,
   Select,
   InputAdornment,
@@ -26,7 +30,11 @@ import StickyListLayout from '@/components/common/StickyListLayout'
 import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 
-import { getTransferInList } from '@/api/transfer_in'
+import DialogCloseButton from '@components/dialogs/DialogCloseButton'
+import WarningAmberIcon from '@mui/icons-material/WarningAmber'
+import { showToast } from '@/components/common/Toasts'
+
+import { getTransferInList, deleteTransferInTM } from '@/api/transfer_in'
 import { getPurchaseFilters } from '@/api/purchase_order'
 
 import { format } from 'date-fns'
@@ -87,6 +95,13 @@ const TransferInPage = () => {
   const [uiDateFilter, setUiDateFilter] = useState(false)
   const [uiDateRange, setUiDateRange] = useState([null, null])
 
+  const [deleteDialog, setDeleteDialog] = useState({
+    open: false,
+    row: null
+  })
+
+  const [deleteLoading, setDeleteLoading] = useState(false)
+
   /* ───────── FETCH FILTERS ───────── */
   useEffect(() => {
     const fetchFilters = async () => {
@@ -104,6 +119,26 @@ const TransferInPage = () => {
 
     fetchFilters()
   }, [])
+
+  const confirmDelete = async () => {
+    if (!deleteDialog.row?.id) return
+
+    try {
+      setDeleteLoading(true)
+
+      await deleteTransferInTM(deleteDialog.row.id)
+
+      showToast('Transfer In deleted successfully', 'delete')
+
+      setDeleteDialog({ open: false, row: null })
+      fetchTransferInList()
+    } catch (error) {
+      console.error('Delete failed', error)
+      showToast(error?.response?.data?.message || 'Failed to delete transfer in', 'error')
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
 
   /* ───────── FETCH LIST ───────── */
   const fetchTransferInList = async () => {
@@ -169,7 +204,16 @@ const TransferInPage = () => {
                 <i className='tabler-edit' />
               </IconButton>
 
-              <IconButton size='small' color='error'>
+              <IconButton
+                size='small'
+                color='error'
+                onClick={() =>
+                  setDeleteDialog({
+                    open: true,
+                    row: r
+                  })
+                }
+              >
                 <i className='tabler-trash' />
               </IconButton>
             </Box>
@@ -411,6 +455,71 @@ const TransferInPage = () => {
             </table>
           </StickyTableWrapper>
         </Box>
+
+        <Dialog
+          onClose={() => setDeleteDialog({ open: false, row: null })}
+          aria-labelledby='customized-dialog-title'
+          open={deleteDialog.open}
+          closeAfterTransition={false}
+          PaperProps={{
+            sx: {
+              overflow: 'visible',
+              width: 420,
+              borderRadius: 1,
+              textAlign: 'center'
+            }
+          }}
+        >
+          <DialogTitle
+            id='customized-dialog-title'
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 1,
+              color: 'error.main',
+              fontWeight: 700,
+              pb: 1,
+              position: 'relative'
+            }}
+          >
+            <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
+            Confirm Delete
+            <DialogCloseButton onClick={() => setDeleteDialog({ open: false, row: null })} disableRipple>
+              <i className='tabler-x' />
+            </DialogCloseButton>
+          </DialogTitle>
+
+          <DialogContent sx={{ px: 5, pt: 1 }}>
+            <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
+              Are you sure you want to delete{' '}
+              <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.transferInNo || 'this transfer in'}</strong>
+              ?
+              <br />
+              This action cannot be undone.
+            </Typography>
+          </DialogContent>
+
+          <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+            <GlobalButton
+              color='secondary'
+              onClick={() => setDeleteDialog({ open: false, row: null })}
+              sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+            >
+              Cancel
+            </GlobalButton>
+
+            <GlobalButton
+              onClick={confirmDelete}
+              variant='contained'
+              color='error'
+              disabled={deleteLoading}
+              sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+            >
+              {deleteLoading ? 'Deleting...' : 'Delete'}
+            </GlobalButton>
+          </DialogActions>
+        </Dialog>
 
         <Box px={4} py={2}>
           <TablePaginationComponent totalCount={totalCount} pagination={pagination} setPagination={setPagination} />

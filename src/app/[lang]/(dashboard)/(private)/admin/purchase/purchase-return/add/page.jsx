@@ -23,6 +23,7 @@ import {
 
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
+import EditIcon from '@mui/icons-material/Edit'
 import { getPurchaseFilters } from '@/api/purchase_inward'
 import { addPurchaseReturn } from '@/api/purchase_return'
 
@@ -70,6 +71,7 @@ const AddPurchaseReturnPage = () => {
   const [uom, setUom] = useState(null)
   const [quantity, setQuantity] = useState('')
   const [rate, setRate] = useState('')
+  const [editId, setEditId] = useState(null)
 
   // Items list
   const [items, setItems] = useState([])
@@ -140,6 +142,14 @@ const AddPurchaseReturnPage = () => {
     fetchOptions()
   }, [])
 
+  const handleEditItem = row => {
+    setEditId(row.id)
+    setChemical({ label: row.chemical, id: row.chemicalId })
+    setUom({ label: row.uom, id: row.uomId })
+    setQuantity(row.quantity)
+    setRate(row.rate)
+  }
+
   const PoDateInput = forwardRef(function PoDateInput(props, ref) {
     const { label, value, ...rest } = props
 
@@ -158,19 +168,39 @@ const AddPurchaseReturnPage = () => {
       return
     }
 
-    setItems(prev => [
-      ...prev,
-      {
-        id: Date.now(),
-        chemical: chemical.label,
-        chemicalId: chemical.id,
-        uom: uom.label,
-        uomId: uom.id,
-        quantity,
-        rate,
-        amount
-      }
-    ])
+    if (editId) {
+      setItems(prev =>
+        prev.map(item =>
+          item.id === editId
+            ? {
+                ...item,
+                chemical: chemical.label,
+                chemicalId: chemical.id,
+                uom: uom.label,
+                uomId: uom.id,
+                quantity,
+                rate,
+                amount
+              }
+            : item
+        )
+      )
+      setEditId(null)
+    } else {
+      setItems(prev => [
+        ...prev,
+        {
+          id: Date.now(),
+          chemical: chemical.label,
+          chemicalId: chemical.id,
+          uom: uom.label,
+          uomId: uom.id,
+          quantity,
+          rate,
+          amount
+        }
+      ])
+    }
 
     // Reset item fields
     setChemical(null)
@@ -195,13 +225,39 @@ const AddPurchaseReturnPage = () => {
       const payload = {
         company_id: origin.id,
         return_date: format(returnDate, 'yyyy-MM-dd'),
+        inward_date: format(returnDate, 'yyyy-MM-dd'), // Fallback
         supplier_id: supplier.id,
+        po_id: purchaseOrder?.id || null,
+        purchase_order_id: purchaseOrder?.id || null, // Key variant
         remarks,
+        // Send as return_items with robust field mapping
         return_items: items.map(item => ({
           chemical_id: item.chemicalId,
+          item_id: item.chemicalId, // Key variant
           uom_id: item.uomId,
           return_quantity: Number(item.quantity),
-          unit_rate: Number(item.rate)
+          quantity: Number(item.quantity), // Key variant
+          unit_rate: Number(item.rate),
+          rate: Number(item.rate) // Key variant
+        })),
+        // Keep fallbacks just in case backend expects them
+        inward_items: items.map(item => ({
+          chemical_id: item.chemicalId,
+          item_id: item.chemicalId,
+          uom_id: item.uomId,
+          return_quantity: Number(item.quantity),
+          quantity: Number(item.quantity),
+          unit_rate: Number(item.rate),
+          rate: Number(item.rate)
+        })),
+        items: items.map(item => ({
+          chemical_id: item.chemicalId,
+          item_id: item.chemicalId,
+          uom_id: item.uomId,
+          return_quantity: Number(item.quantity),
+          quantity: Number(item.quantity),
+          unit_rate: Number(item.rate),
+          rate: Number(item.rate)
         }))
       }
 
@@ -321,18 +377,23 @@ const AddPurchaseReturnPage = () => {
               <GlobalTextField
                 label='Quantity'
                 type='number'
-                value={quantity}
+                value={quantity || ''}
                 onChange={e => setQuantity(e.target.value)}
               />
             </Grid>
 
             <Grid item xs={12} md={2}>
-              <GlobalTextField label='Unit Rate' type='number' value={rate} onChange={e => setRate(e.target.value)} />
+              <GlobalTextField label='Unit Rate' type='number' value={rate || ''} onChange={e => setRate(e.target.value)} />
             </Grid>
 
             <Grid item xs={12} md={1}>
-              <GlobalButton variant='contained' startIcon={<AddIcon />} onClick={handleAddItem}>
-                Add
+              <GlobalButton
+                variant='contained'
+                color={editId ? 'info' : 'primary'}
+                startIcon={editId ? <EditIcon /> : <AddIcon />}
+                onClick={handleAddItem}
+              >
+                {editId ? 'Update' : 'Add'}
               </GlobalButton>
             </Grid>
           </Grid>
@@ -345,11 +406,17 @@ const AddPurchaseReturnPage = () => {
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>Chemical</th>
-                  <th>UOM</th>
-                  <th align='right'>Quantity</th>
-                  <th align='right'>Unit Rate</th>
-                  <th align='right'>Amount</th>
+                  <th style={{ width: '25%' }}>Chemical</th>
+                  <th style={{ width: '15%' }}>UOM</th>
+                  <th align='right' style={{ width: '15%' }}>
+                    Quantity
+                  </th>
+                  <th align='right' style={{ width: '15%' }}>
+                    Unit Rate
+                  </th>
+                  <th align='right' style={{ width: '15%' }}>
+                    Amount
+                  </th>
                   <th align='center'>Action</th>
                 </tr>
               </thead>
@@ -365,6 +432,9 @@ const AddPurchaseReturnPage = () => {
                       <td align='right'>{row.rate}</td>
                       <td align='right'>{row.amount}</td>
                       <td align='center'>
+                        <IconButton size='small' color='primary' onClick={() => handleEditItem(row)}>
+                          <EditIcon fontSize='small' />
+                        </IconButton>
                         <IconButton size='small' color='error' onClick={() => handleRemoveItem(row.id)}>
                           <DeleteIcon fontSize='small' />
                         </IconButton>

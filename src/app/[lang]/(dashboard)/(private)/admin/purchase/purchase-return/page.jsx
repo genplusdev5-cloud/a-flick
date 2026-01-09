@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 
 import Link from 'next/link'
 
@@ -15,6 +15,10 @@ import {
   Divider,
   Breadcrumbs,
   Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   FormControl,
   Select,
   InputAdornment,
@@ -27,7 +31,11 @@ import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 import { IconButton } from '@mui/material'
 
-import { getPurchaseReturnList } from '@/api/purchase_return'
+import DialogCloseButton from '@components/dialogs/DialogCloseButton'
+import WarningAmberIcon from '@mui/icons-material/WarningAmber'
+import { showToast } from '@/components/common/Toasts'
+
+import { getPurchaseReturnList, deletePurchaseReturn } from '@/api/purchase_return'
 import { getPurchaseFilters } from '@/api/purchase_inward'
 
 import { format } from 'date-fns'
@@ -83,12 +91,20 @@ const statusOptions = [
 const PurchaseReturnPage = () => {
   const columnHelper = createColumnHelper()
   const router = useRouter()
+  const { lang } = useParams()
 
   const [originOptions, setOriginOptions] = useState([])
   const [supplierOptions, setSupplierOptions] = useState([])
 
   const [selectedOrigin, setSelectedOrigin] = useState(null)
   const [selectedSupplier, setSelectedSupplier] = useState(null)
+
+  const [deleteDialog, setDeleteDialog] = useState({
+    open: false,
+    row: null
+  })
+
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   // STATES
   const [rows, setRows] = useState([])
@@ -106,8 +122,9 @@ const PurchaseReturnPage = () => {
     try {
       const res = await getPurchaseFilters()
 
-      const companyList = res?.data?.company?.name || []
-      const supplierList = res?.data?.supplier?.name || []
+      const purchaseData = res?.data?.data || {}
+      const companyList = purchaseData?.company?.name || []
+      const supplierList = purchaseData?.supplier?.name || []
 
       setOriginOptions(
         companyList.map(item => ({
@@ -124,6 +141,29 @@ const PurchaseReturnPage = () => {
       )
     } catch (err) {
       console.error('Purchase filter error', err)
+    }
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteDialog.row?.id) return
+
+    try {
+      setDeleteLoading(true)
+
+      await deletePurchaseReturn({
+        id: deleteDialog.row.id,
+        type: 'tm'
+      })
+
+      showToast('Purchase Return deleted successfully', 'delete')
+
+      setDeleteDialog({ open: false, row: null })
+      fetchPurchaseReturnList()
+    } catch (error) {
+      console.error('Delete failed', error)
+      showToast(error?.response?.data?.message || 'Failed to delete purchase return', 'error')
+    } finally {
+      setDeleteLoading(false)
     }
   }
 
@@ -159,7 +199,7 @@ const PurchaseReturnPage = () => {
           contactPhone: item?.supplier_details?.phone || '-',
           remarks: item.remarks || '-',
           status: item.return_status,
-          recordType: item.year === new Date().getFullYear() ? 'tm' : 'tx'
+          recordType: 'tm'
         })) || []
 
       setRows(mappedRows)
@@ -200,7 +240,7 @@ const PurchaseReturnPage = () => {
                 size='small'
                 color='primary'
                 onClick={() => {
-                  router.push(`/admin/purchase/purchase-return/update/${btoa(rowData.id)}?type=${rowData.recordType}`)
+                  router.push(`/${lang}/admin/purchase/purchase-return/update/${btoa(rowData.id)}?type=${rowData.recordType}`)
                 }}
               >
                 <i className='tabler-edit' />
@@ -209,10 +249,12 @@ const PurchaseReturnPage = () => {
               <IconButton
                 size='small'
                 color='error'
-                onClick={() => {
-                  console.log('DELETE', rowData.id, rowData.recordType)
-                  // delete dialog open pannalam
-                }}
+                onClick={() =>
+                  setDeleteDialog({
+                    open: true,
+                    row: rowData
+                  })
+                }
               >
                 <i className='tabler-trash' />
               </IconButton>
@@ -258,10 +300,12 @@ const PurchaseReturnPage = () => {
     <StickyListLayout
       header={
         <Breadcrumbs sx={{ mb: 2 }}>
-          <Link href='/' style={{ textDecoration: 'none' }}>
+          <Link href={`/${lang}`} style={{ textDecoration: 'none' }}>
             Dashboard
           </Link>
-          <Typography color='text.primary'>Purchase Return</Typography>
+          <Link href={`/${lang}/admin/purchase/purchase-return`} style={{ textDecoration: 'none' }}>
+            Purchase Return
+          </Link>
         </Breadcrumbs>
       }
     >
@@ -297,7 +341,7 @@ const PurchaseReturnPage = () => {
                 variant='contained'
                 startIcon={<AddIcon />}
                 sx={{ height: 36 }}
-                onClick={() => router.push('/admin/purchase/purchase-return/add')}
+                onClick={() => router.push(`/${lang}/admin/purchase/purchase-return/add`)}
               >
                 Add Purchase Return
               </GlobalButton>
@@ -473,6 +517,75 @@ const PurchaseReturnPage = () => {
             </table>
           </StickyTableWrapper>
         </Box>
+
+        <Dialog
+          onClose={() => setDeleteDialog({ open: false, row: null })}
+          aria-labelledby='customized-dialog-title'
+          open={deleteDialog.open}
+          closeAfterTransition={false}
+          PaperProps={{
+            sx: {
+              overflow: 'visible',
+              width: 420,
+              borderRadius: 1,
+              textAlign: 'center'
+            }
+          }}
+        >
+          {/* 🔴 Title with Warning Icon */}
+          <DialogTitle
+            id='customized-dialog-title'
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 1,
+              color: 'error.main',
+              fontWeight: 700,
+              pb: 1,
+              position: 'relative'
+            }}
+          >
+            <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
+            Confirm Delete
+            {/* ❌ Close Button */}
+            <DialogCloseButton onClick={() => setDeleteDialog({ open: false, row: null })} disableRipple>
+              <i className='tabler-x' />
+            </DialogCloseButton>
+          </DialogTitle>
+
+          {/* Centered text */}
+          <DialogContent sx={{ px: 5, pt: 1 }}>
+            <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
+              Are you sure you want to delete{' '}
+              <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.returnNo || 'this purchase return'}</strong>
+              ?
+              <br />
+              This action cannot be undone.
+            </Typography>
+          </DialogContent>
+
+          {/* Centered buttons */}
+          <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+            <GlobalButton
+              color='secondary'
+              onClick={() => setDeleteDialog({ open: false, row: null })}
+              sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+            >
+              Cancel
+            </GlobalButton>
+
+            <GlobalButton
+              onClick={confirmDelete}
+              variant='contained'
+              color='error'
+              disabled={deleteLoading}
+              sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+            >
+              {deleteLoading ? 'Deleting...' : 'Delete'}
+            </GlobalButton>
+          </DialogActions>
+        </Dialog>
 
         {/* PAGINATION */}
         <Box sx={{ px: 4, py: 2 }}>
