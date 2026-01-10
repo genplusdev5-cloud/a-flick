@@ -325,7 +325,9 @@ export default function EditProposalPage() {
   const loadDetails = async () => {
     try {
       const decodedId = decodeId(id) || id
+      console.log('🔍 Load Details - ID:', id, 'Decoded:', decodedId)
       const res = await getProposalDetails(decodedId)
+      console.log('🔍 Load Details - Response:', res)
       const data = res?.status === 'success' || res ? res.data || res : null
       if (data) {
         setFormData(prev => ({
@@ -378,9 +380,11 @@ export default function EditProposalPage() {
         }))
 
         if (data.pest_items && Array.isArray(data.pest_items)) {
+          console.log('🦗 Loaded Pest Items:', data.pest_items)
           setPestItems(
             data.pest_items.map(item => ({
               id: generateUniqueId(),
+              item_id: item.id, // 🔥 Preserve DB ID
               pest: item.pest,
               pestId: item.pest_id,
               frequency: item.frequency,
@@ -389,7 +393,7 @@ export default function EditProposalPage() {
               pestValue: item.pest_value,
               totalValue: item.total_value,
               workTime: convertMinutesToTime(item.work_time),
-              chemicals: item.chemical_name,
+              chemicals: item.chemical_name || item.chemical || '',
               chemicalId: item.chemical_id,
               noOfItems: item.pest_service_count
             }))
@@ -464,7 +468,7 @@ export default function EditProposalPage() {
     if (name === 'startDate' && date) {
       try {
         const res = await getContractDates({
-          start_date: date.toISOString().split('T')[0],
+          start_date: formatDate(date),
           contract_type: formData.contractType || '',
           frequency: formData.billingFrequency || ''
         })
@@ -486,8 +490,8 @@ export default function EditProposalPage() {
     if (!formData.startDate || !formData.endDate || !formData.billingFrequencyId) return
     try {
       const res = await getInvoiceCount({
-        start_date: formData.startDate.toISOString().split('T')[0],
-        end_date: formData.endDate.toISOString().split('T')[0],
+        start_date: formatDate(formData.startDate),
+        end_date: formatDate(formData.endDate),
         billing_frequency_id: Number(formData.billingFrequencyId)
       })
       if (res?.status === 'success') setFormData(prev => ({ ...prev, invoiceCount: res.data?.invoice_count || 0 }))
@@ -496,14 +500,16 @@ export default function EditProposalPage() {
     }
   }
 
+  const formatDate = date => (date ? date.toLocaleDateString('en-CA') : '')
+
   const fetchPestCount = async (pestId, frequencyId) => {
     if (!formData.startDate || !formData.endDate || !pestId || !frequencyId) return
     try {
       const res = await getPestCount({
         pest_id: Number(pestId),
         service_frequency_id: Number(frequencyId),
-        start_date: formData.startDate.toISOString().split('T')[0],
-        end_date: formData.endDate.toISOString().split('T')[0]
+        start_date: formatDate(formData.startDate),
+        end_date: formatDate(formData.endDate)
       })
       if (res?.status === 'success')
         setCurrentPestItem(prev => ({ ...prev, pestCount: String(res.data?.pest_count || '') }))
@@ -589,7 +595,7 @@ export default function EditProposalPage() {
         postal_code: formData.postalCode,
         covered_location: formData.coveredLocation,
         po_number: formData.poNumber,
-        po_expiry_date: formData.poExpiry?.toISOString().split('T')[0],
+        po_expiry_date: formatDate(formData.poExpiry),
         preferred_time: formData.preferredTime?.toTimeString().slice(0, 8),
         report_email: formData.reportEmail,
         contact_person_name: formData.contactPerson,
@@ -597,9 +603,9 @@ export default function EditProposalPage() {
         mobile: formData.mobile,
         call_type_id: Number(formData.callTypeId),
         grouping_code: formData.groupCode,
-        start_date: formData.startDate?.toISOString().split('T')[0],
-        end_date: formData.endDate?.toISOString().split('T')[0],
-        reminder_date: formData.reminderDate?.toISOString().split('T')[0],
+        start_date: formatDate(formData.startDate),
+        end_date: formatDate(formData.endDate),
+        reminder_date: formatDate(formData.reminderDate),
         industry_id: Number(formData.industryId),
         contract_value: Number(formData.contractValue),
         technician_id: Number(formData.technicianId),
@@ -619,6 +625,7 @@ export default function EditProposalPage() {
 
         // 🔥 pest items SAME – backend will map for proposal
         pest_items: pestItems.map(i => ({
+          id: i.item_id ? Number(i.item_id) : null, // 🔥 Send DB ID if exists
           pest_id: Number(i.pestId),
           frequency_id: Number(i.frequencyId),
           chemical_id: Number(i.chemicalId),
@@ -952,8 +959,8 @@ export default function EditProposalPage() {
               setFormData(p => ({ ...p, billingFrequency: v?.name || '', billingFrequencyId: v?.id || '' }))
               if (v?.id && formData.startDate && formData.endDate) {
                 const res = await getInvoiceCount({
-                  start_date: formData.startDate.toISOString().split('T')[0],
-                  end_date: formData.endDate.toISOString().split('T')[0],
+                  start_date: formatDate(formData.startDate),
+                  end_date: formatDate(formData.endDate),
                   billing_frequency_id: Number(v.id)
                 })
                 if (res?.status === 'success') setFormData(p => ({ ...p, invoiceCount: res.data?.invoice_count || 0 }))
@@ -1086,41 +1093,165 @@ export default function EditProposalPage() {
         </Grid>
 
         {/* ================= PEST DETAILS ================= */}
-        <Grid item xs={12}>
-          {/* Title + Add button */}
-          <Box
-            sx={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}
-          >
-            <Typography variant='h6'>Pest Details</Typography>
-
-            <Button
-              size='small'
-              variant='contained'
-              onClick={() => refs.pestInputRef.current?.focus()}
-              sx={{ textTransform: 'none' }}
-            >
-              Add New Pest
-            </Button>
-          </Box>
-
-          <Divider sx={{ mt: 1.5, mb: 2 }} />
+        {/* ================= PEST ITEM INPUTS ================= */}
+        <Grid item xs={12} key='pest-section-header'>
+          <Typography variant='h6' sx={{ mb: 2, mt: 2 }}>
+            Pest Details
+          </Typography>
+          <Divider sx={{ mb: 2 }} />
         </Grid>
 
-        {/* Pest dropdown */}
-        <Grid item xs={12} md={3}>
+        {/* Pest */}
+        <Grid item xs={12} md={2.4} key='pest-input-pest'>
           <Autocomplete
-            options={sectionOptions}
-            value={sectionOptions[0]} // default = Pests
-            onChange={(e, v) => {
-              console.log('Selected section:', v)
-              // later: handle section switch here
+            options={dropdowns.pests}
+            getOptionLabel={option => option?.name || ''}
+            isOptionEqualToValue={(opt, val) => opt.id === val.id}
+            renderOption={(props, option) => (
+              <li {...props} key={`pest-${option.id}`}>
+                {option.name}
+              </li>
+            )}
+            value={dropdowns.pests.find(o => o.id === currentPestItem.pestId) || null}
+            onChange={(e, newValue) => {
+              const pestId = newValue?.id || ''
+              setCurrentPestItem(prev => ({
+                ...prev,
+                pest: newValue?.name || '',
+                pestId
+              }))
+              if (pestId && currentPestItem.frequencyId) {
+                fetchPestCount(pestId, currentPestItem.frequencyId)
+              }
             }}
-            renderInput={params => <CustomTextField {...params} label='Section' />}
+            renderInput={params => <CustomTextField {...params} label='Pest' inputRef={refs.pestInputRef} />}
+            onKeyDown={e => handleKeyDown(e, refs.pestInputRef)}
           />
+        </Grid>
+
+        {/* Frequency */}
+        <Grid item xs={12} md={2.4} key='pest-input-frequency'>
+          <Autocomplete
+            options={dropdowns.serviceFrequencies}
+            getOptionLabel={option => option?.name || ''}
+            value={dropdowns.serviceFrequencies.find(o => o.id === currentPestItem.frequencyId) || null}
+            onChange={(e, newValue) => {
+              const frequencyId = newValue?.id || ''
+              setCurrentPestItem(prev => ({
+                ...prev,
+                frequency: newValue?.name || '',
+                frequencyId
+              }))
+              if (currentPestItem.pestId && frequencyId) {
+                fetchPestCount(currentPestItem.pestId, frequencyId)
+              }
+            }}
+            renderInput={params => (
+              <CustomTextField {...params} label='Frequency' inputRef={refs.frequencyInputRef} />
+            )}
+            onKeyDown={e => handleKeyDown(e, refs.frequencyInputRef)}
+          />
+        </Grid>
+
+        {/* Pest Count */}
+        <Grid item xs={12} md={2.4} key='pest-input-count'>
+          <CustomTextField
+            fullWidth
+            label='Pest Count'
+            name='pestCount'
+            value={currentPestItem.pestCount || ''}
+            InputProps={{ readOnly: true }}
+            inputRef={currentPestCountRef}
+            onKeyDown={e => handleKeyDown(e, currentPestCountRef)}
+          />
+        </Grid>
+
+        {/* Pest Value */}
+        <Grid item xs={12} md={2.4} key='pest-input-value'>
+          <CustomTextField
+            fullWidth
+            label='Pest Value'
+            name='pestValue'
+            value={currentPestItem.pestValue || ''}
+            onChange={handleCurrentPestItemChange}
+            inputRef={currentPestValueRef}
+            onKeyDown={e => handleKeyDown(e, currentPestValueRef)}
+          />
+        </Grid>
+
+        {/* Total */}
+        <Grid item xs={12} md={2.4} key='pest-input-total'>
+          <CustomTextField
+            fullWidth
+            label='Total'
+            value={currentPestItem.total || ''}
+            disabled
+            inputRef={currentTotalRef}
+            onKeyDown={e => handleKeyDown(e, currentTotalRef)}
+          />
+        </Grid>
+
+        {/* Time */}
+        <Grid item xs={12} md={3} key='pest-input-time'>
+          <Autocomplete
+            freeSolo
+            options={autocompleteFields.find(f => f.name === 'time')?.options || []}
+            value={currentPestItem.time || ''}
+            onChange={(e, newValue) => setCurrentPestItem(prev => ({ ...prev, time: newValue || '' }))}
+            renderInput={params => <CustomTextField {...params} label='Time' inputRef={refs.timeInputRef} />}
+            onKeyDown={e => handleKeyDown(e, refs.timeInputRef)}
+          />
+        </Grid>
+
+        {/* Chemicals */}
+        <Grid item xs={12} md={3} key='pest-input-chemicals'>
+          <Autocomplete
+            options={dropdowns.chemicals}
+            getOptionLabel={option => option?.name || ''}
+            isOptionEqualToValue={(opt, val) => opt.id === val.id}
+            renderOption={(props, option) => (
+              <li {...props} key={`chem-${option.id}`}>
+                {option.name}
+              </li>
+            )}
+            value={dropdowns.chemicals.find(o => o.id === currentPestItem.chemicalId) || null}
+            onChange={(e, newValue) => {
+              setCurrentPestItem(prev => ({
+                ...prev,
+                chemicals: newValue?.name || '',
+                chemicalId: newValue?.id || ''
+              }))
+            }}
+            renderInput={params => <CustomTextField {...params} label='Chemicals' inputRef={currentChemicalsRef} />}
+            onKeyDown={e => handleKeyDown(e, currentChemicalsRef)}
+          />
+        </Grid>
+
+        {/* No of Items */}
+        <Grid item xs={12} md={3} key='pest-input-noitems'>
+          <CustomTextField
+            fullWidth
+            label='No of Items'
+            name='noOfItems'
+            value={currentPestItem.noOfItems || ''}
+            onChange={handleCurrentPestItemChange}
+            inputRef={currentNoOfItemsRef}
+            onKeyDown={e => handleKeyDown(e, currentNoOfItemsRef)}
+          />
+        </Grid>
+
+        {/* Add/Update Button */}
+        <Grid item xs={12} md={3} key='pest-input-addbtn' sx={{ display: 'flex', alignItems: 'flex-end' }}>
+          <GlobalButton
+            variant='contained'
+            color={editingItemId ? 'success' : 'primary'}
+            fullWidth
+            onClick={handleSavePestItem}
+            ref={addPestButtonRef}
+            onKeyDown={e => handleKeyDown(e, addPestButtonRef)}
+          >
+            {editingItemId ? 'UPDATE PEST' : 'ADD PEST'}
+          </GlobalButton>
         </Grid>
 
         {/* SINGLE DIVIDER (only here) */}

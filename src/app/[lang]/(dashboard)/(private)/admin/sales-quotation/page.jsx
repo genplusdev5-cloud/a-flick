@@ -115,13 +115,18 @@ const SalesQuotationPage = () => {
         header: 'Actions',
         size: 100,
         cell: ({ row }) => {
-          const encodedId = encodeId(row.original.id)
+
           return (
             <Box sx={{ display: 'flex', gap: 1 }}>
               <IconButton
                 size='small'
                 color='primary'
-                onClick={() => router.push(`/admin/sales-quotation/${encodedId}/edit`)}
+                onClick={() => {
+                  console.log('Row Data:', row.original);
+                  const id = row.original.proposal_id || row.original.id;
+                  const encodedId = encodeId(id);
+                  router.push(`/admin/sales-quotation/${encodedId}/edit`);
+                }}
               >
                 <i className='tabler-edit' />
               </IconButton>
