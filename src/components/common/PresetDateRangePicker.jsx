@@ -26,8 +26,10 @@ const formatDate = date => (isValid(date) ? format(date, 'MM/dd/yyyy') : '')
 const PresetDateRangePicker = ({ start, end, onSelectRange, label = '', disabled = false }) => {
   // Anchor Ref for generic positioning
   const anchorRef = useRef(null)
+  const today = new Date()
 
   // State for Presets Popover
+
   const [popoverOpen, setPopoverOpen] = useState(false)
 
   // Track if we should show the calendar (only for Custom Range)
@@ -35,6 +37,9 @@ const PresetDateRangePicker = ({ start, end, onSelectRange, label = '', disabled
 
   const [localStart, setLocalStart] = useState(start)
   const [localEnd, setLocalEnd] = useState(end)
+
+  // ✅ AFTER state is defined
+  const isCustomRangeValid = Boolean(localStart && localEnd)
 
   // Sync internal state with props when opening
   useEffect(() => {
@@ -140,7 +145,10 @@ const PresetDateRangePicker = ({ start, end, onSelectRange, label = '', disabled
   }
 
   const activePreset = getActivePreset()
-  const displayValue = start && end ? `${formatDate(start)} - ${formatDate(end)}` : ''
+  const displayStart = start || today
+  const displayEnd = end || today
+
+  const displayValue = `${formatDate(displayStart)} - ${formatDate(displayEnd)}`
 
   return (
     <>
@@ -285,7 +293,7 @@ const PresetDateRangePicker = ({ start, end, onSelectRange, label = '', disabled
               <Button onClick={handleClosePopover} size='small' color='secondary' variant='outlined'>
                 Cancel
               </Button>
-              <Button onClick={handleApplyCustom} size='small' variant='contained'>
+              <Button onClick={handleApplyCustom} size='small' variant='contained' disabled={!isCustomRangeValid}>
                 Apply
               </Button>
             </Box>

@@ -26,6 +26,7 @@ import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 // Slice Imports
 import { addEvent, deleteEvent, updateEvent, selectedEvent, filterEvents } from '@/redux-store/slices/calendar'
 import { usePermission } from '@/hooks/usePermission'
+import { showToast } from '@/components/common/Toasts'
 
 // Vars
 const capitalize = string => string && string[0].toUpperCase() + string.slice(1)
@@ -125,8 +126,10 @@ const AddEventSidebar = props => {
       (calendarStore.selectedEvent !== null && !calendarStore.selectedEvent.title.length)
     ) {
       dispatch(addEvent(modifiedEvent))
+      showToast('success', 'Event added successfully')
     } else {
       dispatch(updateEvent({ ...modifiedEvent, id: calendarStore.selectedEvent.id }))
+      showToast('success', 'Event updated successfully')
     }
 
     dispatch(filterEvents())
@@ -138,6 +141,7 @@ const AddEventSidebar = props => {
     if (calendarStore.selectedEvent) {
       dispatch(deleteEvent(calendarStore.selectedEvent.id))
       dispatch(filterEvents())
+      showToast('delete', 'Event deleted successfully')
     }
 
     if (onRefresh) onRefresh()

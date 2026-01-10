@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { format, isValid } from 'date-fns'
+import { format, isValid, parseISO } from 'date-fns'
 import {
   Box,
   Button,
@@ -24,7 +24,8 @@ import {
   Pagination,
   FormControl,
   Select,
-  Checkbox
+  Checkbox,
+  Chip
 } from '@mui/material'
 
 import PermissionGuard from '@/components/auth/PermissionGuard'
@@ -35,7 +36,19 @@ import TablePaginationComponent from '@/components/TablePaginationComponent'
 
 import { getTicketReportList } from '@/api/service_request/report'
 import { getReportDropdowns } from '@/api/service_request/report'
-import { getTicketDetails } from '@/api/ticket/details'
+import {
+  getTicketDetails,
+  updateTicket,
+  deleteTicket,
+  addTicketPest,
+  updateTicketPest,
+  deleteTicketPest,
+  addTicketTechnician,
+  updateTicketTechnician,
+  deleteTicketTechnician
+} from '@/api/ticket'
+import { getPestList } from '@/api/pest/list'
+import { getServiceFrequencyList } from '@/api/serviceFrequency/list'
 
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
@@ -106,7 +119,7 @@ const ServiceRequestPageContent = () => {
   const decodedCustomerId = encodedCustomer ? Number(atob(encodedCustomer)) : ''
   const decodedContractId = encodedContract ? Number(atob(encodedContract)) : ''
 
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 })
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
 
   // -- UI (TEMPORARY) FILTER STATES --
   const [uiEnableDateFilter, setUiEnableDateFilter] = useState(false)
@@ -121,6 +134,9 @@ const ServiceRequestPageContent = () => {
   const [uiSearch, setUiSearch] = useState('')
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [editDialog, setEditDialog] = useState({ open: false, row: null, details: null, loading: false })
+  const [pestModal, setPestModal] = useState({ open: false, mode: 'add', index: null, data: {} })
+  const [techModal, setTechModal] = useState({ open: false, mode: 'add', index: null, data: {} })
+  const [deleteDialogNested, setDeleteDialogNested] = useState({ open: false, type: 'pest', index: null })
 
   // -- APPLIED FILTER STATES (Triggers API) --
   const [appliedFilters, setAppliedFilters] = useState({
@@ -139,6 +155,9 @@ const ServiceRequestPageContent = () => {
   // refs
   const techRef = useRef(null)
   const contractRef = useRef(null)
+  const filterTimeoutRef = useRef(null)
+
+  // No changes needed here, just removing the reactive effects
 
   // Lazy init Contract Options from URL
   const [contractOptions, setContractOptions] = useState(() => {
@@ -156,6 +175,8 @@ const ServiceRequestPageContent = () => {
   const [technicianOptions, setTechnicianOptions] = useState([])
   const [supervisorOptions, setSupervisorOptions] = useState([])
   const [attendanceOptions, setAttendanceOptions] = useState([])
+  const [pestOptions, setPestOptions] = useState([])
+  const [frequencyOptions, setFrequencyOptions] = useState([])
   const [summaryData, setSummaryData] = useState([])
 
   // ... (existing imports)
@@ -188,6 +209,16 @@ const ServiceRequestPageContent = () => {
       setTechnicianOptions(technicianList.map(t => ({ id: t.id, label: t.name || '' })))
       setSupervisorOptions(supervisorList.map(s => ({ id: s.id, label: s.name || '' })))
       setAttendanceOptions(attendanceList.map(a => ({ id: a.id, label: a.label || '' })))
+
+      // Fetch Pests
+      const pestRes = await getPestList()
+      const pests = pestRes?.data?.data?.results || pestRes?.data?.results || []
+      setPestOptions(pests.map(p => ({ id: p.id, label: p.pest_name || p.name || '' })))
+
+      // Fetch Frequencies
+      const freqRes = await getServiceFrequencyList()
+      const freqs = freqRes?.data?.data?.results || freqRes?.data?.results || freqRes?.results || []
+      setFrequencyOptions(freqs.map(f => ({ id: f.id, label: f.service_frequency || f.name || '' })))
     } catch (err) {
       console.error('Report dropdown fetch failed:', err)
       showToast('error', 'Failed to load dropdowns')
@@ -206,17 +237,223 @@ const ServiceRequestPageContent = () => {
     loadReportDropdownData()
   }, [])
 
-  const handleEdit = async row => {
-    setEditDialog({ open: true, row, details: null, loading: true })
+  const safeParseDate = dateStr => {
+    if (!dateStr || dateStr.startsWith('0011') || dateStr.startsWith('0000')) return null
     try {
-      const details = await getTicketDetails(row.id)
-      // EXTRACT DATA SAFELY
-      const actualData = details?.data || details
-      setEditDialog(prev => ({ ...prev, details: actualData, loading: false }))
+      const date = parseISO(dateStr)
+      return isValid(date) ? date : null
+    } catch (e) {
+      return null
+    }
+  }
+
+  const fetchTicketDetails = async id => {
+    try {
+      const res = await getTicketDetails(id)
+      const actualData = res?.data || res
+      const details = {
+        ...actualData,
+        pest_items: actualData.pest_items || actualData.ref_job_pests || actualData.ref_ticket_pests || [],
+        job_allocations:
+          actualData.job_allocations ||
+          actualData.technician_items ||
+          actualData.ref_job_technicians ||
+          actualData.ref_ticket_technicians ||
+          []
+      }
+      setEditDialog(prev => ({ ...prev, details, loading: false }))
     } catch (err) {
       console.error(err)
       showToast('error', 'Failed to load ticket details')
       setEditDialog(prev => ({ ...prev, loading: false }))
+    }
+  }
+
+  const handleEdit = async row => {
+    setEditDialog({ open: true, row, details: null, loading: true })
+    fetchTicketDetails(row.id)
+  }
+
+  const deletePestRow = index => {
+    const item = editDialog.details.pest_items[index]
+    setDeleteDialogNested({ open: true, type: 'pest', index, id: item?.id })
+  }
+
+  const deleteTechRow = index => {
+    const item = editDialog.details.job_allocations[index]
+    setDeleteDialogNested({ open: true, type: 'tech', index, id: item?.id })
+  }
+
+  const handleConfirmDeleteNested = async () => {
+    const { type, id } = deleteDialogNested
+    if (!id) {
+      // Local removal if ID doesn't exist (shouldn't happen with direct CRUD but good to have)
+      const field = type === 'pest' ? 'pest_items' : 'job_allocations'
+      const newItems = [...editDialog.details[field]]
+      newItems.splice(deleteDialogNested.index, 1)
+      setEditDialog(prev => ({ ...prev, details: { ...prev.details, [field]: newItems } }))
+      setDeleteDialogNested({ open: false, type: 'pest', index: null, id: null })
+      return
+    }
+
+    try {
+      setLoading(true)
+      if (type === 'pest') {
+        await deleteTicketPest(id)
+      } else {
+        await deleteTicketTechnician(id)
+      }
+      showToast('success', `${type === 'pest' ? 'Pest' : 'Technician'} deleted successfully`)
+      fetchTicketDetails(editDialog.row.id)
+    } catch (err) {
+      console.error(err)
+      showToast('error', `Failed to delete ${type}`)
+    } finally {
+      setLoading(false)
+      setDeleteDialogNested({ open: false, type: 'pest', index: null, id: null })
+    }
+  }
+
+  const addPestRow = () => {
+    setPestModal({ open: true, mode: 'add', index: null, data: { pest_id: '', frequency_id: '' } })
+  }
+
+  const addTechRow = () => {
+    setTechModal({ open: true, mode: 'add', index: null, data: { technician_id: '', is_attachment_technician: 0 } })
+  }
+
+  const handleEditPest = (pest, index) => {
+    setPestModal({ open: true, mode: 'edit', index, data: { ...pest } })
+  }
+
+  const handleEditTech = (tech, index) => {
+    setTechModal({ open: true, mode: 'edit', index, data: { ...tech } })
+  }
+
+  const handleSavePestModal = async () => {
+    try {
+      setLoading(true)
+      const ticket_id = editDialog.details.id
+      const p = pestModal.data
+
+      const payload = {
+        ticket_id: Number(ticket_id),
+        pest_id: Number(p.pest_id),
+        frequency_id: Number(p.frequency_id),
+        pest_value: Number(p.pest_value || 0),
+        work_time: String(p.work_time || '0'),
+        pest_purpose: p.pest_purpose || 'Routine',
+        pest_count: Number(p.pest_count || 0),
+        pest_level: p.pest_level || 'Low',
+        chemical_used: p.chemical_used || '',
+        ticket_pest_action: p.ticket_pest_action || '',
+        ticket_pest_recommendation: p.ticket_pest_recommendation || ''
+      }
+
+      if (pestModal.mode === 'add') {
+        await addTicketPest(payload)
+      } else {
+        await updateTicketPest(pestModal.data.id, payload)
+      }
+
+      showToast('success', `Pest ${pestModal.mode === 'add' ? 'added' : 'updated'} successfully`)
+      fetchTicketDetails(ticket_id)
+      setPestModal({ open: false, mode: 'add', index: null, data: {} })
+    } catch (err) {
+      console.error(err)
+      showToast('error', `Failed to ${pestModal.mode} pest`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSaveTechModal = async () => {
+    try {
+      setLoading(true)
+      const ticket_id = editDialog.details.id
+      const t = techModal.data
+
+      const payload = {
+        ticket_id: Number(ticket_id),
+        technician_id: Number(t.technician_id),
+        production_value: Number(t.production_value || 0),
+        is_attachment_technician: t.is_attachment_technician ? 1 : 0
+      }
+
+      if (techModal.mode === 'add') {
+        await addTicketTechnician(payload)
+      } else {
+        await updateTicketTechnician(techModal.data.id, payload)
+      }
+
+      showToast('success', `Technician ${techModal.mode === 'add' ? 'added' : 'updated'} successfully`)
+      fetchTicketDetails(ticket_id)
+      setTechModal({ open: false, mode: 'add', index: null, data: {} })
+    } catch (err) {
+      console.error(err)
+      showToast('error', `Failed to ${techModal.mode} technician`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSave = async () => {
+    try {
+      const d = editDialog.details
+      if (!d) return
+
+      setLoading(true)
+
+      const payload = {
+        ...d,
+        schedule_date: d.schedule_date,
+        schedule_start_time: d.schedule_start_time,
+        schedule_end_time: d.schedule_end_time,
+        remarks: d.remarks || '',
+        instructions: d.instructions || '',
+        action: d.action || '',
+        findings: d.findings || d.finding || '',
+        recommendation: d.recommendation || '',
+        pest_items: (d.pest_items || []).map(p => ({
+          id: p.id || null,
+          pest_id: p.pest_id || (typeof p.id === 'string' ? '' : p.id),
+          frequency_id: p.frequency_id,
+          pest_value: Number(p.pest_value || 0),
+          work_time: String(p.work_time || '0'),
+          pest_purpose: p.pest_purpose || 'Routine',
+          pest_count: p.pest_count || 0,
+          pest_level: p.pest_level || p.infestation_level || 'Low',
+          chemical_used: p.chemical_used || '',
+          ticket_pest_action: p.ticket_pest_action || p.action || '',
+          ticket_pest_recommendation: p.ticket_pest_recommendation || p.recommendation || '',
+          ticket_id: d.id
+        })),
+        technician_items: (d.job_allocations || []).map(j => ({
+          id: j.id || null,
+          technician_id: j.technician_id || (typeof j.id === 'string' ? '' : j.id),
+          production_value: Number(j.production_value || j.productivity_value || j.productivity || 0),
+          is_attachment_technician: (j.is_attachment_technician || j.is_attachment) ? 1 : 0,
+          ticket_id: d.id
+        }))
+      }
+
+      // Clean payload of read-only keys and file fields from details API
+      delete payload.ref_job_pests
+      delete payload.job_allocations
+      delete payload.finding // Use findings
+      delete payload.file_name
+      delete payload.customer_signature
+      delete payload.technician_signature
+
+      const res = await updateTicket(d.id, payload)
+      showToast('success', res?.message || 'Ticket updated successfully')
+      setEditDialog({ open: false, row: null, details: null, loading: false })
+      fetchTicketsFromApi()
+    } catch (err) {
+      console.error(err)
+      showToast('error', err?.response?.data?.message || 'Failed to update ticket')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -227,7 +464,7 @@ const ServiceRequestPageContent = () => {
 
       setLoading(true)
 
-      const res = await deleteSchedule(id) // 🔥 REAL DELETE API CALL
+      const res = await deleteTicket({ id }) // Use consolidated deleteTicket API
 
       showToast('success', res?.message || 'Deleted successfully')
 
@@ -295,7 +532,13 @@ const ServiceRequestPageContent = () => {
       columnHelper.accessor('scheduleDate', {
         header: 'Schedule Date',
         sortingFn: dateSortingFn,
-        cell: info => (info.getValue() ? format(new Date(info.getValue()), 'dd/MM/yyyy') : '')
+        cell: info => {
+          const val = info.getValue()
+          if (!val) return ''
+          const d = new Date(val)
+          if (!isValid(d) || d.getFullYear() < 1900) return ''
+          return format(d, 'dd/MM/yyyy')
+        }
       }),
       columnHelper.accessor('day', { header: 'Day' }),
       columnHelper.accessor('timeIn', { header: 'Appointment time in' }),
@@ -311,36 +554,43 @@ const ServiceRequestPageContent = () => {
       columnHelper.accessor('contractCode', { header: 'Contract Code' }),
       columnHelper.accessor('appointmentRemarks', { header: 'Appointment Remarks' }),
       columnHelper.accessor('serviceType', { header: 'Service Type' }),
-      columnHelper.accessor('scheduleStatus', { header: 'Schedule Status' }),
+      columnHelper.accessor('scheduleStatus', {
+        header: 'Schedule Status',
+        cell: info => {
+          const s = info.getValue()
+          const color = s === 'Allocated' ? 'info' : 'secondary'
+
+          return (
+            <Chip
+              label={s}
+              color={color}
+              size='small'
+              variant='tonal'
+              sx={{ fontWeight: 600, borderRadius: '6px' }}
+            />
+          )
+        }
+      }),
       columnHelper.accessor('appointmentStatus', {
         header: 'Appointment Status',
         cell: info => {
           const s = info.getValue() || 'Pending'
 
-          const bg =
-            s === 'Done'
-              ? 'success.main'
-              : s === 'Pending'
-                ? 'warning.main'
-                : s === 'Cancelled'
-                  ? 'error.main'
-                  : 'info.main'
+          let color = 'secondary'
+          const sUpper = s.toUpperCase()
+          if (['COMPLETED', 'DONE'].includes(sUpper)) color = 'success'
+          else if (['PENDING', 'NOT STARTED', 'UNALLOCATED', 'NOT UPLOADED'].includes(sUpper)) color = 'warning'
+          else if (['CANCELLED'].includes(sUpper)) color = 'error'
+          else if (['SCHEDULED', 'ALLOCATED', 'OPEN', 'IN-PROGRESS', 'PAUSED'].includes(sUpper)) color = 'info'
 
           return (
-            <Box
-              component='span'
-              sx={{
-                bgcolor: bg,
-                color: '#fff',
-                px: 1.2,
-                py: 0.3,
-                borderRadius: 1,
-                fontWeight: 600,
-                fontSize: '0.75rem'
-              }}
-            >
-              {s}
-            </Box>
+            <Chip
+              label={s}
+              color={color}
+              size='small'
+              variant='tonal'
+              sx={{ fontWeight: 600, borderRadius: '6px' }}
+            />
           )
         }
       }),
@@ -349,30 +599,21 @@ const ServiceRequestPageContent = () => {
         cell: info => {
           const s = info.getValue() || 'Pending'
 
-          const bg =
-            s === 'Completed'
-              ? 'success.main'
-              : s === 'Pending'
-                ? 'warning.main'
-                : s === 'Cancelled'
-                  ? 'error.main'
-                  : 'info.main'
+          let color = 'secondary'
+          const sUpper = s.toUpperCase()
+          if (['COMPLETED', 'DONE'].includes(sUpper)) color = 'success'
+          else if (['PENDING', 'NOT STARTED', 'UNALLOCATED', 'NOT UPLOADED'].includes(sUpper)) color = 'warning'
+          else if (['CANCELLED'].includes(sUpper)) color = 'error'
+          else if (['SCHEDULED', 'ALLOCATED', 'OPEN', 'IN-PROGRESS', 'PAUSED'].includes(sUpper)) color = 'info'
 
           return (
-            <Box
-              component='span'
-              sx={{
-                bgcolor: bg,
-                color: '#fff',
-                px: 1.2,
-                py: 0.3,
-                borderRadius: 1,
-                fontWeight: 600,
-                fontSize: '0.75rem'
-              }}
-            >
-              {s}
-            </Box>
+            <Chip
+              label={s}
+              color={color}
+              size='small'
+              variant='tonal'
+              sx={{ fontWeight: 600, borderRadius: '6px' }}
+            />
           )
         }
       })
@@ -381,21 +622,30 @@ const ServiceRequestPageContent = () => {
   )
 
   const mapTicketToRow = ticket => {
-    let scheduleDate = ticket.schedule_date || ticket.ticket_date || ''
+    // 🔥 DATE LOGIC: Prioritize schedule_date but ignore if it's a placeholder (0011, etc.)
+    let rawDate = ticket.schedule_date || ticket.ticket_date || ''
+    const isBad = d => !d || d.includes('0011') || d.includes('1970') || d.includes('00-00') || d.startsWith('00')
 
-    // Convert DD-MM-YYYY → YYYY-MM-DD
-    if (scheduleDate && scheduleDate.includes('-') && scheduleDate.split('-')[2].length === 4) {
-      const [dd, mm, yyyy] = scheduleDate.split('-')
-      scheduleDate = `${yyyy}-${mm}-${dd}`
+    if (isBad(ticket.schedule_date) && !isBad(ticket.ticket_date)) {
+      rawDate = ticket.ticket_date
+    }
+
+    let scheduleDate = rawDate
+    // Convert DD-MM-YYYY → YYYY-MM-DD (e.g. 30-10-2025 -> 2025-10-30)
+    if (scheduleDate && scheduleDate.includes('-')) {
+      const parts = scheduleDate.split('-')
+      if (parts.length === 3 && parts[2].length === 4) {
+        scheduleDate = `${parts[2]}-${parts[1]}-${parts[0]}`
+      }
     }
 
     const dateObj = new Date(scheduleDate)
+    const valid = isValid(dateObj) && dateObj.getFullYear() > 1900
 
     return {
       id: ticket.id,
-
-      scheduleDate,
-      day: isValid(dateObj) ? format(dateObj, 'EEE') : '',
+      scheduleDate: valid ? format(dateObj, 'yyyy-MM-dd') : null,
+      day: valid ? format(dateObj, 'EEE') : '',
       timeIn: ticket.schedule_start_time || ticket.start_time || '',
       timeOut: ticket.schedule_end_time || ticket.end_time || '',
       pestCode: ticket.pest_code || '',
@@ -426,7 +676,7 @@ const ServiceRequestPageContent = () => {
 
       if (appliedFilters.customer) params.customer_id = appliedFilters.customer
       if (appliedFilters.contract) params.contract_id = appliedFilters.contract
-      if (appliedFilters.technician) params.technician_id = appliedFilters.technician
+      if (appliedFilters.technician) params.employee_id = appliedFilters.technician
       if (appliedFilters.supervisor) params.supervisor_id = appliedFilters.supervisor
       if (appliedFilters.status) params.ticket_status = appliedFilters.status
       if (appliedFilters.appointment) params.ticket_type = appliedFilters.appointment
@@ -441,10 +691,12 @@ const ServiceRequestPageContent = () => {
       console.log('Ticket Params =>', params)
 
       const res = await getTicketReportList(params)
-      const list = res?.results || res?.data?.results || res?.data?.data?.results || []
-      const total = res?.count || res?.data?.count || list.length
+      // 🔥 ROBUST COUNT & DATA MAPPING
+      const list = res?.data?.results || res?.results || res?.data?.data?.results || []
+      const total = Number(res?.count ?? res?.data?.count ?? list.length ?? 0)
 
-      console.log('API Updated:', list.length, total) // ← Paste here 👌
+      console.log('Ticket API Payload:', params)
+      console.log('Ticket API Response:', { listLength: list.length, totalCount: total, raw: res })
 
       const mapped = list.map(mapTicketToRow)
 
@@ -733,6 +985,7 @@ const ServiceRequestPageContent = () => {
               value={technicianOptions.find(o => o.id === uiTechnician) || null}
               onChange={(_, v) => setUiTechnician(v?.id || '')}
               getOptionLabel={option => option?.label || ''}
+              isOptionEqualToValue={(o, v) => String(o?.id) === String(v?.id)}
               renderInput={params => (
                 <CustomTextField
                   {...params}
@@ -749,6 +1002,7 @@ const ServiceRequestPageContent = () => {
               value={supervisorOptions.find(o => o.id === uiSupervisor) || null}
               onChange={(_, v) => setUiSupervisor(v?.id || '')}
               getOptionLabel={option => option?.label || ''}
+              isOptionEqualToValue={(o, v) => String(o?.id) === String(v?.id)}
               renderInput={params => (
                 <CustomTextField
                   {...params}
@@ -765,6 +1019,7 @@ const ServiceRequestPageContent = () => {
               value={appointmentStatusList.find(o => o.id === uiStatus) || null}
               onChange={(_, v) => setUiStatus(v?.id || '')}
               getOptionLabel={option => option?.label || ''}
+              isOptionEqualToValue={(o, v) => String(o?.id) === String(v?.id)}
               renderInput={params => (
                 <CustomTextField
                   {...params}
@@ -781,6 +1036,7 @@ const ServiceRequestPageContent = () => {
               value={appointmentList.find(o => o.id === uiAppointment) || null}
               onChange={(_, v) => setUiAppointment(v?.id || '')}
               getOptionLabel={option => option?.label || ''}
+              isOptionEqualToValue={(o, v) => String(o?.id) === String(v?.id)}
               renderInput={params => (
                 <CustomTextField
                   {...params}
@@ -835,7 +1091,7 @@ const ServiceRequestPageContent = () => {
                   value={pagination.pageSize}
                   onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
                 >
-                  {[10, 25, 50, 100].map(s => (
+                  {[25, 50, 75, 100].map(s => (
                     <MenuItem key={s} value={s}>
                       {s} entries
                     </MenuItem>
@@ -1030,61 +1286,44 @@ const ServiceRequestPageContent = () => {
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, pt: 2 }}>
               {/* SECTION 1: DATES & TIMES */}
               <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3 }}>
+                <Box>
+                  <AppReactDatepicker
+                    selected={safeParseDate(editDialog.details.schedule_date)}
+                    onChange={date =>
+                      setEditDialog(prev => ({
+                        ...prev,
+                        details: { ...prev.details, schedule_date: date ? format(date, 'yyyy-MM-dd') : '' }
+                      }))
+                    }
+                    placeholderText='Select Scheduled Date'
+                    customInput={<CustomTextField label='Scheduled Date' fullWidth />}
+                  />
+                </Box>
                 <CustomTextField
                   fullWidth
-                  label='Scheduled Date'
-                  value={editDialog.details.schedule_date || ''}
-                  InputProps={{ readOnly: true }}
-                />
-                <CustomTextField
-                  fullWidth
-                  label='Start Time'
+                  label='Scheduled Start Time'
+                  type='time'
                   value={editDialog.details.schedule_start_time || ''}
-                  InputProps={{ readOnly: true }}
+                  onChange={e =>
+                    setEditDialog(prev => ({
+                      ...prev,
+                      details: { ...prev.details, schedule_start_time: e.target.value }
+                    }))
+                  }
+                  InputLabelProps={{ shrink: true }}
                 />
                 <CustomTextField
                   fullWidth
-                  label='End Time'
+                  label='Scheduled End Time'
+                  type='time'
                   value={editDialog.details.schedule_end_time || ''}
-                  InputProps={{ readOnly: true }}
-                />
-
-                <CustomTextField
-                  fullWidth
-                  label='Appointment Date'
-                  value={editDialog.details.ticket_date || ''}
-                  InputProps={{ readOnly: true }}
-                />
-                <CustomTextField
-                  fullWidth
-                  label='Start Time'
-                  value={editDialog.details.start_time || ''}
-                  InputProps={{ readOnly: true }}
-                />
-                <CustomTextField
-                  fullWidth
-                  label='End Time'
-                  value={editDialog.details.end_time || ''}
-                  InputProps={{ readOnly: true }}
-                />
-
-                <CustomTextField
-                  fullWidth
-                  label='Actual Start Time'
-                  value={editDialog.details.actual_start_time || ''}
-                  InputProps={{ readOnly: true }}
-                />
-                <CustomTextField
-                  fullWidth
-                  label='Actual End Time'
-                  value={editDialog.details.actual_end_time || ''}
-                  InputProps={{ readOnly: true }}
-                />
-                <CustomTextField
-                  fullWidth
-                  label='Appointment Status'
-                  value={editDialog.details.ticket_status || ''}
-                  InputProps={{ readOnly: true }}
+                  onChange={e =>
+                    setEditDialog(prev => ({
+                      ...prev,
+                      details: { ...prev.details, schedule_end_time: e.target.value }
+                    }))
+                  }
+                  InputLabelProps={{ shrink: true }}
                 />
               </Box>
 
@@ -1096,15 +1335,25 @@ const ServiceRequestPageContent = () => {
                   rows={2}
                   label='Action'
                   value={editDialog.details.action || ''}
-                  InputProps={{ readOnly: true }}
+                  onChange={e =>
+                    setEditDialog(prev => ({
+                      ...prev,
+                      details: { ...prev.details, action: e.target.value }
+                    }))
+                  }
                 />
                 <CustomTextField
                   fullWidth
                   multiline
                   rows={2}
                   label='Findings'
-                  value={editDialog.details.finding || ''}
-                  InputProps={{ readOnly: true }}
+                  value={editDialog.details.findings || editDialog.details.finding || ''}
+                  onChange={e =>
+                    setEditDialog(prev => ({
+                      ...prev,
+                      details: { ...prev.details, findings: e.target.value }
+                    }))
+                  }
                 />
                 <CustomTextField
                   fullWidth
@@ -1112,7 +1361,12 @@ const ServiceRequestPageContent = () => {
                   rows={2}
                   label='Recommendation'
                   value={editDialog.details.recommendation || ''}
-                  InputProps={{ readOnly: true }}
+                  onChange={e =>
+                    setEditDialog(prev => ({
+                      ...prev,
+                      details: { ...prev.details, recommendation: e.target.value }
+                    }))
+                  }
                 />
               </Box>
 
@@ -1129,7 +1383,12 @@ const ServiceRequestPageContent = () => {
                   rows={2}
                   label='Special note for Technician (this service)'
                   value={editDialog.details.instructions || ''}
-                  InputProps={{ readOnly: true }}
+                  onChange={e =>
+                    setEditDialog(prev => ({
+                      ...prev,
+                      details: { ...prev.details, instructions: e.target.value }
+                    }))
+                  }
                 />
               </Box>
 
@@ -1141,7 +1400,12 @@ const ServiceRequestPageContent = () => {
                   rows={2}
                   label='Appointment Remarks (this service)'
                   value={editDialog.details.remarks || ''}
-                  InputProps={{ readOnly: true }}
+                  onChange={e =>
+                    setEditDialog(prev => ({
+                      ...prev,
+                      details: { ...prev.details, remarks: e.target.value }
+                    }))
+                  }
                 />
                 <Box /> {/* Spacer */}
                 <CustomTextField
@@ -1157,7 +1421,7 @@ const ServiceRequestPageContent = () => {
                   multiline
                   rows={2}
                   label='Technician Remarks (From Contract)'
-                  value={editDialog.details.contract_tech_remarks || ''} // Check field name if possible
+                  value={editDialog.details.contract_tech_remarks || ''}
                   InputProps={{ readOnly: true }}
                 />
               </Box>
@@ -1166,14 +1430,25 @@ const ServiceRequestPageContent = () => {
 
               {/* SECTION 4: PEST DETAILS TABLE */}
               <Box>
-                <Typography variant='h6' sx={{ mb: 2, fontWeight: 600 }}>
-                  PEST DETAILS
-                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant='h6' sx={{ fontWeight: 600 }}>
+                    PEST DETAILS
+                  </Typography>
+                  <Button
+                    variant='contained'
+                    size='small'
+                    startIcon={<AddIcon />}
+                    onClick={addPestRow}
+                    sx={{ textTransform: 'none' }}
+                  >
+                    Add Pest
+                  </Button>
+                </Box>
                 <Box sx={{ overflowX: 'auto', border: '1px solid #eee', borderRadius: 1 }}>
                   <table className={styles.table} style={{ minWidth: '100%' }}>
                     <thead style={{ background: '#f9f9f9' }}>
                       <tr>
-                        <th style={{ padding: '8px' }}>ID</th>
+                        <th style={{ padding: '8px', width: '100px' }}>Action</th>
                         <th style={{ padding: '8px' }}>Pest</th>
                         <th style={{ padding: '8px' }}>Frequency</th>
                         <th style={{ padding: '8px' }}>Pest Value</th>
@@ -1181,29 +1456,43 @@ const ServiceRequestPageContent = () => {
                         <th style={{ padding: '8px' }}>Count</th>
                         <th style={{ padding: '8px' }}>Level</th>
                         <th style={{ padding: '8px' }}>Chemicals</th>
-                        <th style={{ padding: '8px' }}>Work Time(Hrs)</th>
+                        <th style={{ padding: '8px', width: '120px' }}>Work Time(Hrs)</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {(editDialog.details.ref_job_pests || []).length > 0 ? (
-                        editDialog.details.ref_job_pests.map((pest, idx) => (
+                      {(editDialog.details.pest_items || []).length > 0 ? (
+                        editDialog.details.pest_items.map((pest, idx) => (
                           <tr key={idx} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                            <td style={{ padding: '8px' }}>{idx + 1}</td>
-                            <td style={{ padding: '8px' }}>{pest.pest_name}</td>
-                            <td style={{ padding: '8px' }}>{pest.frequency}</td>
-                            <td style={{ padding: '8px' }}>{pest.pest_value}</td>
-                            <td style={{ padding: '8px' }}>{pest.purpose}</td>
-                            <td style={{ padding: '8px' }}>{pest.pest_count}</td>
-                            <td style={{ padding: '8px' }}>{pest.infestation_level}</td>
-                            <td style={{ padding: '8px' }}>
-                              {pest.ref_job_chemical?.map(c => c.chemical_name).join(', ') || ''}
+                            <td style={{ padding: '8px', textAlign: 'center' }}>
+                              <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+                                <IconButton size='small' color='primary' onClick={() => handleEditPest(pest, idx)}>
+                                  <i className='tabler-edit text-[18px]' />
+                                </IconButton>
+                                <IconButton size='small' color='error' onClick={() => deletePestRow(idx)}>
+                                  <i className='tabler-trash text-[18px]' />
+                                </IconButton>
+                              </Box>
                             </td>
-                            <td style={{ padding: '8px' }}>{pest.time_spent}</td>
+                            <td style={{ padding: '8px' }}>
+                              {pestOptions.find(o => String(o.id) === String(pest.pest_id || pest.id))?.label ||
+                                pest.pest_name ||
+                                pest.pest ||
+                                'N/A'}
+                            </td>
+                            <td style={{ padding: '8px' }}>
+                              {frequencyOptions.find(o => o.id === pest.frequency_id)?.label || 'N/A'}
+                            </td>
+                            <td style={{ padding: '8px' }}>{pest.pest_value || 0}</td>
+                            <td style={{ padding: '8px' }}>{pest.pest_purpose || ''}</td>
+                            <td style={{ padding: '8px' }}>{pest.pest_count || 0}</td>
+                            <td style={{ padding: '8px' }}>{pest.pest_level || 'Low'}</td>
+                            <td style={{ padding: '8px' }}>{pest.chemical_used || ''}</td>
+                            <td style={{ padding: '8px' }}>{pest.work_time || '0'}</td>
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={9} style={{ padding: '12px', textAlign: 'center' }}>
+                          <td colSpan={8} style={{ padding: '12px', textAlign: 'center' }}>
                             No pest details found
                           </td>
                         </tr>
@@ -1215,25 +1504,52 @@ const ServiceRequestPageContent = () => {
 
               {/* SECTION 5: TECHNICIAN DETAILS TABLE */}
               <Box>
-                <Typography variant='h6' sx={{ mb: 2, fontWeight: 600 }}>
-                  TECHNICIAN DETAILS
-                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant='h6' sx={{ fontWeight: 600 }}>
+                    TECHNICIAN DETAILS
+                  </Typography>
+                  <Button
+                    variant='contained'
+                    size='small'
+                    startIcon={<AddIcon />}
+                    onClick={addTechRow}
+                    sx={{ textTransform: 'none' }}
+                  >
+                    Add Technician
+                  </Button>
+                </Box>
                 <Box sx={{ overflowX: 'auto', border: '1px solid #eee', borderRadius: 1 }}>
                   <table className={styles.table} style={{ minWidth: '100%' }}>
                     <thead style={{ background: '#f9f9f9' }}>
                       <tr>
-                        <th style={{ padding: '8px' }}>ID</th>
+                        <th style={{ padding: '8px', width: '100px' }}>Action</th>
                         <th style={{ padding: '8px' }}>Technician</th>
-                        <th style={{ padding: '8px' }}>Productivity</th>
+                        <th style={{ padding: '8px', width: '200px' }}>Productivity</th>
                       </tr>
                     </thead>
                     <tbody>
                       {(editDialog.details.job_allocations || []).length > 0 ? (
                         editDialog.details.job_allocations.map((tech, idx) => (
                           <tr key={idx} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                            <td style={{ padding: '8px' }}>{idx + 1}</td>
-                            <td style={{ padding: '8px' }}>{tech.employee_name}</td>
-                            <td style={{ padding: '8px' }}>{tech.productivity_value || tech.productivity}</td>
+                            <td style={{ padding: '8px', textAlign: 'center' }}>
+                              <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+                                <IconButton size='small' color='primary' onClick={() => handleEditTech(tech, idx)}>
+                                  <i className='tabler-edit text-[18px]' />
+                                </IconButton>
+                                <IconButton size='small' color='error' onClick={() => deleteTechRow(idx)}>
+                                  <i className='tabler-trash text-[18px]' />
+                                </IconButton>
+                              </Box>
+                            </td>
+                            <td style={{ padding: '8px' }}>
+                              {technicianOptions.find(o => String(o.id) === String(tech.technician_id || tech.id))?.label ||
+                                tech.technician_name ||
+                                tech.technician ||
+                                'N/A'}
+                            </td>
+                            <td style={{ padding: '8px' }}>
+                              {tech.production_value || tech.productivity_value || tech.productivity || 0}
+                            </td>
                           </tr>
                         ))
                       ) : (
@@ -1256,8 +1572,222 @@ const ServiceRequestPageContent = () => {
           <Button onClick={() => setEditDialog({ open: false, row: null })} variant='tonal' color='secondary'>
             Close
           </Button>
-          <Button onClick={() => setEditDialog({ open: false, row: null })} variant='contained'>
-            Save Changes
+          <Button onClick={handleSave} variant='contained' disabled={loading}>
+            {loading ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* NESTED PEST MODAL */}
+      <Dialog
+        open={pestModal.open}
+        onClose={() => setPestModal({ ...pestModal, open: false })}
+        maxWidth='md'
+        fullWidth
+        closeAfterTransition={false}
+        PaperProps={{ sx: { overflow: 'visible' } }}
+      >
+        <DialogTitle>
+          <Typography variant='h5' component='span'>
+            {pestModal.mode === 'add' ? 'Add Pest' : 'Update Ticket'}
+          </Typography>
+          <DialogCloseButton onClick={() => setPestModal({ ...pestModal, open: false })} disableRipple>
+            <i className='tabler-x' />
+          </DialogCloseButton>
+        </DialogTitle>
+        <DialogContent dividers sx={{ p: 6 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {pestModal.mode === 'add' ? (
+              <Box>
+                <CustomAutocomplete
+                  fullWidth
+                  options={pestOptions}
+                  value={pestOptions.find(o => o.id === pestModal.data.pest_id) || null}
+                  onChange={(_, v) => setPestModal(prev => ({ ...prev, data: { ...prev.data, pest_id: v?.id || '' } }))}
+                  getOptionLabel={o => o?.label || ''}
+                  isOptionEqualToValue={(o, v) => String(o?.id) === String(v?.id)}
+                  renderInput={p => <CustomTextField {...p} label='Pest' />}
+                />
+              </Box>
+            ) : (
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 4 }}>
+                <CustomAutocomplete
+                  options={pestOptions}
+                  value={pestOptions.find(o => o.id === pestModal.data.pest_id) || null}
+                  onChange={(_, v) => setPestModal(prev => ({ ...prev, data: { ...prev.data, pest_id: v?.id || '' } }))}
+                  getOptionLabel={o => o?.label || ''}
+                  renderInput={p => <CustomTextField {...p} label='Pest' />}
+                />
+                <CustomAutocomplete
+                  options={frequencyOptions}
+                  value={frequencyOptions.find(o => o.id === pestModal.data.frequency_id) || null}
+                  onChange={(_, v) =>
+                    setPestModal(prev => ({ ...prev, data: { ...prev.data, frequency_id: v?.id || '' } }))
+                  }
+                  getOptionLabel={o => o?.label || ''}
+                  renderInput={p => <CustomTextField {...p} label='Frequency' />}
+                />
+                <CustomAutocomplete
+                  options={['Job', 'Follow Up', 'Complaint']}
+                  value={pestModal.data.pest_purpose || ''}
+                  onChange={(_, v) => setPestModal(prev => ({ ...prev, data: { ...prev.data, pest_purpose: v || '' } }))}
+                  renderInput={p => <CustomTextField {...p} label='Purpose' />}
+                />
+                <CustomTextField
+                  label='Pest Count'
+                  type='number'
+                  value={pestModal.data.pest_count || 0}
+                  onChange={e => setPestModal(prev => ({ ...prev, data: { ...prev.data, pest_count: e.target.value } }))}
+                />
+                <CustomTextField
+                  label='Pest Value'
+                  type='number'
+                  value={pestModal.data.pest_value || 0}
+                  onChange={e => setPestModal(prev => ({ ...prev, data: { ...prev.data, pest_value: e.target.value } }))}
+                />
+                <FormControl fullWidth>
+                  <Typography variant='caption' sx={{ mb: 1 }}>
+                    Level
+                  </Typography>
+                  <Select
+                    value={pestModal.data.pest_level || 'Low'}
+                    onChange={e =>
+                      setPestModal(prev => ({ ...prev, data: { ...prev.data, pest_level: e.target.value } }))
+                    }
+                  >
+                    <MenuItem value='Low'>Low</MenuItem>
+                    <MenuItem value='Medium'>Medium</MenuItem>
+                    <MenuItem value='High'>High</MenuItem>
+                  </Select>
+                </FormControl>
+                <Box sx={{ gridColumn: 'span 2' }}>
+                  <CustomTextField
+                    fullWidth
+                    label='Chemicals Used'
+                    multiline
+                    rows={3}
+                    value={pestModal.data.chemical_used || ''}
+                    onChange={e =>
+                      setPestModal(prev => ({ ...prev, data: { ...prev.data, chemical_used: e.target.value } }))
+                    }
+                  />
+                </Box>
+                <Box sx={{ gridColumn: 'span 1' }}>
+                  <CustomTextField
+                    fullWidth
+                    label='Action'
+                    multiline
+                    rows={3}
+                    value={pestModal.data.ticket_pest_action || pestModal.data.action || ''}
+                    onChange={e => setPestModal(prev => ({ ...prev, data: { ...prev.data, ticket_pest_action: e.target.value } }))}
+                  />
+                </Box>
+                <Box sx={{ gridColumn: 'span 1' }}>
+                  <CustomTextField
+                    fullWidth
+                    label='Recommendation'
+                    multiline
+                    rows={3}
+                    value={pestModal.data.ticket_pest_recommendation || pestModal.data.recommendation || ''}
+                    onChange={e =>
+                      setPestModal(prev => ({ ...prev, data: { ...prev.data, ticket_pest_recommendation: e.target.value } }))
+                    }
+                  />
+                </Box>
+              </Box>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPestModal({ ...pestModal, open: false })} variant='tonal' color='secondary'>
+            Close
+          </Button>
+          <Button onClick={handleSavePestModal} variant='contained' color='primary'>
+            Keep
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* NESTED TECH MODAL */}
+      <Dialog
+        open={techModal.open}
+        onClose={() => setTechModal({ ...techModal, open: false })}
+        maxWidth='xs'
+        fullWidth
+        closeAfterTransition={false}
+        PaperProps={{ sx: { overflow: 'visible' } }}
+      >
+        <DialogTitle>
+          <Typography variant='h5' component='span'>
+            {techModal.mode === 'add' ? 'Add Technician' : 'Update Ticket Technician'}
+          </Typography>
+          <DialogCloseButton onClick={() => setTechModal({ ...techModal, open: false })} disableRipple>
+            <i className='tabler-x' />
+          </DialogCloseButton>
+        </DialogTitle>
+        <DialogContent dividers sx={{ p: 6 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <Box sx={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+              <CustomAutocomplete
+                fullWidth
+                options={technicianOptions}
+                value={technicianOptions.find(o => o.id === techModal.data.technician_id) || null}
+                onChange={(_, v) =>
+                  setTechModal(prev => ({ ...prev, data: { ...prev.data, technician_id: v?.id || '' } }))
+                }
+                getOptionLabel={o => o?.label || ''}
+                renderInput={p => <CustomTextField {...p} label='Technician' />}
+              />
+              {techModal.mode === 'edit' && (
+                <CustomTextField
+                  label='Production Value'
+                  type='number'
+                  value={techModal.data.production_value || techModal.data.productivity_value || 0}
+                  onChange={e =>
+                    setTechModal(prev => ({ ...prev, data: { ...prev.data, production_value: e.target.value } }))
+                  }
+                />
+              )}
+            </Box>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={!!(techModal.data.is_attachment_technician || techModal.data.is_attachment)}
+                  onChange={e => setTechModal(prev => ({ ...prev, data: { ...prev.data, is_attachment_technician: e.target.checked ? 1 : 0 } }))}
+                />
+              }
+              label='Attachment Technician'
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setTechModal({ ...techModal, open: false })} variant='tonal' color='secondary'>
+            Close
+          </Button>
+          <Button onClick={handleSaveTechModal} variant='contained' color='primary'>
+            Keep
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* NESTED DELETE CONFIRMATION */}
+      <Dialog open={deleteDialogNested.open} onClose={() => setDeleteDialogNested({ ...deleteDialogNested, open: false })}>
+        <DialogTitle>
+          <Typography variant='h5' component='span'>Confirm Delete</Typography>
+        </DialogTitle>
+        <DialogContent>
+          <Typography>Are you sure you want to delete this {deleteDialogNested.type}?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setDeleteDialogNested({ ...deleteDialogNested, open: false })}
+            variant='tonal'
+            color='secondary'
+          >
+            Cancel
+          </Button>
+          <Button onClick={handleConfirmDeleteNested} variant='contained' color='error'>
+            Delete
           </Button>
         </DialogActions>
       </Dialog>

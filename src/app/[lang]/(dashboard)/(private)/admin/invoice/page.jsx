@@ -24,7 +24,11 @@ import {
   MenuItem,
   InputAdornment,
   Pagination,
-  Checkbox
+  Checkbox,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
@@ -60,6 +64,7 @@ import SummaryCards from '@/components/common/SummaryCards'
 import PermissionGuard from '@/components/auth/PermissionGuard'
 import { usePermission } from '@/hooks/usePermission'
 import GlobalButton from '@/components/common/GlobalButton'
+import DialogCloseButton from '@/components/dialogs/DialogCloseButton'
 
 const columnHelper = createColumnHelper()
 
@@ -128,7 +133,12 @@ const mapInvoice = (inv, dd) => ({
 
   invoiceType: inv.invoice_type || '-',
 
-  salesPerson: dd.sales_persons?.find(s => String(s.id) === String(inv.sales_person_id))?.label || '-'
+  salesPerson: dd.sales_persons?.find(s => String(s.id) === String(inv.sales_person_id))?.label || '-',
+  
+  // Extra fields for editing
+  total_productivity_amount: inv.total_productivity_amount || '',
+  remarks: inv.remarks || '',
+  service_nos: inv.service_nos || ''
 })
 const InvoiceListPageFullContent = () => {
   const { canAccess } = usePermission()
@@ -213,6 +223,22 @@ const InvoiceListPageFullContent = () => {
   const [selectedInvoiceData, setSelectedInvoiceData] = useState(null)
   const [customerSpecificContracts, setCustomerSpecificContracts] = useState(null)
 
+  // ── Modals State ────────────────────────────────
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [editFormData, setEditFormData] = useState({
+    invoice_no: '',
+    invoice_date: null,
+    amount: '',
+    total_productivity_amount: '',
+    description: '',
+    service_nos: ''
+  })
+  const [savingEdit, setSavingEdit] = useState(false)
+
+  const [approveModalOpen, setApproveModalOpen] = useState(false)
+  const [targetInvoice, setTargetInvoice] = useState(null)
+  const [approving, setApproving] = useState(false)
+
   const data = useMemo(() => {
     return rawResults.map((inv, index) => ({
       sno: index + 1 + pagination.pageIndex * pagination.pageSize,
@@ -258,8 +284,12 @@ const InvoiceListPageFullContent = () => {
     }
 
     if (appliedFilters.origin?.id) params.company_id = appliedFilters.origin.id
-    if (appliedFilters.contractType?.id) params.contract_type = appliedFilters.contractType.id
-    if (appliedFilters.invoiceStatus?.label) params.is_issued = appliedFilters.invoiceStatus.label === 'Yes' ? 1 : 0
+    if (appliedFilters.contractType?.label) params.contract_type = appliedFilters.contractType.label
+    if (appliedFilters.invoiceStatus?.label) {
+      if (appliedFilters.invoiceStatus.label === 'Pending') params.is_issued = 0
+      if (appliedFilters.invoiceStatus.label === 'Issued') params.is_issued = 1
+      if (appliedFilters.invoiceStatus.label === 'Posted') params.is_posted = 1
+    }
     if (appliedFilters.serviceFreq?.id) params.service_frequency = appliedFilters.serviceFreq.id
     if (appliedFilters.billingFreq?.id) params.billing_frequency_id = appliedFilters.billingFreq.id
     if (appliedFilters.contractLevel?.id) params.contract_level = appliedFilters.contractLevel.id
@@ -299,13 +329,24 @@ const InvoiceListPageFullContent = () => {
         customers: processedCustomers,
         contracts: processedContracts,
         sales_persons: dedupeById(dd.sales_person?.name || []),
-        contract_levels: dedupeById(dd.contract_level?.name || []),
-        invoice_statuses: [
-          { id: 1, label: 'Yes' },
-          { id: 0, label: 'No' }
+        contract_levels: [
+          { id: 1, label: 'New' },
+          { id: 2, label: 'Renewal' }
         ],
-        contract_types: dedupeById(dd.contract_type?.name || []),
-        invoice_types: dedupeById(dd.invoice_type?.name || [])
+        invoice_statuses: [
+          { id: 1, label: 'Pending' },
+          { id: 2, label: 'Issued' },
+          { id: 3, label: 'Posted' }
+        ],
+        contract_types: [
+          { id: 1, label: 'Limited Contract' },
+          { id: 2, label: 'Job' },
+          { id: 3, label: 'Continuous Job' },
+          { id: 4, label: 'Warranty' }
+        ],
+        invoice_types: [
+          { id: 1, label: 'Initial' }
+        ]
       }
       setDropdownData(processedDropdowns)
     } catch (err) {
@@ -389,27 +430,66 @@ const InvoiceListPageFullContent = () => {
   }
 
   // APPROVE (Issue Invoice)
-  const handleApprove = async invoice => {
+  const handleApprove = invoice => {
     if (invoice.issued) {
       showToast('info', 'Already approved')
       return
     }
+    setTargetInvoice(invoice)
+    setApproveModalOpen(true)
+  }
 
+  const confirmApproval = async () => {
+    if (!targetInvoice) return
+    setApproving(true)
     try {
-      // same issue API for this user
       const { updateInvoice } = await import('@/api/invoice')
-
-      await updateInvoice(invoice.id, { is_issued: 1 })
+      await updateInvoice(targetInvoice.id, { is_issued: 1 })
       showToast('success', 'Invoice Approved')
+      setApproveModalOpen(false)
       fetchInvoiceList()
     } catch (err) {
       showToast('error', 'Approval Failed')
+    } finally {
+      setApproving(false)
     }
   }
 
   // EDIT
   const handleEdit = invoice => {
-    showToast('info', `Edit Invoice ${invoice.invNo} coming soon...`)
+    setEditFormData({
+      id: invoice.id,
+      invoice_no: invoice.invNo || '',
+      invoice_date: invoice.invDate ? new Date(invoice.invDate) : null,
+      amount: invoice.amount || '',
+      total_productivity_amount: invoice.total_productivity_amount || '',
+      description: invoice.remarks || '',
+      service_nos: invoice.service_nos || ''
+    })
+    setEditModalOpen(true)
+  }
+
+  const handleSaveEdit = async () => {
+    setSavingEdit(true)
+    try {
+      const { updateInvoice } = await import('@/api/invoice')
+      const payload = {
+        invoice_number: editFormData.invoice_no,
+        invoice_date: editFormData.invoice_date ? format(editFormData.invoice_date, 'yyyy-MM-dd') : null,
+        amount: editFormData.amount,
+        total_productivity_amount: editFormData.total_productivity_amount,
+        remarks: editFormData.description, // Mapping description to remarks for PDF/Backend
+        service_nos: editFormData.service_nos
+      }
+      await updateInvoice(editFormData.id, payload)
+      showToast('success', 'Invoice updated successfully')
+      setEditModalOpen(false)
+      fetchInvoiceList()
+    } catch (err) {
+      showToast('error', 'Update failed')
+    } finally {
+      setSavingEdit(false)
+    }
   }
 
   // DELETE
@@ -1019,6 +1099,136 @@ const InvoiceListPageFullContent = () => {
           </Box>
         </Box>
       </Card>
+
+      {/* UPDATE INVOICE MODAL */}
+      <Dialog
+        open={editModalOpen}
+        onClose={() => !savingEdit && setEditModalOpen(false)}
+        maxWidth='sm'
+        fullWidth
+        closeAfterTransition={false}
+        PaperProps={{ sx: { overflow: 'visible' } }}
+      >
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant='h5' component='span'>
+            Update Invoice
+          </Typography>
+          <DialogCloseButton onClick={() => setEditModalOpen(false)} disableRipple>
+            <i className='tabler-x' />
+          </DialogCloseButton>
+        </DialogTitle>
+        <Divider />
+        <DialogContent sx={{ p: 6 }}>
+          <Grid container spacing={4}>
+            <Grid item xs={12} sm={6}>
+              <CustomTextField
+                fullWidth
+                label='Invoice No'
+                value={editFormData.invoice_no}
+                onChange={e => setEditFormData({ ...editFormData, invoice_no: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <AppReactDatepicker
+                selected={editFormData.invoice_date}
+                onChange={date => setEditFormData({ ...editFormData, invoice_date: date })}
+                customInput={<CustomTextField fullWidth label='Invoice Date' />}
+                dateFormat='dd-MM-yyyy'
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <CustomTextField
+                fullWidth
+                label='Invoice Amount'
+                type='number'
+                value={editFormData.amount}
+                onChange={e => setEditFormData({ ...editFormData, amount: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <CustomTextField
+                fullWidth
+                label='Total Productivity Amount'
+                type='number'
+                value={editFormData.total_productivity_amount}
+                onChange={e => setEditFormData({ ...editFormData, total_productivity_amount: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <CustomTextField
+                fullWidth
+                multiline
+                rows={4}
+                label='Invoice Description'
+                value={editFormData.description}
+                onChange={e => setEditFormData({ ...editFormData, description: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <CustomTextField
+                fullWidth
+                label='Service Nos'
+                value={editFormData.service_nos}
+                onChange={e => setEditFormData({ ...editFormData, service_nos: e.target.value })}
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions sx={{ p: 6, pt: 0 }}>
+          <Button variant='tonal' color='secondary' onClick={() => setEditModalOpen(false)} disabled={savingEdit}>
+            Close
+          </Button>
+          <GlobalButton variant='contained' onClick={handleSaveEdit} loading={savingEdit}>
+            Keep
+          </GlobalButton>
+        </DialogActions>
+      </Dialog>
+
+      {/* APPROVE INVOICE MODAL */}
+      <Dialog
+        open={approveModalOpen}
+        onClose={() => !approving && setApproveModalOpen(false)}
+        maxWidth='xs'
+        fullWidth
+        closeAfterTransition={false}
+        PaperProps={{ sx: { overflow: 'visible' } }}
+      >
+        <DialogTitle sx={{ textAlign: 'center' }}>
+          <Typography variant='h5' component='span'>
+            Approve Invoice
+          </Typography>
+          <DialogCloseButton onClick={() => setApproveModalOpen(false)} disableRipple>
+            <i className='tabler-x' />
+          </DialogCloseButton>
+        </DialogTitle>
+        <DialogContent sx={{ textAlign: 'center', pb: 4, pt: 8 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 50,
+              height: 50,
+              bgcolor: 'success.main',
+              color: 'white',
+              borderRadius: '50%',
+              mx: 'auto',
+              mb: 4
+            }}
+          >
+            <i className='tabler-circle-check text-2xl' />
+          </Box>
+          <Typography>Are you sure you want to approve invoice {targetInvoice?.invNo}?</Typography>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center', pb: 8 }}>
+          <Button variant='tonal' color='secondary' onClick={() => setApproveModalOpen(false)} disabled={approving}>
+            Cancel
+          </Button>
+          <Button variant='contained' color='success' onClick={confirmApproval} disabled={approving}>
+            {approving ? 'Approving...' : 'Confirm'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </StickyListLayout>
   )
 }

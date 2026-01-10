@@ -11,6 +11,7 @@ export const getContractList = async (filters = {}) => {
     if (filters.customer_id) params.append('customer_id', filters.customer_id)
     if (filters.contract_type) params.append('contract_type', filters.contract_type)
     if (filters.contract_status) params.append('contract_status', filters.contract_status)
+    if (filters.company_id) params.append('company_id', filters.company_id)
 
     const query = params.toString()
     const url = query ? `contract-list/?${query}` : 'contract-list/'

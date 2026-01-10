@@ -30,6 +30,7 @@ import {
 import PermissionGuard from '@/components/auth/PermissionGuard'
 import { usePermission } from '@/hooks/usePermission'
 import PresetDateRangePicker from '@/components/common/PresetDateRangePicker'
+import { getCompanyList } from '@/api/company'
 
 import { getContractList, deleteContractApi } from '@/api/contract'
 import api from '@/utils/axiosInstance'
@@ -133,6 +134,8 @@ const ContractsPageContent = () => {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
+  const [companyOptions, setCompanyOptions] = useState([])
+  const [uiCompany, setUiCompany] = useState(null)
 
   const [rows, setRows] = useState([])
   const [rowCount, setRowCount] = useState(0)
@@ -160,6 +163,7 @@ const ContractsPageContent = () => {
   const [appliedFilters, setAppliedFilters] = useState({
     search: searchParams.get('search') || '',
     customer: null,
+    company: null, // ✅ ADD
     type: searchParams.get('type') || null,
     status: searchParams.get('status') || null,
     uuid: searchParams.get('uuid') || null,
@@ -170,6 +174,38 @@ const ContractsPageContent = () => {
     ]
   })
 
+  const loadCompanies = async () => {
+    try {
+      const list = await getCompanyList()
+
+      const mapped = list.map(c => ({
+        id: c.id,
+        name: c.name?.trim() || c.company_name || '-'
+      }))
+
+      setCompanyOptions(mapped)
+
+      // 🔥 DEFAULT SELECTION: A-Flick (Only if no URL or Saved filter exists)
+      const hasUrlParam = searchParams.get('company')
+      const hasSavedParam = sessionStorage.getItem('contractFilters')
+
+      if (!hasUrlParam && !hasSavedParam && mapped.length > 0) {
+        // Find "A-Flick Pte Ltd" or similar aflick companies
+        const aflick =
+          mapped.find(c => c.name.toLowerCase() === 'a-flick pte ltd' || c.name.toLowerCase() === 'aflick pte ltd') ||
+          mapped.find(c => c.name.toLowerCase().includes('aflick') || c.name.toLowerCase().includes('a-flick'))
+
+        if (aflick) {
+          setUiCompany(aflick)
+          setAppliedFilters(prev => ({ ...prev, company: aflick }))
+        }
+      }
+    } catch (err) {
+      console.error('Error loading companies', err)
+      setCompanyOptions([])
+    }
+  }
+
   // Sync UI state with applied filters on mount
   useEffect(() => {
     // uiSearch, uiType, etc are already initialized from searchParams
@@ -179,6 +215,7 @@ const ContractsPageContent = () => {
     const params = new URLSearchParams()
     if (filters.search) params.set('search', filters.search)
     if (filters.customer?.id) params.set('customer', encodeId(filters.customer.id))
+    if (filters.company?.id) params.set('company', encodeId(filters.company.id))
     if (filters.type) params.set('type', filters.type)
     if (filters.status) params.set('status', filters.status)
     if (filters.uuid) params.set('uuid', filters.uuid)
@@ -192,6 +229,7 @@ const ContractsPageContent = () => {
     const storageObj = {
       search: filters.search,
       customer: filters.customer ? { id: filters.customer.id, name: filters.customer.name } : null,
+      company: filters.company ? { id: filters.company.id, name: filters.company.name } : null,
       type: filters.type,
       status: filters.status,
       uuid: filters.uuid,
@@ -205,6 +243,9 @@ const ContractsPageContent = () => {
 
   const encodedCustomerId = searchParams.get('customer')
   const decodedCustomerId = encodedCustomerId ? parseInt(decodeId(encodedCustomerId)) : null
+
+  const encodedCompanyId = searchParams.get('company')
+  const decodedCompanyId = encodedCompanyId ? parseInt(decodeId(encodedCompanyId)) : null
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -225,8 +266,9 @@ const ContractsPageContent = () => {
 
       if (appliedFilters.uuid) params.uuid = appliedFilters.uuid
       if (appliedFilters.customer?.id) params.customer_id = appliedFilters.customer.id
-      if (appliedFilters.type?.value) params.contract_type = appliedFilters.type.value
-      if (appliedFilters.status?.value) params.contract_status = appliedFilters.status.value
+      if (appliedFilters.company?.id) params.company_id = appliedFilters.company.id
+      if (appliedFilters.type) params.contract_type = appliedFilters.type
+      if (appliedFilters.status) params.contract_status = appliedFilters.status
 
       const res = await getContractList(params)
 
@@ -240,14 +282,36 @@ const ContractsPageContent = () => {
         customer_id: item.customer_id, // 🔥 REQUIRED FOR NAVIGATION
         customer: item.customer_name || item.customer?.name || item.customer || '-', // 🔥 REQUIRED FOR TABLE ACCESSOR
         uuid: item.uuid || '',
-        contractCode: item.contract_code || `CON-${item.id}`,
-        customerName: item.customer_name || '-',
-        type: item.contract_type || '-',
-        status: item.contract_status || '-',
-        startDate: item.commence_date || '-',
-        endDate: item.expiry_date || '-',
-        address: item.service_address || '-',
-        total: item.total_amount || 0
+
+        // Company/Origin
+        company: item.company || '-',
+
+        // Contract Code
+        contractCode: item.contract_code || item.num_series || `CON-${item.id}`,
+
+        // Address fields
+        serviceAddress: item.service_address || '-',
+        postalCode: item.postal_code || '-',
+
+        // Contract details
+        contractType: item.contract_type || '-',
+        contractStatus: item.contract_status || '-',
+
+        // Dates
+        startDate: item.start_date || item.commencement_date || '-',
+        endDate: item.end_date || '-',
+
+        // Contact details
+        contactName: item.contact_person_name || '-',
+        contactPhone: item.phone || '-',
+        mobile: item.mobile || '-',
+
+        // Financial
+        contractValue: item.contract_value || 0,
+        productValue: 0, // Not in API response
+
+        // Pests - extract from pest_items array
+        pestList: item.pest_items?.map(p => p.pest).join(', ') || 'N/A'
       }))
 
       setRows(normalized)
@@ -262,6 +326,10 @@ const ContractsPageContent = () => {
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  useEffect(() => {
+    loadCompanies()
+  }, [])
 
   const openPlanDrawer = async item => {
     try {
@@ -344,7 +412,15 @@ const ContractsPageContent = () => {
         setAppliedFilters(prev => ({ ...prev, customer: matched }))
       }
     }
-  }, [decodedCustomerId, customerOptions])
+
+    if (decodedCompanyId && companyOptions.length > 0) {
+      const matched = companyOptions.find(c => c.id === decodedCompanyId)
+      if (matched) {
+        setUiCompany(matched)
+        setAppliedFilters(prev => ({ ...prev, company: matched }))
+      }
+    }
+  }, [decodedCustomerId, customerOptions, decodedCompanyId, companyOptions])
 
   // Load customer dropdown only once
   useEffect(() => {
@@ -357,6 +433,7 @@ const ContractsPageContent = () => {
     const hasUrlParams =
       searchParams.get('search') ||
       searchParams.get('customer') ||
+      searchParams.get('company') ||
       searchParams.get('type') ||
       searchParams.get('status') ||
       searchParams.get('dateFilter')
@@ -371,6 +448,7 @@ const ContractsPageContent = () => {
           const params = new URLSearchParams()
           if (filters.search) params.set('search', filters.search)
           if (filters.customer?.id) params.set('customer', encodeId(filters.customer.id))
+          if (filters.company?.id) params.set('company', encodeId(filters.company.id))
           if (filters.type) params.set('type', filters.type)
           if (filters.status) params.set('status', filters.status)
           if (filters.uuid) params.set('uuid', filters.uuid)
@@ -462,6 +540,11 @@ const ContractsPageContent = () => {
         }
       }),
 
+      columnHelper.accessor('company', {
+        id: 'company_column',
+        header: 'Company'
+      }),
+
       columnHelper.accessor('customer', {
         id: 'customer_column',
         header: 'Customer'
@@ -469,7 +552,7 @@ const ContractsPageContent = () => {
 
       columnHelper.display({
         id: 'serve_column',
-        header: 'Serve',
+        header: 'Service',
         meta: { width: '140px', align: 'center' },
 
         cell: ({ row }) => {
@@ -543,12 +626,12 @@ const ContractsPageContent = () => {
       }),
       columnHelper.accessor('contractCode', {
         id: 'code_column',
-        header: 'Code'
+        header: 'Contract Code'
       }),
 
       columnHelper.accessor('serviceAddress', {
         id: 'address_column',
-        header: 'Address'
+        header: 'Service Address'
       }),
 
       columnHelper.accessor('contractType', {
@@ -601,11 +684,11 @@ const ContractsPageContent = () => {
         header: 'Mobile'
       }),
 
-      columnHelper.accessor('services', {
-        id: 'services_column',
-        header: 'Services',
-        cell: info => info.getValue()?.join(', ') || 'N/A'
-      }),
+      // columnHelper.accessor('services', {
+      //   id: 'services_column',
+      //   header: 'Services',
+      //   cell: info => info.getValue()?.join(', ') || 'N/A'
+      // }),
 
       columnHelper.accessor('pestList', {
         id: 'pest_column',
@@ -849,6 +932,20 @@ const ContractsPageContent = () => {
               </Box>
             </Box>
 
+            {/* Origin (Company) Filter */}
+            <Box sx={{ width: 220 }}>
+              <GlobalAutocomplete
+                fullWidth
+                options={companyOptions}
+                getOptionLabel={option => option?.name || ''}
+                value={companyOptions.find(opt => opt.id === uiCompany?.id) || null}
+                onChange={newVal => setUiCompany(newVal)}
+                renderInput={params => (
+                  <GlobalTextField {...params} label='Origin' placeholder='Select Origin' size='small' />
+                )}
+              />
+            </Box>
+
             {/* Customer Filter */}
             <Box sx={{ width: 220 }}>
               <GlobalAutocomplete
@@ -914,12 +1011,14 @@ const ContractsPageContent = () => {
                 const newFilters = {
                   search: uiSearch,
                   customer: uiCustomer,
+                  company: uiCompany, // ✅ ADD THIS
                   type: uiType,
                   status: uiStatus,
                   uuid: uiUuid,
                   dateFilter: uiDateFilter,
                   dateRange: uiDateRange
                 }
+
                 setPagination(p => ({ ...p, pageIndex: 0 }))
                 setAppliedFilters(newFilters)
                 updateUrl(newFilters)

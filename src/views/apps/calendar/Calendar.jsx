@@ -276,7 +276,7 @@ const Calendar = ({
 
           event.setExtendedProp('ticket_id', ticketId)
 
-          showToast('Ticket updated', 'success')
+          showToast('success', 'Ticket updated successfully')
         }
 
         // ---------- LUNCH ----------
@@ -285,6 +285,15 @@ const Calendar = ({
           const employeeId = Number(event.getResources()[0].id)
 
           const newDate = event.startStr.slice(0, 10)
+          const oldDate = info.oldEvent.startStr.slice(0, 10)
+
+          // 🔥 PREVENT LUNCH DATE CHANGE
+          if (newDate !== oldDate) {
+            showToast('warning', 'Lunch date cannot be changed')
+            info.revert()
+            return
+          }
+
           const newStart = cleanTime(event.startStr.split('T')[1])
           const newEnd = cleanTime(event.endStr.split('T')[1])
 
@@ -304,7 +313,7 @@ const Calendar = ({
             event.setProp('id', lunchId)
             event.setExtendedProp('db_id', lunchId)
 
-            showToast('Lunch updated', 'success')
+            showToast('success', 'Lunch updated successfully')
           } else {
             // Create
             const res = await addEmployeeLunch({
@@ -320,7 +329,7 @@ const Calendar = ({
             event.setProp('id', newId)
             event.setExtendedProp('db_id', newId)
 
-            showToast('Lunch created', 'success')
+            showToast('success', 'Lunch created successfully')
           }
         }
 
@@ -335,7 +344,7 @@ const Calendar = ({
         if (onRefresh) onRefresh()
       } catch (err) {
         console.error('eventDrop error', err)
-        showToast('Update failed', 'error')
+        showToast('error', 'Update failed')
       }
     },
 
@@ -377,7 +386,7 @@ const Calendar = ({
           // event.setProp('title', 'New Title') // safe
           // event.setProp('backgroundColor', '#ff9f89') // safe
 
-          showToast('Ticket updated', 'success')
+          showToast('success', 'Ticket updated successfully')
         }
         // ---------- LUNCH ----------
         if (data.type === 'lunch') {
@@ -402,7 +411,7 @@ const Calendar = ({
             end_time: newEndHHMM
           })
 
-          showToast('Lunch resized successfully', 'success')
+          showToast('success', 'Lunch resized successfully')
         }
 
         dispatch(updateEvent(event))
@@ -410,7 +419,7 @@ const Calendar = ({
         if (onRefresh) onRefresh()
       } catch (err) {
         console.error('eventResize error', err)
-        showToast('Update failed', 'error')
+        showToast('error', 'Update failed')
       }
     },
 
