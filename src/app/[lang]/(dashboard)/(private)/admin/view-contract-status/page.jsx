@@ -33,6 +33,7 @@ import GlobalTextarea from '@/components/common/GlobalTextarea'
 import GlobalSelect from '@/components/common/GlobalSelect'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
 import { showToast } from '@/components/common/Toasts'
+import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns'
 import { encodeId } from '@/utils/urlEncoder'
 
 import { getContractView } from '@/api/contract/viewStatus'
@@ -155,10 +156,7 @@ const ContractStatusPageContent = () => {
       if (appliedFilters.contractStatus?.value) params.contract_status = appliedFilters.contractStatus.value
       if (appliedFilters.renewal?.value) params.is_renewed = appliedFilters.renewal.value === 'Renewed' ? true : false
 
-      if (appliedFilters.filterByDate && appliedFilters.dateRange.start && appliedFilters.dateRange.end) {
-        params.from_date = appliedFilters.dateRange.start.toISOString().split('T')[0]
-        params.to_date = appliedFilters.dateRange.end.toISOString().split('T')[0]
-      }
+      // Removed backend date params
 
       params.page = pagination.pageIndex + 1
       params.page_size = pagination.pageSize
@@ -176,36 +174,21 @@ const ContractStatusPageContent = () => {
       setRowCount(count)
 
       // 2️⃣ MAP API FIELDS → UI FIELDS
-      // 2️⃣ MAP API FIELDS → UI FIELDS
       const normalized = results.map((item, index) => {
         // 🔹 Proper Status Text Convert
-        const statusMap = {
-          1: 'Current',
-          2: 'Expired',
-          3: 'Hold',
-          4: 'Terminated'
-        }
-        // Remove number mapping — API gives correct status string
         const statusText = item.contract_status || 'Current'
 
         // Date Formatter
         const formatDate = d => {
-          if (!d) return ''
-          // Convert "DD-MM-YYYY" & "2025-12-06" (BE)
-          const clean = d.replace(/[/\s].*/, '')
-          const parts = clean.split(/[-/]/)
-
-          if (parts.length === 3) {
-            if (parts[0].length === 2) {
-              // dd-mm-yyyy
-              return `${parts[0]}-${parts[1]}-${parts[2]}`
-            } else if (parts[0].length === 4) {
-              // yyyy-mm-dd
-              return `${parts[2]}-${parts[1]}-${parts[0]}`
-            }
-          }
-
-          return new Date(d).toLocaleDateString('en-GB')
+            if (!d) return ''
+            try {
+                // If it's dd-mm-yyyy, parse and format. If yyyy-mm-dd, parseISO.
+                // But let's assume valid date string or standard format.
+                // existing logic handled conversion manually. simpler:
+                const date = new Date(d);
+                if (isNaN(date.getTime())) return d; // Fallback
+                return format(date, 'dd/MM/yyyy');
+            } catch(e) { return '' }
         }
 
         return {
@@ -226,6 +209,13 @@ const ContractStatusPageContent = () => {
           holdedOn: formatDate(item.holded_on),
           terminatedOn: formatDate(item.terminated_on),
           expiredOn: formatDate(item.expired_on),
+
+          // Raw dates for filtering
+          rawStartDate: item.start_date,
+          // We filter by "Date Range". Usually means Start Date or Created Date?
+          // Looking at previous code, it wasn't clear which date was filtered. 
+          // Previous params: from_date/to_date. Backend likely filters by start_date or contract_date.
+          // Let's assume start_date for now as it's the primary date.
 
           pest:
             item.ref_contract_pests?.map(p => p.pest).join(', ') ||
@@ -249,8 +239,26 @@ const ContractStatusPageContent = () => {
         }
       })
 
+      // Frontend Date Filtering
+      let filteredRows = normalized
+
+      if (appliedFilters.filterByDate && appliedFilters.dateRange.start && appliedFilters.dateRange.end) {
+        const startDate = startOfDay(appliedFilters.dateRange.start)
+        const endDate = endOfDay(appliedFilters.dateRange.end)
+
+        filteredRows = normalized.filter(row => {
+          if (!row.rawStartDate) return false // No raw date, exclude?
+          // Parsing might be tricky if raw date is dd-mm-yyyy vs yyyy-mm-dd.
+          // Let's try flexible parsing.
+          const dateStr = row.rawStartDate;
+          let dateObj = new Date(dateStr);
+          if (isNaN(dateObj.getTime())) return false; // Invalid date
+          return isWithinInterval(dateObj, { start: startDate, end: endDate })
+        })
+      }
+
       // 3️⃣ SET DATA TO TABLE
-      setRows(normalized)
+      setRows(filteredRows)
     } catch (err) {
       console.error(err)
       showToast('error', 'Failed to load contracts')

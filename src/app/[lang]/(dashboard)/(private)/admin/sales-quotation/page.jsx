@@ -11,6 +11,7 @@ import FileCopyIcon from '@mui/icons-material/FileCopy'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
 import { useRouter } from 'next/navigation'
+import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns'
 
 import { createColumnHelper, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
@@ -276,20 +277,41 @@ const SalesQuotationPage = () => {
         ordering: sort ? `${sort.desc ? '-' : ''}${sort.id}` : undefined
       }
 
-      if (appliedDateFilter && appliedDateRange[0] && appliedDateRange[1]) {
-        params.from_date = appliedDateRange[0].toISOString().split('T')[0]
-        params.to_date = appliedDateRange[1].toISOString().split('T')[0]
-      }
+      // Removed backend date params
 
       const res = await getProposalList(params)
       const list = res?.data?.results || res?.results || []
 
-      setRows(
-        list.map((row, index) => ({
+      const normalizeDate = (d) => {
+          if (!d) return '-'
+          try {
+              return format(new Date(d), 'dd/MM/yyyy')
+          } catch { return d }
+      }
+
+      const mappedRows = list.map((row, index) => ({
           ...row,
+          // We need to override proposal_date display format
+          proposal_date: normalizeDate(row.proposal_date),
+          rawDate: row.proposal_date, // Store raw
           sno: pagination.pageIndex * pagination.pageSize + index + 1
-        }))
-      )
+      }))
+
+      // Frontend Date Filtering
+      let filteredRows = mappedRows
+
+      if (appliedDateFilter && appliedDateRange[0] && appliedDateRange[1]) {
+        const startDate = startOfDay(appliedDateRange[0])
+        const endDate = endOfDay(appliedDateRange[1])
+
+        filteredRows = mappedRows.filter(row => {
+          if (!row.rawDate) return false
+          const rowDate = parseISO(row.rawDate)
+          return isWithinInterval(rowDate, { start: startDate, end: endDate })
+        })
+      }
+
+      setRows(filteredRows)
 
       setRowCount(res?.data?.count || res?.count || list.length)
     } catch (err) {

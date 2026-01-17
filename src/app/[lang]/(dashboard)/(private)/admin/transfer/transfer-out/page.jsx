@@ -38,7 +38,7 @@ import { getTransferOutList, deleteTmTransferOut, deleteTxTransferOut } from '@/
 
 import { getPurchaseFilters } from '@/api/purchase_inward'
 
-import { format } from 'date-fns'
+import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns'
 
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalTextField from '@/components/common/GlobalTextField'
@@ -137,9 +137,7 @@ const TransferOutPage = () => {
         search: searchText || undefined,
         status: selectedStatus?.value,
         origin: selectedOrigin?.value,
-        supplier: selectedSupplier?.value,
-        start_date: uiDateFilter ? uiDateRange[0] : undefined,
-        end_date: uiDateFilter ? uiDateRange[1] : undefined
+        supplier: selectedSupplier?.value
       })
 
       setTotalCount(res?.data?.count || 0)
@@ -151,6 +149,7 @@ const TransferOutPage = () => {
           origin: item.company,
           transferNo: item.num_series,
           transferDate: item.transfer_date ? format(new Date(item.transfer_date), 'dd/MM/yyyy') : '-',
+          rawDate: item.transfer_date, // Raw date
           supplierName: item.supplier,
           contactEmail: item?.supplier_details?.email || '-',
           contactPhone: item?.supplier_details?.phone || '-',
@@ -159,7 +158,21 @@ const TransferOutPage = () => {
           recordType: 'tm'
         })) || []
 
-      setRows(mapped)
+      // Frontend Date Filtering
+      let filteredRows = mapped
+
+      if (uiDateFilter && uiDateRange[0] && uiDateRange[1]) {
+        const startDate = startOfDay(uiDateRange[0])
+        const endDate = endOfDay(uiDateRange[1])
+
+        filteredRows = mapped.filter(row => {
+          if (!row.rawDate) return false
+          const rowDate = parseISO(row.rawDate)
+          return isWithinInterval(rowDate, { start: startDate, end: endDate })
+        })
+      }
+
+      setRows(filteredRows)
     } finally {
       setLoading(false)
     }

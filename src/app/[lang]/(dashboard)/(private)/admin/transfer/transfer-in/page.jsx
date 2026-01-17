@@ -37,7 +37,7 @@ import { showToast } from '@/components/common/Toasts'
 import { getTransferInList, deleteTransferInTM } from '@/api/transfer_in'
 import { getPurchaseFilters } from '@/api/purchase_order'
 
-import { format } from 'date-fns'
+import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns'
 
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalTextField from '@/components/common/GlobalTextField'
@@ -149,9 +149,7 @@ const TransferInPage = () => {
         page: pagination.pageIndex + 1,
         page_size: pagination.pageSize,
         origin: selectedOrigin?.value,
-        supplier: selectedSupplier?.value,
-        start_date: uiDateFilter ? uiDateRange[0] : undefined,
-        end_date: uiDateFilter ? uiDateRange[1] : undefined
+        supplier: selectedSupplier?.value
       })
 
       setTotalCount(res?.count || 0)
@@ -163,6 +161,7 @@ const TransferInPage = () => {
           origin: item.from_company || '-',
           transferInNo: item.transfer_in_no || item.num_series,
           transferInDate: item.transfer_in_date ? format(new Date(item.transfer_in_date), 'dd/MM/yyyy') : '-',
+          rawDate: item.transfer_in_date, // Raw date
           supplierName: item.to_company || '-',
           contactEmail: item?.contact_email || '-',
           contactPhone: item?.contact_phone || '-',
@@ -171,7 +170,21 @@ const TransferInPage = () => {
           recordType: item.record_type || 'tm'
         })) || []
 
-      setRows(mapped)
+      // Frontend Date Filtering
+      let filteredRows = mapped
+
+      if (uiDateFilter && uiDateRange[0] && uiDateRange[1]) {
+        const startDate = startOfDay(uiDateRange[0])
+        const endDate = endOfDay(uiDateRange[1])
+
+        filteredRows = mapped.filter(row => {
+          if (!row.rawDate) return false
+          const rowDate = parseISO(row.rawDate)
+          return isWithinInterval(rowDate, { start: startDate, end: endDate })
+        })
+      }
+
+      setRows(filteredRows)
     } catch (e) {
       console.error('Transfer In list error', e)
     } finally {

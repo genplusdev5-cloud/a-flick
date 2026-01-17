@@ -35,8 +35,8 @@ const GlobalAutocomplete = ({
 
   // ⭐ Sync string-value selection
   const normalizedValue =
-    typeof value === 'string'
-      ? normalizedOptions.find(o => o.value === value || o.label === value) || null
+    typeof value === 'string' || typeof value === 'number'
+      ? normalizedOptions.find(o => String(o.value) === String(value) || o.label === value) || null
       : value
 
   // ⭐ Display text

@@ -128,7 +128,7 @@ export default function Project() {
         return <InvoiceListPage contractId={contractId} />
 
       case 'location':
-        return <LocationListPage contractId={contractId} />
+        return <LocationListPage contractId={contractId} contract={contract} />
 
       case 'file':
         return <FileManagerListPage contractId={contractId} />

@@ -21,6 +21,7 @@ import {
   updateContractPest,
   deleteContractPest
 } from '@/api/contract/details/pest'
+import { getAllDropdowns } from '@/api/contract/dropdowns'
 
 import SearchIcon from '@mui/icons-material/Search'
 import EditIcon from '@mui/icons-material/Edit'
@@ -46,24 +47,57 @@ export default function PestListPage() {
   const [loading, setLoading] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [isEdit, setIsEdit] = useState(false)
+  
+  // Dropdown state
+  const [dropdownOptions, setDropdownOptions] = useState({
+    pests: [],
+    frequencies: [],
+    chemicals: []
+  })
+
+  // Internal integer ID for API calls (different from UUID param)
+  const [internalContractId, setInternalContractId] = useState(null)
 
   const params = useParams()
-  const contractId = params.uuid || params.id
+  // contractId here is UUID from URL
+  const contractUuid = params.uuid || params.id
+
+  const loadAllDropdowns = async () => {
+    try {
+      const data = await getAllDropdowns()
+      setDropdownOptions({
+        pests: data.pests || [],
+        frequencies: data.serviceFreq || [],
+        chemicals: data.chemicals || []
+      })
+    } catch (err) {
+      console.error(err)
+    }
+  }
 
   const loadPests = async () => {
     try {
       setLoading(true)
-      const res = await listContractPests(contractId)
+      const res = await listContractPests(contractUuid)
       const data = res?.data?.data?.results || []
+
+      // Capture integer contract_id from first item if available
+      if (data.length > 0 && data[0].contract_id) {
+        setInternalContractId(data[0].contract_id)
+      }
 
       const formatted = data.map(item => ({
         id: item.id,
-        pest: item.pest,
-        frequency: item.frequency_id,
-        chemicals: item.chemical_id || '',
+        contractId: item.contract_id, // Integer Store
+        pest: item.pest_id || item.pest,
+        pestName: item.pest,
+        frequency: item.frequency, 
+        frequencyId: item.frequency_id,
+        chemicals: item.chemical || '',
+        chemicalId: item.chemical_id,
         pestValue: Number(item.pest_value),
         totalValue: Number(item.total_value),
-        workTime: item.work_time,
+        workTime: item.work_time, 
         items: Number(item.pest_service_count)
       }))
 
@@ -77,10 +111,14 @@ export default function PestListPage() {
   }
 
   useEffect(() => {
-    if (contractId) loadPests()
-  }, [contractId])
+    if (contractUuid) {
+      loadPests()
+      loadAllDropdowns()
+    }
+  }, [contractUuid])
 
   const [formData, setFormData] = useState({
+    id: null,
     pest: null,
     frequency: null,
     items: '',
@@ -90,21 +128,45 @@ export default function PestListPage() {
     chemicals: []
   })
 
+  // Helper to find ID/Name for form
+  // ...
+
   const handleSubmit = async e => {
     e.preventDefault()
+    // Validation
     if (!formData?.pest) return showToast('error', 'Please select a pest')
     if (!formData?.frequency) return showToast('error', 'Please select frequency')
 
-    const payload = {
-      contract_id: contractId,
-      pest: formData.pest,
-      frequency: formData.frequency,
-      items: Number(formData.items),
-      pest_count: Number(formData.pestCount),
-      pest_value: Number(formData.pestValue),
-      total: Number(formData.total),
-      chemicals: Array.isArray(formData.chemicals) ? formData.chemicals.join(',') : ''
+    // Find IDs if selected value is object, or just use value
+    const pestVal = formData.pest?.id || formData.pest
+    const freqVal = formData.frequency?.id || formData.frequency
+    // chemicals might be array of objects or strings
+    const chemVal = Array.isArray(formData.chemicals) 
+       ? formData.chemicals.map(c => c.id || c).join(',')
+       : ''
+
+    // Use integer contract ID from row (edit) or captured from list (add)
+    const validContractId = formData.contract_id || internalContractId
+
+    if (!validContractId) {
+        return showToast('error', 'Missing Contract ID (Integer). Cannot save.')
     }
+
+    const payload = {
+      contract_id: validContractId,
+      pest: pestVal,
+      frequency: freqVal,
+      pest_service_count: Number(formData.items),
+      work_time: Number(formData.pestCount),
+      pest_value: Number(formData.pestValue),
+      total_value: Number(formData.total),
+      chemical: chemVal
+    }
+    
+    // If pest_count field was used for Work Time, we should keep it or rename it. 
+    // The original code mapped row.workTime -> formData.pestCount.
+    // And payload sent pest_count. 
+    // If the valid field name is 'pest_count' for backend, we keep it.
 
     try {
       setLoading(true)
@@ -129,10 +191,11 @@ export default function PestListPage() {
   const handleOpenAdd = () => {
     setIsEdit(false)
     setFormData({
-      pest: '',
-      frequency: '',
+      id: null,
+      pest: null,
+      frequency: null,
       items: '',
-      pestCount: '',
+      pestCount: '', // Work Time
       pestValue: '',
       total: '',
       chemicals: []
@@ -142,15 +205,27 @@ export default function PestListPage() {
 
   const handleOpenEdit = row => {
     setIsEdit(true)
+    
+    // Find matching objects in dropdowns if possible, or use raw values
+    // Pests (dropdownOptions.pests is array of strings)
+    const pestObj = row.pestName 
+    
+    // Frequency (dropdownOptions.frequencies is array of objects)
+    const freqObj = dropdownOptions.frequencies.find(f => f.label === row.frequency) || row.frequency
+    
+    // Chemicals - split string and match
+    const chemArr = row.chemicals ? row.chemicals.split(',').map(s => s.trim()) : []
+    
     setFormData({
       id: row.id,
-      pest: row.pest,
-      frequency: row.frequency,
+      contract_id: row.contractId,
+      pest: pestObj,
+      frequency: freqObj,
       items: row.items,
-      pestCount: row.workTime,
+      pestCount: row.workTime, // Keeping raw value for edit
       pestValue: row.pestValue,
       total: row.totalValue,
-      chemicals: typeof row.chemicals === 'string' ? row.chemicals.split(',') : []
+      chemicals: chemArr
     })
     setDrawerOpen(true)
   }
@@ -180,12 +255,30 @@ export default function PestListPage() {
         </Box>
       )
     },
-    { id: 'pest', header: 'Pest' },
-    { id: 'frequency', header: 'Frequency' },
-    { id: 'chemicals', header: 'Chemicals' },
+    { id: 'pest', header: 'Pest', cell: row => row.pestName },
+    { id: 'frequency', header: 'Frequency', cell: row => row.frequency },
+    { id: 'chemicals', header: 'Chemicals', cell: row => row.chemicals },
     { id: 'pestValue', header: 'Pest Value', cell: row => `₹ ${row.pestValue}` },
     { id: 'totalValue', header: 'Total Value', cell: row => `₹ ${row.totalValue}` },
-    { id: 'workTime', header: 'Work Time (Hrs)' },
+    { 
+      id: 'workTime', 
+      header: 'Work Time (Hrs)', 
+      // If workTime is minutes, convert to hours (e.g. 60 mins -> 1 hr)
+      // Display with " Hr" suffix
+      cell: row => {
+         const mins = Number(row.workTime) || 0
+         if (mins === 0) return '0 Min'
+         
+         const h = Math.floor(mins / 60)
+         const m = mins % 60
+         
+         let text = ''
+         if (h > 0) text += `${h} Hr `
+         if (m > 0) text += `${m} Min`
+         
+         return text.trim()
+      }
+    },
     { id: 'items', header: 'No of Items' }
   ]
 
@@ -292,7 +385,7 @@ export default function PestListPage() {
           <Box sx={{ mb: 3 }}>
             <GlobalAutocomplete
               label='Select Pest'
-              options={['Cockroach', 'Termite', 'Rodent']}
+              options={dropdownOptions.pests}
               value={formData.pest}
               onChange={v => setFormData(prev => ({ ...prev, pest: v }))}
             />
@@ -300,7 +393,7 @@ export default function PestListPage() {
           <Box sx={{ mb: 3 }}>
             <GlobalAutocomplete
               label='Frequency'
-              options={['Weekly', 'Monthly']}
+              options={dropdownOptions.frequencies}
               value={formData.frequency}
               onChange={v => setFormData(prev => ({ ...prev, frequency: v }))}
             />
@@ -309,13 +402,27 @@ export default function PestListPage() {
             <GlobalTextField label='No of Items' value={formData.items} onChange={e => setFormData(prev => ({ ...prev, items: e.target.value }))} />
           </Box>
           <Box sx={{ mb: 3 }}>
-            <GlobalTextField label='Pest Count' value={formData.pestCount} onChange={e => setFormData(prev => ({ ...prev, pestCount: e.target.value }))} />
+            <GlobalTextField 
+               label='Work Time (Mins)' 
+               value={formData.pestCount} 
+               onChange={e => setFormData(prev => ({ ...prev, pestCount: e.target.value }))} 
+               helperText="Enter time in minutes (e.g. 60 for 1 hr)"
+            />
           </Box>
           <Box sx={{ mb: 3 }}>
             <GlobalTextField label='Pest Value' value={formData.pestValue} onChange={e => setFormData(prev => ({ ...prev, pestValue: e.target.value }))} />
           </Box>
           <Box sx={{ mb: 3 }}>
-            <GlobalAutocomplete multiple label='Chemicals' options={['C1', 'C2', 'C3']} value={formData.chemicals} onChange={v => setFormData(prev => ({ ...prev, chemicals: v }))} />
+            <GlobalAutocomplete 
+               multiple 
+               label='Chemicals' 
+               options={dropdownOptions.chemicals} 
+               value={formData.chemicals} 
+               onChange={v => setFormData(prev => ({ ...prev, chemicals: v }))} 
+            />
+          </Box>
+          <Box sx={{ mb: 3 }}>
+            <GlobalTextField label='Total Value' value={formData.total} onChange={e => setFormData(prev => ({ ...prev, total: e.target.value }))} />
           </Box>
           <Box mt={4} display='flex' gap={2}>
             <GlobalButton fullWidth variant='contained' type='submit'>{isEdit ? 'Update' : 'Save'}</GlobalButton>

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { format, isValid, parseISO } from 'date-fns'
+import { format, isValid, parseISO, startOfDay, endOfDay, isWithinInterval } from 'date-fns'
 import {
   Box,
   Button,
@@ -681,12 +681,8 @@ const ServiceRequestPageContent = () => {
       if (appliedFilters.status) params.ticket_status = appliedFilters.status
       if (appliedFilters.appointment) params.ticket_type = appliedFilters.appointment
 
-      if (appliedFilters.enableDate && appliedFilters.start && appliedFilters.end) {
-        params.from_date = format(appliedFilters.start, 'yyyy-MM-dd')
-        params.to_date = format(appliedFilters.end, 'yyyy-MM-dd')
-      }
-
       if (appliedFilters.search?.trim()) params.search = appliedFilters.search.trim()
+      // Removed backend date params
 
       console.log('Ticket Params =>', params)
 
@@ -700,8 +696,19 @@ const ServiceRequestPageContent = () => {
 
       const mapped = list.map(mapTicketToRow)
 
+      // Frontend Date Filtering
+      let filteredList = mapped
+      if (appliedFilters.enableDate && appliedFilters.start && appliedFilters.end) {
+        const startDate = startOfDay(appliedFilters.start)
+        const endDate = endOfDay(appliedFilters.end)
+        filteredList = mapped.filter(t => {
+          if (!t.scheduleDate) return false
+          return isWithinInterval(parseISO(t.scheduleDate), { start: startDate, end: endDate })
+        })
+      }
+
       const startIndex = pagination.pageIndex * pagination.pageSize
-      const withSno = mapped.map((item, index) => ({
+      const withSno = filteredList.map((item, index) => ({
         ...item,
         sno: startIndex + index + 1
       }))

@@ -4,6 +4,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { format } from 'date-fns'
 import { getContractDetails } from '@/api/contract/details'
 import { updateContractValueApi } from '@/api/contract/icons/contractValueUpdate'
 import ContractValueDrawer from '@/components/service-pages/contract-actions/ContractValueDrawer'
@@ -11,7 +12,7 @@ import ContractValueDrawerContent from '@/components/service-pages/contract-acti
 import EditIcon from '@mui/icons-material/Edit'
 import IconButton from '@mui/material/IconButton' // <--- IDHU MISSING!
 
-import { Box, Card, Typography, Divider, Grid } from '@mui/material'
+import { Box, Card, Typography, Divider, Grid, InputAdornment } from '@mui/material'
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalTextField from '@/components/common/GlobalTextField'
 import GlobalTextarea from '@/components/common/GlobalTextarea'
@@ -19,6 +20,7 @@ import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
 import { showToast } from '@/components/common/Toasts'
 import { getAllDropdowns } from '@/api/contract/dropdowns'
 import { updateContract } from '@/api/contract/update'
+import FileUploaderSingle from '@/components/common/FileUploaderSingle'
 
 export default function ContractViewPage() {
   const [form, setForm] = useState({})
@@ -30,7 +32,8 @@ export default function ContractViewPage() {
     serviceFreq: [],
     pests: [],
     chemicals: [],
-    employees: []
+    employees: [],
+    industries: []
   })
 
   const { uuid } = useParams()
@@ -146,8 +149,8 @@ export default function ContractViewPage() {
             grouping: data.grouping_code || '',
             startDate: data.start_date || '',
             endDate: data.end_date || '',
-            reminderDate: data.reminder_date || '',
-            industry: data.service_frequency_id || '',
+            reminderDate: data.reminder_date ? format(new Date(data.reminder_date), 'dd/MM/yyyy') : '',
+            industry: data.industry_id || data.industry || '',
             serviceStartDate: data.commencement_date || '',
             technicians: data.technician_id ? [data.technician_id] : [],
             paymentTerms: data.billing_term || '',
@@ -195,12 +198,18 @@ export default function ContractViewPage() {
 
         setDropdowns({
           customers: uniqueCustomers,
-          callTypes: data.callTypes || data.call_types || [],
-          billingFreq: data.billingFreq || data.billing_freq || [],
-          serviceFreq: data.serviceFreq || data.service_freq || [],
+          callTypes: data.callTypes || [],
+          billingFreq: data.billingFreq || [],
+          serviceFreq: data.serviceFreq || [],
           pests: data.pests || [],
           chemicals: data.chemicals || [],
-          employees: data.employees || []
+          employees: data.employees || [],
+
+          // Use the mapped fields from the API helper
+          industries: data.industries || [],
+          salesPeople: data.salesPeople || [],
+          supervisors: data.supervisors || [],
+          technicians: data.technicians || []
         })
       } catch (err) {
         console.error('Failed to load dropdowns', err)
@@ -214,25 +223,22 @@ export default function ContractViewPage() {
   // -----------------------------
   // Employee-based dropdowns
   // -----------------------------
-  const employees = dropdowns.employees || []
-
-  const technicianOptions = employees
-    .filter(e => e.designation === 'Technician')
-    .map(e => ({ ...e, uniqueKey: `tech-${e.id || e.name}` }))
-
-  const salesOptions = employees
-    .filter(e => e.designation === 'Sales')
-    .map(e => ({ ...e, uniqueKey: `sales-${e.id || e.name}` }))
-
-  const directorOptions = employees
-    .filter(e => e.designation === 'Supervisor' || e.designation === 'Manager')
-    .map(e => ({ ...e, uniqueKey: `dir-${e.id || e.name}` }))
+  // const employees = dropdowns.employees || []
+  const technicianOptions = (dropdowns.technicians || []).map(e => ({
+    ...e,
+    uniqueKey: `tech-${e.id || e.name}`
+  }))
 
   // -----------------------------
   // File upload
   // -----------------------------
-  const handleFileChange = e => {
-    const file = e.target.files?.[0]
+  // -----------------------------
+  // File upload
+  // -----------------------------
+  const handleFileChange = fileOrEvent => {
+    // Handle both direct file object (from Dropzone) and Event (fallback)
+    const file = fileOrEvent?.target?.files?.[0] || fileOrEvent
+
     if (!file) return
     setVal('floorPlanFile', file)
     setVal('floorPlanName', file.name)
@@ -283,7 +289,8 @@ export default function ContractViewPage() {
         end_date: formatDateToYMD(form.endDate),
         reminder_date: formatDateToYMD(form.reminderDate),
 
-        service_frequency_id: form.industry?.id || form.industry,
+        industry_id: form.industry?.id || form.industry,
+        // Removed service_frequency_id mapping from form.industry
         commencement_date: formatDateToYMD(form.serviceStartDate),
 
         technician_id: form.technicians?.[0]?.id
@@ -570,8 +577,8 @@ export default function ContractViewPage() {
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
                 label='Industry'
-                options={dropdowns.serviceFreq}
-                getOptionLabel={opt => (typeof opt === 'string' ? opt : opt.name || opt.label || opt.frequency || '')}
+                options={dropdowns.industries}
+                getOptionLabel={opt => (typeof opt === 'string' ? opt : opt.name || opt.label || '')}
                 value={form.industry || ''}
                 onChange={handleAutoChange('industry')}
               />
@@ -593,7 +600,9 @@ export default function ContractViewPage() {
                 options={technicianOptions}
                 getOptionLabel={opt => opt.name || opt.label || ''}
                 isOptionEqualToValue={(o, v) => o.id === v.id || o.name === v.name}
-                value={form.technicians || []}
+                value={technicianOptions.filter(opt =>
+                  (form.technicians || []).some(v => v === opt.id || v.id === opt.id || v === opt.uniqueKey)
+                )}
                 onChange={handleAutoChange('technicians')}
                 renderOption={(props, option) => (
                   <li {...props} key={option.uniqueKey || option.id || option.name}>
@@ -613,23 +622,25 @@ export default function ContractViewPage() {
             </Grid>
 
             <Grid item xs={12} md={4}>
-              <GlobalTextField
-                label='Account Item Code'
-                value={form.accountCode || ''}
-                onChange={e => setVal('accountCode', e.target.value)}
+              <GlobalAutocomplete
+                label='Invoice Frequency'
+                options={dropdowns.billingFreq}
+                getOptionLabel={opt => (typeof opt === 'string' ? opt : opt.name || opt.label || opt.frequency || '')}
+                value={form.invoiceFrequency || ''}
+                onChange={handleAutoChange('invoiceFrequency')}
               />
             </Grid>
 
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
                 label='Sales Person'
-                options={salesOptions}
+                options={dropdowns.salesPeople || []}
                 getOptionLabel={opt => opt.name || ''}
                 isOptionEqualToValue={(o, v) => o.id === (v?.id || v)}
                 value={form.salesPerson || null}
                 onChange={handleAutoChange('salesPerson')}
                 renderOption={(props, option) => (
-                  <li {...props} key={option.uniqueKey || option.id}>
+                  <li {...props} key={option.id}>
                     {option.name}
                   </li>
                 )}
@@ -639,13 +650,13 @@ export default function ContractViewPage() {
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
                 label='Supervisor'
-                options={directorOptions}
+                options={dropdowns.supervisors || []}
                 getOptionLabel={opt => opt.name || ''}
                 isOptionEqualToValue={(o, v) => o.id === (v?.id || v)}
                 value={form.director || null}
                 onChange={handleAutoChange('director')}
                 renderOption={(props, option) => (
-                  <li {...props} key={option.uniqueKey || option.id}>
+                  <li {...props} key={option.id}>
                     {option.name}
                   </li>
                 )}
@@ -687,6 +698,8 @@ export default function ContractViewPage() {
                 <GlobalButton
                   variant='contained'
                   size='small'
+                  // Align with input field (approx height of standard input or top aligned with margin)
+                  sx={{ mt: 1, height: 40 }}
                   onClick={() => showToast('info', 'Invoice remark refreshed')}
                 >
                   REFRESH
@@ -694,15 +707,7 @@ export default function ContractViewPage() {
               </Box>
             </Grid>
 
-            <Grid item xs={12} md={3}>
-              <GlobalAutocomplete
-                label='Invoice Frequency'
-                options={dropdowns.billingFreq}
-                getOptionLabel={opt => (typeof opt === 'string' ? opt : opt.name || opt.label || opt.frequency || '')}
-                value={form.invoiceFrequency || ''}
-                onChange={handleAutoChange('invoiceFrequency')}
-              />
-            </Grid>
+            {/* Moved Invoice Frequency to upper section */}
 
             <Grid item xs={12} md={7}>
               <GlobalTextarea
@@ -716,19 +721,12 @@ export default function ContractViewPage() {
               <Typography variant='body2' sx={{ mb: 1, fontWeight: 500 }}>
                 Upload Floor Plan
               </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <input type='file' id='floor-plan-input' style={{ display: 'none' }} onChange={handleFileChange} />
-                <GlobalButton
-                  variant='outlined'
-                  size='small'
-                  onClick={() => document.getElementById('floor-plan-input')?.click()}
-                >
-                  Choose File
-                </GlobalButton>
-                <Typography variant='body2' color='text.secondary'>
-                  {form.floorPlanName || 'No file chosen'}
+              <FileUploaderSingle onFileSelect={handleFileChange} />
+              {form.floorPlanName && !form.floorPlanFile && (
+                <Typography variant='caption' color='text.secondary' sx={{ mt: 1, display: 'block' }}>
+                  Current file: {form.floorPlanName}
                 </Typography>
-              </Box>
+              )}
             </Grid>
 
             <Grid item xs={12} md={7}>
@@ -795,8 +793,7 @@ export default function ContractViewPage() {
                 <Typography variant='subtitle1' fontWeight={600}>
                   Contract Value ($)
                 </Typography>
-
-                {/* Edit Icon Button */}
+                {/* Icon removed from header */}
               </Box>
 
               {/* Readonly + Clickable Field with proper money format */}
@@ -811,7 +808,20 @@ export default function ContractViewPage() {
                 }
                 InputProps={{
                   readOnly: true,
-                  startAdornment: null // we already show $ in value
+                  endAdornment: (
+                    <InputAdornment position='end'>
+                      <IconButton
+                        onClick={e => {
+                          e.stopPropagation()
+                          toggleValueDrawer()
+                        }}
+                        edge='end'
+                        size='small'
+                      >
+                        <EditIcon />
+                      </IconButton>
+                    </InputAdornment>
+                  )
                 }}
                 onClick={toggleValueDrawer}
                 sx={{

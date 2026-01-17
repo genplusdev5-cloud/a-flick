@@ -38,7 +38,7 @@ import classnames from 'classnames'
 import { ChevronRight } from '@mui/icons-material'
 import { showToast } from '@/components/common/Toasts'
 
-import { format } from 'date-fns'
+import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
@@ -295,10 +295,7 @@ const TransferRequestPage = () => {
         search: searchTerm
       }
 
-      if (appliedDateFilter && appliedDateRange[0] && appliedDateRange[1]) {
-        params.start_date = format(appliedDateRange[0], 'yyyy-MM-dd')
-        params.end_date = format(appliedDateRange[1], 'yyyy-MM-dd')
-      }
+      // Removed backend date params
 
       const res = await getTransferRequestList(params)
 
@@ -316,12 +313,27 @@ const TransferRequestPage = () => {
 
         poNo: item.transfer_no,
         poDate: item.transfer_date,
+        rawDate: item.transfer_date, // Raw date
         remarks: item.remarks || '-',
         status: item.status,
         recordType: 'tm'
       }))
 
-      setRows(mappedRows)
+      // Frontend Date Filtering
+      let filteredRows = mappedRows
+
+      if (appliedDateFilter && appliedDateRange[0] && appliedDateRange[1]) {
+        const startDate = startOfDay(appliedDateRange[0])
+        const endDate = endOfDay(appliedDateRange[1])
+
+        filteredRows = mappedRows.filter(row => {
+          if (!row.rawDate) return false
+          const rowDate = parseISO(row.rawDate)
+          return isWithinInterval(rowDate, { start: startDate, end: endDate })
+        })
+      }
+
+      setRows(filteredRows)
     } catch (err) {
       console.error(err)
     } finally {

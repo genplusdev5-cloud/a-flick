@@ -119,23 +119,44 @@ const Calendar = ({
         const api = calendarRef.current?.getApi()
 
         // NORMALIZE EVERY EVENT BEFORE ADDING
-        const normalized = events.map(ev => ({
-          id: ev.type === 'ticket' ? `ticket-${ev.ticket_id || ev.id}` : ev.id,
-          title: ev.title,
-          start: ev.start,
-          end: ev.end ?? ev.start,
-          backgroundColor: ev.backgroundColor,
-          borderColor: ev.borderColor,
-          editable: ev.editable ?? true,
-          resourceId: ev.resourceId,
-          extendedProps: {
-            ...ev,
-            type: ev.type,
-            ticket_id: ev.ticket_id || ev.id,
-            db_id: ev.lunch_id || ev.real_lunch_id || null,
-            technician_id: Number(ev.resourceId)
+        const normalized = events.map(ev => {
+          // Find technician to get their color
+          const tech = selectedEmployees.find(e => String(e.id) === String(ev.resourceId))
+          
+          let color = ev.backgroundColor
+          if (!color) {
+            if (tech?.color_code && tech.color_code.startsWith('#')) {
+              color = tech.color_code
+            } else {
+              // Fallback color logic matching SidebarLeft
+              const name = tech?.name || 'Unknown'
+              const colors = [
+                '#e57373', '#64b5f6', '#81c784', '#ffb74d', '#ba68c8',
+                '#4db6ac', '#9575cd', '#4dd0e1', '#f06292', '#7986cb'
+              ]
+              const index = ((name.charCodeAt(0) || 0) + name.length) % colors.length
+              color = colors[index]
+            }
           }
-        }))
+
+          return {
+            id: ev.type === 'ticket' ? `ticket-${ev.ticket_id || ev.id}` : ev.id,
+            title: ev.title,
+            start: ev.start,
+            end: ev.end ?? ev.start,
+            backgroundColor: color,
+            borderColor: color,
+            editable: ev.editable ?? true,
+            resourceId: ev.resourceId,
+            extendedProps: {
+              ...ev,
+              type: ev.type,
+              ticket_id: ev.ticket_id || ev.id,
+              db_id: ev.lunch_id || ev.real_lunch_id || null,
+              technician_id: Number(ev.resourceId)
+            }
+          }
+        })
 
         api?.removeAllEvents()
         api?.addEventSource(normalized)
@@ -212,6 +233,7 @@ const Calendar = ({
       loadEvents(from, to)
     },
 
+    eventDisplay: 'block', // Force block rendering for Month view boxes
     editable: true,
     events: calendarStore.events || [],
 

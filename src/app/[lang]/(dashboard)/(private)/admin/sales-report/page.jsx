@@ -34,8 +34,8 @@ const DateRangePickerField = () => {
   const CustomInput = forwardRef((props, ref) => {
     const { label, start, end, ...rest } = props
 
-    const s = start ? format(start, 'MM/dd/yyyy') : ''
-    const e = end ? ` - ${format(end, 'MM/dd/yyyy')}` : ''
+    const s = start ? format(start, 'dd/MM/yyyy') : ''
+    const e = end ? ` - ${format(end, 'dd/MM/yyyy')}` : ''
 
     return (
       <CustomTextField

@@ -41,10 +41,20 @@ export const getAllDropdowns = async () => {
           value: item.id
         })) || [],
 
-      serviceFreq: extractNames(raw.service_frequency),
+      serviceFreq:
+        raw.service_frequency?.name?.map(item => ({
+          label: item.name,
+          value: item.id
+        })) || [],
       pests: extractNames(raw.pest),
-      chemicals: [],
-      employees: []
+      chemicals: extractNames(raw.chemical),
+      employees: [], // Keeping this for backward compatibility if used elsewhere
+
+      // New mappings for missing dropdowns
+      industries: raw.industry?.name || [],
+      salesPeople: raw.sales?.name || [],
+      supervisors: raw.supervisor?.name || [],
+      technicians: raw.technician?.name || []
     }
   } catch (err) {
     console.error('Dropdown API Error:', err.response?.data || err)

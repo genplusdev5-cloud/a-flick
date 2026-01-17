@@ -16,35 +16,7 @@ import PermissionGuard from '@/components/auth/PermissionGuard'
 /* -----------------------------------
    📅 DATE RANGE PICKER
 ----------------------------------- */
-const DateRangePickerField = ({ startDate, endDate, setDates }) => {
-  const handleChange = dates => {
-    const [start, end] = dates
-    setDates({ startDate: start, endDate: end })
-  }
-  const CustomInput = forwardRef((props, ref) => {
-    const { label, start, end, ...rest } = props
-    return (
-      <CustomTextField
-        fullWidth
-        inputRef={ref}
-        label={label}
-        {...rest}
-        value={`${start ? format(start, 'MM/dd/yyyy') : ''}${end ? ' - ' + format(end, 'MM/dd/yyyy') : ''}`}
-      />
-    )
-  })
-  return (
-    <AppReactDatepicker
-      selectsRange
-      startDate={startDate}
-      endDate={endDate}
-      selected={startDate}
-      onChange={handleChange}
-      shouldCloseOnSelect={false}
-      customInput={<CustomInput label='Date Filter' start={startDate} end={endDate} />}
-    />
-  )
-}
+// Unused DateRangePickerField removed
 /* -----------------------------------
    📌 MAIN PAGE
 ----------------------------------- */

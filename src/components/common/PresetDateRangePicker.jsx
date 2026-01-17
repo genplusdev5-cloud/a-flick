@@ -21,7 +21,7 @@ import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import CustomTextField from '@core/components/mui/TextField'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 
-const formatDate = date => (isValid(date) ? format(date, 'MM/dd/yyyy') : '')
+const formatDate = date => (isValid(date) ? format(date, 'dd/MM/yyyy') : '')
 
 const PresetDateRangePicker = ({ start, end, onSelectRange, label = '', disabled = false }) => {
   // Anchor Ref for generic positioning
@@ -264,8 +264,8 @@ const PresetDateRangePicker = ({ start, end, onSelectRange, label = '', disabled
             <Box sx={{ p: 2, borderLeft: '1px solid rgba(0, 0, 0, 0.12)' }}>
               <Box sx={{ mb: 1, display: 'flex', gap: 2, justifyContent: 'space-between', alignItems: 'center' }}>
                 <Typography variant='caption' color='text.secondary'>
-                  {localStart ? format(localStart, 'MMM d, yyyy') : ''} -{' '}
-                  {localEnd ? format(localEnd, 'MMM d, yyyy') : ''}
+                  {localStart ? format(localStart, 'dd/MM/yyyy') : ''} -{' '}
+                  {localEnd ? format(localEnd, 'dd/MM/yyyy') : ''}
                 </Typography>
               </Box>
               <AppReactDatepicker

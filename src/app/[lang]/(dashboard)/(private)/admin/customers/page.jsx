@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { openDB } from 'idb'
-import { format } from 'date-fns'
+import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns'
 import {
   Box,
   Button,
@@ -153,13 +153,8 @@ const CustomersPageContent = () => {
         search: appliedSearchText.trim()
       }
 
-      // Date range
-      if (appliedDateFilter && appliedDateRange[0]) {
-        params.from_date = format(appliedDateRange[0], 'yyyy-MM-dd')
-        if (appliedDateRange[1]) {
-          params.to_date = format(appliedDateRange[1], 'yyyy-MM-dd')
-        }
-      }
+      // Date range params removed for frontend filtering
+      // if (appliedDateFilter && appliedDateRange[0]) ...
 
       if (appliedFilterOrigin?.id) {
         params.company = appliedFilterOrigin.id
@@ -171,7 +166,19 @@ const CustomersPageContent = () => {
 
       const res = await getCustomerList(params)
 
-      const list = res?.results || res?.data?.results || res?.data || []
+      let list = res?.results || res?.data?.results || res?.data || []
+
+      // Frontend Date Filtering
+      if (appliedDateFilter && appliedDateRange[0] && appliedDateRange[1]) {
+        const startDate = startOfDay(appliedDateRange[0])
+        const endDate = endOfDay(appliedDateRange[1])
+
+        list = list.filter(item => {
+          if (!item.commence_date) return false
+          const d = parseISO(item.commence_date)
+          return isWithinInterval(d, { start: startDate, end: endDate })
+        })
+      }
 
       const normalized = list.map((item, index) => ({
         sno: index + 1,

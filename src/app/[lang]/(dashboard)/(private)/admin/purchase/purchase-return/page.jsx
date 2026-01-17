@@ -38,7 +38,7 @@ import { showToast } from '@/components/common/Toasts'
 import { getPurchaseReturnList, deletePurchaseReturn } from '@/api/purchase_return'
 import { getPurchaseFilters } from '@/api/purchase_inward'
 
-import { format } from 'date-fns'
+import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns'
 
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalTextField from '@/components/common/GlobalTextField'
@@ -180,9 +180,7 @@ const PurchaseReturnPage = () => {
         page: pagination.pageIndex + 1,
         page_size: pagination.pageSize,
         origin: selectedOrigin?.value,
-        supplier: selectedSupplier?.value,
-        start_date: uiDateFilter ? uiDateRange[0] : undefined,
-        end_date: uiDateFilter ? uiDateRange[1] : undefined
+        supplier: selectedSupplier?.value
       })
 
       setTotalCount(res?.data?.count || 0)
@@ -194,6 +192,7 @@ const PurchaseReturnPage = () => {
           origin: item.company,
           returnNo: item.num_series,
           returnDate: item.return_date ? format(new Date(item.return_date), 'dd/MM/yyyy') : '-',
+          rawDate: item.return_date, // Raw date for filtering
           supplierName: item.supplier,
           contactEmail: item?.supplier_details?.email || '-',
           contactPhone: item?.supplier_details?.phone || '-',
@@ -202,7 +201,21 @@ const PurchaseReturnPage = () => {
           recordType: 'tm'
         })) || []
 
-      setRows(mappedRows)
+      // Frontend Date Filtering
+      let filteredRows = mappedRows
+
+      if (uiDateFilter && uiDateRange[0] && uiDateRange[1]) {
+        const startDate = startOfDay(uiDateRange[0])
+        const endDate = endOfDay(uiDateRange[1])
+
+        filteredRows = mappedRows.filter(row => {
+          if (!row.rawDate) return false
+          const rowDate = parseISO(row.rawDate)
+          return isWithinInterval(rowDate, { start: startDate, end: endDate })
+        })
+      }
+
+      setRows(filteredRows)
     } catch (err) {
       console.error('Purchase inward list error', err)
     } finally {

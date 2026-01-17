@@ -36,7 +36,7 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import { showToast } from '@/components/common/Toasts'
 
 import { getPurchaseInwardList, getPurchaseFilters, deletePurchaseInward } from '@/api/purchase_inward'
-import { format } from 'date-fns'
+import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns'
 
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalTextField from '@/components/common/GlobalTextField'
@@ -178,9 +178,7 @@ const PurchaseInwardPage = () => {
         page: pagination.pageIndex + 1,
         page_size: pagination.pageSize,
         origin: selectedOrigin?.value || undefined,
-        supplier: selectedSupplier?.value || undefined,
-        start_date: uiDateFilter ? uiDateRange[0] : undefined,
-        end_date: uiDateFilter ? uiDateRange[1] : undefined
+        supplier: selectedSupplier?.value || undefined
       })
 
       setTotalCount(res?.data?.count || 0)
@@ -193,6 +191,7 @@ const PurchaseInwardPage = () => {
           origin: item.company,
           inwardNo: item.num_series,
           inwardDate: item.inward_date ? format(new Date(item.inward_date), 'dd/MM/yyyy') : '-',
+          rawDate: item.inward_date, // Store raw date for filtering
           supplierName: item.supplier,
           contactEmail: item?.supplier_details?.email || '-',
           contactPhone: item?.supplier_details?.phone || '-',
@@ -202,7 +201,21 @@ const PurchaseInwardPage = () => {
           recordType: 'tm'
         })) || []
 
-      setRows(mappedRows)
+      // Frontend Date Filtering
+      let filteredRows = mappedRows
+
+      if (uiDateFilter && uiDateRange[0] && uiDateRange[1]) {
+        const startDate = startOfDay(uiDateRange[0])
+        const endDate = endOfDay(uiDateRange[1])
+
+        filteredRows = mappedRows.filter(row => {
+          if (!row.rawDate) return false
+          const rowDate = parseISO(row.rawDate)
+          return isWithinInterval(rowDate, { start: startDate, end: endDate })
+        })
+      }
+
+      setRows(filteredRows)
     } catch (err) {
       console.error('Purchase inward list error', err)
     } finally {

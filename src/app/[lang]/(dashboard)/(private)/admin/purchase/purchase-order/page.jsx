@@ -38,7 +38,7 @@ import classnames from 'classnames'
 import { ChevronRight } from '@mui/icons-material'
 import { showToast } from '@/components/common/Toasts'
 
-import { format } from 'date-fns'
+import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
@@ -325,13 +325,7 @@ const PurchaseOrderPage = () => {
         page_size: pagination.pageSize,
         company: origin?.id,
         supplier: supplier?.id,
-        status: status?.value,
-        ...(dateFilter &&
-          dateRange[0] &&
-          dateRange[1] && {
-            from_date: format(dateRange[0], 'yyyy-MM-dd'),
-            to_date: format(dateRange[1], 'yyyy-MM-dd')
-          })
+        status: status?.value
       })
 
       setTotalCount(res?.count || 0)
@@ -349,12 +343,27 @@ const PurchaseOrderPage = () => {
 
         poNo: item.num_series,
         poDate: item.po_date,
+        rawDate: item.po_date, // Store raw date
         remarks: item.remarks || '-',
         status: item.po_status,
         recordType: item.record_type || 'tm' // Capture type
       }))
 
-      setRows(mappedRows)
+      // Frontend Date Filtering
+      let filteredRows = mappedRows
+
+      if (dateFilter && dateRange[0] && dateRange[1]) {
+        const startDate = startOfDay(dateRange[0])
+        const endDate = endOfDay(dateRange[1])
+
+        filteredRows = mappedRows.filter(row => {
+          if (!row.rawDate) return false
+          const rowDate = parseISO(row.rawDate)
+          return isWithinInterval(rowDate, { start: startDate, end: endDate })
+        })
+      }
+
+      setRows(filteredRows)
     } catch (err) {
       console.error(err)
     } finally {

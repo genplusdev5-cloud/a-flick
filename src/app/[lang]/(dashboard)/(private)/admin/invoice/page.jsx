@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { format } from 'date-fns'
+import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns'
 import classnames from 'classnames'
 import ChevronRight from '@menu/svg/ChevronRight'
 
@@ -275,13 +275,7 @@ const InvoiceListPageFullContent = () => {
       page_size: pagination.pageSize
     }
 
-    // Date range
-    if (appliedFilters.dateFilter && appliedFilters.dateRange[0]) {
-      params.from_date = format(appliedFilters.dateRange[0], 'yyyy-MM-dd')
-      if (appliedFilters.dateRange[1]) {
-        params.to_date = format(appliedFilters.dateRange[1], 'yyyy-MM-dd')
-      }
-    }
+    // Date range params removed for frontend filtering
 
     if (appliedFilters.origin?.id) params.company_id = appliedFilters.origin.id
     if (appliedFilters.contractType?.label) params.contract_type = appliedFilters.contractType.label
@@ -362,8 +356,20 @@ const InvoiceListPageFullContent = () => {
       const listRes = await getInvoiceSummary(params)
 
       const apiData = listRes?.data?.data || {}
-      const results = apiData?.results || []
+      let results = apiData?.results || []
       const count = apiData?.count || 0
+
+      // Frontend Date Filtering
+      if (appliedFilters.dateFilter && appliedFilters.dateRange[0] && appliedFilters.dateRange[1]) {
+        const startDate = startOfDay(appliedFilters.dateRange[0])
+        const endDate = endOfDay(appliedFilters.dateRange[1])
+
+        results = results.filter(row => {
+          if (!row.invoice_date) return false
+          const d = parseISO(row.invoice_date)
+          return isWithinInterval(d, { start: startDate, end: endDate })
+        })
+      }
 
       setRawResults(results)
       setTotalCount(count)

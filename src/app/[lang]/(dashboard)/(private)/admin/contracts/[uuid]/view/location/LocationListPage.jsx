@@ -24,6 +24,9 @@ import {
   deleteContractLocation
 } from '@/api/contract/details/location'
 
+import { getPestList } from '@/api/pest'
+import { getUnitList } from '@/api/unit'
+
 import { useParams } from 'next/navigation'
 
 import SearchIcon from '@mui/icons-material/Search'
@@ -43,17 +46,21 @@ import { showToast } from '@/components/common/Toasts'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 import styles from '@core/styles/table.module.css'
 
-export default function LocationListPage() {
+export default function LocationListPage({ contractId: propContractId, contract }) {
   const [rows, setRows] = useState([])
   const [searchText, setSearchText] = useState('')
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 })
+
+  const [pests, setPests] = useState([])
+  const [units, setUnits] = useState([])
 
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [isEdit, setIsEdit] = useState(false)
   const [editId, setEditId] = useState(null)
 
   const params = useParams()
-  const contractId = params.uuid || params.id
+  // Prioritize the prop (integer ID), fallback to params (likely UUID, which causes error)
+  const contractId = propContractId || params.uuid || params.id
 
   const loadLocations = async () => {
     try {
@@ -62,10 +69,10 @@ export default function LocationListPage() {
 
       const formatted = data.map(item => ({
         id: item.id,
-        pest: item.pest_id,
+        pest: item.contract_pest_id || item.pest_id,
         name: item.name,
         stationNo: item.station_no,
-        pestUnit: item.equipment_id,
+        pestUnit: item.equipment_id || item.pest_unit_id,
         rentalType: item.rental_type,
         description: item.description
       }))
@@ -90,6 +97,34 @@ export default function LocationListPage() {
     if (contractId) loadLocations()
   }, [contractId])
 
+  useEffect(() => {
+    const fetchPests = async () => {
+      try {
+        const res = await getPestList({ page_size: 100 })
+        const list = res?.data?.data?.results || res?.data?.results || []
+        setPests(list)
+      } catch (err) {
+        console.error(err)
+      }
+    }
+    fetchPests()
+  }, [])
+
+  const fetchUnits = async pestId => {
+    if (!pestId) {
+      setUnits([])
+      return
+    }
+    try {
+      const res = await getUnitList(pestId)
+      const list = res?.data?.data?.results || res?.data?.results || []
+      setUnits(list)
+    } catch (err) {
+      console.error(err)
+      setUnits([])
+    }
+  }
+
   const handleAdd = () => {
     setIsEdit(false)
     setFormData({
@@ -97,7 +132,7 @@ export default function LocationListPage() {
       name: '',
       stationNo: '',
       pestUnit: null,
-      rentalType: null,
+      rentalType: 3, // Default to Customer (3)
       description: ''
     })
     setDrawerOpen(true)
@@ -114,6 +149,13 @@ export default function LocationListPage() {
       rentalType: row.rentalType,
       description: row.description
     })
+
+    if (row.pest) {
+      fetchUnits(row.pest)
+    } else {
+      setUnits([])
+    }
+
     setDrawerOpen(true)
   }
 
@@ -123,15 +165,21 @@ export default function LocationListPage() {
       return
     }
 
-    const payload = {
-      contract_id: contractId,
-      pest_id: formData.pest,
-      location_name: formData.name,
-      station_no: formData.stationNo,
-      unit: formData.pestUnit,
-      rental_type: formData.rentalType,
-      description: formData.description
-    }
+    const payload = new FormData()
+
+    payload.append('contract_id', contractId)
+    payload.append('company_id', contract?.company_id ?? 1)
+    payload.append('customer_id', contract?.customer_id ?? 1)
+    payload.append('contract_level', 1)
+    if (formData.pest) payload.append('contract_pest_id', formData.pest)
+    payload.append('name', formData.name)
+    payload.append('qr_code', formData.stationNo || '1233')
+    payload.append('station_no', formData.stationNo)
+    if (formData.pestUnit) payload.append('equipment_id', formData.pestUnit)
+    if (formData.rentalType) payload.append('rental_type', formData.rentalType)
+    payload.append('description', formData.description)
+    payload.append('is_active', 1)
+    payload.append('status', 1)
 
     try {
       if (isEdit) {
@@ -269,7 +317,7 @@ export default function LocationListPage() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  {['ID', 'Actions', 'Pest', 'Name', 'Station No', 'Pest Unit', 'Rental Type'].map(h => (
+                  {['S.No', 'Actions', 'Pest', 'Name', 'Station No', 'Pest Unit', 'Rental Type'].map(h => (
                     <th key={h}>{h}</th>
                   ))}
                 </tr>
@@ -277,9 +325,9 @@ export default function LocationListPage() {
 
               <tbody>
                 {paginated.length ? (
-                  paginated.map(row => (
+                  paginated.map((row, index) => (
                     <tr key={row.id}>
-                      <td>{row.id}</td>
+                      <td>{index + 1 + pagination.pageIndex * pagination.pageSize}</td>
 
                       <td>
                         <Box sx={{ display: 'flex', gap: 1 }}>
@@ -342,8 +390,12 @@ export default function LocationListPage() {
             <GlobalAutocomplete
               label='Select Pest'
               value={formData.pest}
-              options={['Rodent', 'Cockroach', 'Termite']}
-              onChange={val => setFormData({ ...formData, pest: val })}
+              options={pests}
+              onChange={val => {
+                const newPestId = val ? val.value : null
+                setFormData(prev => ({ ...prev, pest: newPestId, pestUnit: null }))
+                fetchUnits(newPestId)
+              }}
             />
           </Grid>
 
@@ -369,8 +421,8 @@ export default function LocationListPage() {
             <GlobalAutocomplete
               label='Pest Unit'
               value={formData.pestUnit}
-              options={['Unit-1', 'Unit-2', 'Unit-3']}
-              onChange={val => setFormData({ ...formData, pestUnit: val })}
+              options={units}
+              onChange={val => setFormData({ ...formData, pestUnit: val ? val.value : null })}
             />
           </Grid>
 
@@ -378,8 +430,12 @@ export default function LocationListPage() {
             <GlobalAutocomplete
               label='Rental Type'
               value={formData.rentalType}
-              options={['Monthly', 'Quarterly', 'Yearly']}
-              onChange={val => setFormData({ ...formData, rentalType: val })}
+              options={[
+                { label: 'Sold', value: 1 },
+                { label: 'Rent', value: 2 },
+                { label: 'Customer', value: 3 }
+              ]}
+              onChange={val => setFormData({ ...formData, rentalType: val ? val.value : null })}
             />
           </Grid>
 
