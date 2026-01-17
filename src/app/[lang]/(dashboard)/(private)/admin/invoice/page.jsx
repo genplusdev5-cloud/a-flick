@@ -56,7 +56,7 @@ import StickyListLayout from '@/components/common/StickyListLayout'
 import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 
 // API
-import { getInvoiceSummary, getInvoiceDropdowns } from '@/api/invoice'
+import { getInvoiceList, getInvoiceDropdowns } from '@/api/invoice'
 import { decodeId } from '@/utils/urlEncoder'
 
 import { showToast } from '@/components/common/Toasts'
@@ -134,7 +134,7 @@ const mapInvoice = (inv, dd) => ({
   invoiceType: inv.invoice_type || '-',
 
   salesPerson: dd.sales_persons?.find(s => String(s.id) === String(inv.sales_person_id))?.label || '-',
-  
+
   // Extra fields for editing
   total_productivity_amount: inv.total_productivity_amount || '',
   remarks: inv.remarks || '',
@@ -353,9 +353,9 @@ const InvoiceListPageFullContent = () => {
     setLoading(true)
     try {
       const params = buildListParams()
-      const listRes = await getInvoiceSummary(params)
+      const listRes = await getInvoiceList(params)
 
-      const apiData = listRes?.data?.data || {}
+      const apiData = listRes?.data || {}
       let results = apiData?.results || []
       const count = apiData?.count || 0
 
@@ -701,15 +701,24 @@ const InvoiceListPageFullContent = () => {
       columnHelper.accessor('cardId', { header: 'Card ID' }),
       columnHelper.accessor('billingName', { header: 'Billing Name' }),
       columnHelper.accessor('address', { header: 'Service Address' }),
-      columnHelper.accessor('amount', { header: 'Amount', cell: info => `₹ ${info.getValue() || 0}` }),
-      columnHelper.accessor('tax', { header: 'Tax', cell: info => `₹ ${info.getValue() || 0}` }),
-      columnHelper.accessor('taxAmount', { header: 'Tax Amount', cell: info => `₹ ${info.getValue() || 0}` }),
-      columnHelper.accessor('total', {
-        header: 'Total Amount',
-        cell: info => <strong>₹ {info.getValue() || 0}</strong>
+      columnHelper.accessor('amount', {
+        header: () => <div className='text-right'>Amount</div>,
+        cell: info => <div className='text-right'>{info.getValue() || 0}</div>
       }),
-      columnHelper.accessor('accountItemCode', { header: 'Account Item Code' }),
-      columnHelper.accessor('poNo', { header: 'PO.No' }),
+      columnHelper.accessor('tax', {
+        header: () => <div className='text-right'>Tax</div>,
+        cell: info => <div className='text-right'>{info.getValue() || 0}</div>
+      }),
+      columnHelper.accessor('taxAmount', {
+        header: () => <div className='text-right'>Tax Amount</div>,
+        cell: info => <div className='text-right'>{info.getValue() || 0}</div>
+      }),
+      columnHelper.accessor('total', {
+        header: () => <div className='text-right'>Total Amount</div>,
+        cell: info => <div className='text-right'><strong>{info.getValue() || 0}</strong></div>
+      }),
+      // columnHelper.accessor('accountItemCode', { header: 'Account Item Code' }),
+      // columnHelper.accessor('poNo', { header: 'PO.No' }),
       columnHelper.accessor('issued', {
         header: 'Issued?',
         cell: info => (

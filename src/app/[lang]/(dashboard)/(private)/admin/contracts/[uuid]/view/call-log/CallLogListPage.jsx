@@ -13,7 +13,10 @@ import {
   Select,
   MenuItem,
   Drawer,
-  Grid
+  Grid,
+  Checkbox,
+  FormControlLabel,
+  Button
 } from '@mui/material'
 
 import StickyTableWrapper from '@/components/common/StickyTableWrapper'
@@ -26,6 +29,7 @@ import AddIcon from '@mui/icons-material/Add'
 import PrintIcon from '@mui/icons-material/Print'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import CloseIcon from '@mui/icons-material/Close'
+import CheckIcon from '@mui/icons-material/Check'
 
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalTextarea from '@/components/common/GlobalTextarea'
@@ -61,7 +65,8 @@ export default function CallLogListPage() {
     entryDate: '',
     reminderDate: null,
     reminderTime: null,
-    remarks: ''
+    remarks: '',
+    setReminder: true
   })
 
   const loadCallLogs = async () => {
@@ -74,7 +79,8 @@ export default function CallLogListPage() {
         entryDate: item.entry_date,
         reminderDate: item.reminder_date,
         reminderTime: item.reminder_time,
-        remarks: item.remarks
+        remarks: item.remarks,
+        isActive: !!item.reminder_date
       }))
       setRows(formatted)
     } catch (err) {
@@ -90,11 +96,12 @@ export default function CallLogListPage() {
   const handleAdd = () => {
     setIsEdit(false)
     setFormData({
-      reminder: '',
+      reminder: 'Call Log',
       entryDate: new Date().toISOString().split('T')[0],
       reminderDate: new Date(),
       reminderTime: new Date(),
-      remarks: ''
+      remarks: '',
+      setReminder: true
     })
     setDrawerOpen(true)
   }
@@ -104,13 +111,15 @@ export default function CallLogListPage() {
       const res = await getCallLogDetails(row.id)
       const d = res?.data?.data || {}
       setIsEdit(true)
+      const hasReminder = !!d.reminder_date
       setFormData({
         id: d.id,
-        reminder: d.reminder,
+        reminder: d.reminder || 'Call Log',
         entryDate: d.entry_date,
-        reminderDate: d.reminder_date ? new Date(d.reminder_date) : null,
-        reminderTime: d.reminder_time ? new Date(`2024-01-01 ${d.reminder_time}`) : null,
-        remarks: d.remarks
+        reminderDate: d.reminder_date ? new Date(d.reminder_date) : new Date(),
+        reminderTime: d.reminder_time ? new Date(`2024-01-01 ${d.reminder_time}`) : new Date(),
+        remarks: d.remarks,
+        setReminder: hasReminder
       })
       setDrawerOpen(true)
     } catch (err) {
@@ -120,12 +129,19 @@ export default function CallLogListPage() {
   }
 
   const handleSubmit = async () => {
-    if (!formData.reminder || !formData.reminderDate || !formData.reminderTime) {
-      showToast('warning', 'Please fill the required fields')
+    if (formData.setReminder && (!formData.reminderDate || !formData.reminderTime)) {
+      showToast('warning', 'Please fill the details')
       return
     }
-    const formattedDate = formData.reminderDate.toISOString().split('T')[0]
-    const formattedTime = formData.reminderTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+
+    let formattedDate = null
+    let formattedTime = null
+
+    if (formData.setReminder) {
+      formattedDate = formData.reminderDate.toISOString().split('T')[0]
+      formattedTime = formData.reminderTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+    }
+
     const payload = {
       contract_id: contractId,
       reminder: formData.reminder,
@@ -160,6 +176,21 @@ export default function CallLogListPage() {
       console.error(err)
       showToast('error', 'Delete failed')
     }
+  }
+
+  const handleToggleReminder = (id) => {
+    setRows(prevRows => prevRows.map(row => {
+      if (row.id === id) {
+        const newStatus = !row.isActive
+        if (newStatus) {
+          showToast('success', 'Reminder Set')
+        } else {
+          showToast('error', 'Dismissed')
+        }
+        return { ...row, isActive: newStatus }
+      }
+      return row
+    }))
   }
 
   const filtered = rows.filter(r => JSON.stringify(r).toLowerCase().includes(searchText.toLowerCase()))
@@ -219,13 +250,13 @@ export default function CallLogListPage() {
           <StickyTableWrapper rowCount={rows.length}>
             <table className={styles.table}>
               <thead>
-                <tr>{['#', 'Action', 'Reminder', 'Entry Date', 'Reminder Date', 'Reminder Time', 'Remarks'].map(h => (<th key={h}>{h}</th>))}</tr>
+                <tr>{['S.No', 'Action', 'Reminder', 'Entry Date', 'Reminder Date', 'Reminder Time', 'Remarks'].map(h => (<th key={h}>{h}</th>))}</tr>
               </thead>
               <tbody>
                 {paginated.length ? (
-                  paginated.map(row => (
+                  paginated.map((row, index) => (
                     <tr key={row.id}>
-                      <td>{row.id}</td>
+                      <td>{pagination.pageIndex * pagination.pageSize + index + 1}</td>
                       <td>
                         <Box sx={{ display: 'flex', gap: 1 }}>
                           <IconButton size='small' color='info'><VisibilityIcon /></IconButton>
@@ -233,7 +264,17 @@ export default function CallLogListPage() {
                           <IconButton size='small' color='error' onClick={() => handleDelete(row.id)}><DeleteIcon /></IconButton>
                         </Box>
                       </td>
-                      <td>{row.reminder}</td>
+                      <td>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          color={row.isActive ? "error" : "success"}
+                          startIcon={row.isActive ? <CloseIcon /> : <CheckIcon />}
+                          onClick={() => handleToggleReminder(row.id)}
+                        >
+                          {row.isActive ? "Dismiss" : "Remind"}
+                        </Button>
+                      </td>
                       <td>{row.entryDate}</td>
                       <td>{row.reminderDate}</td>
                       <td>{row.reminderTime}</td>
@@ -260,13 +301,49 @@ export default function CallLogListPage() {
         </Box>
         <Divider sx={{ my: 2 }} />
         <Grid container spacing={3}>
-          <Grid item xs={12}><GlobalTextField label='Reminder' placeholder='Enter reminder title' value={formData.reminder} onChange={e => setFormData(prev => ({ ...prev, reminder: e.target.value }))} /></Grid>
-          <Grid item xs={12}><AppReactDatepicker selected={formData.reminderDate} onChange={date => setFormData(prev => ({ ...prev, reminderDate: date }))} customInput={<CustomTextField label='Reminder Date' fullWidth />} /></Grid>
-          <Grid item xs={12}><AppReactDatepicker showTimeSelect showTimeSelectOnly timeIntervals={15} selected={formData.reminderTime} dateFormat='HH:mm' onChange={date => setFormData(prev => ({ ...prev, reminderTime: date }))} customInput={<CustomTextField label='Reminder Time' fullWidth />} /></Grid>
-          <Grid item xs={12}><GlobalTextarea label='Remarks' rows={4} placeholder='Enter remarks...' value={formData.remarks} onChange={e => setFormData(prev => ({ ...prev, remarks: e.target.value }))} /></Grid>
+          <Grid item xs={6}>
+            <AppReactDatepicker
+              selected={formData.reminderDate}
+              onChange={date => setFormData(prev => ({ ...prev, reminderDate: date }))}
+              customInput={<CustomTextField label='Reminder Date' fullWidth />}
+              disabled={!formData.setReminder}
+            />
+          </Grid>
+          <Grid item xs={6}>
+             <AppReactDatepicker
+               showTimeSelect
+               showTimeSelectOnly
+               timeIntervals={15}
+               selected={formData.reminderTime}
+               dateFormat='HH:mm'
+               onChange={date => setFormData(prev => ({ ...prev, reminderTime: date }))}
+               customInput={<CustomTextField label='Reminder Time' fullWidth />}
+               disabled={!formData.setReminder}
+             />
+          </Grid>
+          <Grid item xs={12}>
+            <Typography variant="body2" sx={{ mb: 1 }}>Remarks</Typography>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={formData.setReminder}
+                  onChange={e => setFormData(prev => ({ ...prev, setReminder: e.target.checked }))}
+                />
+              }
+              label="Set Reminder"
+              sx={{ mb: 1 }}
+            />
+            <GlobalTextarea
+              label='Description'
+              rows={4}
+              placeholder='Enter remarks...'
+              value={formData.remarks}
+              onChange={e => setFormData(prev => ({ ...prev, remarks: e.target.value }))}
+            />
+          </Grid>
         </Grid>
         <Box mt={4} display='flex' gap={2}>
-          <GlobalButton fullWidth onClick={handleSubmit}>{isEdit ? 'Update' : 'Set Reminder'}</GlobalButton>
+          <GlobalButton fullWidth onClick={handleSubmit}>{isEdit ? 'Update' : 'Save'}</GlobalButton>
           <GlobalButton variant='outlined' color='secondary' fullWidth onClick={() => setDrawerOpen(false)}>Cancel</GlobalButton>
         </Box>
       </Drawer>
