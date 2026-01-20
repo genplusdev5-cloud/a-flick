@@ -6,7 +6,7 @@ import CloseIcon from '@mui/icons-material/Close'
 
 import GlobalTextField from '@/components/common/GlobalTextField'
 import { showToast } from '@/components/common/Toasts'
-import { updateContractValueApi } from '@/api/contract/icons/contractValueUpdate'
+import { updateContractValueApi } from '@/api/contract_group/contract/icons/contractValueUpdate'
 
 export default function ContractValueDrawerContent({
   contractId,

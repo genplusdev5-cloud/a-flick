@@ -24,7 +24,7 @@ import CustomTextFieldWrapper from '@/components/common/CustomTextField'
 import GlobalSelect from '@/components/common/GlobalSelect'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 
-import { getChecklistList, addChecklist, updateChecklist, deleteChecklist } from '@/api/checklist'
+import { getChecklistList, addChecklist, updateChecklist, deleteChecklist } from '@/api/master/checklist'
 import { showToast } from '@/components/common/Toasts'
 import styles from '@core/styles/table.module.css'
 import GlobalButton from '../common/GlobalButton'

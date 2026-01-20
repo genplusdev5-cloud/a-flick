@@ -30,7 +30,7 @@ import {
   addRecommendation,
   updateRecommendation,
   deleteRecommendation
-} from '@/api/recommendation'
+} from '@/api/master/recommendation'
 
 import { showToast } from '@/components/common/Toasts'
 import styles from '@core/styles/table.module.css'

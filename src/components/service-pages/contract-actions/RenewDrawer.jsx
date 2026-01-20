@@ -8,7 +8,7 @@ import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import CustomTextField from '@core/components/mui/TextField'
 import GlobalTextarea from '@/components/common/GlobalTextarea'
 
-import { renewContract } from '@/api/contract/icons/renew'
+import { renewContract } from '@/api/contract_group/contract/icons/renew'
 import { showToast } from '@/components/common/Toasts'
 
 export default function RenewDrawer({ contractId, onClose, reload }) {

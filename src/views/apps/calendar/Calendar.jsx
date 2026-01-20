@@ -14,11 +14,10 @@ import resourceDayGridPlugin from '@fullcalendar/resource-daygrid'
 import resourceTimelinePlugin from '@fullcalendar/resource-timeline'
 import resourceTimeGridPlugin from '@fullcalendar/resource-timegrid'
 
-import { updateSchedule } from '@/api/calendar/schedule/update'
-import { listCalendarEvents } from '@/api/calendar'
-import { setEvents, filterEvents, selectedEvent, updateEvent } from '@/redux-store/slices/calendar'
-
-import { getEmployeeLunchList, updateEmployeeLunch, addEmployeeLunch } from '@/api/calendar/lunch'
+import { updateSchedule } from '@/api/service_group/calendar/schedule/update'
+import { listCalendarEvents } from '@/api/service_group/calendar'
+import { getEmployeeLunchList, updateEmployeeLunch, addEmployeeLunch } from '@/api/service_group/calendar/lunch'
+import { addEvent, updateEvent, deleteEvent, setEvents } from '@/redux-store/slices/calendar'
 
 import { showToast } from '@/components/common/Toasts'
 

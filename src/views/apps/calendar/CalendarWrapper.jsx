@@ -5,7 +5,7 @@ import { useDispatch } from 'react-redux'
 import Card from '@mui/material/Card'
 import AppFullCalendar from '@/libs/styles/AppFullCalendar'
 import AppCalendar from './AppCalendar'
-import { listCalendarEvents } from '@/api/calendar'
+import { listCalendarEvents } from '@/api/service_group/calendar'
 import { setEvents } from '@/redux-store/slices/calendar'
 
 const CalendarWrapper = ({ selectedEmployee }) => {

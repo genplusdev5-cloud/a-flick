@@ -42,14 +42,7 @@ const ATTENDANCE_MODULES = [
   'Payslip Summary'
 ]
 
-const STOCK_MODULES = [
-  'Suppliers',
-  'Material Request',
-  'Stock Report',
-  'Usage Report',
-  'Stock Summary',
-  'Material Usage'
-]
+const STOCK_MODULES = ['Suppliers', 'Stock Report', 'Usage Report', 'Stock Summary', 'Material Usage']
 
 const FINDER_MODULES = ['Non Pre-Schedule', 'Backlog Finder', 'Followup Finder', 'KIV Finder', 'Productivity Finder']
 
@@ -64,7 +57,12 @@ const REPORT_MODULES = [
 
 const PURCHASE_MODULES = ['Purchase Order', 'Purchase Inward', 'Purchase Return']
 
-const TRANSFER_MODULES = ['Transfer Request', 'Transfer In', 'Transfer Out']
+const TRANSFER_MODULES = [
+  'Transfer Request',
+  'Material Request',
+  'Material Request Received',
+  'Material Request Issued'
+]
 
 const AUDIT_MODULES = ['Customer Audit', 'Contracts Audit']
 
@@ -262,6 +260,9 @@ const VerticalMenu = ({ scrollMenu }) => {
 
         {/* ==================== PURCHASE ==================== */}
         <PermissionSubMenu label='Purchase' icon={<i className='tabler-shopping-cart' />} modules={PURCHASE_MODULES}>
+          <PermissionItem module='Suppliers'>
+            <MenuItem href={`/${locale}/admin/suppliers`}>Suppliers</MenuItem>
+          </PermissionItem>
           <PermissionItem module='Purchase Order'>
             <MenuItem href={`/${locale}/admin/purchase/purchase-order`}>Purchase Order</MenuItem>
           </PermissionItem>
@@ -281,33 +282,31 @@ const VerticalMenu = ({ scrollMenu }) => {
           icon={<i className='tabler-arrows-transfer-down' />}
           modules={TRANSFER_MODULES}
         >
-          <PermissionItem module='Transfer Request'>
+          {/* <PermissionItem module='Transfer Request'>
             <MenuItem href={`/${locale}/admin/transfer/transfer-request`}>Transfer Request</MenuItem>
+          </PermissionItem> */}
+
+          <PermissionItem module='Material Request'>
+            <MenuItem href={`/${locale}/admin/transfer/material-request`}>Material Request</MenuItem>
           </PermissionItem>
 
-          <PermissionItem module='Transfer In'>
-            <MenuItem href={`/${locale}/admin/transfer/transfer-in`}>Transfer In</MenuItem>
+          <PermissionItem module='Material Request Received'>
+            <MenuItem href={`/${locale}/admin/transfer/material-received`}>Material Received</MenuItem>
           </PermissionItem>
 
-          <PermissionItem module='Transfer Out'>
-            <MenuItem href={`/${locale}/admin/transfer/transfer-out`}>Transfer Out</MenuItem>
+          <PermissionItem module='Material Request Issued'>
+            <MenuItem href={`/${locale}/admin/transfer/material-issued`}>Material Issued</MenuItem>
           </PermissionItem>
         </PermissionSubMenu>
 
         {/* ✅ Stock Dropdown */}
         <PermissionSubMenu label='Stock' icon={<i className='tabler-package' />} modules={STOCK_MODULES}>
-          <PermissionItem module='Suppliers'>
-            <MenuItem href={`/${locale}/admin/suppliers`}>Suppliers</MenuItem>
-          </PermissionItem>
-          <PermissionItem module='Material Request'>
-            <MenuItem href={`/${locale}/admin/stock/material-request`}>Material Request</MenuItem>
-          </PermissionItem>
-          <PermissionItem module='Stock Report'>
+          {/* <PermissionItem module='Stock Report'>
             <MenuItem href={`/${locale}/admin/stock/report`}>Stock Report</MenuItem>
-          </PermissionItem>
-          <PermissionItem module='Usage Report'>
+          </PermissionItem> */}
+          {/* <PermissionItem module='Usage Report'>
             <MenuItem href={`/${locale}/admin/stock/usage-report`}>Usage Report</MenuItem>
-          </PermissionItem>
+          </PermissionItem> */}
 
           <PermissionItem module='Stock Summary'>
             <MenuItem href={`/${locale}/admin/stock/stock-summary`}>Stock Summary</MenuItem>

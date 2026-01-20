@@ -129,6 +129,18 @@ export const PERMISSION_ALIASES = {
   'Transfer/Transfer Out': 'Transfer Out',
   'Transfer Out': 'Transfer Out',
 
+  // Material Request Extensions
+  'Transfer material Request Recieved': 'Material Request Received', // DB Name (with typo)
+  'transfer_material_request_recieved': 'Material Request Received', // DB Keyword
+  'Transfer material Request Received': 'Material Request Received', // Correct spelling
+  'transfer_material_received': 'Material Request Received', // ✅ Correct Backend Key -> Standardized
+  'Transfer/Material Received': 'Material Request Received', // 🔍 Friendly Name Variation
+ 
+  'Transfer material Request Issued': 'Material Request Issued',
+  'transfer_material_request_issued': 'Material Request Issued',
+  'transfer_material_issued': 'Material Request Issued', // ✅ Correct Backend Key
+  'Transfer/Material Issued': 'Material Request Issued', // 🔍 Friendly Name Variation
+
   // Stock
   'Stock/Suppliers': 'Suppliers',
   'Stock/Material Request': 'Material Request',

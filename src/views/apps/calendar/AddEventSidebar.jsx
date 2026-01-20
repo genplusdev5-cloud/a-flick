@@ -22,8 +22,9 @@ import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
 
 // API Imports
-import { getScheduleDetail } from '@/api/calendar/schedule/detail'
-import { updateScheduleDetails } from '@/api/calendar/schedule/detailUpdate'
+import { addEvent, updateEvent, deleteEvent } from '@/api/service_group/calendar'
+import { getTicketDetails } from '@/api/service_group/ticket'
+import { getScheduleDetails } from '@/api/service_group/schedule'
 import { loadTechnicians } from '@/api/employee/loadTechnician'
 
 // Slice Imports

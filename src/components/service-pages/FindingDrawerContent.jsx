@@ -26,7 +26,7 @@ import CustomTextFieldWrapper from '@/components/common/CustomTextField'
 import CustomSelectField from '@/components/common/CustomSelectField'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 
-import { getFindingList, addFinding, updateFinding, deleteFinding } from '@/api/findings'
+import { getFindingList, addFinding, updateFinding, deleteFinding } from '@/api/master/findings'
 import { showToast } from '@/components/common/Toasts'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 

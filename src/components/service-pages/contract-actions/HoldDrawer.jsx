@@ -7,7 +7,7 @@ import CloseIcon from '@mui/icons-material/Close'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import CustomTextField from '@core/components/mui/TextField'
 import GlobalTextarea from '@/components/common/GlobalTextarea'
-import { holdContract } from '@/api/contract/icons/hold'
+import { holdContract } from '@/api/contract_group/contract/icons/hold'
 import { showToast } from '@/components/common/Toasts'
 
 export default function HoldDrawer({ contractId, onClose, reload }) {

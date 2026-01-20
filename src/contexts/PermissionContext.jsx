@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { getUserPrivilegeList } from '@/api/userPrivilege'
+import { getUserPrivilegeList } from '@/api/employee/userPrivilege'
 import { getEmployeeDetails } from '@/api/employee'
 import { useParams, usePathname } from 'next/navigation'
 import { PERMISSION_ALIASES } from '@/constants/permissionAliases'

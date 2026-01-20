@@ -25,7 +25,7 @@ import DialogCloseButton from '@/components/dialogs/DialogCloseButton'
 
 import { showToast } from '@/components/common/Toasts'
 
-import { getUnitList, addUnit, updateUnit, deleteUnit } from '@/api/unit'
+import { getUnitList, addUnit, updateUnit, deleteUnit } from '@/api/master/unit'
 
 import styles from '@core/styles/table.module.css'
 import GlobalButton from '../common/GlobalButton'

@@ -24,7 +24,7 @@ import CustomTextFieldWrapper from '@/components/common/CustomTextField'
 import GlobalSelect from '@/components/common/GlobalSelect'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 
-import { getPestChemicalsList, addPestChemical, updatePestChemical, deletePestChemical } from '@/api/pestchemicals'
+import { getPestChemicalsList, addPestChemical, updatePestChemical, deletePestChemical } from '@/api/stock/pestchemicals'
 
 import { showToast } from '@/components/common/Toasts'
 import styles from '@core/styles/table.module.css'

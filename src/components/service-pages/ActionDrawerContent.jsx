@@ -12,7 +12,7 @@ import GlobalSelect from '@/components/common/GlobalSelect'
 
 import styles from '@core/styles/table.module.css'
 import { showToast } from '@/components/common/Toasts'
-import { addAction, updateAction } from '@/api/actions'
+import { addAction, updateAction } from '@/api/master/actions'
 import GlobalButton from '../common/GlobalButton'
 
 import { usePermission } from '@/hooks/usePermission'

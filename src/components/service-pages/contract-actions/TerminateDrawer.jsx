@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Box, Grid, Typography, IconButton, Divider, Button } from '@mui/material'
 import CustomTextFieldWrapper from '@/components/common/CustomTextField'
 import GlobalTextarea from '@/components/common/GlobalTextarea'
-import { terminateContract } from '@/api/contract/icons/terminate'
+import { terminateContract } from '@/api/contract_group/contract/icons/terminate'
 import { showToast } from '@/components/common/Toasts'
 import CloseIcon from '@mui/icons-material/Close'
 
