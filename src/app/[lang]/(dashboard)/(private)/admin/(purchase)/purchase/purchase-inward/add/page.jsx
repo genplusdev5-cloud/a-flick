@@ -25,7 +25,7 @@ import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
 import { getPurchaseFilters, addPurchaseInward } from '@/api/purchase/purchase_inward'
-import { getPurchaseOrderList } from '@/api/purchase/purchase_order'
+import { getPurchaseOrderList, getPurchaseOrderDetails } from '@/api/purchase/purchase_order'
 
 import StickyListLayout from '@/components/common/StickyListLayout'
 import GlobalButton from '@/components/common/GlobalButton'
@@ -174,10 +174,65 @@ const AddPurchaseInwardPage = () => {
     }
   }, [supplier, initLoading])
 
+  // ✅ NEW – Fetch PO Items when PO is selected
+  useEffect(() => {
+    const fetchPoDetails = async () => {
+      if (!purchaseOrder?.id) return
+
+      try {
+        setInitLoading(true)
+        const res = await getPurchaseOrderDetails({ id: purchaseOrder.id })
+        const poData = res?.data || res
+
+        if (poData?.order_items?.length) {
+          const mappedItems = poData.order_items.map((item, index) => {
+            // Calculate quantities
+            const q = Number(item.quantity) || 0
+            // Assuming conversion is 1 from PO context if not available, or part of logic
+            // PO usually has 'quantity', might not have detailed packing info like 'in_quantity' vs 'conversion'
+            // We'll assume direct mapping for now:
+            // in_quantity = quantity, conversion = 1 (unless PO has these fields)
+
+            // Check if PO item has specific packing details, otherwise default
+            const inQty = Number(item.in_quantity) || q
+            const conv = Number(item.conversion) || 1
+            const total = inQty * conv + (Number(item.additional) || 0)
+
+            return {
+              id: Date.now() + index, // Unique ID
+              item_name: item.item_name,
+              item_id: item.item_id,
+              uom: item.uom,
+              uom_id: item.uom_id,
+              in_quantity: inQty,
+              conversion: conv,
+              quantity: inQty * conv,
+              additional: Number(item.additional) || 0,
+              total_quantity: total,
+              // Keep reference to PO Item ID if needed for backend
+              po_item_id: item.id
+            }
+          })
+
+          setItems(mappedItems)
+          showToast('success', 'Items populated from Purchase Order')
+        }
+      } catch (err) {
+        console.error('Failed to fetch PO details', err)
+        showToast('error', 'Failed to load Purchase Order items')
+      } finally {
+        setInitLoading(false)
+      }
+    }
+
+    fetchPoDetails()
+  }, [purchaseOrder])
+
   const handleEditItem = row => {
     setEditId(row.id)
-    setChemical({ label: row.chemical, id: row.chemicalId })
-    setUom({ label: row.uom, id: row.uomId })
+    // Fix: Match keys with items state
+    setChemical({ label: row.item_name, id: row.item_id })
+    setUom({ label: row.uom, id: row.uom_id })
     setInQuantity(row.in_quantity || '')
     setConversion(row.conversion || '')
     setAdditional(row.additional || '')
@@ -272,18 +327,24 @@ const AddPurchaseInwardPage = () => {
         po_id: purchaseOrder?.id || null,
         remarks,
         inward_items: items.map(item => ({
-          company_id: origin ? origin.id : null,
-          supplier_id: supplier ? supplier.id : null,
-          po_id: purchaseOrder?.id || null, // Propagate PO ID to items
+          company_id: origin.id,
+          supplier_id: supplier.id,
+          po_id: purchaseOrder?.id || null,
+
+          // 🔥 THIS IS THE KEY FIX
+          po_item_id: item.po_item_id || null,
+
           item_id: item.item_id,
           item_name: item.item_name,
           uom_id: item.uom_id,
-          uom: item.uom,
+
           in_quantity: Number(item.in_quantity),
           conversion: Number(item.conversion),
           quantity: Number(item.quantity),
+
           additional: Number(item.additional) || 0,
           total_quantity: Number(item.total_quantity),
+
           is_active: 1,
           status: 1
         }))
@@ -458,14 +519,26 @@ const AddPurchaseInwardPage = () => {
               <thead>
                 <tr>
                   <th style={{ width: '50px', minWidth: '50px' }}>ID</th>
-                  <th align='center' style={{ width: '80px' }}>ACTION</th>
+                  <th align='center' style={{ width: '80px' }}>
+                    ACTION
+                  </th>
                   <th style={{ width: '20%' }}>CHEMICAL</th>
                   <th style={{ width: '10%' }}>UOM</th>
-                  <th align='right' style={{ width: '10%', textAlign: 'right' }}>IN QTY</th>
-                  <th align='right' style={{ width: '10%', textAlign: 'right' }}>CONV.</th>
-                  <th align='right' style={{ width: '10%', textAlign: 'right' }}>QTY</th>
-                  <th align='right' style={{ width: '12%', textAlign: 'right' }}>ADDITIONAL</th>
-                  <th align='right' style={{ width: '15%', textAlign: 'right' }}>TOTAL AMOUNT</th>
+                  <th align='right' style={{ width: '10%', textAlign: 'right' }}>
+                    IN QTY
+                  </th>
+                  <th align='right' style={{ width: '10%', textAlign: 'right' }}>
+                    CONV.
+                  </th>
+                  <th align='right' style={{ width: '10%', textAlign: 'right' }}>
+                    QTY
+                  </th>
+                  <th align='right' style={{ width: '12%', textAlign: 'right' }}>
+                    ADDITIONAL
+                  </th>
+                  <th align='right' style={{ width: '15%', textAlign: 'right' }}>
+                    TOTAL AMOUNT
+                  </th>
                 </tr>
               </thead>
 
@@ -484,11 +557,21 @@ const AddPurchaseInwardPage = () => {
                       </td>
                       <td>{row.item_name}</td>
                       <td>{row.uom}</td>
-                      <td align='right' style={{ textAlign: 'right' }}>{row.in_quantity}</td>
-                      <td align='right' style={{ textAlign: 'right' }}>{row.conversion || '-'}</td>
-                      <td align='right' style={{ textAlign: 'right' }}>{row.quantity}</td>
-                      <td align='right' style={{ textAlign: 'right' }}>{row.additional || '-'}</td>
-                      <td align='right' style={{ textAlign: 'right' }}>{row.total_quantity}</td>
+                      <td align='right' style={{ textAlign: 'right' }}>
+                        {row.in_quantity}
+                      </td>
+                      <td align='right' style={{ textAlign: 'right' }}>
+                        {row.conversion || '-'}
+                      </td>
+                      <td align='right' style={{ textAlign: 'right' }}>
+                        {row.quantity}
+                      </td>
+                      <td align='right' style={{ textAlign: 'right' }}>
+                        {row.additional || '-'}
+                      </td>
+                      <td align='right' style={{ textAlign: 'right' }}>
+                        {row.total_quantity}
+                      </td>
                     </tr>
                   ))
                 ) : (

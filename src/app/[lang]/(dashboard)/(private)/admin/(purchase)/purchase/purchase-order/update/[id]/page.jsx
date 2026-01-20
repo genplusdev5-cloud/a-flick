@@ -32,6 +32,7 @@ import EditIcon from '@mui/icons-material/Edit'
 
 import styles from '@core/styles/table.module.css'
 import { getPurchaseFilters, getPurchaseOrderDetails, updatePurchaseOrder } from '@/api/purchase/purchase_order'
+import { getSupplierList } from '@/api/stock/supplier'
 import { getMaterialRequestDropdowns } from '@/api/transfer/materialRequest/dropdown'
 import { showToast } from '@/components/common/Toasts'
 
@@ -40,8 +41,14 @@ const EditPurchaseOrderPage = () => {
   const params = useParams()
   const { lang, id } = params
   const searchParams = useSearchParams()
-  const type = searchParams.get('type') || 'tm'
-  const decodedId = id ? atob(id) : null
+  const decodedId = useMemo(() => {
+    if (!id) return null
+    try {
+      return atob(id)
+    } catch (e) {
+      return id
+    }
+  }, [id])
 
   // Dropdown options
   const [originOptions, setOriginOptions] = useState([])
@@ -64,7 +71,7 @@ const EditPurchaseOrderPage = () => {
   const [chemical, setChemical] = useState(null)
   const [uom, setUom] = useState(null)
   const [quantity, setQuantity] = useState('')
-  const [rate, setRate] = useState('')
+
   const [editId, setEditId] = useState(null)
 
   const [items, setItems] = useState([])
@@ -79,26 +86,33 @@ const EditPurchaseOrderPage = () => {
     const fetchData = async () => {
       try {
         setInitLoading(true)
-        const [purchaseRes, materialRes, detailsRes] = await Promise.all([
+        const [purchaseRes, materialRes, detailsRes, supplierRes] = await Promise.all([
           getPurchaseFilters(),
           getMaterialRequestDropdowns(),
-          getPurchaseOrderDetails({ id: decodedId, type })
+          getPurchaseOrderDetails({ id: decodedId }),
+          getSupplierList()
         ])
 
         // Parse Dropdowns
-        const purchaseData = purchaseRes?.data?.data || {}
+        // Fix: Check nested data
+        const purchaseData = purchaseRes?.data?.data || purchaseRes?.data || {}
         const origins =
           purchaseData?.company?.name?.map(item => ({
             label: item.name,
             value: item.name,
             id: item.id
           })) || []
-        const suppliers =
-          purchaseData?.supplier?.name?.map(item => ({
-            label: item.name,
-            value: item.name,
-            id: item.id
-          })) || []
+
+        // Fix: supplierRes might be { count: ..., results: ... } or { data: { results: ... } }
+        console.log('Supplier Response:', supplierRes) // DEBUG
+        const supplierList = supplierRes?.data?.results || supplierRes?.results || supplierRes?.data || []
+        const suppliers = Array.isArray(supplierList)
+          ? supplierList.map(item => ({
+              label: item.name,
+              value: item.name,
+              id: item.id
+            }))
+          : []
 
         const materialData = materialRes?.data || materialRes
         const chemicals =
@@ -120,7 +134,8 @@ const EditPurchaseOrderPage = () => {
         setUomOptions(uoms)
 
         // Parse Details
-        const details = detailsRes?.data || {}
+        const details = detailsRes?.data || detailsRes || {}
+        console.log('PO Details Response:', details) // DEBUG DETAILS
         setPoDate(details.po_date ? parseISO(details.po_date) : null)
         setRemarks(details.remarks || '')
 
@@ -130,14 +145,22 @@ const EditPurchaseOrderPage = () => {
         }
 
         if (details.supplier_id) {
-          const foundSupplier = suppliers.find(s => s.id === details.supplier_id)
-          if (foundSupplier) setSupplier(foundSupplier)
+          const foundSupplier = suppliers.find(s => String(s.id) === String(details.supplier_id))
+          if (foundSupplier) {
+            setSupplier(foundSupplier)
+          } else if (details.supplier) {
+            // Fallback: Use name from details if ID match fails (since it's read-only)
+            setSupplier({ label: details.supplier, value: details.supplier, id: details.supplier_id })
+          }
+        } else if (details.supplier) {
+          setSupplier({ label: details.supplier, value: details.supplier, id: null })
         }
 
         const itemsList =
           details.order_items || details.po_chemicals || details.items || details.purchase_order_chemicals || []
         const mappedItems = itemsList.map(item => {
-          const chemId = item.chemical_id || item.item_id || item.chemical?.id || item.chemical_details?.id || item.chemical
+          const chemId =
+            item.chemical_id || item.item_id || item.chemical?.id || item.chemical_details?.id || item.chemical
           const uomId = item.uom_id || item.uom_details?.id || item.uom?.id || item.uom
 
           // Fallback lookup if name is null
@@ -164,8 +187,9 @@ const EditPurchaseOrderPage = () => {
               '',
             uomId: uomId,
             quantity: item.quantity,
-            rate: item.unit_rate || item.rate,
-            amount: (Number(item.quantity) || 0) * (Number(item.unit_rate || item.rate) || 0)
+            rate: 0,
+            amount: 0,
+            isNew: false
           }
         })
         setItems(mappedItems)
@@ -187,61 +211,68 @@ const EditPurchaseOrderPage = () => {
     setChemical({ label: row.chemical, id: row.chemicalId })
     setUom({ label: row.uom, id: row.uomId })
     setQuantity(row.quantity)
-    setRate(row.rate)
   }
 
-  const amount = useMemo(() => {
-    const q = Number(quantity)
-    const r = Number(rate)
-    return q && r ? q * r : ''
-  }, [quantity, rate])
+ const handleAddItem = () => {
+  if (!chemical) {
+    showToast('error', 'Please select a chemical')
+    return
+  }
+  if (!uom) {
+    showToast('error', 'Please select a UOM')
+    return
+  }
+  if (!quantity || Number(quantity) <= 0) {
+    showToast('error', 'Please enter valid quantity')
+    return
+  }
 
-  const handleAddItem = () => {
-    if (!chemical || !uom || !quantity || !rate) {
-      showToast('error', 'Please fill all chemical fields')
-      return
-    }
+  const chemId = chemical.id
+  const uomId = uom.id
+  const qty = Number(quantity)
 
-    if (editId) {
-      // Update existing item
-      setItems(prev =>
-        prev.map(item =>
-          item.id === editId
-            ? {
-                ...item,
-                chemical: chemical?.label || (typeof chemical === 'string' ? chemical : ''),
-                chemicalId: chemical?.id || (typeof chemical === 'object' ? chemical?.value : chemical),
-                uom: uom?.label || (typeof uom === 'string' ? uom : ''),
-                uomId: uom?.id || (typeof uom === 'object' ? uom?.value : uom),
-                quantity,
-                rate,
-                amount
-              }
-            : item
-        )
+  // 🔍 Check SAME chemical + SAME UOM already exists
+  const existingIndex = items.findIndex(
+    item =>
+      String(item.chemicalId) === String(chemId) &&
+      String(item.uomId) === String(uomId)
+  )
+
+  // 🟢 CASE 1: Same chemical + same UOM → ADD quantity
+  if (existingIndex !== -1) {
+    setItems(prev =>
+      prev.map((item, index) =>
+        index === existingIndex
+          ? {
+              ...item,
+              quantity: Number(item.quantity) + qty
+            }
+          : item
       )
-      setEditId(null)
-    } else {
-      setItems(prev => [
-        ...prev,
-        {
-          id: Date.now(),
-          chemical: chemical?.label || (typeof chemical === 'string' ? chemical : ''),
-          chemicalId: chemical?.id || (typeof chemical === 'object' ? chemical?.value : chemical),
-          uom: uom?.label || (typeof uom === 'string' ? uom : ''),
-          uomId: uom?.id || (typeof uom === 'object' ? uom?.value : uom),
-          quantity,
-          rate,
-          amount
-        }
-      ])
-    }
-
-    setChemical(null)
-    setUom(null)
-    setQuantity('')
-    setRate('')
+    )
   }
+  // 🟡 CASE 2: Different chemical OR different UOM → NEW ROW
+  else {
+    setItems(prev => [
+      ...prev,
+      {
+        id: Date.now(),
+        chemical: chemical.label,
+        chemicalId: chemId,
+        uom: uom.label,
+        uomId: uomId,
+        quantity: qty,
+        isNew: true
+      }
+    ])
+  }
+
+  // reset fields
+  setChemical(null)
+  setUom(null)
+  setQuantity('')
+}
+
 
   const handleRemoveItem = id => {
     setItems(prev => prev.filter(i => i.id !== id))
@@ -255,50 +286,43 @@ const EditPurchaseOrderPage = () => {
 
     try {
       setSaveLoading(true)
-      const itemsPayload = items.map(item => {
-        const itemObj = {
-          chemical_id: item.chemicalId,
-          uom_id: item.uomId,
-          quantity: Number(item.quantity),
-          unit_rate: Number(item.rate)
-        }
-
-        // Only add ID if NOT tx type, or if we want to risk it.
-        // User says "like add", and "add" has NO IDs.
-        // So for 'tx', we strictly omit IDs. 
-        if (type !== 'tx') {
-          itemObj.id = String(item.id).length > 10 ? null : item.id
-        }
-
-        return itemObj
-      })
-
+      // Build payload
       const payload = {
-        company_id: origin.id,
-        po_date: format(poDate, 'yyyy-MM-dd'),
         supplier_id: supplier.id,
-        remarks: remarks,
-        order_items_input: items.map(item => ({
-          id: String(item.id).length > 10 ? null : item.id,
-          chemical_id: item.chemicalId,
-          item_id: item.chemicalId,
-          item_name: item.chemical,
-          uom_id: item.uomId,
-          uom: item.uom,
-          quantity: Number(item.quantity),
-          unit_rate: Number(item.rate),
-          rate: Number(item.rate),
-          is_active: 1,
-          status: 1
-        })),
-        order_items: itemsPayload,
-        items: itemsPayload, // Fallback key
-        po_chemicals: itemsPayload, // Another fallback
-        purchase_order_chemicals: itemsPayload, // Long form
-        chemicals: itemsPayload // Simple form
+        po_date: format(poDate, 'yyyy-MM-dd'),
+        company_id: origin.id,
+        remarks,
+        employee_id: 1,
+        po_status: 'Pending',
+        is_completed: 0,
+
+        order_items_input: items.map(item => {
+          const obj = {
+            company_id: origin.id,
+            supplier_id: supplier.id,
+            po_id: decodedId, // 🔥 MUST
+            item_id: item.chemicalId,
+            item_name: item.chemical,
+            uom_id: item.uomId,
+            quantity: Number(item.quantity),
+            unit_rate: item.unit_rate || 0,
+            is_active: 1,
+            status: 1
+          }
+
+          // Existing item → UPDATE
+          if (!item.isNew && item.id) {
+            obj.id = item.id
+          }
+
+          return obj
+        })
       }
 
-      await updatePurchaseOrder({ id: decodedId, payload, type })
+      console.log('Update Payload:', JSON.stringify(payload, null, 2)) // DEBUG PAYLOAD
+
+      await updatePurchaseOrder({ id: decodedId, payload })
+
       showToast('success', 'Purchase Order updated successfully')
       router.push(`/${lang}/admin/purchase/purchase-order`)
     } catch (err) {
@@ -370,7 +394,13 @@ const EditPurchaseOrderPage = () => {
             </Grid>
 
             <Grid item xs={12} md={4}>
-              <GlobalAutocomplete label='Supplier' options={supplierOptions} value={supplier} onChange={setSupplier} />
+              <GlobalTextField
+                label='Supplier'
+                value={supplier?.label || ''}
+                InputProps={{
+                  readOnly: true
+                }}
+              />
             </Grid>
 
             <Grid item xs={12}>
@@ -398,21 +428,13 @@ const EditPurchaseOrderPage = () => {
               <GlobalAutocomplete label='UOM' options={uomOptions} value={uom} onChange={setUom} />
             </Grid>
 
-            <Grid item xs={12} md={2}>
+            <Grid item xs={12} md={3}>
               <GlobalTextField
                 label='Quantity'
                 type='number'
                 value={quantity}
                 onChange={e => setQuantity(e.target.value)}
               />
-            </Grid>
-
-            <Grid item xs={12} md={2}>
-              <GlobalTextField label='Rate' type='number' value={rate} onChange={e => setRate(e.target.value)} />
-            </Grid>
-
-            <Grid item xs={12} md={2}>
-              <GlobalTextField label='Amount' value={amount} disabled />
             </Grid>
 
             <Grid item xs={12} md={1}>
@@ -434,15 +456,13 @@ const EditPurchaseOrderPage = () => {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th style={{ width: '50px', minWidth: '50px' }}>ID</th>
-                  <th align='center' style={{ width: '100px' }}>
+                  <th style={{ width: '50px' }}>S.No</th>
+                  <th align='center' style={{ width: '100px', textAlign: 'center' }}>
                     Action
                   </th>
-                  <th style={{ width: '25%' }}>Chemical</th>
-                  <th style={{ width: '15%' }}>UOM</th>
-                  <th style={{ width: '15%', textAlign: 'right' }}>Quantity</th>
-                  <th style={{ width: '15%', textAlign: 'right' }}>Rate</th>
-                  <th style={{ width: '15%', textAlign: 'right' }}>Amount</th>
+                  <th style={{ width: '40%' }}>Chemical</th>
+                  <th style={{ width: '25%' }}>UOM</th>
+                  <th style={{ width: '25%', textAlign: 'right' }}>Quantity</th>
                 </tr>
               </thead>
 
@@ -452,23 +472,34 @@ const EditPurchaseOrderPage = () => {
                     <tr key={row.id}>
                       <td>{i + 1}</td>
                       <td align='center'>
-                        <IconButton size='small' color='primary' onClick={() => handleEditItem(row)}>
-                          <EditIcon fontSize='small' />
-                        </IconButton>
-                        <IconButton size='small' color='error' onClick={() => handleRemoveItem(row.id)}>
-                          <DeleteIcon fontSize='small' />
-                        </IconButton>
+                        <div style={{ display: 'flex', justifyContent: 'center', gap: '4px' }}>
+                          <IconButton
+                            size='small'
+                            color='primary'
+                            onClick={() => handleEditItem(row)}
+                            sx={{ padding: '4px' }}
+                          >
+                            <EditIcon fontSize='small' sx={{ fontSize: '1.25rem' }} />
+                          </IconButton>
+
+                          <IconButton
+                            size='small'
+                            color='error'
+                            onClick={() => handleRemoveItem(row.id)}
+                            sx={{ padding: '4px' }}
+                          >
+                            <DeleteIcon fontSize='small' sx={{ fontSize: '1.25rem' }} />
+                          </IconButton>
+                        </div>
                       </td>
                       <td>{row.chemical}</td>
                       <td>{row.uom}</td>
                       <td style={{ textAlign: 'right' }}>{row.quantity}</td>
-                      <td style={{ textAlign: 'right' }}>{row.rate}</td>
-                      <td style={{ textAlign: 'right' }}>{row.amount}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', padding: 24 }}>
+                    <td colSpan={5} style={{ textAlign: 'center', padding: 24 }}>
                       No items
                     </td>
                   </tr>

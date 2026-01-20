@@ -62,70 +62,70 @@ const EditPurchaseReturnPage = () => {
   // Dropdown options
   const [originOptions, setOriginOptions] = useState([])
   const [supplierOptions, setSupplierOptions] = useState([])
-  const [purchaseOrderOptions, setPurchaseOrderOptions] = useState([])
+  const [purchaseInwardOptions, setPurchaseInwardOptions] = useState([])
   const [chemicalOptions, setChemicalOptions] = useState([])
   const [uomOptions, setUomOptions] = useState([])
-
+ 
   // Loading states
   const [initLoading, setInitLoading] = useState(false)
   const [saveLoading, setSaveLoading] = useState(false)
-
+ 
   // Header fields
   const [origin, setOrigin] = useState(null)
-  const [returnDate, setReturnDate] = useState(null)
-
+  const [returnDate, setReturnDate] = useState(new Date())
+ 
   const [supplier, setSupplier] = useState(null)
-  const [purchaseOrder, setPurchaseOrder] = useState(null)
+  const [purchaseInward, setPurchaseInward] = useState(null)
   const [remarks, setRemarks] = useState('')
   const [details, setDetails] = useState({})
-
+ 
   // Item entry fields
   const [chemical, setChemical] = useState(null)
   const [uom, setUom] = useState(null)
   const [quantity, setQuantity] = useState('')
   const [editId, setEditId] = useState(null)
-
+ 
   const [items, setItems] = useState([])
-
+ 
   const PoDateInput = forwardRef(function PoDateInput(props, ref) {
     const { label, value, ...rest } = props
-
+ 
     return <CustomTextField fullWidth inputRef={ref} label={label} value={value} {...rest} />
   })
-
+ 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setInitLoading(true)
-
+ 
         const [purchaseRes, materialRes, detailsRes] = await Promise.all([
           getPurchaseFilters(),
           getMaterialRequestDropdowns(),
           getPurchaseReturnDetails({ id: decodedId, type })
         ])
-
+ 
         // Dropdowns
         const purchaseData = purchaseRes?.data?.data || {}
-
+ 
         const origins =
           purchaseData?.company?.name?.map(item => ({
             label: item.name,
             value: item.name,
             id: item.id
           })) || []
-
+ 
         const suppliers =
           purchaseData?.supplier?.name?.map(item => ({
             label: item.name,
             value: item.name,
             id: item.id
           })) || []
-
+ 
         setOriginOptions(origins)
         setSupplierOptions(suppliers)
-
+ 
         const materialData = materialRes?.data || materialRes
-
+ 
         setChemicalOptions(
           materialData?.chemicals?.name?.map(c => ({
             label: c.name,
@@ -133,7 +133,7 @@ const EditPurchaseReturnPage = () => {
             id: c.id
           })) || []
         )
-
+ 
         setUomOptions(
           materialData?.uom?.name?.map(u => ({
             label: u.name,
@@ -141,7 +141,7 @@ const EditPurchaseReturnPage = () => {
             id: u.id
           })) || []
         )
-
+ 
         // 🔥 Purchase Inward Details
         let details = {}
         if (detailsRes?.return_items || detailsRes?.items) {
@@ -152,25 +152,25 @@ const EditPurchaseReturnPage = () => {
           details = detailsRes?.data?.data || detailsRes?.data || detailsRes || {}
         }
         setDetails(details)
-
-        setReturnDate(details.pr_date || details.return_date ? parseISO(details.pr_date || details.return_date) : null)
-
+ 
+        setReturnDate(details.pr_date || details.return_date ? parseISO(details.pr_date || details.return_date) : new Date())
+ 
         setRemarks(details.remarks || '')
-
+ 
         if (details.company_id) {
           const o = origins.find(x => x.id == details.company_id)
           if (o) setOrigin(o)
         }
-
+ 
         if (details.supplier_id) {
           const s = suppliers.find(x => x.id == details.supplier_id)
           if (s) setSupplier(s)
         }
-
-        if (details.po_id) {
-          setPurchaseOrder({
-            label: String(details.num_series || details.po_number || 'Loading...'),
-            id: details.po_id
+ 
+        if (details.pi_id || details.po_id) {
+          setPurchaseInward({
+            label: String(details.num_series || details.pi_number || details.po_number || 'Loading...'),
+            id: details.pi_id || details.po_id
           })
         }
 
@@ -202,40 +202,40 @@ const EditPurchaseReturnPage = () => {
   }, [decodedId])
 
   useEffect(() => {
-    const fetchPOs = async () => {
+    const fetchPIs = async () => {
       if (supplier?.id) {
         try {
           const res = await getPurchaseFilters({ supplier_id: supplier.id })
           const purchaseData = res?.data?.data || res?.data || {}
-
-          // Use robust mapping based on observed backend structures
-          const rawPOs = purchaseData?.purchase_order?.name || purchaseData?.po_number?.po_number || []
-
-          const pos = rawPOs.map(item => ({
-            label: String(item.name || item.po_number || item.num_series || 'Unknown'),
+ 
+          // Update: Map pi_number for options
+          const rawPIs = purchaseData?.pi_number?.pi_number || []
+ 
+          const pis = rawPIs.map(item => ({
+            label: String(item.pi_number || item.name || 'Unknown'),
             value: item.id,
             id: item.id
           }))
-
-          setPurchaseOrderOptions(pos)
-
-          // Sync the selected PO label if we had a skeleton
-          if (purchaseOrder?.id) {
-            const matchingPO = pos.find(p => p.id === purchaseOrder.id)
-            if (matchingPO) setPurchaseOrder(matchingPO)
+ 
+          setPurchaseInwardOptions(pis)
+ 
+          // Sync the selected PI label if we had a skeleton
+          if (purchaseInward?.id) {
+            const matchingPI = pis.find(p => p.id === purchaseInward.id)
+            if (matchingPI) setPurchaseInward(matchingPI)
           }
         } catch (err) {
-          console.error('Failed to fetch POs', err)
-          setPurchaseOrderOptions([])
+          console.error('Failed to fetch PIs', err)
+          setPurchaseInwardOptions([])
         }
       } else {
-        setPurchaseOrderOptions([])
-        if (!initLoading) setPurchaseOrder(null)
+        setPurchaseInwardOptions([])
+        if (!initLoading) setPurchaseInward(null)
       }
     }
-
+ 
     if (supplier && !initLoading) {
-      fetchPOs()
+      fetchPIs()
     }
   }, [supplier, initLoading])
 
@@ -305,8 +305,9 @@ const EditPurchaseReturnPage = () => {
         company_id: origin.id,
         return_date: format(returnDate, 'yyyy-MM-dd'),
         supplier_id: supplier.id,
-        po_id: purchaseOrder?.id || null,
-        purchase_order_id: purchaseOrder?.id || null,
+        po_id: purchaseInward?.id || null, // Keeping po_id for compatibility or update
+        purchase_order_id: items[0]?.poId || purchaseInward?.id || null,
+        pi_id: purchaseInward?.id || null, // Explicit PI ID
         remarks,
         return_items_input: items.map(item => ({
           id: String(item.id).length > 10 ? null : item.id,
@@ -315,14 +316,14 @@ const EditPurchaseReturnPage = () => {
           item_name: item.chemical,
           uom_id: item.uomId,
           uom: item.uom,
-          po_id: item.poId || purchaseOrder?.id || null, // Use preserved Item PO ID or fallback to header
+          po_id: item.poId || purchaseInward?.id || null, // Use preserved Item PO ID or fallback
           return_quantity: Number(item.quantity),
           quantity: Number(item.quantity),
           status: 1,
           is_active: 1
         }))
       }
-
+ 
       await updatePurchaseReturn({ id: decodedId, payload })
 
       showToast('success', 'Purchase Return updated successfully')
@@ -391,15 +392,20 @@ const EditPurchaseReturnPage = () => {
             </Grid>
 
             <Grid item xs={12} md={4}>
-              <GlobalAutocomplete label='Supplier' options={supplierOptions} value={supplier} onChange={setSupplier} />
+              <GlobalTextField
+                label='Supplier'
+                value={supplier?.label || ''}
+                readOnly
+                fullWidth
+              />
             </Grid>
 
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
-                label='Purchase Order'
-                options={purchaseOrderOptions}
-                value={purchaseOrder}
-                onChange={setPurchaseOrder}
+                label='Purchase Inward No'
+                options={purchaseInwardOptions}
+                value={purchaseInward}
+                onChange={setPurchaseInward}
               />
             </Grid>
 
@@ -456,13 +462,13 @@ const EditPurchaseReturnPage = () => {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th style={{ width: '50px', minWidth: '50px' }}>ID</th>
-                  <th align='center' style={{ width: '100px' }}>
+                  <th style={{ width: '50px', minWidth: '50px' }}>S.NO</th>
+                  <th align='center' style={{ width: '80px' }}>
                     Action
                   </th>
-                  <th style={{ width: '25%' }}>Chemical</th>
-                  <th style={{ width: '15%' }}>UOM</th>
-                  <th style={{ width: '15%', textAlign: 'right' }}>Quantity</th>
+                  <th style={{ width: '50%' }}>Chemical</th>
+                  <th align='left' style={{ width: '15%', textAlign: 'left' }}>UOM</th>
+                  <th align='left' style={{ width: '15%', textAlign: 'left' }}>Quantity</th>
                 </tr>
               </thead>
 
@@ -480,8 +486,8 @@ const EditPurchaseReturnPage = () => {
                         </IconButton>
                       </td>
                       <td>{row.chemical}</td>
-                      <td>{row.uom}</td>
-                      <td style={{ textAlign: 'right' }}>{row.quantity}</td>
+                      <td align='left' style={{ textAlign: 'left' }}>{row.uom}</td>
+                      <td align='left' style={{ textAlign: 'left' }}>{row.quantity}</td>
                     </tr>
                   ))
                 ) : (

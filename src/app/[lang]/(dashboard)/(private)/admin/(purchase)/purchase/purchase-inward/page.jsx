@@ -39,6 +39,7 @@ import {
   getPurchaseInwardList,
   deletePurchaseInward
 } from '@/api/purchase/purchase_inward'
+import { getPurchaseFilters } from '@/api/purchase/purchase_order'
 import { getSupplierList } from '@/api/stock/supplier'
 import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns'
 
@@ -181,7 +182,7 @@ const PurchaseInwardPage = () => {
       const res = await getPurchaseInwardList({
         page: pagination.pageIndex + 1,
         page_size: pagination.pageSize,
-        origin: selectedOrigin?.value || undefined,
+        company: selectedOrigin?.value || undefined,
         supplier: selectedSupplier?.value || undefined
       })
 

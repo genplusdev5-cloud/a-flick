@@ -141,8 +141,10 @@ const PurchaseOrderPage = () => {
     try {
       const [filterRes, supplierRes] = await Promise.all([getPurchaseFilters(), getSupplierList()])
 
-      const dropdownData = filterRes?.data?.data || {}
-
+      // Fix: Check if data is nested or direct
+      // Robust fallback: filterRes.data.data -> filterRes.data -> filterRes
+      const dropdownData = filterRes?.data?.data || filterRes?.data || filterRes || {}
+      
       // ✅ Origin (company)
       const origins =
         dropdownData?.company?.name?.map(item => ({
@@ -152,15 +154,37 @@ const PurchaseOrderPage = () => {
         })) || []
 
       // ✅ Supplier (from Master)
+      // Fix: supplierRes might be { count: ..., results: ... }, { data: { results: ... } }, or direct array
+      // supplierRes is the Axios response, so we look at supplierRes.data
+      const supplierData = supplierRes?.data
+      console.log('Supplier Filter Debug:', supplierData) // DEBUG
+
+      let supplierList = []
+      if (Array.isArray(supplierData?.results)) {
+        supplierList = supplierData.results
+      } else if (Array.isArray(supplierData?.data)) {
+        supplierList = supplierData.data
+      } else if (Array.isArray(supplierData)) {
+        supplierList = supplierData
+      }
+
       const suppliers =
-        supplierRes?.data?.results?.map(item => ({
+        supplierList.map(item => ({
           label: item.name,
           value: item.name,
           id: item.id
-        })) || []
+        }))
 
       setOriginOptions(origins)
       setSupplierOptions(suppliers)
+      
+      // Default Origin: A-Flick Pte Ltd
+      const defaultOrigin = origins.find(o => o.label === 'A-Flick Pte Ltd')
+      if (defaultOrigin) {
+        setFilterOrigin(defaultOrigin)
+        setAppliedFilterOrigin(defaultOrigin)
+      }
+      
     } catch (err) {
       console.error('Filter fetch failed', err)
     }
@@ -282,7 +306,7 @@ const PurchaseOrderPage = () => {
 
   useEffect(() => {
     fetchPurchaseOrders()
-  }, [pagination.pageIndex, pagination.pageSize])
+  }, [pagination.pageIndex, pagination.pageSize, appliedFilterOrigin, appliedFilterSupplier, appliedFilterStatus])
 
   const confirmDelete = async () => {
     if (!deleteDialog.row?.id) return
@@ -339,7 +363,7 @@ const PurchaseOrderPage = () => {
 
         // ✅ CONTACT DETAILS (FIX)
         contactEmail: item?.supplier_details?.email || '-',
-        contactPhone: item?.supplier_details?.phone || '-',
+        contactPhone: item?.supplier_details?.mobile || item?.supplier_details?.phone || '-',
 
         poNo: item.num_series,
         poDate: item.po_date,

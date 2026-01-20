@@ -61,7 +61,7 @@ const AddPurchaseOrderPage = () => {
   const [chemical, setChemical] = useState(null)
   const [uom, setUom] = useState(null)
   const [quantity, setQuantity] = useState('')
-  const [rate, setRate] = useState('')
+
   const [editId, setEditId] = useState(null)
 
   // Items list
@@ -73,7 +73,7 @@ const AddPurchaseOrderPage = () => {
         const [purchaseRes, materialRes] = await Promise.all([getPurchaseFilters(), getMaterialRequestDropdowns()])
 
         // Parse Purchase Filters (Company/Origin, Supplier)
-        const purchaseData = purchaseRes?.data?.data || {}
+        const purchaseData = purchaseRes?.data?.data || purchaseRes?.data || {}
         const origins =
           purchaseData?.company?.name?.map(item => ({
             label: item.name,
@@ -108,8 +108,9 @@ const AddPurchaseOrderPage = () => {
         setUomOptions(uoms)
 
         // Set default origin if available
-        if (origins.length > 0) {
-          setOrigin(origins[0])
+        const defaultOrigin = origins.find(o => o.label === 'A-Flick Pte Ltd') || origins[0]
+        if (defaultOrigin) {
+          setOrigin(defaultOrigin)
         }
       } catch (err) {
         console.error('Failed to fetch dropdowns', err)
@@ -126,7 +127,6 @@ const AddPurchaseOrderPage = () => {
     setChemical({ label: row.chemical, id: row.chemicalId })
     setUom({ label: row.uom, id: row.uomId })
     setQuantity(row.quantity)
-    setRate(row.rate)
   }
 
   const PoDateInput = forwardRef(function PoDateInput(props, ref) {
@@ -135,15 +135,19 @@ const AddPurchaseOrderPage = () => {
     return <CustomTextField fullWidth inputRef={ref} label={label} value={value} {...rest} />
   })
 
-  const amount = useMemo(() => {
-    const q = Number(quantity)
-    const r = Number(rate)
-    return q && r ? q * r : ''
-  }, [quantity, rate])
+
 
   const handleAddItem = () => {
-    if (!chemical || !uom || !quantity || !rate) {
-      showToast('error', 'Please fill all chemical fields')
+    if (!chemical) {
+      showToast('error', 'Please select a chemical')
+      return
+    }
+    if (!uom) {
+      showToast('error', 'Please select a UOM')
+      return
+    }
+    if (!quantity) {
+      showToast('error', 'Please enter a quantity')
       return
     }
 
@@ -158,9 +162,7 @@ const AddPurchaseOrderPage = () => {
                 chemicalId: chemical?.id || (typeof chemical === 'object' ? chemical?.value : chemical),
                 uom: uom?.label || (typeof uom === 'string' ? uom : ''),
                 uomId: uom?.id || (typeof uom === 'object' ? uom?.value : uom),
-                quantity,
-                rate,
-                amount
+                quantity
               }
             : item
         )
@@ -176,9 +178,7 @@ const AddPurchaseOrderPage = () => {
           chemicalId: chemical?.id || (typeof chemical === 'object' ? chemical?.value : chemical),
           uom: uom?.label || (typeof uom === 'string' ? uom : ''),
           uomId: uom?.id || (typeof uom === 'object' ? uom?.value : uom),
-          quantity,
-          rate,
-          amount
+          quantity
         }
       ])
     }
@@ -187,7 +187,6 @@ const AddPurchaseOrderPage = () => {
     setChemical(null)
     setUom(null)
     setQuantity('')
-    setRate('')
   }
 
   const handleRemoveItem = id => {
@@ -208,9 +207,11 @@ const AddPurchaseOrderPage = () => {
         remarks,
         order_items: items.map(item => ({
           chemical_id: item.chemicalId,
+          item_id: item.chemicalId,
+          item_name: item.chemical,
           uom_id: item.uomId,
           quantity: Number(item.quantity),
-          unit_rate: Number(item.rate)
+          unit_rate: 0
         }))
       }
 
@@ -294,21 +295,13 @@ const AddPurchaseOrderPage = () => {
               <GlobalAutocomplete label='UOM' options={uomOptions} value={uom} onChange={setUom} />
             </Grid>
 
-            <Grid item xs={12} md={2}>
+            <Grid item xs={12} md={3}>
               <GlobalTextField
                 label='Quantity'
                 type='number'
                 value={quantity}
                 onChange={e => setQuantity(e.target.value)}
               />
-            </Grid>
-
-            <Grid item xs={12} md={2}>
-              <GlobalTextField label='Rate [₹]' type='number' value={rate} onChange={e => setRate(e.target.value)} />
-            </Grid>
-
-            <Grid item xs={12} md={2}>
-              <GlobalTextField label='Amount' value={amount} disabled />
             </Grid>
 
             <Grid item xs={12} md={1}>
@@ -330,15 +323,13 @@ const AddPurchaseOrderPage = () => {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th style={{ width: '50px', minWidth: '50px' }}>ID</th>
-                  <th align='center' style={{ width: '100px' }}>
+                  <th style={{ width: '50px' }}>S.No</th>
+                  <th align='center' style={{ width: '100px', textAlign: 'center' }}>
                     Action
                   </th>
-                  <th style={{ width: '25%' }}>Chemical</th>
-                  <th style={{ width: '15%' }}>UOM</th>
-                  <th style={{ width: '15%', textAlign: 'right' }}>Quantity</th>
-                  <th style={{ width: '15%', textAlign: 'right' }}>Unit Rate</th>
-                  <th style={{ width: '15%', textAlign: 'right' }}>Amount</th>
+                  <th style={{ width: '40%' }}>Chemical</th>
+                  <th style={{ width: '25%' }}>UOM</th>
+                  <th style={{ width: '25%', textAlign: 'right' }}>Quantity</th>
                 </tr>
               </thead>
 
@@ -348,24 +339,34 @@ const AddPurchaseOrderPage = () => {
                     <tr key={row.id}>
                       <td>{i + 1}</td>
                       <td align='center'>
-                        <IconButton size='small' color='primary' onClick={() => handleEditItem(row)}>
-                          <EditIcon fontSize='small' />
-                        </IconButton>
+                        <div style={{ display: 'flex', justifyContent: 'center', gap: '4px' }}>
+                          <IconButton
+                            size='small'
+                            color='primary'
+                            onClick={() => handleEditItem(row)}
+                            sx={{ padding: '4px' }}
+                          >
+                            <EditIcon fontSize='small' sx={{ fontSize: '1.25rem' }} />
+                          </IconButton>
 
-                        <IconButton size='small' color='error' onClick={() => handleRemoveItem(row.id)}>
-                          <DeleteIcon fontSize='small' />
-                        </IconButton>
+                          <IconButton
+                            size='small'
+                            color='error'
+                            onClick={() => handleRemoveItem(row.id)}
+                            sx={{ padding: '4px' }}
+                          >
+                            <DeleteIcon fontSize='small' sx={{ fontSize: '1.25rem' }} />
+                          </IconButton>
+                        </div>
                       </td>
                       <td>{row.chemical}</td>
                       <td>{row.uom}</td>
                       <td style={{ textAlign: 'right' }}>{row.quantity}</td>
-                      <td style={{ textAlign: 'right' }}>{row.rate}</td>
-                      <td style={{ textAlign: 'right' }}>{row.amount}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', padding: '24px' }}>
+                    <td colSpan={5} style={{ textAlign: 'center', padding: '24px' }}>
                       No chemicals added
                     </td>
                   </tr>

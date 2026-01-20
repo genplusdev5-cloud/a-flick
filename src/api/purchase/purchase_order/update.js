@@ -1,7 +1,6 @@
 import api from '@/utils/axiosInstance'
 
-export const updatePurchaseOrder = async ({ id, payload, type = 'tm' }) => {
-  const url = type === 'tx' ? `tx-purchase_order-update/?id=${id}` : `purchase_order-update/?id=${id}`
-  const res = await api.put(url, payload)
+export const updatePurchaseOrder = async ({ id, payload }) => {
+  const res = await api.put(`purchase_order-update/?id=${id}`, payload)
   return res.data
 }

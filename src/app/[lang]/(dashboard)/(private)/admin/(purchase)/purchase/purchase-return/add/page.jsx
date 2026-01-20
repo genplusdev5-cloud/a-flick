@@ -24,7 +24,7 @@ import {
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
-import { getPurchaseFilters } from '@/api/purchase/purchase_inward'
+import { getPurchaseFilters, getPurchaseInwardList, getPurchaseInwardDetails } from '@/api/purchase/purchase_inward'
 import { addPurchaseReturn } from '@/api/purchase/purchase_return'
 
 import StickyListLayout from '@/components/common/StickyListLayout'
@@ -52,8 +52,8 @@ const AddPurchaseReturnPage = () => {
   const [chemicalOptions, setChemicalOptions] = useState([])
   const [uomOptions, setUomOptions] = useState([])
 
-  const [purchaseOrderOptions, setPurchaseOrderOptions] = useState([])
-  const [purchaseOrder, setPurchaseOrder] = useState(null)
+  const [purchaseInwardOptions, setPurchaseInwardOptions] = useState([])
+  const [purchaseInward, setPurchaseInward] = useState(null)
 
   // Loading states
   const [initLoading, setInitLoading] = useState(false)
@@ -69,7 +69,14 @@ const AddPurchaseReturnPage = () => {
   // Item fields
   const [chemical, setChemical] = useState(null)
   const [uom, setUom] = useState(null)
-  const [quantity, setQuantity] = useState('')
+
+  // ✅ NEW FIELDS matching Purchase Inward
+  const [in_quantity, setInQuantity] = useState('')
+  const [conversion, setConversion] = useState('')
+  const [quantity, setQuantity] = useState('') // Auto-calculated usually
+  const [additional, setAdditional] = useState('')
+  const [total_quantity, setTotalQuantity] = useState('') // Auto-calculated
+
   const [editId, setEditId] = useState(null)
 
   // Items list
@@ -134,42 +141,106 @@ const AddPurchaseReturnPage = () => {
   }, [])
 
   useEffect(() => {
-    const fetchPOs = async () => {
+    const fetchPIs = async () => {
       if (supplier?.id) {
         try {
           const res = await getPurchaseFilters({ supplier_id: supplier.id })
           const purchaseData = res?.data?.data || res?.data || {}
 
-          // Use robust mapping based on observed backend structures
-          const rawPOs = purchaseData?.purchase_order?.name || purchaseData?.po_number?.po_number || []
+          // Update: Map pi_number for options
+          const rawPIs = purchaseData?.pi_number?.pi_number || []
 
-          const pos = rawPOs.map(item => ({
-            label: String(item.name || item.po_number || item.num_series || 'Unknown'),
+          const pis = rawPIs.map(item => ({
+            label: String(item.pi_number || item.name || 'Unknown'),
             value: item.id,
             id: item.id
           }))
 
-          setPurchaseOrderOptions(pos)
+          setPurchaseInwardOptions(pis)
         } catch (err) {
-          console.error('Failed to fetch POs', err)
-          setPurchaseOrderOptions([])
+          console.error('Failed to fetch PIs', err)
+          setPurchaseInwardOptions([])
         }
       } else {
-        setPurchaseOrderOptions([])
-        setPurchaseOrder(null)
+        setPurchaseInwardOptions([])
+        setPurchaseInward(null)
       }
     }
 
     if (!initLoading) {
-      fetchPOs()
+      fetchPIs()
     }
   }, [supplier, initLoading])
+
+  // ✅ CALCULATIONS similar to Inward
+  useEffect(() => {
+    const q = Number(in_quantity) || 0
+    const c = Number(conversion) || 0
+    const qty = q && c ? q * c : 0
+    setQuantity(qty)
+
+    const add = Number(additional) || 0
+    setTotalQuantity(qty + add)
+  }, [in_quantity, conversion, additional])
+
+  // ✅ FETCH INWARD ITEMS WHEN PI IS SELECTED
+  useEffect(() => {
+    const fetchInwardItems = async () => {
+      if (!purchaseInward?.id) return
+
+      try {
+        setInitLoading(true)
+
+        // Directly fetch details for the selected Purchase Inward
+        const detailRes = await getPurchaseInwardDetails({ id: purchaseInward.id })
+        const inwardData = detailRes?.data || detailRes
+
+        if (inwardData?.inward_items?.length) {
+          const mappedItems = inwardData.inward_items.map((item, index) => ({
+            id: Date.now() + index,
+            chemical: item.item_name,
+            chemicalId: item.item_id,
+            uom: item.uom,
+            uomId: item.uom_id,
+
+            // Map Inward Fields
+            in_quantity: item.in_quantity || 0,
+            conversion: item.conversion || 1,
+            quantity: item.quantity,
+            additional: item.additional || 0,
+            total_quantity: item.total_quantity || item.quantity,
+
+            // Reference
+            inward_item_id: item.id,
+            po_item_id: item.po_item_id,
+
+            // Helpful ref if we need the global PO ID later
+            po_id: item.po_id || inwardData.po_id
+          }))
+
+          setItems(mappedItems)
+          showToast('success', 'Items populated from Purchase Inward')
+        } else {
+          showToast('warning', 'No items found in this Purchase Inward')
+        }
+      } catch (err) {
+        console.error('Failed to fetch Inward details', err)
+        showToast('error', 'Failed to fetch Purchase Inward details')
+      } finally {
+        setInitLoading(false)
+      }
+    }
+
+    fetchInwardItems()
+  }, [purchaseInward])
 
   const handleEditItem = row => {
     setEditId(row.id)
     setChemical({ label: row.chemical, id: row.chemicalId })
     setUom({ label: row.uom, id: row.uomId })
-    setQuantity(row.quantity)
+    setInQuantity(row.in_quantity || '')
+    setConversion(row.conversion || '')
+    setAdditional(row.additional || '')
   }
 
   const PoDateInput = forwardRef(function PoDateInput(props, ref) {
@@ -178,45 +249,27 @@ const AddPurchaseReturnPage = () => {
     return <CustomTextField fullWidth inputRef={ref} label={label} value={value} {...rest} />
   })
 
-// Rate/Amount calculation removed
-
   const handleAddItem = () => {
     if (!chemical || !uom || !quantity) {
-      showToast('error', 'Please fill all chemical fields')
+      showToast('error', 'Please fill Chemical, UOM and Quantity')
       return
     }
 
-    if (editId) {
-      setItems(prev =>
-        prev.map(item =>
-          item.id === editId
-            ? {
-                ...item,
-                chemical: chemical.label,
-                chemicalId: chemical.id,
-                uom: uom.label,
-                uomId: uom.id,
-                quantity
-              }
-            : item
-        )
-      )
-      setEditId(null)
-    } else {
-      setItems(prev => [
-        ...prev,
-        {
-          id: Date.now(),
-          chemical: chemical.label,
-          chemicalId: chemical.id,
-          uom: uom.label,
-          uomId: uom.id,
-          quantity
-        }
-      ])
+    const newItem = {
+      chemical: chemical.label,
+      chemicalId: chemical.id,
+      uom: uom.label,
+      uomId: uom.id,
+      quantity: Number(quantity)
     }
 
-    // Reset item fields
+    if (editId) {
+      setItems(prev => prev.map(item => (item.id === editId ? { ...item, ...newItem } : item)))
+      setEditId(null)
+    } else {
+      setItems(prev => [...prev, { id: Date.now(), ...newItem }])
+    }
+
     setChemical(null)
     setUom(null)
     setQuantity('')
@@ -240,8 +293,9 @@ const AddPurchaseReturnPage = () => {
         return_date: format(returnDate, 'yyyy-MM-dd'),
         inward_date: format(returnDate, 'yyyy-MM-dd'), // Fallback
         supplier_id: supplier.id,
-        po_id: purchaseOrder?.id || null,
-        purchase_order_id: purchaseOrder?.id || null, // Key variant
+        po_id: purchaseInward?.id || null, // Keeping po_id key but sending PI ID if backend treats it generically, or relying on item level po_id
+        purchase_order_id: items[0]?.po_id || null, // Try to find linked PO ID from items
+        pi_id: purchaseInward?.id || null, // Explicit PI ID
         remarks,
         // Send as return_items_input with robust field mapping
         return_items_input: items.map(item => ({
@@ -250,27 +304,21 @@ const AddPurchaseReturnPage = () => {
           item_name: item.chemical,
           uom_id: item.uomId,
           uom: item.uom,
-          po_id: purchaseOrder?.id || null, // Added po_id
-          return_quantity: Number(item.quantity),
+          po_id: item.po_id || null, // Use stored PO ID
+          po_item_id: item.po_item_id || null,
+          inward_item_id: item.inward_item_id || null, // Link to original Inward item
+
+          return_quantity: Number(item.total_quantity), // Main qty is total
           quantity: Number(item.quantity),
+
+          // New Fields
+          in_quantity: Number(item.in_quantity),
+          conversion: Number(item.conversion),
+          additional: Number(item.additional),
+          total_quantity: Number(item.total_quantity),
+
           status: 1,
           is_active: 1
-        })),
-        // Keep fallbacks just in case backend expects them
-        inward_items: items.map(item => ({
-          chemical_id: item.chemicalId,
-          item_id: item.chemicalId,
-          uom_id: item.uomId,
-          return_quantity: Number(item.quantity),
-          quantity: Number(item.quantity)
-        })),
-        items: items.map(item => ({
-          chemical_id: item.chemicalId,
-          item_id: item.chemicalId,
-          uom_id: item.uomId,
-          return_quantity: Number(item.quantity),
-          quantity: Number(item.quantity),
-          rate: Number(item.rate)
         }))
       }
 
@@ -350,14 +398,13 @@ const AddPurchaseReturnPage = () => {
               <GlobalAutocomplete label='Suppliers' options={supplierOptions} value={supplier} onChange={setSupplier} />
             </Grid>
 
-            {/* ✅ NEW – Purchase Order */}
             <Grid item xs={12} md={3}>
               <GlobalAutocomplete
-                label='Purchase Order'
-                options={purchaseOrderOptions}
-                value={purchaseOrder}
-                onChange={setPurchaseOrder}
-                placeholder='Select PO'
+                label='Purchase Inward No'
+                options={purchaseInwardOptions}
+                value={purchaseInward}
+                onChange={setPurchaseInward}
+                placeholder='Select PI No'
               />
             </Grid>
 
@@ -377,26 +424,27 @@ const AddPurchaseReturnPage = () => {
 
         {/* ITEM ENTRY */}
         <Box px={4} py={3}>
-          <Grid container spacing={2} alignItems='flex-end'>
-            <Grid item xs={12} md={3}>
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={4}>
               <GlobalAutocomplete label='Chemicals' options={chemicalOptions} value={chemical} onChange={setChemical} />
             </Grid>
 
-            <Grid item xs={12} md={2}>
+            <Grid item xs={12} md={3}>
               <GlobalAutocomplete label='UOM' options={uomOptions} value={uom} onChange={setUom} />
             </Grid>
 
-            <Grid item xs={12} md={2}>
+            <Grid item xs={12} md={3}>
               <GlobalTextField
                 label='Quantity'
                 type='number'
-                value={quantity || ''}
+                value={quantity}
                 onChange={e => setQuantity(e.target.value)}
               />
             </Grid>
 
-            <Grid item xs={12} md={1}>
+            <Grid item xs={12} md={2}>
               <GlobalButton
+                fullWidth
                 variant='contained'
                 color={editId ? 'info' : 'primary'}
                 startIcon={editId ? <EditIcon /> : <AddIcon />}
@@ -414,13 +462,16 @@ const AddPurchaseReturnPage = () => {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th style={{ width: '50px', minWidth: '50px' }}>ID</th>
-                  <th align='center' style={{ width: '100px' }}>
-                    Action
+                  <th style={{ width: '50px', minWidth: '50px' }}>S.NO</th>
+                  <th align='center' style={{ width: '80px' }}>
+                    ACTION
                   </th>
-                  <th style={{ width: '25%' }}>Chemical</th>
-                  <th style={{ width: '15%' }}>UOM</th>
-                  <th style={{ width: '15%', textAlign: 'right' }}>Quantity</th>
+                  <th style={{ width: '50%' }}>CHEMICAL</th>
+                  <th align='left' style={{ width: '15%', textAlign: 'left' }}>UOM</th>
+
+                  <th align='left' style={{ width: '15%', textAlign: 'left' }}>
+                    QTY
+                  </th>
                 </tr>
               </thead>
 
@@ -429,6 +480,7 @@ const AddPurchaseReturnPage = () => {
                   items.map((row, i) => (
                     <tr key={row.id}>
                       <td>{i + 1}</td>
+
                       <td align='center'>
                         <IconButton size='small' color='primary' onClick={() => handleEditItem(row)}>
                           <EditIcon fontSize='small' />
@@ -437,14 +489,18 @@ const AddPurchaseReturnPage = () => {
                           <DeleteIcon fontSize='small' />
                         </IconButton>
                       </td>
+
                       <td>{row.chemical}</td>
-                      <td>{row.uom}</td>
-                      <td style={{ textAlign: 'right' }}>{row.quantity}</td>
+                      <td align='left' style={{ textAlign: 'left' }}>{row.uom}</td>
+
+                      <td align='left' style={{ textAlign: 'left' }}>
+                        {row.quantity}
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', padding: '24px' }}>
+                    <td colSpan={5} style={{ textAlign: 'center', padding: '24px' }}>
                       No chemicals added
                     </td>
                   </tr>
