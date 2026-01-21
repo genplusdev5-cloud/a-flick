@@ -87,8 +87,8 @@ const DUMMY_ROWS = [
 ]
 
 const statusOptions = [
-  { label: 'Pending', value: 'Pending' },
-  { label: 'Completed', value: 'Completed' }
+  { id: 1, label: 'Pending', value: 'Pending' },
+  { id: 2, label: 'Completed', value: 'Completed' }
 ]
 
 const PurchaseInwardPage = () => {
@@ -99,8 +99,6 @@ const PurchaseInwardPage = () => {
   const [originOptions, setOriginOptions] = useState([])
   const [supplierOptions, setSupplierOptions] = useState([])
 
-  const [selectedOrigin, setSelectedOrigin] = useState(null)
-  const [selectedSupplier, setSelectedSupplier] = useState(null)
 
   const [deleteDialog, setDeleteDialog] = useState({
     open: false,
@@ -108,8 +106,21 @@ const PurchaseInwardPage = () => {
   })
 
   const [deleteLoading, setDeleteLoading] = useState(false)
+  // UI STATES (Local to dropdowns)
+  const [filterOrigin, setFilterOrigin] = useState(null)
+  const [filterSupplier, setFilterSupplier] = useState(null)
+  const [filterStatus, setFilterStatus] = useState(null)
+  const [filterPiNo, setFilterPiNo] = useState(null)
+  const [piNoOptions, setPiNoOptions] = useState([])
 
-  // STATES
+  // APPLIED STATES (Used for API calls)
+  const [appliedOrigin, setAppliedOrigin] = useState(null)
+  const [appliedSupplier, setAppliedSupplier] = useState(null)
+  const [appliedStatus, setAppliedStatus] = useState(null)
+  const [appliedPiNo, setAppliedPiNo] = useState(null)
+  const [appliedDateFilter, setAppliedDateFilter] = useState(false)
+  const [appliedDateRange, setAppliedDateRange] = useState([null, null])
+
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(false)
   const [totalCount, setTotalCount] = useState(0)
@@ -121,27 +132,49 @@ const PurchaseInwardPage = () => {
   const [uiDateFilter, setUiDateFilter] = useState(false)
   const [uiDateRange, setUiDateRange] = useState([null, null])
 
+  const [searchQuery, setSearchQuery] = useState('')
+  const [appliedSearchQuery, setAppliedSearchQuery] = useState('')
+
   const fetchPurchaseFilters = async () => {
     try {
       const [filterRes, supplierRes] = await Promise.all([getPurchaseFilters(), getSupplierList()])
 
-      const purchaseData = filterRes?.data?.data || {}
-      const companyList = purchaseData?.company?.name || []
-      const supplierList = supplierRes?.data?.results || []
+      const dropdownData = filterRes?.data?.data || filterRes?.data || filterRes || {}
+      const companyList = dropdownData?.company?.name || []
+      
+      const supplierData = supplierRes?.data
+      let supplierList = []
+      if (Array.isArray(supplierData?.data?.results)) {
+        supplierList = supplierData.data.results
+      } else if (Array.isArray(supplierData?.data)) {
+        supplierList = supplierData.data
+      } else if (Array.isArray(supplierData?.results)) {
+        supplierList = supplierData.results
+      } else if (Array.isArray(supplierData)) {
+        supplierList = supplierData
+      }
 
-      setOriginOptions(
-        companyList.map(item => ({
-          label: item.name,
-          value: item.id
-        }))
-      )
+      const origins = companyList.map(item => ({
+        label: item.name,
+        value: item.id, // Value as ID
+        id: item.id
+      }))
 
+      setOriginOptions(origins)
       setSupplierOptions(
         supplierList.map(item => ({
           label: item.name,
-          value: item.id
+          value: item.id, // Value as ID
+          id: item.id
         }))
       )
+
+      // Default Origin: A-Flick Pte Ltd
+      const defaultOrigin = origins.find(o => o.label === 'A-Flick Pte Ltd')
+      if (defaultOrigin) {
+        setFilterOrigin(defaultOrigin)
+        setAppliedOrigin(defaultOrigin)
+      }
     } catch (err) {
       console.error('Purchase filter error', err)
     }
@@ -174,53 +207,100 @@ const PurchaseInwardPage = () => {
     fetchPurchaseFilters()
   }, [])
 
+  useEffect(() => {
+    const fetchPiOptions = async () => {
+      if (!filterSupplier) {
+        setPiNoOptions([])
+        setFilterPiNo(null)
+        return
+      }
+      try {
+        const res = await getPurchaseInwardList({
+          company: filterOrigin?.id,
+          supplier_id: filterSupplier.id,
+          page_size: 1000
+        })
+        const items = res?.data?.results || []
+        setPiNoOptions(
+          items.map(item => ({
+            label: item.pi_number || item.num_series,
+            value: item.id,
+            id: item.id
+          }))
+        )
+      } catch (err) {
+        console.error('PI options fetch failed', err)
+      }
+    }
+    fetchPiOptions()
+  }, [filterSupplier, filterOrigin])
+
   // ✅ FETCH FUNCTION
-  const fetchPurchaseInwardList = async () => {
+  const fetchPurchaseInwardList = async (
+    origin = appliedOrigin,
+    supplier = appliedSupplier,
+    statusVal = appliedStatus,
+    piNo = appliedPiNo,
+    dateFilter = appliedDateFilter,
+    dateRange = appliedDateRange,
+    search = appliedSearchQuery,
+    pageIdx = pagination.pageIndex
+  ) => {
     try {
       setLoading(true)
 
-      const res = await getPurchaseInwardList({
-        page: pagination.pageIndex + 1,
+      const params = {
+        page: pageIdx + 1,
         page_size: pagination.pageSize,
-        company: selectedOrigin?.value || undefined,
-        supplier: selectedSupplier?.value || undefined
-      })
+        company: origin?.id || undefined,
+        supplier_id: supplier?.id || undefined,
+        status: statusVal?.label || statusVal?.value || undefined, // Send Name/Label for Status
+        inward_status: statusVal?.label || statusVal?.value || undefined, // ✅ ALSO SEND inward_status
+        id: piNo?.id || undefined, // Send ID for PI No
+        search: search.trim()
+      }
+
+      // Backend Date Filtering
+      if (dateFilter && dateRange[0]) {
+        if (dateRange[0] && dateRange[1]) {
+          params.from_date = format(dateRange[0], 'yyyy-MM-dd')
+          params.to_date = format(dateRange[1], 'yyyy-MM-dd')
+        } else {
+          params.date = format(dateRange[0], 'yyyy-MM-dd')
+        }
+      }
+
+      const res = await getPurchaseInwardList(params)
 
       setTotalCount(res?.data?.count || 0)
 
-      const mappedRows =
+      let mappedRows =
         res?.data?.results?.map((item, index) => ({
           sno: pagination.pageIndex * pagination.pageSize + (index + 1),
           id: Number(item.id),
 
           origin: item.company,
-          inwardNo: item.num_series,
+          inwardNo: item.pi_number || item.num_series,
           inwardDate: item.inward_date ? format(new Date(item.inward_date), 'dd/MM/yyyy') : '-',
-          rawDate: item.inward_date, // Store raw date for filtering
-          supplierName: item.supplier,
+          rawDate: item.inward_date,
           contactEmail: item?.supplier_details?.email || '-',
           contactPhone: item?.supplier_details?.phone || '-',
-          poDetails: item.po_id || '-',
+          supplierName: item.supplier,
+          noOfItems: (item.inward_items || []).reduce((acc, curr) => acc + Number(curr.quantity || 0), 0),
+          poNo: item.po?.po_number || item.po_number || '-',
+          poDate: item.po?.date || item.po_date || '-',
           remarks: item.remarks || '-',
           status: item.inward_status,
           recordType: 'tm'
         })) || []
 
-      // Frontend Date Filtering
-      let filteredRows = mappedRows
-
-      if (uiDateFilter && uiDateRange[0] && uiDateRange[1]) {
-        const startDate = startOfDay(uiDateRange[0])
-        const endDate = endOfDay(uiDateRange[1])
-
-        filteredRows = mappedRows.filter(row => {
-          if (!row.rawDate) return false
-          const rowDate = parseISO(row.rawDate)
-          return isWithinInterval(rowDate, { start: startDate, end: endDate })
-        })
+      // ✅ FRONTEND FALLBACK: Filter by status if backend ignored it
+      if (statusVal?.label || statusVal?.value) {
+        const targetStatus = (statusVal.label || statusVal.value).toLowerCase()
+        mappedRows = mappedRows.filter(row => row.status?.toLowerCase() === targetStatus)
       }
 
-      setRows(filteredRows)
+      setRows(mappedRows)
     } catch (err) {
       console.error('Purchase inward list error', err)
     } finally {
@@ -230,7 +310,7 @@ const PurchaseInwardPage = () => {
 
   useEffect(() => {
     fetchPurchaseInwardList()
-  }, [pagination.pageIndex, pagination.pageSize, selectedOrigin, selectedSupplier, uiDateFilter, uiDateRange])
+  }, [pagination.pageIndex, pagination.pageSize, appliedOrigin, appliedSupplier, appliedStatus, appliedPiNo, appliedDateFilter, appliedDateRange, appliedSearchQuery])
 
   const columns = useMemo(
     () => [
@@ -296,10 +376,12 @@ const PurchaseInwardPage = () => {
       columnHelper.accessor('inwardNo', { header: 'Inward No.' }),
       columnHelper.accessor('inwardDate', { header: 'Inward Date' }),
       columnHelper.accessor('supplierName', { header: 'Supplier Name' }),
-      columnHelper.accessor('contactEmail', { header: 'Contact Email' }),
-      columnHelper.accessor('contactPhone', { header: 'Contact Phone' }),
-      columnHelper.accessor('poDetails', { header: 'PO Details' }),
-      columnHelper.accessor('remarks', { header: 'Remarks' }),
+      columnHelper.accessor('noOfItems', { header: 'No. of Items' }),
+      columnHelper.accessor('poNo', { header: 'PO No.' }),
+      columnHelper.accessor('poDate', {
+        header: 'PO Date',
+        cell: info => (info.getValue() && info.getValue() !== '-' ? format(new Date(info.getValue()), 'dd/MM/yyyy') : '-')
+      }),
 
       columnHelper.accessor('status', {
         header: 'Status',
@@ -414,30 +496,42 @@ const PurchaseInwardPage = () => {
               label='Origin'
               placeholder='Select Origin'
               options={originOptions}
-              value={selectedOrigin}
-              onChange={(_, val) => {
-                setSelectedOrigin(val)
-                setPagination(p => ({ ...p, pageIndex: 0 }))
-              }}
+              value={filterOrigin}
+              onChange={val => setFilterOrigin(val)}
             />
           </Box>
 
           {/* Status */}
           <Box sx={{ width: 220 }}>
-            <GlobalAutocomplete label='Status' placeholder='Select Status' options={statusOptions} />
+            <GlobalAutocomplete
+              label='Status'
+              placeholder='Select Status'
+              options={statusOptions}
+              value={filterStatus}
+              onChange={val => setFilterStatus(val)}
+            />
           </Box>
-
+ 
           {/* Supplier */}
           <Box sx={{ width: 220 }}>
             <GlobalAutocomplete
               label='Supplier'
               placeholder='Select Supplier'
               options={supplierOptions}
-              value={selectedSupplier}
-              onChange={(_, val) => {
-                setSelectedSupplier(val)
-                setPagination(p => ({ ...p, pageIndex: 0 }))
-              }}
+              value={filterSupplier}
+              onChange={val => setFilterSupplier(val)}
+            />
+          </Box>
+ 
+          {/* PI No Filter */}
+          <Box sx={{ width: 220 }}>
+            <GlobalAutocomplete
+              label='PI No.'
+              placeholder='Select PI No.'
+              options={piNoOptions}
+              value={filterPiNo}
+              onChange={val => setFilterPiNo(val)}
+              disabled={!filterSupplier}
             />
           </Box>
 
@@ -448,11 +542,15 @@ const PurchaseInwardPage = () => {
             startIcon={<RefreshIcon />}
             sx={{ height: 36 }}
             onClick={() => {
-              setSelectedOrigin(null)
-              setSelectedSupplier(null)
-              setUiDateFilter(false)
-              setUiDateRange([null, null])
-              setPagination(p => ({ ...p, pageIndex: 0 }))
+              setAppliedOrigin(filterOrigin)
+              setAppliedSupplier(filterSupplier)
+              setAppliedStatus(filterStatus)
+              setAppliedPiNo(filterPiNo)
+              setAppliedDateFilter(uiDateFilter)
+              setAppliedDateRange(uiDateRange)
+              setAppliedSearchQuery(searchQuery)
+              setPagination({ pageIndex: 0, pageSize: pagination.pageSize })
+              fetchPurchaseInwardList(filterOrigin, filterSupplier, filterStatus, filterPiNo, uiDateFilter, uiDateRange, searchQuery, 0)
             }}
           >
             Refresh
@@ -480,6 +578,14 @@ const PurchaseInwardPage = () => {
             size='small'
             placeholder='Search Inward No'
             sx={{ width: 320 }}
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                setAppliedSearchQuery(searchQuery)
+                setPagination({ pageIndex: 0, pageSize: pagination.pageSize })
+              }
+            }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position='start'>

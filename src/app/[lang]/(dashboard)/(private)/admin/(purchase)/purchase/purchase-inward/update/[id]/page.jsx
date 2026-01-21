@@ -137,12 +137,22 @@ const EditPurchaseInwardPage = () => {
         // --- MATERIAL DROPDOWNS ---
         const materialData = materialRes?.data || materialRes
 
-        const chemicals =
-          materialData?.chemicals?.name?.map(c => ({
-            label: c.name,
-            value: c.name,
-            id: c.id
-          })) || []
+        // 3. Chemicals (PRIORITY: Check multiple sources)
+        let chemRaw = []
+        if (Array.isArray(purchaseData?.chemicals)) {
+          chemRaw = purchaseData.chemicals
+        } else if (Array.isArray(purchaseData?.chemicals?.name)) {
+          chemRaw = purchaseData.chemicals.name
+        } else if (Array.isArray(materialData?.chemicals?.name)) {
+          chemRaw = materialData.chemicals.name
+        }
+
+        const chemicals = chemRaw.map(c => ({
+          label: c.name,
+          value: c.name,
+          id: c.id,
+          uom: c.uom || c.uom_name || c.unit
+        }))
 
         const uoms =
           materialData?.uom?.name?.map(u => ({
@@ -192,19 +202,6 @@ const EditPurchaseInwardPage = () => {
           const foundChem = chemicals.find(c => String(c.id) === String(chemId))
           const foundUom = uoms.find(u => String(u.id) === String(uomId))
 
-          const rateValue =
-            item.unit_rate ||
-            item.unit_price ||
-            item.rate ||
-            item.price ||
-            item.cost ||
-            item.unit_cost ||
-            item.purchase_rate ||
-            item.purchase_price ||
-            item.chemical_details?.purchase_price ||
-            item.chemical_details?.unit_rate ||
-            0
-
           return {
             id: item.id,
             chemical:
@@ -248,6 +245,21 @@ const EditPurchaseInwardPage = () => {
     }
   }, [decodedId])
 
+  const handleChemicalChange = val => {
+    setChemical(val)
+    if (val && val.uom) {
+      // Find matching UOM object or create one
+      const foundUom = uomOptions.find(u => u.label.toLowerCase() === val.uom.toLowerCase())
+      if (foundUom) {
+        setUom(foundUom)
+      } else {
+        setUom({ label: val.uom, value: val.uom, id: null })
+      }
+    } else {
+      setUom(null)
+    }
+  }
+
   useEffect(() => {
     const fetchPOs = async () => {
       if (supplier?.id) {
@@ -282,8 +294,8 @@ const EditPurchaseInwardPage = () => {
 
   const handleEditItem = row => {
     setEditId(row.id)
-    setChemical(chemicalOptions.find(c => c.id === row.item_id) || null)
-    setUom(uomOptions.find(u => u.id === row.uom_id) || null)
+    setChemical({ label: row.item_name, id: row.item_id })
+    setUom({ label: row.uom, id: row.uom_id })
     setInQuantity(row.in_quantity || '')
     setConversion(row.conversion || '')
     setAdditional(row.additional || '')
@@ -492,11 +504,19 @@ const EditPurchaseInwardPage = () => {
           <Grid container spacing={3}>
             {/* Row 1 */}
             <Grid item xs={12} md={3}>
-              <GlobalAutocomplete label='Chemical' options={chemicalOptions} value={chemical} onChange={setChemical} />
+              <GlobalAutocomplete label='Chemical' options={chemicalOptions} value={chemical} onChange={handleChemicalChange} />
             </Grid>
 
             <Grid item xs={12} md={2}>
-              <GlobalAutocomplete label='UOM' options={uomOptions} value={uom} onChange={setUom} />
+              <GlobalTextField
+                label='UOM'
+                value={uom?.label || ''}
+                InputProps={{
+                  readOnly: true
+                }}
+                disabled
+                sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#f5f5f5' } }}
+              />
             </Grid>
 
             <Grid item xs={12} md={2}>
@@ -531,9 +551,11 @@ const EditPurchaseInwardPage = () => {
               />
             </Grid>
 
-            <Grid item xs={12} md={6}>
-              <GlobalTextField label='Total Amount' value={total_quantity} disabled />
+            {/* 🔥 Reduced Width & Spacer */}
+            <Grid item xs={12} md={3}>
+              <GlobalTextField label='Total Qty' type='number' value={total_quantity} disabled />
             </Grid>
+            <Grid item xs={12} md={3} />
 
             <Grid item xs={12} md={3}>
               <GlobalButton
@@ -555,15 +577,15 @@ const EditPurchaseInwardPage = () => {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th style={{ width: '50px', minWidth: '50px' }}>ID</th>
+                  <th style={{ width: '50px', minWidth: '50px' }}>S.No</th>
                   <th align='center' style={{ width: '80px' }}>ACTION</th>
                   <th style={{ width: '20%' }}>CHEMICAL</th>
                   <th style={{ width: '10%' }}>UOM</th>
-                  <th align='right' style={{ width: '10%', textAlign: 'right' }}>IN QTY</th>
-                  <th align='right' style={{ width: '10%', textAlign: 'right' }}>CONV.</th>
-                  <th align='right' style={{ width: '10%', textAlign: 'right' }}>QTY</th>
-                  <th align='right' style={{ width: '12%', textAlign: 'right' }}>ADDITIONAL</th>
-                  <th align='right' style={{ width: '15%', textAlign: 'right' }}>TOTAL AMOUNT</th>
+                  <th align='left' style={{ width: '10%', textAlign: 'left' }}>IN QTY</th>
+                  <th align='left' style={{ width: '10%', textAlign: 'left' }}>CONV.</th>
+                  <th align='left' style={{ width: '10%', textAlign: 'left' }}>QTY</th>
+                  <th align='left' style={{ width: '12%', textAlign: 'left' }}>ADDITIONAL</th>
+                  <th align='left' style={{ width: '15%', textAlign: 'left' }}>TOTAL QTY</th>
                 </tr>
               </thead>
 
@@ -582,11 +604,11 @@ const EditPurchaseInwardPage = () => {
                       </td>
                       <td>{row.item_name}</td>
                       <td>{row.uom}</td>
-                      <td align='right' style={{ textAlign: 'right' }}>{row.in_quantity}</td>
-                      <td align='right' style={{ textAlign: 'right' }}>{row.conversion}</td>
-                      <td align='right' style={{ textAlign: 'right' }}>{row.quantity}</td>
-                      <td align='right' style={{ textAlign: 'right' }}>{row.additional}</td>
-                      <td align='right' style={{ textAlign: 'right' }}>{isNaN(row.total_quantity) ? '-' : row.total_quantity}</td>
+                      <td align='left' style={{ textAlign: 'left' }}>{row.in_quantity}</td>
+                      <td align='left' style={{ textAlign: 'left' }}>{row.conversion}</td>
+                      <td align='left' style={{ textAlign: 'left' }}>{row.quantity}</td>
+                      <td align='left' style={{ textAlign: 'left' }}>{row.additional}</td>
+                      <td align='left' style={{ textAlign: 'left' }}>{isNaN(row.total_quantity) ? '-' : row.total_quantity}</td>
                     </tr>
                   ))
                 ) : (

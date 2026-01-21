@@ -97,8 +97,20 @@ const PurchaseReturnPage = () => {
   const [originOptions, setOriginOptions] = useState([])
   const [supplierOptions, setSupplierOptions] = useState([])
 
-  const [selectedOrigin, setSelectedOrigin] = useState(null)
-  const [selectedSupplier, setSelectedSupplier] = useState(null)
+  // UI STATES (Local to dropdowns)
+  const [filterOrigin, setFilterOrigin] = useState(null)
+  const [filterSupplier, setFilterSupplier] = useState(null)
+  const [filterStatus, setFilterStatus] = useState(null)
+  const [filterPiNo, setFilterPiNo] = useState(null)
+  const [piNoOptions, setPiNoOptions] = useState([])
+
+  // APPLIED STATES (Used for API calls)
+  const [appliedOrigin, setAppliedOrigin] = useState(null)
+  const [appliedSupplier, setAppliedSupplier] = useState(null)
+  const [appliedStatus, setAppliedStatus] = useState(null)
+  const [appliedPiNo, setAppliedPiNo] = useState(null)
+  const [appliedDateFilter, setAppliedDateFilter] = useState(false)
+  const [appliedDateRange, setAppliedDateRange] = useState([null, null])
 
   const [deleteDialog, setDeleteDialog] = useState({
     open: false,
@@ -119,27 +131,49 @@ const PurchaseReturnPage = () => {
   const [uiDateFilter, setUiDateFilter] = useState(false)
   const [uiDateRange, setUiDateRange] = useState([null, null])
 
+  const [searchQuery, setSearchQuery] = useState('')
+  const [appliedSearchQuery, setAppliedSearchQuery] = useState('')
+
   const fetchPurchaseFilters = async () => {
     try {
       const [filterRes, supplierRes] = await Promise.all([getPurchaseFilters(), getSupplierList()])
 
-      const purchaseData = filterRes?.data?.data || {}
-      const companyList = purchaseData?.company?.name || []
-      const supplierList = supplierRes?.data?.results || []
+      const dropdownData = filterRes?.data?.data || filterRes?.data || filterRes || {}
+      const companyList = dropdownData?.company?.name || []
+      
+      const supplierData = supplierRes?.data
+      let supplierList = []
+      if (Array.isArray(supplierData?.data?.results)) {
+        supplierList = supplierData.data.results
+      } else if (Array.isArray(supplierData?.data)) {
+        supplierList = supplierData.data
+      } else if (Array.isArray(supplierData?.results)) {
+        supplierList = supplierData.results
+      } else if (Array.isArray(supplierData)) {
+        supplierList = supplierData
+      }
 
-      setOriginOptions(
-        companyList.map(item => ({
-          label: item.name,
-          value: item.id
-        }))
-      )
+      const origins = companyList.map(item => ({
+        label: item.name,
+        value: item.id,
+        id: item.id
+      }))
 
+      setOriginOptions(origins)
       setSupplierOptions(
         supplierList.map(item => ({
           label: item.name,
-          value: item.id
+          value: item.id,
+          id: item.id
         }))
       )
+
+      // Default Origin: A-Flick Pte Ltd
+      const defaultOrigin = origins.find(o => o.label === 'A-Flick Pte Ltd')
+      if (defaultOrigin) {
+        setFilterOrigin(defaultOrigin)
+        setAppliedOrigin(defaultOrigin)
+      }
     } catch (err) {
       console.error('Purchase filter error', err)
     }
@@ -172,51 +206,99 @@ const PurchaseReturnPage = () => {
     fetchPurchaseFilters()
   }, [])
 
+  useEffect(() => {
+    const fetchPiOptions = async () => {
+      if (!filterSupplier) {
+        setPiNoOptions([])
+        setFilterPiNo(null)
+        return
+      }
+      try {
+        const { getPurchaseInwardList } = await import('@/api/purchase/purchase_inward')
+        const res = await getPurchaseInwardList({
+          company: filterOrigin?.id,
+          supplier_id: filterSupplier.id,
+          page_size: 1000
+        })
+        const items = res?.data?.results || res?.results || []
+        setPiNoOptions(
+          items.map(item => ({
+            label: item.pi_number || item.inward_number || item.num_series,
+            value: item.id,
+            id: item.id
+          }))
+        )
+      } catch (err) {
+        console.error('PI options fetch failed', err)
+      }
+    }
+    fetchPiOptions()
+  }, [filterSupplier, filterOrigin])
+
   // ✅ FETCH FUNCTION
-  const fetchPurchaseReturnList = async () => {
+  const fetchPurchaseReturnList = async (
+    origin = appliedOrigin,
+    supplier = appliedSupplier,
+    statusVal = appliedStatus,
+    piNo = appliedPiNo,
+    dateFilter = appliedDateFilter,
+    dateRange = appliedDateRange,
+    search = appliedSearchQuery,
+    pageIdx = pagination.pageIndex
+  ) => {
     try {
       setLoading(true)
 
-      const res = await getPurchaseReturnList({
-        page: pagination.pageIndex + 1,
+      const params = {
+        page: pageIdx + 1,
         page_size: pagination.pageSize,
-        origin: selectedOrigin?.value,
-        supplier: selectedSupplier?.value
-      })
+        company: origin?.id || undefined,
+        supplier_id: supplier?.id || undefined,
+        status: statusVal?.label || undefined,
+        pi_id: piNo?.id || undefined,
+        search: search.trim()
+      }
+
+      // Backend Date Filtering
+      if (dateFilter && dateRange[0]) {
+        if (dateRange[0] && dateRange[1]) {
+          params.from_date = format(dateRange[0], 'yyyy-MM-dd')
+          params.to_date = format(dateRange[1], 'yyyy-MM-dd')
+        } else {
+          params.date = format(dateRange[0], 'yyyy-MM-dd')
+        }
+      }
+
+      const res = await getPurchaseReturnList(params)
 
       setTotalCount(res?.data?.count || 0)
+
+      const formatDateSafe = (dateValue) => {
+        if (!dateValue) return '-'
+        const date = new Date(dateValue)
+        return isNaN(date.getTime()) ? '-' : format(date, 'dd/MM/yyyy')
+      }
 
       const mappedRows =
         res?.data?.results?.map((item, index) => ({
           sno: pagination.pageIndex * pagination.pageSize + (index + 1),
           id: item.id,
           origin: item.company,
-          returnNo: item.num_series,
-          returnDate: item.pr_date || item.return_date ? format(new Date(item.pr_date || item.return_date), 'dd/MM/yyyy') : '-',
+          returnNo: item.pr_number || item.num_series || '-',
+          returnDate: formatDateSafe(item.pr_date || item.return_date),
           rawDate: item.pr_date || item.return_date, // Raw date for filtering
+          inwardNo: item.pi?.pi_number || item.pi_number || item.inward_number || '-',
+          inwardDate: formatDateSafe(item.pi?.inward_date || item.pi?.date || item.inward_date),
           supplierName: item.supplier,
           contactEmail: item?.supplier_details?.email || '-',
           contactPhone: item?.supplier_details?.phone || '-',
+          noOfItems: (item.return_items || item.items || []).reduce((acc, curr) => acc + Number(curr.quantity || curr.return_quantity || 0), 0),
           remarks: item.remarks || '-',
           status: item.pr_status || item.return_status || 'Pending',
           recordType: 'tm'
         })) || []
 
-      // Frontend Date Filtering
-      let filteredRows = mappedRows
-
-      if (uiDateFilter && uiDateRange[0] && uiDateRange[1]) {
-        const startDate = startOfDay(uiDateRange[0])
-        const endDate = endOfDay(uiDateRange[1])
-
-        filteredRows = mappedRows.filter(row => {
-          if (!row.rawDate) return false
-          const rowDate = parseISO(row.rawDate)
-          return isWithinInterval(rowDate, { start: startDate, end: endDate })
-        })
-      }
-
-      setRows(filteredRows)
+      setRows(mappedRows)
     } catch (err) {
       console.error('Purchase inward list error', err)
     } finally {
@@ -226,7 +308,7 @@ const PurchaseReturnPage = () => {
 
   useEffect(() => {
     fetchPurchaseReturnList()
-  }, [pagination.pageIndex, pagination.pageSize, selectedOrigin, selectedSupplier, uiDateFilter, uiDateRange])
+  }, [pagination.pageIndex, pagination.pageSize, appliedOrigin, appliedSupplier, appliedStatus, appliedPiNo, appliedDateFilter, appliedDateRange, appliedSearchQuery])
 
   const columns = useMemo(
     () => [
@@ -278,13 +360,12 @@ const PurchaseReturnPage = () => {
       }),
 
       columnHelper.accessor('origin', { header: 'Origin' }),
-      columnHelper.accessor('returnNo', { header: 'Return .No' }),
+      columnHelper.accessor('returnNo', { header: 'Return No.' }),
       columnHelper.accessor('returnDate', { header: 'Return Date' }),
+      columnHelper.accessor('inwardNo', { header: 'Inward No.' }),
+      columnHelper.accessor('inwardDate', { header: 'Inward Date' }),
       columnHelper.accessor('supplierName', { header: 'Supplier Name' }),
-      columnHelper.accessor('contactEmail', { header: 'Contact Email' }),
-      columnHelper.accessor('contactPhone', { header: 'Contact Phone' }),
-
-      columnHelper.accessor('remarks', { header: 'Remarks' }),
+      columnHelper.accessor('noOfItems', { header: 'No. of Items' }),
 
       columnHelper.accessor('status', {
         header: 'Status',
@@ -401,30 +482,42 @@ const PurchaseReturnPage = () => {
               label='Origin'
               placeholder='Select Origin'
               options={originOptions}
-              value={selectedOrigin}
-              onChange={(_, val) => {
-                setSelectedOrigin(val)
-                setPagination(p => ({ ...p, pageIndex: 0 }))
-              }}
+              value={filterOrigin}
+              onChange={val => setFilterOrigin(val)}
             />
           </Box>
 
           {/* Status */}
           <Box sx={{ width: 220 }}>
-            <GlobalAutocomplete label='Status' placeholder='Select Status' options={statusOptions} />
+            <GlobalAutocomplete
+              label='Status'
+              placeholder='Select Status'
+              options={statusOptions}
+              value={filterStatus}
+              onChange={val => setFilterStatus(val)}
+            />
           </Box>
-
+ 
           {/* Supplier */}
           <Box sx={{ width: 220 }}>
             <GlobalAutocomplete
               label='Supplier'
               placeholder='Select Supplier'
               options={supplierOptions}
-              value={selectedSupplier}
-              onChange={(_, val) => {
-                setSelectedSupplier(val)
-                setPagination(p => ({ ...p, pageIndex: 0 }))
-              }}
+              value={filterSupplier}
+              onChange={val => setFilterSupplier(val)}
+            />
+          </Box>
+ 
+          {/* PI No Filter */}
+          <Box sx={{ width: 220 }}>
+            <GlobalAutocomplete
+              label='PI No.'
+              placeholder='Select PI No.'
+              options={piNoOptions}
+              value={filterPiNo}
+              onChange={val => setFilterPiNo(val)}
+              disabled={!filterSupplier}
             />
           </Box>
 
@@ -435,11 +528,15 @@ const PurchaseReturnPage = () => {
             startIcon={<RefreshIcon />}
             sx={{ height: 36 }}
             onClick={() => {
-              setSelectedOrigin(null)
-              setSelectedSupplier(null)
-              setUiDateFilter(false)
-              setUiDateRange([null, null])
-              setPagination(p => ({ ...p, pageIndex: 0 }))
+              setAppliedOrigin(filterOrigin)
+              setAppliedSupplier(filterSupplier)
+              setAppliedStatus(filterStatus)
+              setAppliedPiNo(filterPiNo)
+              setAppliedDateFilter(uiDateFilter)
+              setAppliedDateRange(uiDateRange)
+              setAppliedSearchQuery(searchQuery)
+              setPagination({ pageIndex: 0, pageSize: pagination.pageSize })
+              fetchPurchaseReturnList(filterOrigin, filterSupplier, filterStatus, filterPiNo, uiDateFilter, uiDateRange, searchQuery, 0)
             }}
           >
             Refresh
@@ -467,6 +564,14 @@ const PurchaseReturnPage = () => {
             size='small'
             placeholder='Search Return No'
             sx={{ width: 320 }}
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                setAppliedSearchQuery(searchQuery)
+                setPagination({ pageIndex: 0, pageSize: pagination.pageSize })
+              }
+            }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position='start'>

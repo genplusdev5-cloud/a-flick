@@ -134,8 +134,15 @@ const PurchaseOrderPage = () => {
   const [appliedFilterOrigin, setAppliedFilterOrigin] = useState(null)
   const [appliedFilterSupplier, setAppliedFilterSupplier] = useState(null)
   const [appliedFilterStatus, setAppliedFilterStatus] = useState(null)
+  const [filterPoNo, setFilterPoNo] = useState(null)
+  const [appliedFilterPoNo, setAppliedFilterPoNo] = useState(null)
+  const [poNoOptions, setPoNoOptions] = useState([])
+
   const [appliedDateFilter, setAppliedDateFilter] = useState(false)
   const [appliedDateRange, setAppliedDateRange] = useState([null, null])
+
+  const [searchQuery, setSearchQuery] = useState('')
+  const [appliedSearchQuery, setAppliedSearchQuery] = useState('')
 
   const fetchFilterOptions = async () => {
     try {
@@ -160,10 +167,12 @@ const PurchaseOrderPage = () => {
       console.log('Supplier Filter Debug:', supplierData) // DEBUG
 
       let supplierList = []
-      if (Array.isArray(supplierData?.results)) {
-        supplierList = supplierData.results
+      if (Array.isArray(supplierData?.data?.results)) {
+        supplierList = supplierData.data.results
       } else if (Array.isArray(supplierData?.data)) {
         supplierList = supplierData.data
+      } else if (Array.isArray(supplierData?.results)) {
+        supplierList = supplierData.results
       } else if (Array.isArray(supplierData)) {
         supplierList = supplierData
       }
@@ -193,6 +202,34 @@ const PurchaseOrderPage = () => {
   useEffect(() => {
     fetchFilterOptions()
   }, [])
+
+  useEffect(() => {
+    const fetchPoOptions = async () => {
+      if (!filterSupplier) {
+        setPoNoOptions([])
+        setFilterPoNo(null)
+        return
+      }
+      try {
+        const res = await getPurchaseOrderList({
+          company: filterOrigin?.id,
+          supplier_id: filterSupplier.id,
+          page_size: 1000
+        })
+        const items = res?.data?.results || res?.results || []
+        setPoNoOptions(
+          items.map(item => ({
+            label: item.po_number || item.num_series,
+            value: item.id,
+            id: item.id
+          }))
+        )
+      } catch (err) {
+        console.error('PO options fetch failed', err)
+      }
+    }
+    fetchPoOptions()
+  }, [filterSupplier, filterOrigin])
 
   const columns = useMemo(
     () => [
@@ -260,16 +297,8 @@ const PurchaseOrderPage = () => {
         header: 'Supplier Name'
       }),
 
-      columnHelper.accessor('contactEmail', {
-        header: 'Contact Email'
-      }),
-
-      columnHelper.accessor('contactPhone', {
-        header: 'Contact Phone'
-      }),
-
-      columnHelper.accessor('remarks', {
-        header: 'Remarks'
+      columnHelper.accessor('noOfItems', {
+        header: 'No. of Items'
       }),
 
       columnHelper.accessor('status', {
@@ -306,7 +335,7 @@ const PurchaseOrderPage = () => {
 
   useEffect(() => {
     fetchPurchaseOrders()
-  }, [pagination.pageIndex, pagination.pageSize, appliedFilterOrigin, appliedFilterSupplier, appliedFilterStatus])
+  }, [pagination.pageIndex, pagination.pageSize, appliedFilterOrigin, appliedFilterSupplier, appliedFilterStatus, appliedFilterPoNo, appliedDateFilter, appliedDateRange, appliedSearchQuery])
 
   const confirmDelete = async () => {
     if (!deleteDialog.row?.id) return
@@ -338,56 +367,110 @@ const PurchaseOrderPage = () => {
     origin = appliedFilterOrigin,
     supplier = appliedFilterSupplier,
     status = appliedFilterStatus,
+    poNo = appliedFilterPoNo,
     dateFilter = appliedDateFilter,
-    dateRange = appliedDateRange
+    dateRange = appliedDateRange,
+    search = appliedSearchQuery,
+    pageIdx = pagination.pageIndex
   ) => {
     try {
       setLoading(true)
 
-      const res = await getPurchaseOrderList({
-        page: pagination.pageIndex + 1,
-        page_size: pagination.pageSize,
+      const params = {
+        page: pageIdx + 1,
+        page_size: (dateFilter || status || origin || supplier || poNo) ? 500 : pagination.pageSize,
         company: origin?.id,
-        supplier: supplier?.id,
-        status: status?.value
-      })
+        company_id: origin?.id, // Fallback
+        supplier_id: supplier?.id,
+        status: status?.label,
+        po_status: status?.label, // Fallback
+        id: poNo?.id,
+        po_id: poNo?.id, // Fallback
+        search: search.trim()
+      }
 
-      setTotalCount(res?.count || 0)
+      // Backend Date Filtering
+      if (dateFilter && dateRange[0]) {
+        if (dateRange[0] && dateRange[1]) {
+          const from = format(dateRange[0], 'yyyy-MM-dd')
+          const to = format(dateRange[1], 'yyyy-MM-dd')
+          params.from_date = from
+          params.to_date = to
+          params.start_date = from // Fallback
+          params.end_date = to // Fallback
+          params.po_from_date = from // Fallback
+          params.po_to_date = to // Fallback
+        } else {
+          const d = format(dateRange[0], 'yyyy-MM-dd')
+          params.date = d
+          params.po_date = d // Fallback
+        }
+      }
 
-      const mappedRows = (res?.data?.results || []).map((item, index) => ({
+      const res = await getPurchaseOrderList(params)
+
+      let rawResults = res?.data?.results || []
+
+      const mappedRows = rawResults.map((item, index) => ({
         sno: pagination.pageIndex * pagination.pageSize + (index + 1),
         id: item.id,
 
         origin: item.company,
         supplierName: item.supplier,
 
-        // ✅ CONTACT DETAILS (FIX)
-        contactEmail: item?.supplier_details?.email || '-',
-        contactPhone: item?.supplier_details?.mobile || item?.supplier_details?.phone || '-',
-
-        poNo: item.num_series,
+        poNo: item.po_number || item.num_series,
         poDate: item.po_date,
         rawDate: item.po_date, // Store raw date
-        remarks: item.remarks || '-',
+        noOfItems: item.no_of_items || item.order_items?.length || 0,
         status: item.po_status,
         recordType: item.record_type || 'tm' // Capture type
       }))
 
-      // Frontend Date Filtering
-      let filteredRows = mappedRows
+      // 🔥 FRONTEND FILTER FALLBACK
+      let finalRows = mappedRows
 
+      // 1. Date Filter
       if (dateFilter && dateRange[0] && dateRange[1]) {
-        const startDate = startOfDay(dateRange[0])
-        const endDate = endOfDay(dateRange[1])
+        const startDate = startOfDay(new Date(dateRange[0]))
+        const endDate = endOfDay(new Date(dateRange[1]))
 
-        filteredRows = mappedRows.filter(row => {
+        finalRows = finalRows.filter(row => {
           if (!row.rawDate) return false
-          const rowDate = parseISO(row.rawDate)
-          return isWithinInterval(rowDate, { start: startDate, end: endDate })
+          let dateObj
+          if (row.rawDate.includes('/')) {
+            const [day, month, year] = row.rawDate.split('/')
+            dateObj = new Date(year, month - 1, day)
+          } else {
+            dateObj = new Date(row.rawDate)
+          }
+          if (isNaN(dateObj.getTime())) return false
+          return isWithinInterval(dateObj, { start: startDate, end: endDate })
         })
       }
 
-      setRows(filteredRows)
+      // 2. Status Filter
+      if (status?.label) {
+        finalRows = finalRows.filter(row => row.status?.toLowerCase() === status.label.toLowerCase())
+      }
+
+      // 3. Origin Filter
+      if (origin?.id || origin?.name) {
+        finalRows = finalRows.filter(row =>
+          row.origin?.toLowerCase().includes(origin.name?.toLowerCase() || '') ||
+          String(row.origin_id) === String(origin.id)
+        )
+      }
+
+      // 4. Supplier Filter
+      if (supplier?.id || supplier?.name) {
+        finalRows = finalRows.filter(row =>
+          row.supplierName?.toLowerCase().includes(supplier.name?.toLowerCase() || '') ||
+          String(row.supplier_id) === String(supplier.id)
+        )
+      }
+
+      setRows(finalRows)
+      setTotalCount((dateFilter || status || origin || supplier || poNo) ? finalRows.length : res?.count || 0)
     } catch (err) {
       console.error(err)
     } finally {
@@ -395,17 +478,19 @@ const PurchaseOrderPage = () => {
     }
   }
 
-  const handleApplyFilters = () => {
+  const handleRefresh = async () => {
     setAppliedFilterOrigin(filterOrigin)
     setAppliedFilterSupplier(filterSupplier)
     setAppliedFilterStatus(filterStatus)
+    setAppliedFilterPoNo(filterPoNo)
     setAppliedDateFilter(uiDateFilter)
     setAppliedDateRange(uiDateRange)
+    setAppliedSearchQuery(searchQuery)
 
-    // Manual fetch with UI values to ensure immediate update
-    fetchPurchaseOrders(filterOrigin, filterSupplier, filterStatus, uiDateFilter, uiDateRange)
+    setPagination({ pageIndex: 0, pageSize: pagination.pageSize })
 
-    setPagination(prev => ({ ...prev, pageIndex: 0 }))
+    // Force fetch with current UI values to override useEffect's state check
+    fetchPurchaseOrders(filterOrigin, filterSupplier, filterStatus, filterPoNo, uiDateFilter, uiDateRange, searchQuery, 0)
   }
 
   return (
@@ -534,6 +619,18 @@ const PurchaseOrderPage = () => {
                 onChange={val => setFilterSupplier(val)}
               />
             </Box>
+ 
+            {/* PO No Filter */}
+            <Box sx={{ width: 220 }}>
+              <GlobalAutocomplete
+                label='PO No.'
+                placeholder='Select PO No.'
+                options={poNoOptions}
+                value={filterPoNo}
+                onChange={val => setFilterPoNo(val)}
+                disabled={!filterSupplier}
+              />
+            </Box>
 
             {/* Refresh */}
             <GlobalButton
@@ -541,7 +638,7 @@ const PurchaseOrderPage = () => {
               color='primary'
               startIcon={<RefreshIcon />}
               sx={{ height: 36 }}
-              onClick={handleApplyFilters}
+              onClick={handleRefresh}
             >
               Refresh
             </GlobalButton>
@@ -582,10 +679,14 @@ const PurchaseOrderPage = () => {
             </Select>
           </FormControl>
 
-          {/* RIGHT — Search */}
           <GlobalTextField
             size='small'
             placeholder='Search PO No'
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') handleRefresh()
+            }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position='start'>

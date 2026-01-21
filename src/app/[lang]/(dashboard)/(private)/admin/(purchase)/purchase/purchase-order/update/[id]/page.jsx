@@ -115,12 +115,24 @@ const EditPurchaseOrderPage = () => {
           : []
 
         const materialData = materialRes?.data || materialRes
-        const chemicals =
-          materialData?.chemicals?.name?.map(c => ({
-            label: c.name,
-            value: c.name,
-            id: c.id
-          })) || []
+
+        // Chemicals (PRIORITY: Specialized Purchase API)
+        let chemRaw = []
+        if (Array.isArray(purchaseData?.chemicals)) {
+          chemRaw = purchaseData.chemicals
+        } else if (Array.isArray(purchaseData?.chemicals?.name)) {
+          chemRaw = purchaseData.chemicals.name
+        } else if (Array.isArray(materialData?.chemicals?.name)) {
+          chemRaw = materialData.chemicals.name
+        }
+
+        const chemicals = chemRaw.map(c => ({
+          label: c.name,
+          value: c.name,
+          id: c.id,
+          uom: c.uom || c.uom_name || c.unit
+        }))
+
         const uoms =
           materialData?.uom?.name?.map(u => ({
             label: u.name,
@@ -205,6 +217,20 @@ const EditPurchaseOrderPage = () => {
       fetchData()
     }
   }, [decodedId])
+
+  const handleChemicalChange = val => {
+    setChemical(val)
+    if (val && val.uom) {
+      const foundUom = uomOptions.find(u => u.label.toLowerCase() === val.uom.toLowerCase())
+      if (foundUom) {
+        setUom(foundUom)
+      } else {
+        setUom({ label: val.uom, value: val.uom, id: null })
+      }
+    } else {
+      setUom(null)
+    }
+  }
 
   const handleEditItem = row => {
     setEditId(row.id)
@@ -421,11 +447,24 @@ const EditPurchaseOrderPage = () => {
         <Box px={4} py={3}>
           <Grid container spacing={2} alignItems='flex-end'>
             <Grid item xs={12} md={3}>
-              <GlobalAutocomplete label='Chemical' options={chemicalOptions} value={chemical} onChange={setChemical} />
+              <GlobalAutocomplete
+                label='Chemical'
+                options={chemicalOptions}
+                value={chemical}
+                onChange={handleChemicalChange}
+              />
             </Grid>
 
             <Grid item xs={12} md={2}>
-              <GlobalAutocomplete label='UOM' options={uomOptions} value={uom} onChange={setUom} />
+              <GlobalTextField
+                label='UOM'
+                value={uom?.label || ''}
+                InputProps={{
+                  readOnly: true
+                }}
+                disabled
+                sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#f5f5f5' } }}
+              />
             </Grid>
 
             <Grid item xs={12} md={3}>
@@ -462,7 +501,7 @@ const EditPurchaseOrderPage = () => {
                   </th>
                   <th style={{ width: '40%' }}>Chemical</th>
                   <th style={{ width: '25%' }}>UOM</th>
-                  <th style={{ width: '25%', textAlign: 'right' }}>Quantity</th>
+                  <th style={{ width: '25%', textAlign: 'left' }}>Quantity</th>
                 </tr>
               </thead>
 
@@ -494,7 +533,7 @@ const EditPurchaseOrderPage = () => {
                       </td>
                       <td>{row.chemical}</td>
                       <td>{row.uom}</td>
-                      <td style={{ textAlign: 'right' }}>{row.quantity}</td>
+                      <td style={{ textAlign: 'left' }}>{row.quantity}</td>
                     </tr>
                   ))
                 ) : (

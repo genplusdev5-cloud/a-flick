@@ -40,7 +40,7 @@ import CustomTextField from '@core/components/mui/TextField'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import { Autocomplete } from '@mui/material'
 
-import { getCustomerList } from '@/api/customer_group/customer'
+import { getCustomerList, getCustomerDetails } from '@/api/customer_group/customer'
 import { getContractDropdowns, getContractDates, getInvoiceCount, getPestCount, getInvoiceRemark } from '@/api/contract_group/contract'
 import { updateProposal, getProposalDetails } from '@/api/sales/proposal'
 import { decodeId } from '@/utils/urlEncoder'

@@ -36,6 +36,7 @@ import StatusChip from '@/components/common/StatusChip'
 
 import { getTmMaterialRequestList } from '@/api/transfer/materialRequest/list'
 import { deleteTmMaterialRequest } from '@/api/transfer/materialRequest/delete'
+import { getMaterialRequestDropdowns } from '@/api/transfer/materialRequest/dropdown'
 
 import CustomTextField from '@core/components/mui/TextField'
 import CustomAutocomplete from '@core/components/mui/Autocomplete'
@@ -74,9 +75,7 @@ const MaterialRequestPageContent = () => {
   const [uiStartDate, setUiStartDate] = useState(new Date())
   const [uiEndDate, setUiEndDate] = useState(new Date())
   const [uiRequestStatus, setUiRequestStatus] = useState('')
-  const [uiFromLocation, setUiFromLocation] = useState('')
-  const [uiToLocation, setUiToLocation] = useState('')
-  const [uiRequestedBy, setUiRequestedBy] = useState('')
+  const [uiEmployee, setUiEmployee] = useState('')
   const [uiSearchText, setUiSearchText] = useState('')
 
   // -- APPLIED (PERSISTENT) FILTER STATES --
@@ -85,14 +84,28 @@ const MaterialRequestPageContent = () => {
     startDate: new Date(),
     endDate: new Date(),
     requestStatus: '',
-    fromLocation: '',
-    toLocation: '',
-    requestedBy: '',
+    employee: '',
     searchText: ''
   })
 
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [sorting, setSorting] = useState([])
+  const [employeeOptions, setEmployeeOptions] = useState([])
+
+  const fetchOptions = async () => {
+    try {
+      const res = await getMaterialRequestDropdowns()
+      const data = res?.data || res
+      const uniqueNames = [...new Set((data?.employee?.name || []).map(e => e.name))]
+      setEmployeeOptions(uniqueNames)
+    } catch (err) {
+      console.error('Dropdown load failed:', err)
+    }
+  }
+
+  useEffect(() => {
+    fetchOptions()
+  }, [])
 
   const confirmDelete = async () => {
     try {
@@ -120,12 +133,10 @@ const MaterialRequestPageContent = () => {
 
       const mapped = data.map(r => ({
         id: r.id,
-        requestType: r.request_type || 'Material',
         requestNo: r.request_no || `REQ-${r.id}`,
         requestDate: r.request_date,
-        fromLocation: r.from_location || r.from_location_supplier || '',
-        toLocation: r.to_location || r.to_location_supplier || '',
-        requestedBy: r.requested_by_name || r.employee_name || (r.employee_id ? `EMP-${r.employee_id}` : ''),
+        fromEmployee: r.from_location || '',
+        toEmployee: r.to_location || '',
         approvedStatus: r.is_approved === 1 ? 'Yes' : 'N/A',
         issuedStatus: r.is_issued === 1 ? 'Yes' : 'N/A',
         completedStatus: r.is_completed === 1 ? 'Yes' : 'No',
@@ -142,10 +153,10 @@ const MaterialRequestPageContent = () => {
             new Date(row.requestDate) >= appliedFilters.startDate &&
             new Date(row.requestDate) <= appliedFilters.endDate
         const matchesStatus = !appliedFilters.requestStatus || row.status === appliedFilters.requestStatus
-        const matchesFrom = !appliedFilters.fromLocation || row.fromLocation === appliedFilters.fromLocation
-        const matchesTo = !appliedFilters.toLocation || row.toLocation === appliedFilters.toLocation
-        const matchesBy = !appliedFilters.requestedBy || row.requestedBy === appliedFilters.requestedBy
-        return matchesSearch && matchesDate && matchesStatus && matchesFrom && matchesTo && matchesBy
+        const matchesEmployee = !appliedFilters.employee || 
+          row.fromEmployee === appliedFilters.employee || 
+          row.toEmployee === appliedFilters.employee
+        return matchesSearch && matchesDate && matchesStatus && matchesEmployee
       })
 
       const withSno = filtered.map((row, i) => ({
@@ -262,41 +273,25 @@ const MaterialRequestPageContent = () => {
           )
         }
       }),
-      columnHelper.accessor('requestType', { header: 'Request Type', size: 150 }),
-      columnHelper.accessor('requestNo', { header: 'Request No', size: 150 }),
+      columnHelper.accessor('requestNo', { header: 'Request No' }),
       columnHelper.accessor('requestDate', {
         header: 'Request Date',
-        size: 130,
         cell: info => {
           const d = info.getValue()
           return d ? format(new Date(d), 'dd/MM/yyyy') : ''
         }
       }),
-      columnHelper.accessor('fromLocation', { header: 'From Location/Supplier', size: 200 }),
-      columnHelper.accessor('toLocation', { header: 'To Location/Supplier', size: 200 }),
-      columnHelper.accessor('requestedBy', { header: 'Requested By', size: 140 }),
+      columnHelper.accessor('fromEmployee', { header: 'From Employee' }),
+      columnHelper.accessor('toEmployee', { header: 'To Employee' }),
       columnHelper.display({
         id: 'isApproved',
         header: 'Is Approved',
-        size: 120,
         cell: ({ row }) => <StatusChip status={row.original.approvedStatus} />
       }),
-      columnHelper.display({
-        id: 'isIssued',
-        header: 'Is Issued',
-        size: 120,
-        cell: ({ row }) => <StatusChip status={row.original.issuedStatus} />
-      }),
-      columnHelper.display({
-        id: 'isCompleted',
-        header: 'Is Completed',
-        size: 120,
-        cell: ({ row }) => <StatusChip status={row.original.completedStatus} />
-      }),
-      columnHelper.accessor('remarks', { header: 'Remarks', size: 200 }),
+
+      columnHelper.accessor('remarks', { header: 'Remarks' }),
       columnHelper.accessor('status', {
         header: 'Request Status',
-        size: 150,
         cell: info => <StatusChip status={info.getValue()} />
       })
     ],
@@ -341,45 +336,9 @@ const MaterialRequestPageContent = () => {
         >
           <CardHeader
             title={
-              <Box display='flex' alignItems='center' gap={2}>
-                <Typography variant='h5' sx={{ fontWeight: 600 }}>
-                  Material Request List
-                </Typography>
-
-                <Button
-                  variant='contained'
-                  color='primary'
-                  startIcon={
-                    <RefreshIcon
-                      sx={{
-                        animation: loading ? 'spin 1s linear infinite' : 'none',
-                        '@keyframes spin': {
-                          '0%': { transform: 'rotate(0deg)' },
-                          '100%': { transform: 'rotate(360deg)' }
-                        }
-                      }}
-                    />
-                  }
-                  disabled={loading}
-                  onClick={() => {
-                    setPage(1)
-                    setAppliedFilters({
-                      enableDateFilter: uiEnableDateFilter,
-                      startDate: uiStartDate,
-                      endDate: uiEndDate,
-                      requestStatus: uiRequestStatus,
-                      fromLocation: uiFromLocation,
-                      toLocation: uiToLocation,
-                      requestedBy: uiRequestedBy,
-                      searchText: uiSearchText
-                    })
-                    loadData(true)
-                  }}
-                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-                >
-                  {loading ? 'Refreshing...' : 'Refresh'}
-                </Button>
-              </Box>
+              <Typography variant='h5' sx={{ fontWeight: 600 }}>
+                Material Request List
+              </Typography>
             }
             action={
               <Box display='flex' alignItems='center' gap={2}>
@@ -442,41 +401,50 @@ const MaterialRequestPageContent = () => {
                 )}
               />
               <CustomAutocomplete
-                options={['Stock-TECH STOCK 1', 'Supplier-ABC']}
-                value={uiFromLocation || null}
-                onChange={(e, val) => setUiFromLocation(val || '')}
+                options={employeeOptions}
+                value={uiEmployee || null}
+                onChange={(e, val) => setUiEmployee(val || '')}
                 renderInput={params => (
                   <CustomTextField
                     {...params}
                     size='small'
-                    label='From Location'
+                    label='Employee'
                     sx={{ width: 180 }}
-                    placeholder='From'
+                    placeholder='Select Employee'
                   />
                 )}
               />
-              <CustomAutocomplete
-                options={['Stock-TECH STOCK 1', 'Site-A', 'Site-B']}
-                value={uiToLocation || null}
-                onChange={(e, val) => setUiToLocation(val || '')}
-                renderInput={params => (
-                  <CustomTextField {...params} size='small' label='To Location' sx={{ width: 180 }} placeholder='To' />
-                )}
-              />
-              <CustomAutocomplete
-                options={['Admin', 'Tech', 'John Doe']}
-                value={uiRequestedBy || null}
-                onChange={(e, val) => setUiRequestedBy(val || '')}
-                renderInput={params => (
-                  <CustomTextField
-                    {...params}
-                    size='small'
-                    label='Requested By'
-                    sx={{ width: 180 }}
-                    placeholder='Employee'
-                  />
-                )}
-              />
+              <Button
+                  variant='contained'
+                  color='primary'
+                  startIcon={
+                    <RefreshIcon
+                      sx={{
+                        animation: loading ? 'spin 1s linear infinite' : 'none',
+                        '@keyframes spin': {
+                          '0%': { transform: 'rotate(0deg)' },
+                          '100%': { transform: 'rotate(360deg)' }
+                        }
+                      }}
+                    />
+                  }
+                  disabled={loading}
+                  onClick={() => {
+                    setPage(1)
+                    setAppliedFilters({
+                      enableDateFilter: uiEnableDateFilter,
+                      startDate: uiStartDate,
+                      endDate: uiEndDate,
+                      requestStatus: uiRequestStatus,
+                      employee: uiEmployee,
+                      searchText: uiSearchText
+                    })
+                    loadData(true)
+                  }}
+                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                >
+                  {loading ? 'Refreshing...' : 'Refresh'}
+                </Button>
             </Box>
 
             <Divider sx={{ mb: 3 }} />
@@ -554,30 +522,18 @@ const MaterialRequestPageContent = () => {
               <StickyTableWrapper rowCount={rows.length}>
                 <table
                   className={styles.table}
-                  style={{ width: 'max-content', minWidth: '100%', tableLayout: 'fixed' }}
+                  style={{ width: '100%', tableLayout: 'auto' }}
                 >
-                  <colgroup>
-                    <col style={{ width: 60 }} />
-                    <col style={{ width: 100 }} />
-                    <col style={{ width: 150 }} />
-                    <col style={{ width: 150 }} />
-                    <col style={{ width: 130 }} />
-                    <col style={{ width: 200 }} />
-                    <col style={{ width: 200 }} />
-                    <col style={{ width: 140 }} />
-                    <col style={{ width: 120 }} />
-                    <col style={{ width: 120 }} />
-                    <col style={{ width: 120 }} />
-                    <col style={{ width: 200 }} />
-                    <col style={{ width: 150 }} />
-                  </colgroup>
+
                   <thead>
                     {table.getHeaderGroups().map(hg => (
                       <tr key={hg.id}>
                         {hg.headers.map(header => (
                           <th
                             key={header.id}
-                            style={{ width: header.getSize(), minWidth: header.getSize(), maxWidth: header.getSize() }}
+                            style={{
+                              width: header.column.id === 'actions' ? 100 : 'auto'
+                            }}
                           >
                             <div
                               className={classnames({
@@ -610,7 +566,7 @@ const MaterialRequestPageContent = () => {
                       table.getRowModel().rows.map(row => (
                         <tr key={row.id}>
                           {row.getVisibleCells().map(cell => (
-                            <td key={cell.id} style={{ width: cell.column.getSize() }}>
+                            <td key={cell.id} style={{ width: cell.column.id === 'actions' ? cell.column.getSize() : 'auto' }}>
                               {flexRender(cell.column.columnDef.cell, cell.getContext())}
                             </td>
                           ))}

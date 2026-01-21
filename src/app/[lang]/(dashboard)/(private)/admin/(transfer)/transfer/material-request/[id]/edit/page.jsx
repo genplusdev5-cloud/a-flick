@@ -30,10 +30,11 @@ import DeleteIcon from '@mui/icons-material/Delete'
 import AddIcon from '@mui/icons-material/Add'
 import EditIcon from '@mui/icons-material/Edit'
 
-import styles from '@core/styles/table.module.css'
+import { getPurchaseFilters } from '@/api/purchase/purchase_order/filter'
 import { getMaterialRequestById, updateMaterialRequest } from '@/api/transfer/materialRequest/edit'
 import { getMaterialRequestDropdowns } from '@/api/transfer/materialRequest/dropdown'
 import { showToast } from '@/components/common/Toasts'
+import styles from '@core/styles/table.module.css'
 
 const EditMaterialRequestPage = () => {
   const router = useRouter()
@@ -55,10 +56,11 @@ const EditMaterialRequestPage = () => {
   }, [id])
 
   // Dropdown options
+  const [originOptions, setOriginOptions] = useState([])
   const [employeeOptions, setEmployeeOptions] = useState([])
   const [chemicalOptions, setChemicalOptions] = useState([])
   const [uomOptions, setUomOptions] = useState([])
-  const [locationOptions, setLocationOptions] = useState([])
+  const [supplierOptions, setSupplierOptions] = useState([])
 
   // Loading states
   const [initLoading, setInitLoading] = useState(false)
@@ -66,10 +68,9 @@ const EditMaterialRequestPage = () => {
 
   // Header fields
   const [requestDate, setRequestDate] = useState(null)
-  const [requestType, setRequestType] = useState(null)
-  const [requestedBy, setRequestedBy] = useState(null)
-  const [fromLocation, setFromLocation] = useState(null)
-  const [toLocation, setToLocation] = useState(null)
+  const [origin, setOrigin] = useState(null)
+  const [fromEmployee, setFromEmployee] = useState(null)
+  const [toEmployee, setToEmployee] = useState(null)
 
   // Item entry fields
   const [remarks, setRemarks] = useState('')
@@ -85,18 +86,21 @@ const EditMaterialRequestPage = () => {
 
     return <CustomTextField fullWidth inputRef={ref} label={label} value={value} {...rest} />
   })
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         setInitLoading(true)
 
-        const [dropdownRes, detailsRes] = await Promise.all([
+        const [dropdownRes, detailsRes, filterRes] = await Promise.all([
           getMaterialRequestDropdowns(),
-          getMaterialRequestById(decodedId)
+          getMaterialRequestById(decodedId),
+          getPurchaseFilters()
         ])
 
         // --- DROPDOWNS ---
         const dd = dropdownRes?.data || dropdownRes || {}
+        const filterData = filterRes?.data || filterRes || {}
 
         const employees =
           dd.employee?.name?.map(item => ({
@@ -108,19 +112,27 @@ const EditMaterialRequestPage = () => {
         const chemicals =
           dd.chemicals?.name?.map(item => ({
             label: item.name,
-            value: item.name,
+            value: item.id,
             id: item.id
           })) || []
 
         const uoms =
           dd.uom?.name?.map(item => ({
             label: item.name,
-            value: item.name,
+            value: item.id,
             id: item.id
           })) || []
 
-        const locations =
+        const suppliers =
           dd.supplier?.name?.map(item => ({
+            label: item.name,
+            value: item.id,
+            id: item.id
+          })) || []
+
+        const purchaseData = filterData?.data || filterData || {}
+        const origins =
+          purchaseData?.company?.name?.map(item => ({
             label: item.name,
             value: item.name,
             id: item.id
@@ -129,17 +141,18 @@ const EditMaterialRequestPage = () => {
         setEmployeeOptions(employees)
         setChemicalOptions(chemicals)
         setUomOptions(uoms)
-        setLocationOptions(locations)
+        setSupplierOptions(suppliers)
+        setOriginOptions(origins)
 
         // --- DETAILS ---
         const data = detailsRes?.data ?? detailsRes ?? {}
 
         if (data.request_date) setRequestDate(new Date(data.request_date))
 
-        setRequestType({ label: data.request_type, value: data.request_type })
-        setRequestedBy(employees.find(e => e.id == data.employee_id) || null)
-        setFromLocation(locations.find(l => l.label === data.from_location) || { label: data.from_location, value: data.from_location })
-        setToLocation(locations.find(l => l.label === data.to_location) || { label: data.to_location, value: data.to_location })
+        setOrigin(origins.find(o => o.id == data.origin_id) || null)
+        setFromEmployee(employees.find(e => e.label === data.from_location) || (data.from_location ? { label: data.from_location, id: data.from_location } : null))
+        setToEmployee(employees.find(e => e.label === data.to_location) || (data.to_location ? { label: data.to_location, id: data.to_location } : null))
+        setRemarks(data.remarks || '')
 
         // --- ITEMS ---
         const itemsList = data.items || []
@@ -148,14 +161,11 @@ const EditMaterialRequestPage = () => {
           const chemId = item.item_id || item.item?.id || item.chemical_id
           const uomId = item.uom_id || item.uom?.id
 
-          const foundChem = chemicals.find(c => String(c.id) === String(chemId))
-          const foundUom = uoms.find(u => String(u.id) === String(uomId))
-
           return {
             id: item.id,
-            chemical: item.item_name || item.chemical_name || item.item?.name || foundChem?.label || '',
+            chemical: item.item_name || item.chemical_name || item.item?.name || '',
             chemicalId: chemId,
-            uom: item.uom_name || item.uom || item.uom_details?.name || foundUom?.label || '',
+            uom: item.uom_name || item.uom || item.uom_details?.name || '',
             uomId: uomId,
             quantity: item.quantity,
             remarks: item.remarks || ''
@@ -178,10 +188,11 @@ const EditMaterialRequestPage = () => {
 
   const handleEditItem = row => {
     setEditId(row.id)
-    setChemical(chemicalOptions.find(c => String(c.id) === String(row.chemicalId)) || { label: row.chemical, id: row.chemicalId })
-    setUom(uomOptions.find(u => String(u.id) === String(row.uomId)) || { label: row.uom, id: row.uomId })
+    setChemical({ label: row.chemical, id: row.chemicalId })
+    setUom({ label: row.uom, id: row.uomId })
     setQuantity(row.quantity)
-    setRemarks(row.remarks)
+    // In update, remarks for individual items might be handled differently, 
+    // but the user's focus is on header fields and UI alignment.
   }
 
   const handleAddItem = () => {
@@ -200,8 +211,7 @@ const EditMaterialRequestPage = () => {
                 chemicalId: chemical.id,
                 uom: uom.label,
                 uomId: uom.id,
-                quantity,
-                remarks
+                quantity
               }
             : item
         )
@@ -216,8 +226,7 @@ const EditMaterialRequestPage = () => {
           chemicalId: chemical.id,
           uom: uom.label,
           uomId: uom.id,
-          quantity,
-          remarks
+          quantity
         }
       ])
     }
@@ -225,7 +234,6 @@ const EditMaterialRequestPage = () => {
     setChemical(null)
     setUom(null)
     setQuantity('')
-    setRemarks('')
   }
 
   const handleRemoveItem = id => {
@@ -233,8 +241,8 @@ const EditMaterialRequestPage = () => {
   }
 
   const handleUpdate = async () => {
-    if (!requestDate || !requestType || !requestedBy || !fromLocation || !toLocation || items.length === 0) {
-      showToast('warning', 'Please fill all required fields and add at least one item')
+    if (items.length === 0) {
+      showToast('warning', 'Please add at least one item')
       return
     }
 
@@ -244,18 +252,17 @@ const EditMaterialRequestPage = () => {
       const payload = {
         id: Number(decodedId),
         request_date: format(requestDate, 'yyyy-MM-dd'),
-        request_type: requestType.value,
-        requested_by: requestedBy.id,
-        from_location: fromLocation.label,
-        to_location: toLocation.label,
+        origin_id: origin?.id || null,
+        from_location: fromEmployee?.label || null,
+        to_location: toEmployee?.label || null,
+        remarks: remarks,
         items: items.map(item => ({
           id: String(item.id).startsWith('temp') ? null : item.id,
           item_id: item.chemicalId,
           item_name: item.chemical,
           uom: item.uom,
           uom_id: item.uomId,
-          quantity: Number(item.quantity),
-          remarks: item.remarks || ''
+          quantity: Number(item.quantity)
         }))
       }
 
@@ -331,41 +338,38 @@ const EditMaterialRequestPage = () => {
 
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
-                label='Request Type'
-                options={[
-                  { label: 'Material Request', value: 'Material Request' },
-                  { label: 'Material Return', value: 'Material Return' },
-                  { label: 'Opening Stock', value: 'Opening Stock' }
-                ]}
-                value={requestType}
-                onChange={setRequestType}
+                label='Origin'
+                options={originOptions}
+                value={origin}
+                onChange={setOrigin}
               />
             </Grid>
 
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
-                label='Requested By'
+                label='From Employee'
                 options={employeeOptions}
-                value={requestedBy}
-                onChange={setRequestedBy}
+                value={fromEmployee}
+                onChange={setFromEmployee}
               />
             </Grid>
 
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
-                label='From Location'
-                options={locationOptions}
-                value={fromLocation}
-                onChange={setFromLocation}
+                label='To Employee'
+                options={employeeOptions}
+                value={toEmployee}
+                onChange={setToEmployee}
               />
             </Grid>
 
-            <Grid item xs={12} md={4}>
-              <GlobalAutocomplete
-                label='To Location'
-                options={locationOptions}
-                value={toLocation}
-                onChange={setToLocation}
+            <Grid item xs={12} md={8}>
+              <GlobalTextField
+                label='Remarks'
+                multiline
+                minRows={1}
+                value={remarks}
+                onChange={e => setRemarks(e.target.value)}
               />
             </Grid>
           </Grid>
@@ -384,20 +388,12 @@ const EditMaterialRequestPage = () => {
               <GlobalAutocomplete label='UOM' options={uomOptions} value={uom} onChange={setUom} />
             </Grid>
 
-            <Grid item xs={12} md={2}>
+            <Grid item xs={12} md={3}>
               <GlobalTextField
                 label='Quantity'
                 type='number'
                 value={quantity || ''}
                 onChange={e => setQuantity(e.target.value)}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <GlobalTextField
-                label='Remarks'
-                value={remarks || ''}
-                onChange={e => setRemarks(e.target.value)}
               />
             </Grid>
 
@@ -421,12 +417,11 @@ const EditMaterialRequestPage = () => {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th style={{ width: '50px' }}>ID</th>
+                  <th style={{ width: '50px' }}>S.No</th>
                   <th style={{ width: '100px', textAlign: 'center' }}>Action</th>
-                  <th style={{ width: '25%' }}>Chemical</th>
-                  <th style={{ width: '15%' }}>UOM</th>
-                  <th style={{ width: '15%', textAlign: 'right' }}>Quantity</th>
-                  <th>Remarks</th>
+                  <th style={{ width: '40%' }}>Chemical</th>
+                  <th style={{ width: '25%' }}>UOM</th>
+                  <th style={{ width: '25%', textAlign: 'right' }}>Quantity</th>
                 </tr>
               </thead>
 
@@ -436,22 +431,34 @@ const EditMaterialRequestPage = () => {
                     <tr key={row.id}>
                       <td>{i + 1}</td>
                       <td align='center'>
-                        <IconButton size='small' color='primary' onClick={() => handleEditItem(row)}>
-                          <EditIcon fontSize='small' />
-                        </IconButton>
-                        <IconButton size='small' color='error' onClick={() => handleRemoveItem(row.id)}>
-                          <DeleteIcon fontSize='small' />
-                        </IconButton>
+                        <div style={{ display: 'flex', justifyContent: 'center', gap: '4px' }}>
+                          <IconButton
+                            size='small'
+                            color='primary'
+                            onClick={() => handleEditItem(row)}
+                            sx={{ padding: '4px' }}
+                          >
+                            <EditIcon fontSize='small' sx={{ fontSize: '1.25rem' }} />
+                          </IconButton>
+
+                          <IconButton
+                            size='small'
+                            color='error'
+                            onClick={() => handleRemoveItem(row.id)}
+                            sx={{ padding: '4px' }}
+                          >
+                            <DeleteIcon fontSize='small' sx={{ fontSize: '1.25rem' }} />
+                          </IconButton>
+                        </div>
                       </td>
                       <td>{row.chemical}</td>
                       <td>{row.uom}</td>
                       <td style={{ textAlign: 'right' }}>{row.quantity}</td>
-                      <td>{row.remarks || '-'}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', padding: 24 }}>
+                    <td colSpan={5} style={{ textAlign: 'center', padding: 24 }}>
                       No items
                     </td>
                   </tr>

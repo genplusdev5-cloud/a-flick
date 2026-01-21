@@ -67,60 +67,107 @@ const AddPurchaseOrderPage = () => {
   // Items list
   const [items, setItems] = useState([])
 
-  useEffect(() => {
-    const fetchOptions = async () => {
-      try {
-        const [purchaseRes, materialRes] = await Promise.all([getPurchaseFilters(), getMaterialRequestDropdowns()])
+  const [initLoading, setInitLoading] = useState(false)
 
-        // Parse Purchase Filters (Company/Origin, Supplier)
-        const purchaseData = purchaseRes?.data?.data || purchaseRes?.data || {}
-        const origins =
-          purchaseData?.company?.name?.map(item => ({
-            label: item.name,
-            value: item.name,
-            id: item.id
-          })) || []
-        const suppliers =
-          purchaseData?.supplier?.name?.map(item => ({
-            label: item.name,
-            value: item.name,
-            id: item.id
-          })) || []
+  const fetchOptions = async (supplierId = null) => {
+    try {
+      if (!supplierId) setInitLoading(true)
 
-        // Parse Material Dropdowns (Chemicals, UOM)
-        const materialData = materialRes?.data || materialRes
-        const chemicals =
-          materialData?.chemicals?.name?.map(c => ({
-            label: c.name,
-            value: c.name,
-            id: c.id
-          })) || []
-        const uoms =
-          materialData?.uom?.name?.map(u => ({
-            label: u.name,
-            value: u.name,
-            id: u.id
-          })) || []
+      const params = { is_filter: 1 }
+      if (supplierId) params.supplier_id = supplierId
 
-        setOriginOptions(origins)
-        setSupplierOptions(suppliers)
-        setChemicalOptions(chemicals)
-        setUomOptions(uoms)
+      const [purchaseRes, materialRes] = await Promise.all([
+        getPurchaseFilters(params),
+        getMaterialRequestDropdowns()
+      ])
 
-        // Set default origin if available
-        const defaultOrigin = origins.find(o => o.label === 'A-Flick Pte Ltd') || origins[0]
-        if (defaultOrigin) {
-          setOrigin(defaultOrigin)
-        }
-      } catch (err) {
-        console.error('Failed to fetch dropdowns', err)
-        showToast('error', 'Failed to load dropdown data')
-      } finally {
+      // Parse Purchase Filters (Company/Origin, Supplier)
+      const purchaseData = purchaseRes?.data?.data || purchaseRes?.data || {}
+      const materialData = materialRes?.data || materialRes
+
+      // 1. Origin/Company
+      const origins =
+        purchaseData?.company?.name?.map(item => ({
+          label: item.name,
+          value: item.name,
+          id: item.id
+        })) || []
+      setOriginOptions(origins)
+
+      // 2. Suppliers
+      const suppliers =
+        purchaseData?.supplier?.name?.map(item => ({
+          label: item.name,
+          value: item.name,
+          id: item.id
+        })) || []
+      setSupplierOptions(suppliers)
+
+      // 3. Chemicals (PRIORITY: Specialized Purchase API)
+      let chemRaw = []
+      if (Array.isArray(purchaseData?.chemicals)) {
+        chemRaw = purchaseData.chemicals
+      } else if (Array.isArray(purchaseData?.chemicals?.name)) {
+        chemRaw = purchaseData.chemicals.name
+      } else if (Array.isArray(materialData?.chemicals?.name)) {
+        chemRaw = materialData.chemicals.name
       }
-    }
 
+      const chemicals = chemRaw.map(c => ({
+        label: c.name,
+        value: c.name,
+        id: c.id,
+        uom: c.uom || c.uom_name || c.unit
+      }))
+      setChemicalOptions(chemicals)
+
+      // 4. UOM
+      const uomRaw = materialData?.uom?.name || materialData?.uom || []
+      const uoms = uomRaw.map(u => ({
+        label: u.name,
+        value: u.name,
+        id: u.id
+      }))
+      setUomOptions(uoms)
+
+      // Set default origin ONLY on first load
+      if (!supplierId) {
+        const defaultOrigin = origins.find(o => o.label === 'A-Flick Pte Ltd') || origins[0]
+        if (defaultOrigin) setOrigin(defaultOrigin)
+      }
+    } catch (err) {
+      console.error('Failed to fetch dropdowns', err)
+      showToast('error', 'Failed to load dropdown data')
+    } finally {
+      setInitLoading(false)
+    }
+  }
+
+  // Initial load
+  useEffect(() => {
     fetchOptions()
   }, [])
+
+  // Refetch chemicals when supplier changes
+  useEffect(() => {
+    if (supplier?.id) {
+      fetchOptions(supplier.id)
+    }
+  }, [supplier])
+
+  const handleChemicalChange = val => {
+    setChemical(val)
+    if (val && val.uom) {
+      const foundUom = uomOptions.find(u => u.label.toLowerCase() === val.uom.toLowerCase())
+      if (foundUom) {
+        setUom(foundUom)
+      } else {
+        setUom({ label: val.uom, value: val.uom, id: null })
+      }
+    } else {
+      setUom(null)
+    }
+  }
 
   const handleEditItem = row => {
     setEditId(row.id)
@@ -288,11 +335,24 @@ const AddPurchaseOrderPage = () => {
         <Box px={4} py={3}>
           <Grid container spacing={2} alignItems='flex-end'>
             <Grid item xs={12} md={3}>
-              <GlobalAutocomplete label='Chemicals' options={chemicalOptions} value={chemical} onChange={setChemical} />
+              <GlobalAutocomplete
+                label='Chemicals'
+                options={chemicalOptions}
+                value={chemical}
+                onChange={handleChemicalChange}
+              />
             </Grid>
 
             <Grid item xs={12} md={2}>
-              <GlobalAutocomplete label='UOM' options={uomOptions} value={uom} onChange={setUom} />
+              <GlobalTextField
+                label='UOM'
+                value={uom?.label || ''}
+                InputProps={{
+                  readOnly: true
+                }}
+                disabled
+                sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#f5f5f5' } }}
+              />
             </Grid>
 
             <Grid item xs={12} md={3}>

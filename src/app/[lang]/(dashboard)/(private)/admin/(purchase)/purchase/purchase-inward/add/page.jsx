@@ -108,12 +108,22 @@ const AddPurchaseInwardPage = () => {
 
         const materialData = materialRes?.data || materialRes
 
-        const chemicals =
-          materialData?.chemicals?.name?.map(c => ({
-            label: c.name,
-            value: c.name,
-            id: c.id
-          })) || []
+        // 3. Chemicals (PRIORITY: Check multiple sources)
+        let chemRaw = []
+        if (Array.isArray(purchaseData?.chemicals)) {
+          chemRaw = purchaseData.chemicals
+        } else if (Array.isArray(purchaseData?.chemicals?.name)) {
+          chemRaw = purchaseData.chemicals.name
+        } else if (Array.isArray(materialData?.chemicals?.name)) {
+          chemRaw = materialData.chemicals.name
+        }
+
+        const chemicals = chemRaw.map(c => ({
+          label: c.name,
+          value: c.name,
+          id: c.id,
+          uom: c.uom || c.uom_name || c.unit
+        }))
 
         const uoms =
           materialData?.uom?.name?.map(u => ({
@@ -141,6 +151,21 @@ const AddPurchaseInwardPage = () => {
 
     fetchOptions()
   }, [])
+
+  const handleChemicalChange = val => {
+    setChemical(val)
+    if (val && val.uom) {
+      // Find matching UOM object or create one
+      const foundUom = uomOptions.find(u => u.label.toLowerCase() === val.uom.toLowerCase())
+      if (foundUom) {
+        setUom(foundUom)
+      } else {
+        setUom({ label: val.uom, value: val.uom, id: null })
+      }
+    } else {
+      setUom(null)
+    }
+  }
 
   useEffect(() => {
     const fetchPOs = async () => {
@@ -436,6 +461,7 @@ const AddPurchaseInwardPage = () => {
               />
             </Grid>
 
+
             <Grid item xs={12}>
               <GlobalTextField
                 label='Remarks'
@@ -455,11 +481,19 @@ const AddPurchaseInwardPage = () => {
           <Grid container spacing={3}>
             {/* Row 1 */}
             <Grid item xs={12} md={3}>
-              <GlobalAutocomplete label='Chemicals' options={chemicalOptions} value={chemical} onChange={setChemical} />
+              <GlobalAutocomplete label='Chemicals' options={chemicalOptions} value={chemical} onChange={handleChemicalChange} />
             </Grid>
 
             <Grid item xs={12} md={2}>
-              <GlobalAutocomplete label='UOM' options={uomOptions} value={uom} onChange={setUom} />
+              <GlobalTextField
+                label='UOM'
+                value={uom?.label || ''}
+                InputProps={{
+                  readOnly: true
+                }}
+                disabled
+                sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#f5f5f5' } }}
+              />
             </Grid>
 
             <Grid item xs={12} md={2}>
@@ -494,9 +528,11 @@ const AddPurchaseInwardPage = () => {
               />
             </Grid>
 
-            <Grid item xs={12} md={6}>
-              <GlobalTextField label='Total Amount' type='number' value={total_quantity} disabled />
+            {/* 🔥 Reduced Width & Spacer */}
+            <Grid item xs={12} md={3}>
+              <GlobalTextField label='Total Qty' type='number' value={total_quantity} disabled />
             </Grid>
+            <Grid item xs={12} md={3} />
 
             <Grid item xs={12} md={3}>
               <GlobalButton
@@ -518,26 +554,26 @@ const AddPurchaseInwardPage = () => {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th style={{ width: '50px', minWidth: '50px' }}>ID</th>
+                  <th style={{ width: '50px', minWidth: '50px' }}>S.No</th>
                   <th align='center' style={{ width: '80px' }}>
                     ACTION
                   </th>
                   <th style={{ width: '20%' }}>CHEMICAL</th>
                   <th style={{ width: '10%' }}>UOM</th>
-                  <th align='right' style={{ width: '10%', textAlign: 'right' }}>
+                  <th align='left' style={{ width: '10%', textAlign: 'left' }}>
                     IN QTY
                   </th>
-                  <th align='right' style={{ width: '10%', textAlign: 'right' }}>
+                  <th align='left' style={{ width: '10%', textAlign: 'left' }}>
                     CONV.
                   </th>
-                  <th align='right' style={{ width: '10%', textAlign: 'right' }}>
+                  <th align='left' style={{ width: '10%', textAlign: 'left' }}>
                     QTY
                   </th>
-                  <th align='right' style={{ width: '12%', textAlign: 'right' }}>
+                  <th align='left' style={{ width: '12%', textAlign: 'left' }}>
                     ADDITIONAL
                   </th>
-                  <th align='right' style={{ width: '15%', textAlign: 'right' }}>
-                    TOTAL AMOUNT
+                  <th align='left' style={{ width: '15%', textAlign: 'left' }}>
+                    TOTAL QTY
                   </th>
                 </tr>
               </thead>
@@ -557,19 +593,19 @@ const AddPurchaseInwardPage = () => {
                       </td>
                       <td>{row.item_name}</td>
                       <td>{row.uom}</td>
-                      <td align='right' style={{ textAlign: 'right' }}>
+                      <td align='left' style={{ textAlign: 'left' }}>
                         {row.in_quantity}
                       </td>
-                      <td align='right' style={{ textAlign: 'right' }}>
+                      <td align='left' style={{ textAlign: 'left' }}>
                         {row.conversion || '-'}
                       </td>
-                      <td align='right' style={{ textAlign: 'right' }}>
+                      <td align='left' style={{ textAlign: 'left' }}>
                         {row.quantity}
                       </td>
-                      <td align='right' style={{ textAlign: 'right' }}>
+                      <td align='left' style={{ textAlign: 'left' }}>
                         {row.additional || '-'}
                       </td>
-                      <td align='right' style={{ textAlign: 'right' }}>
+                      <td align='left' style={{ textAlign: 'left' }}>
                         {row.total_quantity}
                       </td>
                     </tr>
@@ -585,6 +621,10 @@ const AddPurchaseInwardPage = () => {
             </table>
           </StickyTableWrapper>
         </Box>
+
+        <Divider />
+
+
 
         <Divider />
 

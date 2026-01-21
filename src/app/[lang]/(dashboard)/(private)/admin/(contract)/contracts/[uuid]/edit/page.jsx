@@ -60,7 +60,7 @@ import {
   getContractDetails,
   updateContract
 } from '@/api/contract_group/contract'
-import { getCustomerList } from '@/api/customer_group/customer'
+import { getCustomerList, getCustomerDetails } from '@/api/customer_group/customer'
 
 const autocompleteFields = [
   { name: 'salesMode', options: ['Confirmed Sales', 'Quotation'] },
@@ -141,7 +141,6 @@ export default function EditContractPage() {
     id: '',
     salesMode: '',
     salesModeId: '',
-    contractName: '',
     contractType: '',
     contractTypeId: '',
     coveredLocation: '',
@@ -255,7 +254,6 @@ export default function EditContractPage() {
   }, [])
 
   // Explicit Refs
-  const contractNameRef = useRef(null)
   const coveredLocationRef = useRef(null),
     contractCodeRef = useRef(null),
     serviceAddressRef = useRef(null)
@@ -295,10 +293,8 @@ export default function EditContractPage() {
   const saveButtonRef = useRef(null)
 
   const focusableElementRefs = [
-    refs.salesModeInputRef,
     refs.customerInputRef,
     refs.contractTypeInputRef,
-    contractNameRef,
     coveredLocationRef,
     contractCodeRef,
     serviceAddressRef,
@@ -444,7 +440,6 @@ export default function EditContractPage() {
           salesMode: data.sales_mode?.replace(/_/g, ' ')?.replace(/\b\w/g, l => l.toUpperCase()) || '',
           customerId: data.customer_id,
           customer: data.customer,
-          contractName: data.name || '',
           contractType: data.contract_type?.replace(/_/g, ' ')?.replace(/\b\w/g, l => l.toUpperCase()) || '',
           contractCode: data.contract_code || '',
           serviceAddress: data.service_address || '',
@@ -805,14 +800,14 @@ export default function EditContractPage() {
   }
 
   const handleSubmit = async () => {
-    if (!formData.contractName || !formData.customerId || !formData.startDate || !formData.endDate) {
+    if (!formData.customerId || !formData.startDate || !formData.endDate) {
       showToast('error', 'Required fields are missing!')
       return
     }
     try {
       const payload = {
         id: formData.id,
-        name: formData.contractName,
+        name: '',
         customer_id: Number(formData.customerId),
         sales_mode: formData.salesMode?.toLowerCase().replace(/\s+/g, '_'),
         contract_code: formData.contractCode,
@@ -918,18 +913,6 @@ export default function EditContractPage() {
               label: 'Contract Type',
               options: ['Limited Contract', 'Continuous Contract', 'Warranty']
             })}
-
-            <Grid item xs={12} md={3}>
-              <CustomTextField
-                fullWidth
-                label='Contract Name'
-                name='contractName'
-                value={formData.contractName}
-                onChange={handleChange}
-                inputRef={contractNameRef}
-                onKeyDown={e => handleKeyDown(e, contractNameRef)}
-              />
-            </Grid>
 
             <Grid item xs={12} md={3}>
               <CustomTextField

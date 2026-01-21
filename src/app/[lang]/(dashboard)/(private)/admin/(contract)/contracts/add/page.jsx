@@ -59,7 +59,7 @@ import {
   getInvoiceRemark,
   createContract
 } from '@/api/contract_group/contract'
-import { getCustomerList } from '@/api/customer_group/customer'
+import { getCustomerList, getCustomerDetails } from '@/api/customer_group/customer'
 import { getProposalDetails } from '@/api/sales/proposal'
 import { decodeId } from '@/utils/urlEncoder'
 
@@ -153,9 +153,8 @@ export default function AddContractPage() {
   // ----------------------------------------------------------------------
   const [formData, setFormData] = useState({
     // Initializing all fields to sensible defaults
-    salesMode: '',
-    salesModeId: '',
-    contractName: '', // ⭐ ADD THIS
+    salesMode: 'Confirmed Sales',
+    salesModeId: '1',
     contractType: '',
     contractTypeId: '',
     coveredLocation: '',
@@ -320,7 +319,6 @@ export default function AddContractPage() {
   }, [])
 
   // Explicit Refs (Unchanged)
-  const contractNameRef = useRef(null)
   const coveredLocationRef = useRef(null),
     contractCodeRef = useRef(null),
     serviceAddressRef = useRef(null)
@@ -362,10 +360,8 @@ export default function AddContractPage() {
 
   // Group all focusable element refs for keyboard navigation sequence (UPDATED)
   const focusableElementRefs = [
-    refs.salesModeInputRef,
     refs.customerInputRef,
     refs.contractTypeInputRef,
-    contractNameRef,
     coveredLocationRef,
     contractCodeRef,
     serviceAddressRef,
@@ -526,7 +522,6 @@ export default function AddContractPage() {
             ...prev,
             salesMode: 'Quotation',
             salesModeId: '2',
-            contractName: data.name || '',
             contractType: data.contract_type?.replace(/_/g, ' ')?.replace(/\b\w/g, l => l.toUpperCase()) || '',
             customerId: data.customer_id,
             customer: data.customer,
@@ -1029,7 +1024,7 @@ export default function AddContractPage() {
   }
 
   const handleSubmit = async () => {
-    if (!formData.contractName || !formData.customerId || !formData.startDate || !formData.endDate) {
+    if (!formData.customerId || !formData.startDate || !formData.endDate) {
       showToast('error', 'Required fields are missing!')
       return
     }
@@ -1039,7 +1034,7 @@ export default function AddContractPage() {
     try {
       // Prepare payload exactly as per Updated Requirement
       const payload = {
-        name: formData.contractName,
+        name: '',
         customer_id: Number(formData.customerId),
         sales_mode: formData.salesMode?.toLowerCase().replace(/\s+/g, '_'),
         contract_code: formData.contractCode,
@@ -1179,18 +1174,6 @@ export default function AddContractPage() {
               label: 'Contract Type',
               options: ['Limited Contract', 'Continuous Contract', 'Warranty']
             })}
-
-            <Grid item xs={12} md={3}>
-              <CustomTextField
-                fullWidth
-                label='Contract Name'
-                name='contractName'
-                value={formData.contractName}
-                onChange={handleChange}
-                inputRef={contractNameRef}
-                onKeyDown={e => handleKeyDown(e, contractNameRef)}
-              />
-            </Grid>
 
             <Grid item xs={12} md={3}>
               <CustomTextField

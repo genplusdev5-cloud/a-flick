@@ -1,493 +1,437 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useMemo, useEffect, forwardRef } from 'react'
+import Link from 'next/link'
+import { useRouter, useParams } from 'next/navigation'
 import {
   Box,
-  Button,
   Card,
-  CardContent,
-  Grid,
+  CardHeader,
   Typography,
-  Table,
-  TableHead,
-  TableRow,
-  TableCell,
-  TableBody,
+  Grid,
+  Divider,
   IconButton,
-  Autocomplete
+  Breadcrumbs,
+  CircularProgress
 } from '@mui/material'
+
+import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
-import { format } from 'date-fns'
 
-import ContentLayout from '@/components/layout/ContentLayout'
-import CustomTextField from '@core/components/mui/TextField'
-import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
+import StickyListLayout from '@/components/common/StickyListLayout'
+import GlobalButton from '@/components/common/GlobalButton'
+import GlobalTextField from '@/components/common/GlobalTextField'
+import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
+import PermissionGuard from '@/components/auth/PermissionGuard'
 
+import StickyTableWrapper from '@/components/common/StickyTableWrapper'
+import styles from '@core/styles/table.module.css'
+import { getPurchaseFilters } from '@/api/purchase/purchase_order/filter'
 import { addMaterialRequest } from '@/api/transfer/materialRequest/add'
 import { getMaterialRequestDropdowns } from '@/api/transfer/materialRequest/dropdown'
+import { showToast } from '@/components/common/Toasts'
+
+import { format } from 'date-fns'
+import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
+import CustomTextField from '@core/components/mui/TextField'
 
 export default function AddMaterialRequestPage() {
   const router = useRouter()
+  const { lang } = useParams()
 
-  const [date, setDate] = useState(new Date())
-  const [formData, setFormData] = useState({
-    requestType: '',
-    requestedBy: '',
-    requestedById: null,
-    fromLocation: '',
-    fromLocationId: null,
-    toLocation: '',
-    remarks: '',
-    chemical: '',
-    chemicalId: null,
-    unit: '',
-    unitId: null,
-    quantity: ''
+  // Dropdown options
+  const [originOptions, setOriginOptions] = useState([])
+  const [employeeOptions, setEmployeeOptions] = useState([])
+  const [chemicalOptions, setChemicalOptions] = useState([])
+  const [uomOptions, setUomOptions] = useState([])
+  const [supplierOptions, setSupplierOptions] = useState([])
+
+  // Loading states
+  const [initLoading, setInitLoading] = useState(false)
+  const [saveLoading, setSaveLoading] = useState(false)
+
+  // Header fields
+  const [requestDate, setRequestDate] = useState(new Date())
+  const [origin, setOrigin] = useState(null)
+  const [fromEmployee, setFromEmployee] = useState(null)
+  const [toEmployee, setToEmployee] = useState(null)
+  const [remarks, setRemarks] = useState('')
+
+  // Item fields
+  const [chemical, setChemical] = useState(null)
+  const [uom, setUom] = useState(null)
+  const [quantity, setQuantity] = useState('')
+
+  const [editId, setEditId] = useState(null)
+
+  // Items list
+  const [items, setItems] = useState([])
+
+  const PoDateInput = forwardRef(function PoDateInput(props, ref) {
+    const { label, value, ...rest } = props
+
+    return <CustomTextField fullWidth inputRef={ref} label={label} value={value} {...rest} />
   })
 
-  const [items, setItems] = useState([])
-  const [itemToEditIndex, setItemToEditIndex] = useState(null)
-
-  const [employeeList, setEmployeeList] = useState([])
-  const [chemicalList, setChemicalList] = useState([])
-  const [uomList, setUomList] = useState([])
-  const [supplierList, setSupplierList] = useState([])
-
-  const [requestTypeOpen, setRequestTypeOpen] = useState(false)
-  const [requestedByOpen, setRequestedByOpen] = useState(false)
-  const [fromLocationOpen, setFromLocationOpen] = useState(false)
-  const [toLocationOpen, setToLocationOpen] = useState(false)
-  const [chemicalOpen, setChemicalOpen] = useState(false)
-  const [unitOpen, setUnitOpen] = useState(false)
-
-  const requestTypeRef = useRef(null)
-  const requestedByRef = useRef(null)
-  const fromLocationRef = useRef(null)
-  const toLocationRef = useRef(null)
-  const remarksRef = useRef(null)
-  const chemicalRef = useRef(null)
-  const unitRef = useRef(null)
-  const quantityInputRef = useRef(null)
-
-  const focusElement = (ref, openSetter) => {
-    setTimeout(() => {
-      const input = ref.current?.querySelector('input') || ref.current
-      if (input) {
-        input.focus()
-        if (openSetter) openSetter(true)
-      }
-    }, 0)
-  }
-
   useEffect(() => {
-    ;(async () => {
+    const fetchOptions = async () => {
       try {
-        const response = await getMaterialRequestDropdowns()
-        const data = response?.data || response
+        setInitLoading(true)
+        const [mrRes, filterRes] = await Promise.all([
+          getMaterialRequestDropdowns(),
+          getPurchaseFilters()
+        ])
+        const data = mrRes?.data || mrRes
+        const filterData = filterRes?.data || filterRes
+        const purchaseData = filterData?.data || filterData || {}
+        const origins =
+          purchaseData?.company?.name?.map(item => ({
+            label: item.name,
+            value: item.name,
+            id: item.id
+          })) || []
 
-        setEmployeeList(data?.employee?.name || [])
-        setChemicalList(data?.chemicals?.name || [])
-        setUomList(data?.uom?.name || [])
-        setSupplierList(data?.supplier?.name || [])
+        setChemicalOptions((data?.chemicals?.name || []).map(c => ({
+          label: c.name,
+          id: c.id,
+          value: c.id,
+          uom: c.uom || c.uom_name || c.unit
+        })))
+        setUomOptions((data?.uom?.name || []).map(u => ({ label: u.name, id: u.id, value: u.id })))
+        setSupplierOptions((data?.supplier?.name || []).map(s => ({ label: s.name, id: s.id, value: s.id })))
+        setOriginOptions(origins)
+        setEmployeeOptions((data?.employee?.name || []).map(e => ({ label: e.name, id: e.id, value: e.id })))
+
+        // Set default origin if available
+        const defaultOrigin = origins.find(o => o.label === 'A-Flick Pte Ltd') || origins[0]
+        if (defaultOrigin) {
+          setOrigin(defaultOrigin)
+        }
       } catch (err) {
         console.error('Dropdown load failed:', err)
+        showToast('error', 'Failed to load dropdown data')
+      } finally {
+        setInitLoading(false)
       }
-    })()
+    }
+    fetchOptions()
   }, [])
 
-  const handleKeyDown = (e, currentRef) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      const map = {
-        [requestTypeRef.current]: () => focusElement(requestedByRef, setRequestedByOpen),
-        [requestedByRef.current]: () => focusElement(fromLocationRef, setFromLocationOpen),
-        [fromLocationRef.current]: () => focusElement(toLocationRef, setToLocationOpen),
-        [toLocationRef.current]: () => focusElement(remarksRef),
-        [remarksRef.current]: () => focusElement(chemicalRef, setChemicalOpen),
-        [chemicalRef.current]: () => focusElement(unitRef, setUnitOpen),
-        [unitRef.current]: () => focusElement(quantityInputRef),
-        [quantityInputRef.current]: handleAddOrUpdateItem
+  const handleChemicalChange = val => {
+    setChemical(val)
+    if (val && val.uom) {
+      const foundUom = uomOptions.find(u => u.label.toLowerCase() === val.uom.toLowerCase())
+      if (foundUom) {
+        setUom(foundUom)
+      } else {
+        setUom({ label: val.uom, value: val.uom, id: null })
       }
-      const action = map[currentRef?.current || currentRef]
-      if (action) action()
-    }
-  }
-
-  const handleAddOrUpdateItem = () => {
-    const { chemical, chemicalId, unit, unitId, quantity } = formData
-    if (!chemical || !unit || !quantity) return
-
-    const newItem = {
-      id: Date.now() + Math.random(),
-      requestDate: date.toISOString().split('T')[0],
-      requestType: formData.requestType,
-      requestedBy: formData.requestedBy,
-      fromLocation: formData.fromLocation,
-      toLocation: formData.toLocation,
-      remarks: formData.remarks,
-      chemical,
-      chemicalId,
-      unit,
-      unitId,
-      quantity
-    }
-
-    if (itemToEditIndex !== null) {
-      setItems(prev => prev.map((it, i) => (i === itemToEditIndex ? { ...newItem, id: it.id } : it)))
-      setItemToEditIndex(null)
     } else {
-      setItems(prev => [newItem, ...prev])
+      setUom(null)
     }
-
-    setFormData(prev => ({ ...prev, chemical: '', chemicalId: null, unit: '', unitId: null, quantity: '' }))
-    focusElement(chemicalRef, setChemicalOpen)
   }
 
-  const handleEditItem = index => {
-    const item = items[index]
-    setFormData(prev => ({
-      ...prev,
-      chemical: item.chemical,
-      chemicalId: item.chemicalId,
-      unit: item.unit,
-      unitId: item.unitId,
-      quantity: item.quantity
-    }))
-    setItemToEditIndex(index)
-    focusElement(chemicalRef, setChemicalOpen)
+  const handleEditItem = row => {
+    setEditId(row.id)
+    setChemical({ label: row.chemical, id: row.chemicalId })
+    setUom({ label: row.uom, id: row.uomId })
+    setQuantity(row.quantity)
   }
 
-  const handleDeleteItem = index => {
-    setItems(prev => prev.filter((_, i) => i !== index))
-    if (itemToEditIndex === index) setItemToEditIndex(null)
-  }
-
-  const handleSaveAll = async () => {
-    if (items.length === 0) return
-
-    if (!formData.requestedById) {
-      alert('Please select Requested By')
+  const handleAddItem = () => {
+    if (!chemical || !uom || !quantity) {
+      showToast('error', 'Please select a chemical, UOM, and enter quantity')
       return
     }
 
-    const payload = {
-      employee_id: formData.requestedById, // ✅ REQUIRED BY BACKEND
-      request_date: date.toISOString().split('T')[0],
-      remarks: formData.remarks,
-      items: items.map(i => ({
-        item_name: i.chemical,
-        uom: i.unit,
-        quantity: Number(i.quantity)
-      }))
+    if (editId) {
+      setItems(prev =>
+        prev.map(item =>
+          item.id === editId
+            ? {
+                ...item,
+                chemical: chemical.label,
+                chemicalId: chemical.id,
+                uom: uom.label,
+                uomId: uom.id,
+                quantity
+              }
+            : item
+        )
+      )
+      setEditId(null)
+    } else {
+      setItems(prev => [
+        ...prev,
+        {
+          id: Date.now(),
+          chemical: chemical.label,
+          chemicalId: chemical.id,
+          uom: uom.label,
+          uomId: uom.id,
+          quantity
+        }
+      ])
+    }
+
+    setChemical(null)
+    setUom(null)
+    setQuantity('')
+  }
+
+  const handleRemoveItem = id => {
+    setItems(prev => prev.filter(i => i.id !== id))
+  }
+
+  const handleSaveAll = async () => {
+    if (items.length === 0) {
+      showToast('warning', 'Please add at least one chemical')
+      return
     }
 
     try {
+      setSaveLoading(true)
+      const payload = {
+        request_date: format(requestDate, 'yyyy-MM-dd'),
+        remarks: remarks,
+        origin_id: origin?.id || null,
+        from_location: fromEmployee?.label || null,
+        to_location: toEmployee?.label || null,
+        items: items.map(i => ({
+          item_id: i.chemicalId,
+          item_name: i.chemical,
+          uom: i.uom,
+          uom_id: i.uomId,
+          quantity: Number(i.quantity)
+        }))
+      }
+
       await addMaterialRequest(payload)
-      router.push('/admin/transfer/material-request')
+      showToast('success', 'Material Request added successfully')
+      router.push(`/${lang}/admin/transfer/material-request`)
     } catch (err) {
       console.error('Save failed:', err)
+      showToast('error', err?.response?.data?.message || 'Failed to save Material Request')
+    } finally {
+      setSaveLoading(false)
     }
   }
 
-  const requiredLabel = label => (
-    <>
-      {label} <span style={{ color: 'red' }}>*</span>
-    </>
-  )
-
   return (
-    <ContentLayout
-      title='Add Material Request'
-      breadcrumbs={[
-        { label: 'Home', href: '/' },
-        { label: 'Material Request', href: '/admin/transfer/material-request' },
-        { label: 'Add Request' }
-      ]}
+    <StickyListLayout
+      header={
+        <Breadcrumbs sx={{ mb: 2 }}>
+          <Link href={`/${lang}`} style={{ textDecoration: 'none' }}>
+            Dashboard
+          </Link>
+          <Link href={`/${lang}/admin/transfer/material-request`} style={{ textDecoration: 'none' }}>
+            Material Request
+          </Link>
+          <Typography color='text.primary'>Add</Typography>
+        </Breadcrumbs>
+      }
     >
-      <Card elevation={0} sx={{ boxShadow: 'none' }}>
-        <Typography variant='h6' align='center' sx={{ py: 3 }}>
-          Add Material Request
-        </Typography>
-        <CardContent>
-          {/* Header Row */}
-          <Grid container spacing={6} mb={3}>
+      <Card>
+        <CardHeader
+          title={
+            <Typography variant='h5' fontWeight={600}>
+              Add Material Request
+            </Typography>
+          }
+        />
+
+        <Divider />
+
+        {/* HEADER FORM */}
+        <Box px={4} py={3} position='relative'>
+          {initLoading && (
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                bgcolor: 'rgba(255,255,255,0.7)',
+                zIndex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <CircularProgress size={40} />
+            </Box>
+          )}
+
+          <Grid container spacing={3}>
             <Grid item xs={12} md={4}>
               <AppReactDatepicker
-                selected={date}
-                onChange={setDate}
-                customInput={
-                  <CustomTextField
-                    fullWidth
-                    label={requiredLabel('Request Date')}
-                    value={format(date, 'dd/MM/yyyy')}
-                    onKeyDown={e => handleKeyDown(e, requestTypeRef)}
-                  />
-                }
+                selected={requestDate}
+                onChange={date => setRequestDate(date)}
+                dateFormat='dd/MM/yyyy'
+                customInput={<PoDateInput label='Request Date' value={requestDate ? format(requestDate, 'dd/MM/yyyy') : ''} />}
               />
             </Grid>
 
             <Grid item xs={12} md={4}>
-              <Autocomplete
-                options={['Material Request', 'Material Return', 'Opening Stock']}
-                value={formData.requestType}
-                onChange={(_, v) => {
-                  setFormData(prev => ({ ...prev, requestType: v || '' }))
-                  if (v) focusElement(requestedByRef, setRequestedByOpen)
-                }}
-                open={requestTypeOpen}
-                onOpen={() => setRequestTypeOpen(true)}
-                onClose={() => setRequestTypeOpen(false)}
-                renderInput={params => (
-                  <CustomTextField
-                    {...params}
-                    fullWidth
-                    label={requiredLabel('Request Type')}
-                    onKeyDown={e => handleKeyDown(e, requestTypeRef)}
-                  />
-                )}
-                ref={requestTypeRef}
+              <GlobalAutocomplete
+                label='Origin'
+                options={originOptions}
+                value={origin}
+                onChange={setOrigin}
               />
             </Grid>
 
             <Grid item xs={12} md={4}>
-              <Autocomplete
-                options={employeeList}
-                value={
-                  Array.isArray(employeeList) ? employeeList.find(e => e.id === formData.requestedById) || null : null
-                }
-                onChange={(_, v) => {
-                  setFormData(prev => ({
-                    ...prev,
-                    requestedBy: v?.name || '',
-                    requestedById: v?.id || null
-                  }))
-                  if (v) focusElement(fromLocationRef, setFromLocationOpen)
-                }}
-                getOptionLabel={option => option.name || ''}
-                getOptionKey={option => option.id}
-                isOptionEqualToValue={(o, v) => o.id === v?.id}
-                open={requestedByOpen}
-                onOpen={() => setRequestedByOpen(true)}
-                onClose={() => setRequestedByOpen(false)}
-                renderInput={params => (
-                  <CustomTextField
-                    {...params}
-                    fullWidth
-                    label={requiredLabel('Requested By')}
-                    onKeyDown={e => handleKeyDown(e, requestedByRef)}
-                  />
-                )}
-                ref={requestedByRef}
-              />
-            </Grid>
-          </Grid>
-
-          {/* Second Row */}
-          <Grid container spacing={6} mb={3}>
-            <Grid item xs={12} md={4}>
-              <Autocomplete
-                options={supplierList}
-                value={supplierList.find(s => s.id === formData.fromLocationId) || null}
-                onChange={(_, v) => {
-                  setFormData(prev => ({
-                    ...prev,
-                    fromLocation: v?.name || '',
-                    fromLocationId: v?.id || null
-                  }))
-                  if (v) focusElement(toLocationRef, setToLocationOpen)
-                }}
-                getOptionLabel={option => option.name || ''}
-                getOptionKey={option => option.id}
-                isOptionEqualToValue={(o, v) => o.id === v?.id}
-                open={fromLocationOpen}
-                onOpen={() => setFromLocationOpen(true)}
-                onClose={() => setFromLocationOpen(false)}
-                renderInput={params => (
-                  <CustomTextField
-                    {...params}
-                    fullWidth
-                    label={requiredLabel('From Location/Supplier')}
-                    onKeyDown={e => handleKeyDown(e, fromLocationRef)}
-                  />
-                )}
-                ref={fromLocationRef}
+              <GlobalAutocomplete
+                label='From Employee'
+                options={employeeOptions}
+                value={fromEmployee}
+                onChange={setFromEmployee}
               />
             </Grid>
 
             <Grid item xs={12} md={4}>
-              <Autocomplete
-                options={supplierList}
-                value={supplierList.find(s => s.id === formData.toLocationId) || null}
-                onChange={(_, v) => {
-                  setFormData(prev => ({ ...prev, toLocation: v?.name || '', toLocationId: v?.id || null }))
-                  if (v) focusElement(remarksRef)
-                }}
-                getOptionLabel={option => option.name || ''}
-                isOptionEqualToValue={(o, v) => o.id === v?.id}
-                open={toLocationOpen}
-                onOpen={() => setToLocationOpen(true)}
-                onClose={() => setToLocationOpen(false)}
-                renderInput={params => (
-                  <CustomTextField
-                    {...params}
-                    fullWidth
-                    label={requiredLabel('To Location/Supplier')}
-                    onKeyDown={e => handleKeyDown(e, toLocationRef)}
-                  />
-                )}
-                ref={toLocationRef}
+              <GlobalAutocomplete
+                label='To Employee'
+                options={employeeOptions}
+                value={toEmployee}
+                onChange={setToEmployee}
               />
             </Grid>
 
-            <Grid item xs={12} md={4}>
-              <CustomTextField
-                fullWidth
-                multiline
-                rows={2}
+            <Grid item xs={12} md={8}>
+              <GlobalTextField
                 label='Remarks'
-                value={formData.remarks}
-                onChange={e => setFormData(prev => ({ ...prev, remarks: e.target.value }))}
-                onKeyDown={e => handleKeyDown(e, remarksRef)}
-                ref={remarksRef}
+                multiline
+                minRows={1}
+                value={remarks}
+                onChange={e => setRemarks(e.target.value)}
               />
             </Grid>
           </Grid>
+        </Box>
 
-          <Box my={8} sx={{ borderTop: '1px solid #ddd', width: '100%' }} />
+        <Divider />
 
-          {/* Items Input Row */}
-          <Grid container spacing={6} mb={3}>
+        {/* ITEM ENTRY */}
+        <Box px={4} py={3}>
+          <Grid container spacing={2} alignItems='flex-end'>
             <Grid item xs={12} md={3}>
-              <Autocomplete
-                options={chemicalList}
-                value={chemicalList.find(c => c.id === formData.chemicalId) || null}
-                onChange={(_, v) => {
-                  setFormData(prev => ({
-                    ...prev,
-                    chemical: v?.name || '',
-                    chemicalId: v?.id || null
-                  }))
-                  if (v) focusElement(unitRef, setUnitOpen)
+              <GlobalAutocomplete
+                label='Chemicals'
+                options={chemicalOptions}
+                value={chemical}
+                onChange={handleChemicalChange}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={2}>
+              <GlobalTextField
+                label='UOM'
+                value={uom?.label || ''}
+                InputProps={{
+                  readOnly: true
                 }}
-                getOptionLabel={option => option.name || ''}
-                getOptionKey={option => option.id}
-                isOptionEqualToValue={(o, v) => o.id === v?.id}
-                open={chemicalOpen}
-                onOpen={() => setChemicalOpen(true)}
-                onClose={() => setChemicalOpen(false)}
-                renderInput={params => (
-                  <CustomTextField
-                    {...params}
-                    fullWidth
-                    label={requiredLabel('Chemicals')}
-                    onKeyDown={e => handleKeyDown(e, chemicalRef)}
-                  />
-                )}
-                ref={chemicalRef}
+                disabled
+                sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#f5f5f5' } }}
               />
             </Grid>
 
             <Grid item xs={12} md={3}>
-              <Autocomplete
-                options={uomList}
-                value={uomList.find(u => u.id === formData.unitId) || null}
-                onChange={(_, v) => {
-                  setFormData(prev => ({
-                    ...prev,
-                    unit: v?.name || '',
-                    unitId: v?.id || null
-                  }))
-                  if (v) focusElement(quantityInputRef)
-                }}
-                getOptionLabel={option => option.name || ''}
-                getOptionKey={option => option.id}
-                isOptionEqualToValue={(o, v) => o.id === v?.id}
-                open={unitOpen}
-                onOpen={() => setUnitOpen(true)}
-                onClose={() => setUnitOpen(false)}
-                renderInput={params => (
-                  <CustomTextField
-                    {...params}
-                    fullWidth
-                    label={requiredLabel('Unit')}
-                    onKeyDown={e => handleKeyDown(e, unitRef)}
-                  />
-                )}
-                ref={unitRef}
+              <GlobalTextField
+                label='Quantity'
+                type='number'
+                value={quantity}
+                onChange={e => setQuantity(e.target.value)}
               />
             </Grid>
 
-            <Grid item xs={12} md={3}>
-              <CustomTextField
-                fullWidth
-                label={requiredLabel('Quantity')}
-                value={formData.quantity}
-                onChange={e => setFormData(prev => ({ ...prev, quantity: e.target.value.replace(/[^0-9]/g, '') }))}
-                inputRef={quantityInputRef}
-                onKeyDown={e => e.key === 'Enter' && handleAddOrUpdateItem()}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={3}>
-              <Button variant='contained' fullWidth onClick={handleAddOrUpdateItem} sx={{ height: 56 }}>
-                {itemToEditIndex !== null ? 'Update Item' : '+ Add Item'}
-              </Button>
+            <Grid item xs={12} md={1}>
+              <GlobalButton
+                variant='contained'
+                color={editId ? 'info' : 'primary'}
+                startIcon={editId ? <EditIcon /> : <AddIcon />}
+                onClick={handleAddItem}
+              >
+                {editId ? 'Update' : 'Add'}
+              </GlobalButton>
             </Grid>
           </Grid>
+        </Box>
 
-          {/* Items Table */}
-          <Box sx={{ overflowX: 'auto', mt: 6 }}>
-            <Table sx={{ minWidth: 1200 }}>
-              <TableHead>
-                <TableRow>
-                  <TableCell>S.No</TableCell>
-                  <TableCell>Action</TableCell>
-                  <TableCell>Chemical</TableCell>
-                  <TableCell>Unit</TableCell>
-                  <TableCell>Quantity</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {items.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} align='center'>
-                      No items added
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  items.map((item, i) => (
-                    <TableRow key={item.id} sx={{ bgcolor: itemToEditIndex === i ? '#f0f8ff' : 'inherit' }}>
-                      <TableCell>{i + 1}</TableCell>
-                      <TableCell>
-                        <IconButton size='small' color='primary' onClick={() => handleEditItem(i)}>
-                          <i className='tabler-edit' />
-                        </IconButton>
-                        <IconButton size='small' onClick={() => handleDeleteItem(i)}>
-                          <i className='tabler-trash text-red-600 text-lg' />
-                        </IconButton>
-                      </TableCell>
-                      <TableCell>{item.chemical}</TableCell>
-                      <TableCell>{item.unit}</TableCell>
-                      <TableCell>{item.quantity}</TableCell>
-                    </TableRow>
+        {/* ITEMS TABLE */}
+        <Box px={4} pb={3}>
+          <StickyTableWrapper rowCount={items.length}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th style={{ width: '50px' }}>S.No</th>
+                  <th align='center' style={{ width: '100px', textAlign: 'center' }}>
+                    Action
+                  </th>
+                  <th style={{ width: '40%' }}>Chemical</th>
+                  <th style={{ width: '25%' }}>UOM</th>
+                  <th style={{ width: '25%', textAlign: 'right' }}>Quantity</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {items.length ? (
+                  items.map((row, i) => (
+                    <tr key={row.id}>
+                      <td>{i + 1}</td>
+                      <td align='center'>
+                        <div style={{ display: 'flex', justifyContent: 'center', gap: '4px' }}>
+                          <IconButton
+                            size='small'
+                            color='primary'
+                            onClick={() => handleEditItem(row)}
+                            sx={{ padding: '4px' }}
+                          >
+                            <EditIcon fontSize='small' sx={{ fontSize: '1.25rem' }} />
+                          </IconButton>
+
+                          <IconButton
+                            size='small'
+                            color='error'
+                            onClick={() => handleRemoveItem(row.id)}
+                            sx={{ padding: '4px' }}
+                          >
+                            <DeleteIcon fontSize='small' sx={{ fontSize: '1.25rem' }} />
+                          </IconButton>
+                        </div>
+                      </td>
+                      <td>{row.chemical}</td>
+                      <td>{row.uom}</td>
+                      <td style={{ textAlign: 'right' }}>{row.quantity}</td>
+                    </tr>
                   ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} style={{ textAlign: 'center', padding: '24px' }}>
+                      No chemicals added
+                    </td>
+                  </tr>
                 )}
-              </TableBody>
-            </Table>
-          </Box>
+              </tbody>
+            </table>
+          </StickyTableWrapper>
+        </Box>
 
-          <Box mt={6} display='flex' justifyContent='flex-end' gap={2}>
-            <Button variant='outlined' onClick={() => router.push('/admin/transfer/material-request')}>
-              Close
-            </Button>
-            <Button variant='contained' onClick={handleSaveAll} disabled={items.length === 0}>
-              Save Request
-            </Button>
-          </Box>
-        </CardContent>
+        <Divider />
+
+        {/* ACTIONS */}
+        <Box px={4} py={3} display='flex' justifyContent='flex-end' gap={2}>
+          <GlobalButton color='secondary' onClick={() => router.push(`/${lang}/admin/transfer/material-request`)}>
+            Close
+          </GlobalButton>
+          <GlobalButton variant='contained' onClick={handleSaveAll} disabled={saveLoading || items.length === 0}>
+            {saveLoading ? 'Saving...' : 'Save Request'}
+          </GlobalButton>
+        </Box>
       </Card>
-    </ContentLayout>
+    </StickyListLayout>
   )
 }
