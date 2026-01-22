@@ -1,0 +1,5 @@
+export { default as addVehicle } from './add'
+export { default as getVehicleList } from './list'
+export { default as getVehicleDetails } from './details'
+export { default as updateVehicle } from './update'
+export { default as deleteVehicle } from './delete'

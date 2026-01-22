@@ -54,8 +54,8 @@ export default function AddMaterialRequestPage() {
   // Header fields
   const [requestDate, setRequestDate] = useState(new Date())
   const [origin, setOrigin] = useState(null)
-  const [fromEmployee, setFromEmployee] = useState(null)
-  const [toEmployee, setToEmployee] = useState(null)
+  const [fromVehicle, setFromVehicle] = useState(null)
+  const [toVehicle, setToVehicle] = useState(null)
   const [remarks, setRemarks] = useState('')
   const [currentUser, setCurrentUser] = useState(null)
 
@@ -237,13 +237,13 @@ export default function AddMaterialRequestPage() {
       return
     }
 
-    if (!fromEmployee) {
-      showToast('error', 'Please select From Employee')
+    if (!fromVehicle) {
+      showToast('error', 'Please select From Vehicle')
       return
     }
 
-    if (!toEmployee) {
-      showToast('error', 'Please select To Employee')
+    if (!toVehicle) {
+      showToast('error', 'Please select To Vehicle')
       return
     }
 
@@ -254,11 +254,11 @@ export default function AddMaterialRequestPage() {
         remarks: remarks,
         company_id: origin?.id || null,
         origin_id: origin?.id || null,
-        employee_id: currentUser?.id || fromEmployee?.id || null,
-        from_vehicle: fromEmployee?.label || null,
-        from_vehicle_id: fromEmployee?.id || null,
-        to_vehicle: toEmployee?.label || null,
-        to_vehicle_id: toEmployee?.id || null,
+        employee_id: currentUser?.id || fromVehicle?.id || null,
+        from_vehicle: fromVehicle?.label || null,
+        from_vehicle_id: fromVehicle?.id || null,
+        to_vehicle: toVehicle?.label || null,
+        to_vehicle_id: toVehicle?.id || null,
         supervisor_id: null,
         request_status: 'Pending',
         is_active: 1,
@@ -354,19 +354,19 @@ export default function AddMaterialRequestPage() {
 
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
-                label='From Employee'
+                label='From Vehicle'
                 options={employeeOptions}
-                value={fromEmployee}
-                onChange={setFromEmployee}
+                value={fromVehicle}
+                onChange={setFromVehicle}
               />
             </Grid>
 
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
-                label='To Employee'
+                label='To Vehicle'
                 options={employeeOptions}
-                value={toEmployee}
-                onChange={setToEmployee}
+                value={toVehicle}
+                onChange={setToVehicle}
               />
             </Grid>
 

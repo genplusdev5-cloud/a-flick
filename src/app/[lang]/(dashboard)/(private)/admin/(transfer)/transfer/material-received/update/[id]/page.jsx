@@ -62,8 +62,8 @@ const EditMaterialRequestReceivedPage = () => {
   const [saveLoading, setSaveLoading] = useState(false)
 
   // Header fields
-  const [fromEmployee, setFromEmployee] = useState(null)
-  const [toEmployee, setToEmployee] = useState(null)
+  const [fromVehicle, setFromVehicle] = useState(null)
+  const [toVehicle, setToVehicle] = useState(null)
   const [materialIssue, setMaterialIssue] = useState(null)
   const [receiveDate, setReceiveDate] = useState(null)
   const [remarks, setRemarks] = useState('')
@@ -142,8 +142,8 @@ const EditMaterialRequestReceivedPage = () => {
         setReceiveDate(details.receive_date ? parseISO(details.receive_date) : details.issue_date ? parseISO(details.issue_date) : null)
         setRemarks(details.remarks || '')
 
-        setFromEmployee(techs.find(t => t.id === details.from_vehicle_id) || (details.from_vehicle ? { label: details.from_vehicle, id: details.from_vehicle_id } : null))
-        setToEmployee(techs.find(t => t.id === details.to_vehicle_id) || (details.to_vehicle ? { label: details.to_vehicle, id: details.to_vehicle_id } : null))
+        setFromVehicle(techs.find(t => t.id === details.from_vehicle_id) || (details.from_vehicle ? { label: details.from_vehicle, id: details.from_vehicle_id } : null))
+        setToVehicle(techs.find(t => t.id === details.to_vehicle_id) || (details.to_vehicle ? { label: details.to_vehicle, id: details.to_vehicle_id } : null))
 
         setMaterialIssue(issues.find(i => i.id === details.issue_id) || (details.issue_id ? { label: `Issue #${details.issue_id}`, id: details.issue_id } : null))
 
@@ -243,7 +243,7 @@ const EditMaterialRequestReceivedPage = () => {
   }
 
   const handleUpdate = async () => {
-    if (!fromEmployee || !toEmployee || !receiveDate || items.length === 0) {
+    if (!fromVehicle || !toVehicle || !receiveDate || items.length === 0) {
       showToast('warning', 'Fill all required fields')
       return
     }
@@ -253,12 +253,12 @@ const EditMaterialRequestReceivedPage = () => {
 
       const payload = {
         id: decodedId,
-        from_vehicle: fromEmployee.label,
-        from_vehicle_id: fromEmployee.id,
-        to_vehicle: toEmployee.label,
-        to_vehicle_id: toEmployee.id,
+        from_vehicle: fromVehicle.label,
+        from_vehicle_id: fromVehicle.id,
+        to_vehicle: toVehicle.label,
+        to_vehicle_id: toVehicle.id,
         issue_id: materialIssue?.id || null,
-        employee_id: fromEmployee.id,
+        employee_id: fromVehicle.id,
         receive_date: format(receiveDate, 'yyyy-MM-dd'),
         remarks,
         is_active: 1,
@@ -314,10 +314,10 @@ const EditMaterialRequestReceivedPage = () => {
           <Grid container spacing={3}>
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
-                label='From Employee'
+                label='From Vehicle'
                 options={employeeOptions}
-                value={fromEmployee}
-                onChange={setFromEmployee}
+                value={fromVehicle}
+                onChange={setFromVehicle}
               />
             </Grid>
 
@@ -331,10 +331,10 @@ const EditMaterialRequestReceivedPage = () => {
 
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
-                label='To Employee'
+                label='To Vehicle'
                 options={employeeOptions}
-                value={toEmployee}
-                onChange={setToEmployee}
+                value={toVehicle}
+                onChange={setToVehicle}
               />
             </Grid>
 

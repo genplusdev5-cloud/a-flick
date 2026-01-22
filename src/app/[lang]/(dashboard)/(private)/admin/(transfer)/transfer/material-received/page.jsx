@@ -75,8 +75,8 @@ const MaterialRequestReceivedPage = () => {
   const [supplierOptions, setSupplierOptions] = useState([])
 
   // FILTER VALUES
-  const [selectedFromEmployee, setSelectedFromEmployee] = useState(null)
-  const [selectedToEmployee, setSelectedToEmployee] = useState(null)
+  const [selectedFromVehicle, setSelectedFromVehicle] = useState(null)
+  const [selectedToVehicle, setSelectedToVehicle] = useState(null)
   const [selectedIssue, setSelectedIssue] = useState(null)
   const [issueOptions, setIssueOptions] = useState([])
 
@@ -164,8 +164,8 @@ const MaterialRequestReceivedPage = () => {
       const res = await getMaterialReceiveList({
         page: pagination.pageIndex + 1,
         page_size: pagination.pageSize,
-        from_vehicle_id: selectedFromEmployee?.id,
-        to_vehicle_id: selectedToEmployee?.id,
+        from_vehicle_id: selectedFromVehicle?.id,
+        to_vehicle_id: selectedToVehicle?.id,
         issue_id: selectedIssue?.id
       })
 
@@ -176,8 +176,8 @@ const MaterialRequestReceivedPage = () => {
         return {
           sno: pagination.pageIndex * pagination.pageSize + (index + 1),
           id: item.id,
-          fromEmployee: item.from_vehicle || '-',
-          toEmployee: item.to_vehicle || '-',
+          fromVehicle: item.from_vehicle || '-',
+          toVehicle: item.to_vehicle || '-',
           issueNo: item.issue_number || item.num_series_issue || (item.issue_id ? `Issue #${item.issue_id}` : '-'),
           transferInNo: item.num_series || item.receive_number || '-',
           transferInDate: item.receive_date ? format(new Date(item.receive_date), 'dd/MM/yyyy') : '-',
@@ -215,8 +215,8 @@ const MaterialRequestReceivedPage = () => {
   }, [
     pagination.pageIndex,
     pagination.pageSize,
-    selectedFromEmployee,
-    selectedToEmployee,
+    selectedFromVehicle,
+    selectedToVehicle,
     selectedIssue,
     uiDateFilter,
     uiDateRange
@@ -262,8 +262,8 @@ const MaterialRequestReceivedPage = () => {
         }
       }),
 
-      columnHelper.accessor('fromEmployee', { header: 'From Employee' }),
-      columnHelper.accessor('toEmployee', { header: 'To Employee' }),
+      columnHelper.accessor('fromVehicle', { header: 'From Vehicle' }),
+      columnHelper.accessor('toVehicle', { header: 'To Vehicle' }),
       columnHelper.accessor('issueNo', { header: 'Issue No' }),
       columnHelper.accessor('transferInNo', { header: 'TR No.' }),
       columnHelper.accessor('transferInDate', { header: 'TR Date' }),
@@ -364,29 +364,29 @@ const MaterialRequestReceivedPage = () => {
             />
           </Box>
 
-          {/* FROM EMPLOYEE */}
+          {/* FROM VEHICLE */}
           <Box sx={{ width: 220 }}>
             <GlobalAutocomplete
-              label='From Employee'
-              placeholder='Select From Employee'
+              label='From Vehicle'
+              placeholder='Select From Vehicle'
               options={employeeOptions}
-              value={selectedFromEmployee}
+              value={selectedFromVehicle}
               onChange={(_, val) => {
-                setSelectedFromEmployee(val)
+                setSelectedFromVehicle(val)
                 setPagination(p => ({ ...p, pageIndex: 0 }))
               }}
             />
           </Box>
 
-          {/* TO EMPLOYEE */}
+          {/* TO VEHICLE */}
           <Box sx={{ width: 220 }}>
             <GlobalAutocomplete
-              label='To Employee'
-              placeholder='Select To Employee'
+              label='To Vehicle'
+              placeholder='Select To Vehicle'
               options={employeeOptions}
-              value={selectedToEmployee}
+              value={selectedToVehicle}
               onChange={(_, val) => {
-                setSelectedToEmployee(val)
+                setSelectedToVehicle(val)
                 setPagination(p => ({ ...p, pageIndex: 0 }))
               }}
             />
@@ -413,8 +413,8 @@ const MaterialRequestReceivedPage = () => {
             startIcon={<RefreshIcon />}
             sx={{ height: 36 }}
             onClick={() => {
-              setSelectedFromEmployee(null)
-              setSelectedToEmployee(null)
+              setSelectedFromVehicle(null)
+              setSelectedToVehicle(null)
               setSelectedIssue(null)
               setUiDateFilter(false)
               setUiDateRange([null, null])

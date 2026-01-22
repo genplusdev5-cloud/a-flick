@@ -370,11 +370,11 @@ export default function Project() {
                       </IconButton>
                     </Tooltip>
 
-                    <Tooltip title='MTBS Agreement'>
+                    {/* <Tooltip title='MTBS Agreement'>
                       <IconButton size='small' className='bg-primary text-white hover:bg-primary/90'>
                         <i className='tabler-file-text text-[18px]' />
                       </IconButton>
-                    </Tooltip>
+                    </Tooltip> */}
                   </div>
                 </div>
               </CardContent>
@@ -391,7 +391,7 @@ export default function Project() {
               <div className='flex items-center gap-3'>
                 <div className='flex flex-col'>
                   {/* Company Name */}
-                  <Typography variant='h4' fontWeight='600' className='flex items-center gap-2'>
+                  {/* <Typography variant='h4' fontWeight='600' className='flex items-center gap-2'>
                     ICAS Company Genplus Innovations
                     <a href='/edit-company'>
                       <Fab
@@ -408,17 +408,17 @@ export default function Project() {
                         <EditIcon sx={{ fontSize: 15 }} />
                       </Fab>
                     </a>
-                  </Typography>
+                  </Typography> */}
 
                   {/* Address */}
                   <Box className='mt-1'>
-                    <Typography variant='h6' color='text.secondary' className='flex items-center gap-1'>
+                    {/* <Typography variant='h6' color='text.secondary' className='flex items-center gap-1'>
                       <LocationOnIcon sx={{ fontSize: 20, color: 'primary.main' }} />
                       Office 123, Green Park Avenue, New Delhi, India
-                    </Typography>
+                    </Typography> */}
 
                     {/* Contact */}
-                    <Typography
+                    {/* <Typography
                       variant='body1'
                       color='text.secondary'
                       fontWeight={500}
@@ -426,7 +426,7 @@ export default function Project() {
                     >
                       <PhoneIcon sx={{ fontSize: 18, color: 'primary.main' }} />
                       John Doe | john@example.com | +1 234 567 8901
-                    </Typography>
+                    </Typography> */}
                   </Box>
                 </div>
               </div>
@@ -441,7 +441,7 @@ export default function Project() {
             <Grid item xs={12} md={5}>
               <div className='grid grid-cols-1 sm:grid-cols-3 gap-3'>
                 {/* Tasks */}
-                <Card className='bg-[#1DA1F2]'>
+                {/* <Card className='bg-[#1DA1F2]'>
                   <CardContent>
                     <div className='flex items-center gap-2 mb-3'>
                       <i className='tabler-clipboard-check text-3xl text-white' />
@@ -453,10 +453,10 @@ export default function Project() {
                       <Typography className='text-white'>Total Task: 50</Typography>
                     </div>
                   </CardContent>
-                </Card>
+                </Card> */}
 
                 {/* Team */}
-                <Card className='bg-[#7367F0]'>
+                {/* <Card className='bg-[#7367F0]'>
                   <CardContent>
                     <div className='flex items-center gap-2 mb-3'>
                       <i className='tabler-users text-3xl text-white' />
@@ -468,10 +468,10 @@ export default function Project() {
                       <Typography className='text-white'>Total Task: 25</Typography>
                     </div>
                   </CardContent>
-                </Card>
+                </Card> */}
 
                 {/* Logs */}
-                <Card className='bg-[#1EDA57] w-[200px]'>
+                {/* <Card className='bg-[#1EDA57] w-[200px]'>
                   <CardContent>
                     <div className='flex items-center gap-2 mb-3'>
                       <i className='tabler-login text-3xl text-white' />
@@ -483,7 +483,7 @@ export default function Project() {
                       <Typography className='text-white'>Total Task: 38</Typography>
                     </div>
                   </CardContent>
-                </Card>
+                </Card> */}
               </div>
             </Grid>
           </Grid>

@@ -22,7 +22,7 @@ const LinearProgress = styled(MuiLinearProgress)(() => ({
 const SalesOverview = () => {
   return (
     <CardContent>
-      <div className='flex items-start justify-between gap-3 mb-4'>
+      {/* <div className='flex items-start justify-between gap-3 mb-4'>
         <div className='flex items-center gap-x-[6px]'>
           <CustomAvatar skin='light' color='primary' variant='rounded' size={24}>
             <i className='tabler-shopping-cart text-lg' />
@@ -30,9 +30,9 @@ const SalesOverview = () => {
           <Typography variant='h5'>Assets Progress Chart</Typography>
         </div>
         <Typography variant='h5'>3/3</Typography>
-      </div>
+      </div> */}
 
-      <div className='flex flex-col gap-1'>
+      {/* <div className='flex flex-col gap-1'>
         <div className='flex items-center justify-between'>
           <Typography className='font-medium' color='text.primary'>
             Asset - 100%
@@ -46,7 +46,7 @@ const SalesOverview = () => {
           </a>
         </div>
         <LinearProgress variant='determinate' value={100} />
-      </div>
+      </div> */}
     </CardContent>
   )
 }

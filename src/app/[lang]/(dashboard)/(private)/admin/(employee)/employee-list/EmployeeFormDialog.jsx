@@ -32,6 +32,7 @@ import { getEmployeeDetails, addEmployee, updateEmployee, getSchedulerList, getS
 import { getDepartmentList } from '@/api/employee/departments/list'
 import { getDesignationList } from '@/api/employee/designations/list'
 import { getUserRoleList } from '@/api/userRole/list'
+import { getVehicleList } from '@/api/purchase/vehicle'
 import { format } from 'date-fns'
 
 const requiredStyle = {
@@ -56,6 +57,7 @@ const EmployeeFormDialog = ({ open, mode, employeeId, onClose, onSuccess }) => {
   const [userRoleList, setUserRoleList] = useState([])
   const [schedulerList, setSchedulerList] = useState([])
   const [supervisorList, setSupervisorList] = useState([])
+  const [vehicleList, setVehicleList] = useState([])
 
   const initialForm = {
     employeeRole: null,
@@ -72,7 +74,7 @@ const EmployeeFormDialog = ({ open, mode, employeeId, onClose, onSuccess }) => {
     targetDay: '',
     targetNight: '',
     targetSaturday: '',
-    vehicleNumber: '',
+    vehicleNumber: null,
     description: '',
     color: '#000000',
     dob: new Date(),
@@ -116,12 +118,13 @@ const EmployeeFormDialog = ({ open, mode, employeeId, onClose, onSuccess }) => {
 
     const loadDropdowns = async () => {
       try {
-        const [deptRes, desigRes, roleRes, schedRes, superRes] = await Promise.all([
+        const [deptRes, desigRes, roleRes, schedRes, superRes, vehicleRes] = await Promise.all([
           getDepartmentList(),
           getDesignationList(),
           getUserRoleList(),
           getSchedulerList(),
-          getSupervisorList()
+          getSupervisorList(),
+          getVehicleList({ page_size: 1000 })
         ])
 
         const extract = res => {
@@ -138,16 +141,18 @@ const EmployeeFormDialog = ({ open, mode, employeeId, onClose, onSuccess }) => {
         const roles = sanitize(extract(roleRes))
         const schedulers = extract(schedRes).map(x => ({ id: x.id, label: x.name }))
         const supervisors = extract(superRes).map(x => ({ id: x.id, label: x.name }))
+        const vehicles = (vehicleRes?.data?.results || vehicleRes?.results || []).map(x => ({ id: x.id, label: x.vehicle_name || x.vehicle_number || x.name }))
 
         setDepartmentList(departments)
         setDesignationList(designations)
         setUserRoleList(roles)
         setSchedulerList(schedulers)
         setSupervisorList(supervisors)
+        setVehicleList(vehicles)
 
         // If edit mode, trigger details fetch AFTER lists are ready
         if (mode === 'edit' && employeeId) {
-          fetchDetails(employeeId, { departments, designations, roles, schedulers, supervisors })
+          fetchDetails(employeeId, { departments, designations, roles, schedulers, supervisors, vehicles })
         }
       } catch (error) {
         console.error('❌ Dropdown fetch failed:', error)
@@ -195,7 +200,7 @@ const EmployeeFormDialog = ({ open, mode, employeeId, onClose, onSuccess }) => {
         targetDay: d.target_day || '',
         targetNight: d.target_night || '',
         targetSaturday: d.target_saturday || '',
-        vehicleNumber: d.vehicle_no || '',
+        vehicleNumber: lists.vehicles.find(v => v.label === d.vehicle_no) || (d.vehicle_no ? { label: d.vehicle_no, id: null } : null),
         description: d.description || '',
         color: d.color_code || '#000000',
         dob: d.dob && d.dob !== '0000-00-00' ? new Date(d.dob) : null,
@@ -264,7 +269,7 @@ const EmployeeFormDialog = ({ open, mode, employeeId, onClose, onSuccess }) => {
       fd.append('target_day', form.targetDay || '')
       fd.append('target_night', form.targetNight || '')
       fd.append('target_saturday', form.targetSaturday || '')
-      fd.append('vehicle_no', form.vehicleNumber || '')
+      fd.append('vehicle_no', form.vehicleNumber?.label || '')
       fd.append('description', form.description || '')
       fd.append('color_code', form.color || '')
       fd.append('finger_print_id', form.fingerPrintId || '')
@@ -318,11 +323,26 @@ const EmployeeFormDialog = ({ open, mode, employeeId, onClose, onSuccess }) => {
 
   const handleFileChange = e => {
     const file = e.target.files[0]
-    if (file) {
-      setField('signature', file)
-      const url = URL.createObjectURL(file)
-      setSignaturePreview(url)
+    if (!file) return
+
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png']
+    if (!validTypes.includes(file.type)) {
+      showToast('error', 'Only JPG and PNG files are allowed')
+      e.target.value = '' // reset input
+      return
     }
+
+    // Validate file size (500KB = 512,000 bytes)
+    if (file.size > 500 * 1024) {
+      showToast('error', 'File size must be less than 500KB')
+      e.target.value = '' // reset input
+      return
+    }
+
+    setField('signature', file)
+    const url = URL.createObjectURL(file)
+    setSignaturePreview(url)
   }
 
   const renderAC = (name, label, list, required = false) => (
@@ -359,7 +379,7 @@ const EmployeeFormDialog = ({ open, mode, employeeId, onClose, onSuccess }) => {
         </DialogCloseButton>
       </DialogTitle>
 
-      <DialogContent dividers sx={{ p: 6 }}>
+      <DialogContent sx={{ p: 6, pb: 4 }}>
         {fetching ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', p: 10 }}>
             <CircularProgress />
@@ -557,14 +577,7 @@ const EmployeeFormDialog = ({ open, mode, employeeId, onClose, onSuccess }) => {
             </Grid>
 
             {/* Row 8 */}
-            <Grid item xs={12} md={4}>
-              <GlobalTextField
-                label='Vehicle Number'
-                value={form.vehicleNumber}
-                onChange={e => setField('vehicleNumber', e.target.value)}
-                fullWidth
-              />
-            </Grid>
+            {renderAC('vehicleNumber', 'Vehicle Number', vehicleList)}
             <Grid item xs={12} md={4}>
               <GlobalTextField
                 type='color'
@@ -579,9 +592,9 @@ const EmployeeFormDialog = ({ open, mode, employeeId, onClose, onSuccess }) => {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Button variant='outlined' component='label' fullWidth sx={{ height: 56 }}>
                   {form.signature ? form.signature.name : 'Upload Signature'}
-                  <input type='file' hidden onChange={handleFileChange} accept='image/*' />
+                  <input type='file' hidden onChange={handleFileChange} accept='.jpg,.jpeg,.png' />
                 </Button>
-                {(form.signature || form.existingSignature) && (
+                {(form.signature || (form.existingSignature && form.existingSignature !== '')) && (
                   <IconButton
                     color='info'
                     onClick={() => setPreviewOpen(true)}
@@ -611,10 +624,18 @@ const EmployeeFormDialog = ({ open, mode, employeeId, onClose, onSuccess }) => {
         )}
       </DialogContent>
 
+      <Box
+        sx={{
+          borderTop: '1px solid #e0e0e0',
+          mx: 6,
+          my: 3
+        }}
+      />
+
       <DialogActions sx={{ p: 6 }}>
-        <Button onClick={onClose} variant='tonal' color='secondary' disabled={loading}>
+        <GlobalButton onClick={onClose} color='secondary' disabled={loading}>
           Close
-        </Button>
+        </GlobalButton>
         <GlobalButton variant='contained' onClick={handleSave} disabled={loading || fetching}>
           {loading ? 'Saving...' : mode === 'add' ? 'Save Changes' : 'Update'}
         </GlobalButton>

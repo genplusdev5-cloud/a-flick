@@ -75,7 +75,7 @@ const MaterialRequestPageContent = () => {
   const [uiStartDate, setUiStartDate] = useState(new Date())
   const [uiEndDate, setUiEndDate] = useState(new Date())
   const [uiRequestStatus, setUiRequestStatus] = useState('')
-  const [uiEmployee, setUiEmployee] = useState('')
+  const [uiVehicle, setUiVehicle] = useState('')
   const [uiSearchText, setUiSearchText] = useState('')
 
   // -- APPLIED (PERSISTENT) FILTER STATES --
@@ -84,7 +84,7 @@ const MaterialRequestPageContent = () => {
     startDate: new Date(),
     endDate: new Date(),
     requestStatus: '',
-    employee: '',
+    vehicle: '',
     searchText: ''
   })
 
@@ -135,8 +135,8 @@ const MaterialRequestPageContent = () => {
         id: r.id,
         requestNo: r.request_no || `REQ-${r.id}`,
         requestDate: r.request_date,
-        fromEmployee: r.from_vehicle || '',
-        toEmployee: r.to_vehicle || '',
+        fromVehicle: r.from_vehicle || '',
+        toVehicle: r.to_vehicle || '',
         approvedStatus: r.is_approved === 1 ? 'Yes' : 'N/A',
         issuedStatus: r.is_issued === 1 ? 'Yes' : 'N/A',
         completedStatus: r.is_completed === 1 ? 'Yes' : 'No',
@@ -153,10 +153,10 @@ const MaterialRequestPageContent = () => {
             new Date(row.requestDate) >= appliedFilters.startDate &&
             new Date(row.requestDate) <= appliedFilters.endDate
         const matchesStatus = !appliedFilters.requestStatus || row.status === appliedFilters.requestStatus
-        const matchesEmployee = !appliedFilters.employee || 
-          row.fromEmployee === appliedFilters.employee || 
-          row.toEmployee === appliedFilters.employee
-        return matchesSearch && matchesDate && matchesStatus && matchesEmployee
+        const matchesVehicle = !appliedFilters.vehicle || 
+          row.fromVehicle === appliedFilters.vehicle || 
+          row.toVehicle === appliedFilters.vehicle
+        return matchesSearch && matchesDate && matchesStatus && matchesVehicle
       })
 
       const withSno = filtered.map((row, i) => ({
@@ -281,8 +281,8 @@ const MaterialRequestPageContent = () => {
           return d ? format(new Date(d), 'dd/MM/yyyy') : ''
         }
       }),
-      columnHelper.accessor('fromEmployee', { header: 'From Employee' }),
-      columnHelper.accessor('toEmployee', { header: 'To Employee' }),
+      columnHelper.accessor('fromVehicle', { header: 'From Vehicle' }),
+      columnHelper.accessor('toVehicle', { header: 'To Vehicle' }),
       columnHelper.display({
         id: 'isApproved',
         header: 'Is Approved',
@@ -402,15 +402,15 @@ const MaterialRequestPageContent = () => {
               />
               <CustomAutocomplete
                 options={employeeOptions}
-                value={uiEmployee || null}
-                onChange={(e, val) => setUiEmployee(val || '')}
+                value={uiVehicle || null}
+                onChange={(e, val) => setUiVehicle(val || '')}
                 renderInput={params => (
                   <CustomTextField
                     {...params}
                     size='small'
-                    label='Employee'
+                    label='Vehicle'
                     sx={{ width: 180 }}
-                    placeholder='Select Employee'
+                    placeholder='Select Vehicle'
                   />
                 )}
               />
@@ -436,7 +436,7 @@ const MaterialRequestPageContent = () => {
                       startDate: uiStartDate,
                       endDate: uiEndDate,
                       requestStatus: uiRequestStatus,
-                      employee: uiEmployee,
+                      vehicle: uiVehicle,
                       searchText: uiSearchText
                     })
                     loadData(true)
