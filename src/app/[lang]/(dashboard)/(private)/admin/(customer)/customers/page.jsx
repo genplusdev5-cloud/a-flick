@@ -31,9 +31,12 @@ import {
   Checkbox
 } from '@mui/material'
 
+import CustomAvatar from '@core/components/mui/Avatar'
 import PermissionGuard from '@/components/auth/PermissionGuard'
 import { usePermission } from '@/hooks/usePermission'
 import PresetDateRangePicker from '@/components/common/PresetDateRangePicker'
+
+import { exportMyob } from '@/api/customer_group/customer'
 
 import { getCustomerList, deleteCustomer } from '@/api/customer_group/customer'
 import { getCustomerSummary } from '@/api/customer_group/customer'
@@ -80,6 +83,7 @@ import styles from '@core/styles/table.module.css'
 import ChevronRight from '@menu/svg/ChevronRight'
 import { dateSortingFn } from '@/utils/tableUtils'
 import StickyListLayout from '@/components/common/StickyListLayout'
+import DonutChartGeneratedLeads from '@/views/pages/widget-examples/statistics/DonutChartGeneratedLeads'
 import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 
 // Debounced Input
@@ -102,6 +106,8 @@ const CustomersPageContent = () => {
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
+
+  const [selectedIds, setSelectedIds] = useState([])
 
   // Initialize pagination from URL search params
   const initialPageIndex = searchParams.get('pageIndex') ? Number(searchParams.get('pageIndex')) : 0
@@ -131,6 +137,31 @@ const CustomersPageContent = () => {
 
   // Sync pagination state to URL search params
   const isFirstRender = useRef(true)
+
+  const handleMyobExport = async () => {
+    if (selectedIds.length === 0) {
+      showToast('warning', 'Select at least one customer')
+      return
+    }
+
+    try {
+      setLoading(true)
+
+      await exportMyob({
+        customerIds: selectedIds
+      })
+
+      showToast('success', 'Customers exported to MYOB successfully')
+
+      setSelectedIds([])
+      setFilterMyob(null)
+      handleRefresh()
+    } catch (err) {
+      showToast('error', 'MYOB export failed')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleRefresh = () => {
     setAppliedSearchText(searchText)
@@ -192,6 +223,7 @@ const CustomersPageContent = () => {
         email: item.billing_email || item.email || '',
         phone: item.billing_phone || item.pic_phone || '',
         address: item.billing_address || '',
+        postalCode: item.postal_code || '',
         commenceDate: item.commence_date || '',
         origin: originMap[item.company_id] || item.company_name || '-',
         contacts: item.contact || []
@@ -294,18 +326,47 @@ const CustomersPageContent = () => {
 
   // --- Table ---
   const columnHelper = createColumnHelper()
+
   const columns = useMemo(
     () => [
-      // 1) S.No
-      columnHelper.accessor('sno', { header: 'S.No' }),
+      // ✅ 0) CHECKBOX COLUMN (ONLY FOR NOT EXPORTED)
+      columnHelper.display({
+        id: 'select',
+        header: () =>
+          filterMyob?.value === 'Not Exported' ? (
+            <Checkbox
+              checked={rows.length > 0 && selectedIds.length === rows.length}
+              indeterminate={selectedIds.length > 0 && selectedIds.length < rows.length}
+              onChange={e => {
+                setSelectedIds(e.target.checked ? rows.map(r => r.id) : [])
+              }}
+            />
+          ) : null,
 
-      // 2) ACTION (keep it here always)
+        cell: info =>
+          filterMyob?.value === 'Not Exported' ? (
+            <Checkbox
+              checked={selectedIds.includes(info.row.original.id)}
+              onChange={e => {
+                const id = info.row.original.id
+                setSelectedIds(prev => (e.target.checked ? [...prev, id] : prev.filter(x => x !== id)))
+              }}
+            />
+          ) : null
+      }),
+
+      // 1) S.No
+      columnHelper.accessor('sno', {
+        header: 'S.No'
+      }),
+
+      // 2) ACTION
       columnHelper.display({
         id: 'actions',
         header: 'Action',
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
-            {/* 1. CONTRACTS ICON (LEFT) */}
+            {/* CONTRACT */}
             <IconButton
               size='small'
               color='success'
@@ -317,14 +378,14 @@ const CustomersPageContent = () => {
               <i className='tabler-file-text' />
             </IconButton>
 
-            {/* 2. EDIT ICON */}
+            {/* EDIT */}
             {canAccess('Customers', 'update') && (
               <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original.id)}>
-                <i className='tabler-edit ' />
+                <i className='tabler-edit' />
               </IconButton>
             )}
 
-            {/* 3. DELETE ICON */}
+            {/* DELETE */}
             {canAccess('Customers', 'delete') && (
               <IconButton
                 size='small'
@@ -338,13 +399,17 @@ const CustomersPageContent = () => {
         )
       }),
 
-      columnHelper.accessor('origin', { header: 'Origin' }),
-
-      // 3) NEW — Card ID
-      columnHelper.accessor('cardId', {
-        header: 'Card ID'
+      // 3) Origin
+      columnHelper.accessor('origin', {
+        header: 'Origin'
       }),
 
+      // 4) Customer Code
+      columnHelper.accessor('cardId', {
+        header: 'Customer Code'
+      }),
+
+      // 5) Commence Date
       columnHelper.accessor('commenceDate', {
         header: 'Commence Date',
         sortingFn: dateSortingFn,
@@ -354,18 +419,37 @@ const CustomersPageContent = () => {
         }
       }),
 
-      columnHelper.accessor('name', { header: 'Customer Name' }),
+      // 6) Customer Name
+      columnHelper.accessor('name', {
+        header: 'Customer Name'
+      }),
 
-      // 4) NEW — ABSS Customer Name
+      // 7) ABSS Customer Name
       columnHelper.accessor('abssName', {
         header: 'ABSS Customer Name'
       }),
 
-      columnHelper.accessor('email', { header: 'Contact Email' }),
-      columnHelper.accessor('phone', { header: 'Contact Phone' }),
-      columnHelper.accessor('address', { header: 'Billing Address' }),
+      // 8) Email
+      columnHelper.accessor('email', {
+        header: 'Contact Email'
+      }),
 
-      // 5) NEW — MYOB STATUS
+      // 9) Phone
+      columnHelper.accessor('phone', {
+        header: 'Contact Phone'
+      }),
+
+      // 10) Address
+      columnHelper.accessor('address', {
+        header: 'Billing Address'
+      }),
+
+      // 11) Postal Code
+      columnHelper.accessor('postalCode', {
+        header: 'Postal Code'
+      }),
+
+      // 12) MYOB Status
       columnHelper.accessor('myobStatus', {
         header: 'MYOB',
         cell: info => {
@@ -381,16 +465,12 @@ const CustomersPageContent = () => {
         }
       }),
 
-      // 6) NEW — GENERAL STATUS
+      // 13) Status
       columnHelper.accessor('status', {
         header: 'Status',
         cell: info => {
           const raw = info.getValue()
-
-          // Convert 1/0 to text
           const value = raw === 1 ? 'Active' : 'Inactive'
-
-          // Red/Green color
           const color = value === 'Active' ? 'success' : 'error'
 
           return (
@@ -408,10 +488,10 @@ const CustomersPageContent = () => {
           )
         }
       })
-
-      // 7) Existing Columns
     ],
-    []
+
+    // 🔥🔥🔥 VERY IMPORTANT DEPENDENCIES 🔥🔥🔥
+    [filterMyob, selectedIds, rows]
   )
 
   const fuzzyFilter = (row, columnId, value, addMeta) => {
@@ -436,7 +516,7 @@ const CustomersPageContent = () => {
   // --- Export ---
   const exportOpen = Boolean(exportAnchorEl)
   const exportCSV = () => {
-    const headers = ['S.No', 'Origin', 'Email', 'Address', 'Name', 'Commence Date', 'Phone']
+    const headers = ['S.No', 'Origin', 'Email', 'Address', 'Postal Code', 'Name', 'Commence Date', 'Phone']
     const csv = [
       headers.join(','),
       ...rows.map(r =>
@@ -445,6 +525,7 @@ const CustomersPageContent = () => {
           `"${r.origin}"`,
           `"${r.email}"`,
           `"${r.address}"`,
+          `"${r.postalCode}"`,
           `"${r.name}"`,
           r.commenceDate ? new Date(r.commenceDate).toLocaleDateString('en-GB') : '',
           r.phone
@@ -469,7 +550,7 @@ const CustomersPageContent = () => {
       </style></head><body>
       <h2>Customer List</h2>
       <table><thead><tr>
-      <th>S.No</th><th>Origin</th><th>Email</th><th>Address</th><th>Name</th><th>Commence Date</th><th>Phone</th>
+      <th>S.No</th><th>Origin</th><th>Email</th><th>Address</th><th>Postal Code</th><th>Name</th><th>Commence Date</th><th>Phone</th>
       </tr></thead><tbody>
       ${rows
         .map(
@@ -478,6 +559,7 @@ const CustomersPageContent = () => {
           <td>${r.origin}</td>
           <td>${r.email}</td>
           <td>${r.address}</td>
+          <td>${r.postalCode}</td>
           <td>${r.name}</td>
           <td>${r.commenceDate ? new Date(r.commenceDate).toLocaleDateString('en-GB') : ''}</td>
           <td>${r.phone}</td>
@@ -504,88 +586,75 @@ const CustomersPageContent = () => {
             <Typography color='text.primary'>Customer List</Typography>
           </Breadcrumbs>
 
-          {/* Stats Cards */}
-          <Card
-            sx={{
-              p: 3,
-              mb: 4,
-              borderRadius: 1,
-              boxShadow: 'none',
-              border: '1px solid #e0e0e0',
-              flexShrink: 0
-            }}
-          >
-            <Typography variant='h6' fontWeight={600} mb={2}>
-              Customer Summary
-            </Typography>
+          {/* Stats Section */}
+          <Grid container spacing={6}>
+            <Grid item xs={12} md={9}>
+              <Card className='h-full'>
+                <CardHeader title='' />
+                <CardContent className='flex justify-between flex-wrap gap-4'>
+                  <Grid container spacing={4} flex={1}>
+                    {/* Total Customers */}
+                    <Grid item xs={12} sm={6} md={3} className='flex gap-4 items-center'>
+                      <CustomAvatar color='primary' variant='rounded' size={42} skin='light'>
+                        <i className='tabler-users text-[26px]' />
+                      </CustomAvatar>
+                      <div>
+                        <Typography variant='h5'>{summary.total_customers}</Typography>
+                        <Typography variant='body2'>Total Customers</Typography>
+                      </div>
+                    </Grid>
 
-            <Grid
-              container
-              spacing={4}
-              justifyContent='center' // ⭐ Center horizontally
-              alignItems='center' // ⭐ Center vertically
-            >
-              {/* Total Customers */}
-              <Grid item xs={12} md={3}>
-                <Box display='flex' alignItems='center' gap={2} justifyContent='center'>
-                  <GroupIcon sx={{ fontSize: 40, color: '#1976D2' }} />
-                  <Box textAlign='center'>
-                    <Typography variant='subtitle2' color='text.secondary'>
-                      Total Customers
-                    </Typography>
-                    <Typography variant='h5' fontWeight={700}>
-                      {summary.total_customers}
-                    </Typography>
-                  </Box>
-                </Box>
-              </Grid>
+                    {/* MYOB Exported */}
+                    <Grid item xs={12} sm={6} md={3} className='flex gap-4 items-center'>
+                      <CustomAvatar color='secondary' variant='rounded' size={42} skin='light'>
+                        <i className='tabler-chart-bar text-[26px]' />
+                      </CustomAvatar>
+                      <div>
+                        <Typography variant='h5'>{summary.total_myob}</Typography>
+                        <Typography variant='body2'>MYOB Exported</Typography>
+                      </div>
+                    </Grid>
 
-              {/* MYOB Exported */}
-              <Grid item xs={12} md={3}>
-                <Box display='flex' alignItems='center' gap={2} justifyContent='center'>
-                  <BarChartIcon sx={{ fontSize: 40, color: '#6A4FBF' }} />
-                  <Box textAlign='center'>
-                    <Typography variant='subtitle2' color='text.secondary'>
-                      MYOB Exported
-                    </Typography>
-                    <Typography variant='h5' fontWeight={700}>
-                      {summary.total_myob}
-                    </Typography>
-                  </Box>
-                </Box>
-              </Grid>
+                    {/* Active */}
+                    <Grid item xs={12} sm={6} md={3} className='flex gap-4 items-center'>
+                      <CustomAvatar color='success' variant='rounded' size={42} skin='light'>
+                        <i className='tabler-circle-check text-[26px]' />
+                      </CustomAvatar>
+                      <div>
+                        <Typography variant='h5' color='success.main'>
+                          {summary.total_active}
+                        </Typography>
+                        <Typography variant='body2'>Active</Typography>
+                      </div>
+                    </Grid>
 
-              {/* Active */}
-              <Grid item xs={12} md={3}>
-                <Box display='flex' alignItems='center' gap={1} justifyContent='center'>
-                  <CheckCircleIcon sx={{ fontSize: 32, color: 'success.main' }} />
-                  <Box textAlign='center'>
-                    <Typography variant='subtitle2' color='text.secondary'>
-                      Active
-                    </Typography>
-                    <Typography variant='h5' fontWeight={700} color='success.main'>
-                      {summary.total_active}
-                    </Typography>
-                  </Box>
-                </Box>
-              </Grid>
-
-              {/* Inactive */}
-              <Grid item xs={12} md={3}>
-                <Box display='flex' alignItems='center' gap={1} justifyContent='center'>
-                  <CancelIcon sx={{ fontSize: 32, color: 'error.main' }} />
-                  <Box textAlign='center'>
-                    <Typography variant='subtitle2' color='text.secondary'>
-                      Inactive
-                    </Typography>
-                    <Typography variant='h5' fontWeight={700} color='error.main'>
-                      {summary.total_inactive}
-                    </Typography>
-                  </Box>
-                </Box>
-              </Grid>
+                    {/* Inactive */}
+                    <Grid item xs={12} sm={6} md={3} className='flex gap-4 items-center'>
+                      <CustomAvatar color='error' variant='rounded' size={42} skin='light'>
+                        <i className='tabler-circle-x text-[26px]' />
+                      </CustomAvatar>
+                      <div>
+                        <Typography variant='h5' color='error.main'>
+                          {summary.total_inactive}
+                        </Typography>
+                        <Typography variant='body2'>Inactive</Typography>
+                      </div>
+                    </Grid>
+                  </Grid>
+                </CardContent>
+              </Card>
             </Grid>
-          </Card>
+            <Grid item xs={12} md={3}>
+              <DonutChartGeneratedLeads
+                title='Customer Status'
+                subtitle='Active vs Inactive'
+                total={summary.total_customers}
+                series={[summary.total_active, summary.total_inactive]}
+                labels={['Active', 'Inactive']}
+                customColors={['var(--mui-palette-success-main)', 'var(--mui-palette-error-main)']}
+              />
+            </Grid>
+          </Grid>
         </>
       }
     >
@@ -600,14 +669,17 @@ const CustomersPageContent = () => {
           }
           action={
             <Box display='flex' alignItems='center' gap={2}>
-              <GlobalButton
-                color='secondary'
-                endIcon={<ArrowDropDownIcon />}
-                onClick={e => setExportAnchorEl(e.currentTarget)}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-              >
-                Export
-              </GlobalButton>
+              {filterMyob?.value === 'Not Exported' && (
+                <GlobalButton
+                  variant='contained'
+                  color='success'
+                  disabled={selectedIds.length === 0}
+                  onClick={handleMyobExport}
+                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                >
+                  Export
+                </GlobalButton>
+              )}
 
               <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
                 <MenuItem
@@ -673,7 +745,6 @@ const CustomersPageContent = () => {
         <Divider />
 
         <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-
           {/* --- Row 2: Filters --- */}
           <Box
             sx={{
@@ -722,15 +793,13 @@ const CustomersPageContent = () => {
               <GlobalAutocomplete
                 label='MYOB Status'
                 placeholder='Select'
-                options={[
-                  { id: 1, label: 'Exported', value: 'Exported' },
-                  { id: 2, label: 'Not Exported', value: 'Not Exported' }
-                ]}
+                options={[{ id: 2, label: 'Not Exported', value: 'Not Exported' }]}
                 value={filterMyob}
                 getOptionLabel={opt => opt?.label || ''}
                 isOptionEqualToValue={(a, b) => a?.id === b?.id}
                 onChange={val => {
                   setFilterMyob(val)
+                  setSelectedIds([]) // 🔥 RESET selection
                 }}
               />
             </Box>

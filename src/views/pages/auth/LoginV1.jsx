@@ -93,7 +93,7 @@ const LoginV1 = () => {
 
           <div className='flex flex-col gap-1 mb-6 text-center'>
             <Typography variant='h4'>{`Welcome to ${themeConfig.templateName}! 👋🏻`}</Typography>
-            <Typography>Please sign in to continue using A-Flick.</Typography>
+            <Typography>Please sign in to continue</Typography>
           </div>
 
           {/* ✅ Login Form */}

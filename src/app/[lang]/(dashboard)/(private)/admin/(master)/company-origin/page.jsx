@@ -325,11 +325,11 @@ const CompanyOriginListContent = () => {
                 </MenuItem>
               </Menu>
 
-              {canAccess('Company Origin', 'create') && (
+              {/* {canAccess('Company Origin', 'create') && (
                 <GlobalButton startIcon={<AddIcon />} onClick={() => router.push('/admin/company-origin/add')}>
                   Add Company
                 </GlobalButton>
-              )}
+              )} */}
             </Box>
           }
           sx={{

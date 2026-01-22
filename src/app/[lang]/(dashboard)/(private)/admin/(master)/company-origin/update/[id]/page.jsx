@@ -25,7 +25,7 @@ import CustomTextField from '@core/components/mui/TextField'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import { Autocomplete } from '@mui/material'
 
-import { getCompany, updateCompany } from '@/api/master/company'
+import { getCompanyDetails, updateCompany } from '@/api/master/company'
 import { useParams, useRouter } from 'next/navigation'
 import { showToast } from '@/components/common/Toasts'
 import { decodeId } from '@/utils/urlEncoder'
@@ -211,6 +211,8 @@ export default function CompanyOriginEditPage() {
       </Box>
     )
   }
+
+  if (!formData) return null
 
   return (
     <Box>

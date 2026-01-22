@@ -30,7 +30,13 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { chemicalsSchema } from '@/validations/chemicals.schema'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 
-import { getChemicalsList, addChemical, updateChemical, deleteChemical, getChemicalDetails } from '@/api/master/chemicals'
+import {
+  getChemicalsList,
+  addChemical,
+  updateChemical,
+  deleteChemical,
+  getChemicalDetails
+} from '@/api/master/chemicals'
 import { getUomList } from '@/api/master/uom'
 
 import { showToast } from '@/components/common/Toasts'
@@ -168,30 +174,37 @@ const ChemicalsPageContent = () => {
   const loadData = async (showLoader = false) => {
     if (showLoader) setLoading(true)
     try {
-      const result = await getChemicalsList()
-      const dataArray = result?.data || []
+      const result = await getChemicalsList({
+        page: pagination.pageIndex + 1,
+        page_size: pagination.pageSize,
+        search: searchText
+      })
 
-      if (result.success || Array.isArray(dataArray)) {
-        const formatted = dataArray
-          .map((item, idx) => ({
-            sno: idx + 1,
-            id: item.id,
-            name: item.name || '-',
-            unit: item.uom || '-',
-            unit_id: item.uom_id || item.uom, // Store ID if available
-            dosage: item.unit_value || '-',
-            ingredients: item.description || '-',
-            file: item.file_name || '-',
-            is_active: item.is_active,
-            status: item.is_active === 1 ? 'Active' : 'Inactive'
-          }))
-          .sort((a, b) => b.id - a.id)
+      const dataObj = result?.data || {}
+      const results = dataObj.results || []
+      const total = dataObj.count || 0
+
+      if (result.success) {
+        const formatted = results.map((item, idx) => ({
+          sno: pagination.pageIndex * pagination.pageSize + idx + 1,
+          id: item.id,
+          name: item.name || '-',
+          unit: item.uom || '-',
+          unit_id: item.uom_id || item.uom,
+          store_unit: item.store_unit || '-',
+          conversion_value: item.conversion_value || '-',
+          unit_rate: item.unit_rate || '-',
+          file: item.file_name || '-',
+          is_active: item.is_active,
+          status: item.is_active === 1 ? 'Active' : 'Inactive'
+        }))
 
         setRows(formatted)
-        setRowCount(formatted.length)
+        setRowCount(total)
       } else {
         showToast('error', result.message || 'Failed to load chemicals')
         setRows([])
+        setRowCount(0)
       }
     } catch (err) {
       console.error(err)
@@ -406,8 +419,18 @@ const ChemicalsPageContent = () => {
           return matched?.name || val || '-'
         }
       }),
-      columnHelper.accessor('dosage', { header: 'Dosage' }),
-      columnHelper.accessor('ingredients', { header: 'Ingredients' }),
+      columnHelper.accessor('store_unit', {
+        header: 'Store Unit'
+      }),
+
+      columnHelper.accessor('conversion_value', {
+        header: 'Conversion Value'
+      }),
+
+      columnHelper.accessor('unit_rate', {
+        header: 'Unit Rate'
+      }),
+
       columnHelper.accessor('file', {
         header: 'File',
         cell: info => {
@@ -474,14 +497,8 @@ const ChemicalsPageContent = () => {
     return itemRank.passed
   }
 
-  const paginatedRows = useMemo(() => {
-    const start = pagination.pageIndex * pagination.pageSize
-    const end = start + pagination.pageSize
-    return rows.slice(start, end)
-  }, [rows, pagination])
-
   const table = useReactTable({
-    data: paginatedRows,
+    data: rows,
     columns,
     manualPagination: true,
     pageCount: Math.ceil(rowCount / pagination.pageSize),

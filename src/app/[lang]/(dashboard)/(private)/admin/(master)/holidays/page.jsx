@@ -48,7 +48,7 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
 
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalTextField from '@/components/common/GlobalTextField'
-import GlobalSelect from '@/components/common/GlobalSelect'
+import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
 import PermissionGuard from '@/components/auth/PermissionGuard'
 import { usePermission } from '@/hooks/usePermission'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
@@ -86,6 +86,10 @@ const HolidaysPageContent = () => {
   const [rowCount, setRowCount] = useState(0)
   const [searchText, setSearchText] = useState('')
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
+  const [selectedYear, setSelectedYear] = useState({
+    label: String(new Date().getFullYear()),
+    value: new Date().getFullYear()
+  })
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [isEdit, setIsEdit] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -368,17 +372,22 @@ const HolidaysPageContent = () => {
     return itemRank.passed
   }
 
+  const filteredByYearRows = useMemo(() => {
+    if (!selectedYear?.value) return rows
+    return rows.filter(row => String(row.year) === String(selectedYear.value))
+  }, [rows, selectedYear])
+
   const paginatedRows = useMemo(() => {
     const start = pagination.pageIndex * pagination.pageSize
     const end = start + pagination.pageSize
-    return rows.slice(start, end)
-  }, [rows, pagination])
+    return filteredByYearRows.slice(start, end)
+  }, [filteredByYearRows, pagination])
 
   const table = useReactTable({
     data: paginatedRows,
     columns,
     manualPagination: true,
-    pageCount: Math.ceil(rowCount / pagination.pageSize),
+    pageCount: Math.ceil(filteredByYearRows.length / pagination.pageSize),
     state: { globalFilter: searchText, pagination },
     onGlobalFilterChange: setSearchText,
     onPaginationChange: setPagination,
@@ -497,20 +506,45 @@ const HolidaysPageContent = () => {
 
         <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <Box
-            sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, flexShrink: 0 }}
+            sx={{
+              mb: 3,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-end',
+              flexWrap: 'wrap',
+              gap: 2,
+              flexShrink: 0
+            }}
           >
-            <FormControl size='small' sx={{ width: 140 }}>
-              <Select
-                value={pagination.pageSize}
-                onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
-              >
-                {[25, 50, 75, 100].map(s => (
-                  <MenuItem key={s} value={s}>
-                    {s} entries
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 2 }}>
+              <FormControl size='small' sx={{ width: 140 }}>
+                <Select
+                  value={pagination.pageSize}
+                  onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
+                >
+                  {[25, 50, 75, 100].map(s => (
+                    <MenuItem key={s} value={s}>
+                      {s} entries
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <Box sx={{ width: 140 }}>
+                <GlobalAutocomplete
+                  label='Year'
+                  placeholder='Select Year'
+                  options={[2024, 2025, 2026, 2027, 2028, 2029, 2030].map(yr => ({ label: String(yr), value: yr }))}
+                  value={selectedYear}
+                  getOptionLabel={opt => opt?.label || ''}
+                  isOptionEqualToValue={(a, b) => a?.value === b?.value}
+                  onChange={val => {
+                    setSelectedYear(val)
+                    setPagination(p => ({ ...p, pageIndex: 0 }))
+                  }}
+                />
+              </Box>
+            </Box>
             <DebouncedInput
               value={searchText}
               onChange={v => {
@@ -580,7 +614,11 @@ const HolidaysPageContent = () => {
             </StickyTableWrapper>
           </Box>
           <Box sx={{ mt: 'auto', flexShrink: 0 }}>
-            <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+            <TablePaginationComponent
+              totalCount={filteredByYearRows.length}
+              pagination={pagination}
+              setPagination={setPagination}
+            />
           </Box>
         </Box>
       </Card>
@@ -638,7 +676,6 @@ const HolidaysPageContent = () => {
                 <Controller
                   name='date'
                   control={control}
-
                   render={({ field }) => (
                     <AppReactDatepicker
                       selected={field.value ? new Date(field.value) : null}
@@ -651,8 +688,6 @@ const HolidaysPageContent = () => {
                           field.onChange('')
                         }
                       }}
-
-
                       placeholderText='Select Date'
                       customInput={
                         <CustomTextFieldWrapper
@@ -667,16 +702,15 @@ const HolidaysPageContent = () => {
                               </InputAdornment>
                             )
                           }}
-
-                           sx={{
-                        '& .MuiFormLabel-asterisk': {
-                          color: '#e91e63 !important',
-                          fontWeight: 700
-                        },
-                        '& .MuiInputLabel-root.Mui-required': {
-                          color: 'inherit'
-                        }
-                      }}
+                          sx={{
+                            '& .MuiFormLabel-asterisk': {
+                              color: '#e91e63 !important',
+                              fontWeight: 700
+                            },
+                            '& .MuiInputLabel-root.Mui-required': {
+                              color: 'inherit'
+                            }
+                          }}
                         />
                       }
                     />

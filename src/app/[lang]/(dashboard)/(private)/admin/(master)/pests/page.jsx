@@ -47,7 +47,12 @@ import {
   deleteRecommendation
 } from '@/api/master/recommendation'
 import { getChecklistList, addChecklist, updateChecklist, deleteChecklist } from '@/api/master/checklist'
-import { getPestChemicalsList, addPestChemical, updatePestChemical, deletePestChemical } from '@/api/stock/pestchemicals'
+import {
+  getPestChemicalsList,
+  addPestChemical,
+  updatePestChemical,
+  deletePestChemical
+} from '@/api/stock/pestchemicals'
 import { getUnitList, addUnit, updateUnit, deleteUnit } from '@/api/master/unit'
 
 // ADD THIS LINE (after other imports)
@@ -603,20 +608,20 @@ const PestPageContent = () => {
         )
       }),
 
-      columnHelper.display({
-        id: 'pest_finding',
-        header: 'Finding',
-        cell: info => (
-          <Button
-            variant='outlined'
-            size='small'
-            onClick={() => openSubDrawer(info.row.original, 'Finding')}
-            sx={{ borderRadius: '999px', px: 2 }}
-          >
-            Finding({info.row.original.finding_count || 0})
-          </Button>
-        )
-      }),
+      // columnHelper.display({
+      //   id: 'pest_finding',
+      //   header: 'Finding',
+      //   cell: info => (
+      //     <Button
+      //       variant='outlined'
+      //       size='small'
+      //       onClick={() => openSubDrawer(info.row.original, 'Finding')}
+      //       sx={{ borderRadius: '999px', px: 2 }}
+      //     >
+      //       Finding({info.row.original.finding_count || 0})
+      //     </Button>
+      //   )
+      // }),
 
       columnHelper.display({
         id: 'pest_recommendation', // ✅ unique id
@@ -663,20 +668,20 @@ const PestPageContent = () => {
         )
       }),
 
-      columnHelper.display({
-        id: 'pest_units', // ✅ unique id
-        header: 'Pest Units',
-        cell: info => (
-          <Button
-            variant='outlined'
-            size='small'
-            onClick={() => openSubDrawer(info.row.original, 'Pest Units')}
-            sx={{ borderRadius: '999px', px: 2 }}
-          >
-            PestUnits({info.row.original.unit_count || 0})
-          </Button>
-        )
-      }),
+      // columnHelper.display({
+      //   id: 'pest_units', // ✅ unique id
+      //   header: 'Pest Units',
+      //   cell: info => (
+      //     <Button
+      //       variant='outlined'
+      //       size='small'
+      //       onClick={() => openSubDrawer(info.row.original, 'Pest Units')}
+      //       sx={{ borderRadius: '999px', px: 2 }}
+      //     >
+      //       PestUnits({info.row.original.unit_count || 0})
+      //     </Button>
+      //   )
+      // }),
 
       columnHelper.accessor('is_active', {
         header: 'Status',

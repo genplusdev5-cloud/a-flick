@@ -96,7 +96,7 @@ const DashboardCRM = () => {
 
       <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2 }}>
         <CardStatVertical
-          title='Yearly Terminations'
+          title='Terminations'
           subtitle='Total'
           stats={dashboard.yearly_terminations}
           avatarColor='secondary'

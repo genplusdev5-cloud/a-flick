@@ -18,13 +18,22 @@ import AddIcon from '@mui/icons-material/Add'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
+import Autocomplete from '@mui/material/Autocomplete'
 
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import CustomTextFieldWrapper from '@/components/common/CustomTextField'
 import GlobalSelect from '@/components/common/GlobalSelect'
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 
-import { getPestChemicalsList, addPestChemical, updatePestChemical, deletePestChemical } from '@/api/stock/pestchemicals'
+import {
+  getPestChemicalsList,
+  addPestChemical,
+  updatePestChemical,
+  deletePestChemical,
+  duplicatePestChemical
+} from '@/api/stock/pestchemicals'
+
+import { getChemicalsList } from '@/api/master/chemicals/list'
 
 import { showToast } from '@/components/common/Toasts'
 import styles from '@core/styles/table.module.css'
@@ -33,11 +42,19 @@ import { usePermission } from '@/hooks/usePermission'
 
 export default function PestChemicalsDrawerContent({ pestId }) {
   const { canAccess } = usePermission()
+
+  // ✅ ADD HERE ONLY (TOP LEVEL)
+  const [showDuplicate, setShowDuplicate] = useState(false)
+  const [selectedChemical, setSelectedChemical] = useState(null)
+
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(false)
   const [editId, setEditId] = useState(null)
   const [openDelete, setOpenDelete] = useState(false)
   const [deleteId, setDeleteId] = useState(null)
+
+  const [mainChemicals, setMainChemicals] = useState([])
+  const [chemLoading, setChemLoading] = useState(false)
 
   const [formData, setFormData] = useState({
     name: '',
@@ -66,6 +83,60 @@ export default function PestChemicalsDrawerContent({ pestId }) {
       setRows(mapped)
     } catch {
       showToast('error', 'Failed to load chemicals')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadMainChemicals = async (search = '') => {
+    setChemLoading(true)
+    try {
+      const res = await getChemicalsList({
+        page: 1,
+        page_size: 50,
+        search
+      })
+
+      if (res.success) {
+        setMainChemicals(res.data?.results || [])
+      } else {
+        showToast('error', res.message)
+      }
+    } catch {
+      showToast('error', 'Failed to load chemicals')
+    } finally {
+      setChemLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (showDuplicate) {
+      loadMainChemicals()
+    }
+  }, [showDuplicate])
+
+  const handleDuplicate = async sourcePest => {
+    if (!sourcePest?.id || !pestId) return
+
+    const payload = {
+      from_pest: sourcePest.id, // 👈 EXACTLY LIKE POSTMAN
+      to_pest: pestId
+    }
+
+    setLoading(true)
+    try {
+      const res = await duplicatePestChemical(payload)
+
+      if (res.status === 'success') {
+        showToast('success', 'Chemical duplicated successfully')
+        setShowDuplicate(false)
+        setSelectedChemical(null)
+        loadChemicals()
+      } else {
+        showToast('error', res.message || 'Duplicate failed')
+      }
+    } catch (err) {
+      showToast('error', 'Duplicate failed')
     } finally {
       setLoading(false)
     }
@@ -141,7 +212,9 @@ export default function PestChemicalsDrawerContent({ pestId }) {
   return (
     <Box>
       {/* FORM */}
+      {/* FORM */}
       <Grid container spacing={2} mb={2}>
+        {/* Chemical Name */}
         <Grid item xs={12}>
           <CustomTextFieldWrapper
             fullWidth
@@ -152,6 +225,7 @@ export default function PestChemicalsDrawerContent({ pestId }) {
           />
         </Grid>
 
+        {/* Status (Edit only) */}
         {editId && (
           <Grid item xs={12}>
             <GlobalSelect
@@ -167,6 +241,7 @@ export default function PestChemicalsDrawerContent({ pestId }) {
           </Grid>
         )}
 
+        {/* Buttons */}
         <Grid item xs={12} display='flex' gap={2}>
           {editId && (
             <GlobalButton
@@ -175,17 +250,55 @@ export default function PestChemicalsDrawerContent({ pestId }) {
               onClick={() => {
                 setEditId(null)
                 setFormData({ name: '', status: 'Active' })
+                setShowDuplicate(false)
               }}
             >
               Cancel
             </GlobalButton>
           )}
-          {canAccess('Service Type (Pest)', editId ? 'update' : 'create') && (
-            <GlobalButton variant='contained' fullWidth startIcon={<AddIcon />} onClick={handleSubmit}>
-              {editId ? 'Update Chemical' : 'Add Chemical'}
+
+          <GlobalButton variant='contained' fullWidth startIcon={<AddIcon />} onClick={handleSubmit}>
+            {editId ? 'Update Chemical' : 'Add Chemical'}
+          </GlobalButton>
+
+          {!editId && (
+            <GlobalButton color='secondary' fullWidth onClick={() => setShowDuplicate(prev => !prev)}>
+              Duplicate
             </GlobalButton>
           )}
         </Grid>
+
+        {/* 👇 DUPLICATE AUTOCOMPLETE (PASTE HERE) */}
+        {showDuplicate && (
+          <Grid item xs={12}>
+            <Autocomplete
+              fullWidth
+              options={mainChemicals}
+              loading={chemLoading}
+              value={selectedChemical}
+              getOptionLabel={option => option.name || option.chemical_name || ''}
+              // comparison fix (keep this)
+              isOptionEqualToValue={(option, value) => option.id === value.id}
+              onChange={(e, value) => {
+                setSelectedChemical(value)
+                if (value) handleDuplicate(value)
+              }}
+              // 🔥 THIS IS THE REAL FIX
+              renderOption={(props, option) => (
+                <li {...props} key={option.id}>
+                  {option.name || option.chemical_name}
+                </li>
+              )}
+              renderInput={params => (
+                <CustomTextFieldWrapper
+                  {...params}
+                  label='Select Chemical to Duplicate'
+                  placeholder='Choose chemical'
+                />
+              )}
+            />
+          </Grid>
+        )}
       </Grid>
 
       {/* LIST TITLE */}
