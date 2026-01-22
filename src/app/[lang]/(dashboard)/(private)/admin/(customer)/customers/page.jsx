@@ -138,30 +138,52 @@ const CustomersPageContent = () => {
   // Sync pagination state to URL search params
   const isFirstRender = useRef(true)
 
-  const handleMyobExport = async () => {
-    if (selectedIds.length === 0) {
-      showToast('warning', 'Select at least one customer')
-      return
-    }
-
-    try {
-      setLoading(true)
-
-      await exportMyob({
-        customerIds: selectedIds
-      })
-
-      showToast('success', 'Customers exported to MYOB successfully')
-
-      setSelectedIds([])
-      setFilterMyob(null)
-      handleRefresh()
-    } catch (err) {
-      showToast('error', 'MYOB export failed')
-    } finally {
-      setLoading(false)
-    }
+ const handleMyobExport = async () => {
+  if (selectedIds.length === 0) {
+    showToast('warning', 'Select at least one customer')
+    return
   }
+
+  try {
+    setLoading(true)
+
+    // 🔥 Convert array → comma separated string
+    const items = selectedIds.join(',')
+
+    const res = await exportMyob(items)
+
+    // 🔥 FILE DOWNLOAD
+    const blob = new Blob([res.data], {
+      type:
+        res.headers['content-type'] ||
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    })
+
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+
+    link.href = url
+    link.download = 'MYOB_Customers.xlsx'
+    document.body.appendChild(link)
+    link.click()
+
+    link.remove()
+    window.URL.revokeObjectURL(url)
+
+    showToast('success', 'MYOB export completed')
+
+    // reset
+    setSelectedIds([])
+    setFilterMyob(null)
+    handleRefresh()
+  } catch (err) {
+    console.error(err)
+    showToast('error', 'MYOB export failed')
+  } finally {
+    setLoading(false)
+  }
+}
+
 
   const handleRefresh = () => {
     setAppliedSearchText(searchText)
