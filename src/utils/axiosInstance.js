@@ -23,8 +23,8 @@ api.interceptors.request.use(config => {
 // Token attach interceptor
 api.interceptors.request.use(
   config => {
-    // Show loader for all requests unless explicitly disabled
-    if (config.showLoader !== false) {
+    // Show loader only if explicitly requested
+    if (config.showLoader === true) {
       store.dispatch(setLoading(true))
     }
 
@@ -43,13 +43,13 @@ api.interceptors.request.use(
 // Response interceptor (token refresh)
 api.interceptors.response.use(
   res => {
-    if (res.config.showLoader !== false) {
+    if (res.config.showLoader === true) {
       store.dispatch(setLoading(false))
     }
     return res
   },
   async err => {
-    if (err.config?.showLoader !== false) {
+    if (err.config?.showLoader === true) {
       store.dispatch(setLoading(false))
     }
 

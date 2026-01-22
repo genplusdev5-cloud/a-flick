@@ -134,8 +134,8 @@ const EquipmentsPageContent = () => {
   }, [drawerOpen])
 
   // Load Data
-  const loadData = async () => {
-    setLoading(true)
+  const loadData = async (showLoader = false) => {
+    if (showLoader) setLoading(true)
     try {
       const result = await getEquipmentList()
       const dataArray = result?.data || []
@@ -162,12 +162,12 @@ const EquipmentsPageContent = () => {
       console.error(err)
       showToast('error', 'Failed to load equipments')
     } finally {
-      setLoading(false)
+      if (showLoader) setLoading(false)
     }
   }
 
   useEffect(() => {
-    loadData()
+    loadData(false)
   }, [pagination.pageIndex, pagination.pageSize, searchText])
 
   // Drawer
@@ -415,10 +415,8 @@ const EquipmentsPageContent = () => {
                 }
                 disabled={loading}
                 onClick={async () => {
-                  setLoading(true)
                   setPagination(prev => ({ ...prev, pageSize: 25, pageIndex: 0 }))
-                  await loadData()
-                  setTimeout(() => setLoading(false), 500)
+                  await loadData(true)
                 }}
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
@@ -465,6 +463,13 @@ const EquipmentsPageContent = () => {
           }}
         />
         <Divider />
+        {loading && (
+          <Box sx={{ width: '100%', position: 'absolute', top: 0, left: 0, zIndex: 10 }}>
+            <div className='h-1 w-full bg-primary/20 overflow-hidden'>
+              <div className='h-full bg-primary animate-progress' style={{ width: '30%' }} />
+            </div>
+          </Box>
+        )}
 
         <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <Box

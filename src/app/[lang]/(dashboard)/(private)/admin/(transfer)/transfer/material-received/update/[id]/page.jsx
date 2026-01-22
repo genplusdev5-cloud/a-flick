@@ -34,6 +34,7 @@ import styles from '@core/styles/table.module.css'
 import { getPurchaseFilters } from '@/api/purchase/purchase_order'
 import { getMaterialRequestDropdowns } from '@/api/transfer/materialRequest/dropdown'
 import { getMaterialReceiveDetails, updateMaterialReceive } from '@/api/transfer/material_receive'
+import { getMaterialIssueList } from '@/api/transfer/material_issue'
 import { showToast } from '@/components/common/Toasts'
 
 const EditMaterialRequestReceivedPage = () => {
@@ -51,18 +52,19 @@ const EditMaterialRequestReceivedPage = () => {
   }, [id])
 
   // Dropdowns
-  const [originOptions, setOriginOptions] = useState([])
-  const [technicianOptions, setTechnicianOptions] = useState([])
+  const [employeeOptions, setEmployeeOptions] = useState([])
   const [chemicalOptions, setChemicalOptions] = useState([])
   const [uomOptions, setUomOptions] = useState([])
+  const [issueOptions, setIssueOptions] = useState([])
 
   // Loading
   const [initLoading, setInitLoading] = useState(false)
   const [saveLoading, setSaveLoading] = useState(false)
 
   // Header fields
-  const [origin, setOrigin] = useState(null)
-  const [technician, setTechnician] = useState(null)
+  const [fromEmployee, setFromEmployee] = useState(null)
+  const [toEmployee, setToEmployee] = useState(null)
+  const [materialIssue, setMaterialIssue] = useState(null)
   const [receiveDate, setReceiveDate] = useState(null)
   const [remarks, setRemarks] = useState('')
 
@@ -84,23 +86,12 @@ const EditMaterialRequestReceivedPage = () => {
       try {
         setInitLoading(true)
 
-        const [purchaseRes, materialRes, detailsRes] = await Promise.all([
+        const [purchaseRes, materialRes, detailsRes, issueRes] = await Promise.all([
           getPurchaseFilters(),
           getMaterialRequestDropdowns(),
-          getMaterialReceiveDetails(decodedId, type)
+          getMaterialReceiveDetails(decodedId, type),
+          getMaterialIssueList({ page_size: 100 })
         ])
-
-        // Companies
-        const purchaseData = purchaseRes?.data?.data || purchaseRes?.data || purchaseRes || {}
-
-        const companies =
-          purchaseData?.company?.name?.map(c => ({
-            label: c.name,
-            value: c.id,
-            id: c.id
-          })) || []
-
-        setOriginOptions(companies)
 
         const materialData = materialRes?.data?.data || materialRes?.data || materialRes || {}
 
@@ -112,13 +103,14 @@ const EditMaterialRequestReceivedPage = () => {
             id: e.id
           })) || []
 
-        setTechnicianOptions(techs)
+        setEmployeeOptions(techs)
 
         setChemicalOptions(
           materialData?.chemicals?.name?.map(c => ({
             label: c.name,
             value: c.id,
-            id: c.id
+            id: c.id,
+            uom: c.uom || c.uom_name || c.unit
           })) || []
         )
 
@@ -130,6 +122,19 @@ const EditMaterialRequestReceivedPage = () => {
           })) || []
         )
 
+        const issues = (issueRes?.data?.results || issueRes?.results || []).map(i => {
+          const trNo = i.num_series || i.issue_number || `Issue #${i.id}`
+          const trDate = i.receive_date || i.issue_date ? format(parseISO(i.receive_date || i.issue_date), 'dd/MM/yyyy') : ''
+          const tech = i.technician_name || i.technician || ''
+          return {
+            label: `${trNo}${trDate ? ` (${trDate})` : ''}${tech ? ` - ${tech}` : ''}`,
+            value: i.id,
+            id: i.id,
+            items: i.items || i.transfer_items || []
+          }
+        })
+        setIssueOptions(issues)
+
         // Details
         const detailJson = detailsRes?.data || detailsRes || {}
         const details = detailJson?.data || detailJson
@@ -137,8 +142,10 @@ const EditMaterialRequestReceivedPage = () => {
         setReceiveDate(details.receive_date ? parseISO(details.receive_date) : details.issue_date ? parseISO(details.issue_date) : null)
         setRemarks(details.remarks || '')
 
-        setOrigin(companies.find(c => c.id === details.company_id) || null)
-        setTechnician(techs.find(t => t.id === details.technician_id) || null)
+        setFromEmployee(techs.find(t => t.id === details.from_vehicle_id) || (details.from_vehicle ? { label: details.from_vehicle, id: details.from_vehicle_id } : null))
+        setToEmployee(techs.find(t => t.id === details.to_vehicle_id) || (details.to_vehicle ? { label: details.to_vehicle, id: details.to_vehicle_id } : null))
+
+        setMaterialIssue(issues.find(i => i.id === details.issue_id) || (details.issue_id ? { label: `Issue #${details.issue_id}`, id: details.issue_id } : null))
 
         setItems(
           (details.items || details.transfer_items || details.transfer_in_items || []).map(item => ({
@@ -161,11 +168,33 @@ const EditMaterialRequestReceivedPage = () => {
     if (decodedId) fetchData()
   }, [decodedId, type])
 
-  const handleEditItem = row => {
-    setEditId(row.id)
-    setChemical({ label: row.chemical, id: row.chemicalId })
-    setUom({ label: row.uom, id: row.uomId })
-    setQuantity(row.quantity)
+  const handleIssueChange = val => {
+    setMaterialIssue(val)
+    if (val && val.items) {
+      setItems(val.items.map(i => ({
+        id: Date.now() + Math.random(),
+        chemical: i.item_name || i.chemical_name || '',
+        chemicalId: i.item_id || i.chemical_id,
+        uom: i.uom || i.uom_name || '',
+        uomId: i.uom_id,
+        quantity: i.transfer_quantity || i.quantity || ''
+      })))
+    }
+  }
+
+  const handleChemicalChange = val => {
+    setChemical(val)
+    if (val && val.uom) {
+      const uomStr = typeof val.uom === 'object' ? val.uom.label || val.uom.name : val.uom
+      const foundUom = uomOptions.find(u => u.label.toLowerCase() === uomStr.toLowerCase())
+      if (foundUom) {
+        setUom(foundUom)
+      } else {
+        setUom({ label: uomStr, value: uomStr, id: null })
+      }
+    } else {
+      setUom(null)
+    }
   }
 
   const handleAddItem = () => {
@@ -214,7 +243,7 @@ const EditMaterialRequestReceivedPage = () => {
   }
 
   const handleUpdate = async () => {
-    if (!origin || !technician || !receiveDate || items.length === 0) {
+    if (!fromEmployee || !toEmployee || !receiveDate || items.length === 0) {
       showToast('warning', 'Fill all required fields')
       return
     }
@@ -224,18 +253,26 @@ const EditMaterialRequestReceivedPage = () => {
 
       const payload = {
         id: decodedId,
-        company_id: origin.id,
-        technician_id: technician.id,
+        from_vehicle: fromEmployee.label,
+        from_vehicle_id: fromEmployee.id,
+        to_vehicle: toEmployee.label,
+        to_vehicle_id: toEmployee.id,
+        issue_id: materialIssue?.id || null,
+        employee_id: fromEmployee.id,
         receive_date: format(receiveDate, 'yyyy-MM-dd'),
         remarks,
-        items: items.map(i => ({
+        is_active: 1,
+        status: 1,
+        items: JSON.stringify(items.map(i => ({
           id: typeof i.id === 'number' && i.id < 1000000000000 ? i.id : null,
           item_id: i.chemicalId,
           item_name: i.chemical,
           uom_id: i.uomId,
           uom: i.uom,
-          quantity: Number(i.quantity)
-        }))
+          quantity: Number(i.quantity),
+          is_active: 1,
+          status: 1
+        })))
       }
 
       await updateMaterialReceive(decodedId, payload)
@@ -277,10 +314,10 @@ const EditMaterialRequestReceivedPage = () => {
           <Grid container spacing={3}>
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
-                label='Origin'
-                options={originOptions}
-                value={origin}
-                onChange={setOrigin}
+                label='From Employee'
+                options={employeeOptions}
+                value={fromEmployee}
+                onChange={setFromEmployee}
               />
             </Grid>
 
@@ -294,14 +331,23 @@ const EditMaterialRequestReceivedPage = () => {
 
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
-                label='Technician'
-                options={technicianOptions}
-                value={technician}
-                onChange={setTechnician}
+                label='To Employee'
+                options={employeeOptions}
+                value={toEmployee}
+                onChange={setToEmployee}
               />
             </Grid>
 
-            <Grid item xs={12}>
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete
+                label='Material Issued'
+                options={issueOptions}
+                value={materialIssue}
+                onChange={handleIssueChange}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={8}>
               <GlobalTextField
                 label='Remarks'
                 multiline
@@ -319,10 +365,18 @@ const EditMaterialRequestReceivedPage = () => {
         <Box px={4} py={3}>
           <Grid container spacing={2} alignItems='flex-end'>
             <Grid item xs={12} md={4}>
-              <GlobalAutocomplete label='Chemical' options={chemicalOptions} value={chemical} onChange={setChemical} />
+              <GlobalAutocomplete label='Chemical' options={chemicalOptions} value={chemical} onChange={handleChemicalChange} />
             </Grid>
             <Grid item xs={12} md={3}>
-              <GlobalAutocomplete label='UOM' options={uomOptions} value={uom} onChange={setUom} />
+              <GlobalTextField
+                label='UOM'
+                value={uom?.label || ''}
+                InputProps={{
+                  readOnly: true
+                }}
+                disabled
+                sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#f5f5f5' } }}
+              />
             </Grid>
             <Grid item xs={12} md={3}>
               <GlobalTextField
@@ -370,7 +424,12 @@ const EditMaterialRequestReceivedPage = () => {
                       <td>{i.uom}</td>
                       <td align='right'>{i.quantity}</td>
                       <td align='center'>
-                        <IconButton size='small' color='primary' onClick={() => handleEditItem(i)}>
+                        <IconButton size='small' color='primary' onClick={() => {
+                          setEditId(i.id)
+                          setChemical({ label: i.chemical, id: i.chemicalId })
+                          setUom({ label: i.uom, id: i.uomId })
+                          setQuantity(i.quantity)
+                        }}>
                           <EditIcon fontSize='small' />
                         </IconButton>
                         <IconButton size='small' color='error' onClick={() => handleRemoveItem(i.id)}>

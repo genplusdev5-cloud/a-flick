@@ -30,6 +30,7 @@ import styles from '@core/styles/table.module.css'
 import { getPurchaseFilters } from '@/api/purchase/purchase_order'
 import { getMaterialRequestDropdowns } from '@/api/transfer/materialRequest/dropdown'
 import { addMaterialReceive } from '@/api/transfer/material_receive'
+import { getMaterialIssueList } from '@/api/transfer/material_issue'
 import { showToast } from '@/components/common/Toasts'
 
 import { format } from 'date-fns'
@@ -41,18 +42,19 @@ const AddMaterialRequestReceivedPage = () => {
   const { lang } = useParams()
 
   // Dropdowns
-  const [originOptions, setOriginOptions] = useState([])
-  const [technicianOptions, setTechnicianOptions] = useState([])
+  const [employeeOptions, setEmployeeOptions] = useState([])
   const [chemicalOptions, setChemicalOptions] = useState([])
   const [uomOptions, setUomOptions] = useState([])
+  const [issueOptions, setIssueOptions] = useState([])
 
   // Loading
   const [initLoading, setInitLoading] = useState(false)
   const [saveLoading, setSaveLoading] = useState(false)
 
   // Header fields
-  const [origin, setOrigin] = useState(null)
-  const [technician, setTechnician] = useState(null)
+  const [fromEmployee, setFromEmployee] = useState(null)
+  const [toEmployee, setToEmployee] = useState(null)
+  const [materialIssue, setMaterialIssue] = useState(null)
   const [receiveDate, setReceiveDate] = useState(new Date())
   const [remarks, setRemarks] = useState('')
 
@@ -70,36 +72,27 @@ const AddMaterialRequestReceivedPage = () => {
       try {
         setInitLoading(true)
 
-        const [purchaseRes, materialRes] = await Promise.all([
-          getPurchaseFilters(),
-          getMaterialRequestDropdowns()
-        ])
+        const [purchaseRes, materialRes] = await Promise.all([getPurchaseFilters(), getMaterialRequestDropdowns()])
 
         const purchaseData = purchaseRes?.data?.data || purchaseRes?.data || {}
 
-        setOriginOptions(
-          purchaseData?.company?.name?.map(i => ({
-            label: i.name,
-            value: i.id,
-            id: i.id
-          })) || []
-        )
-
         const materialData = materialRes?.data?.data || materialRes?.data || materialRes || {}
 
-        setTechnicianOptions(
+        const techs =
           materialData?.employee?.name?.map(e => ({
             label: e.name,
             value: e.id,
             id: e.id
           })) || []
-        )
+
+        setEmployeeOptions(techs)
 
         setChemicalOptions(
           materialData?.chemicals?.name?.map(c => ({
             label: c.name,
             value: c.id,
-            id: c.id
+            id: c.id,
+            uom: c.uom || c.uom_name || c.unit
           })) || []
         )
 
@@ -109,6 +102,22 @@ const AddMaterialRequestReceivedPage = () => {
             value: u.id,
             id: u.id
           })) || []
+        )
+
+        const issueRes = await getMaterialIssueList({ page_size: 100 })
+        const issueData = issueRes?.data?.results || issueRes?.results || []
+        setIssueOptions(
+          issueData.map(i => {
+            const trNo = i.num_series || i.issue_number || `Issue #${i.id}`
+            const trDate = i.receive_date || i.issue_date ? format(parseISO(i.receive_date || i.issue_date), 'dd/MM/yyyy') : ''
+            const tech = i.technician_name || i.technician || ''
+            return {
+              label: `${trNo}${trDate ? ` (${trDate})` : ''}${tech ? ` - ${tech}` : ''}`,
+              value: i.id,
+              id: i.id,
+              items: i.items || i.transfer_items || []
+            }
+          })
         )
       } catch (err) {
         console.error(err)
@@ -126,6 +135,21 @@ const AddMaterialRequestReceivedPage = () => {
     setChemical({ label: row.chemical, id: row.chemicalId })
     setUom({ label: row.uom, id: row.uomId })
     setQuantity(row.quantity)
+  }
+
+  const handleChemicalChange = val => {
+    setChemical(val)
+    if (val && val.uom) {
+      const uomStr = typeof val.uom === 'object' ? val.uom.label || val.uom.name : val.uom
+      const foundUom = uomOptions.find(u => u.label.toLowerCase() === uomStr.toLowerCase())
+      if (foundUom) {
+        setUom(foundUom)
+      } else {
+        setUom({ label: uomStr, value: uomStr, id: null })
+      }
+    } else {
+      setUom(null)
+    }
   }
 
   // Date input
@@ -179,9 +203,25 @@ const AddMaterialRequestReceivedPage = () => {
     setItems(prev => prev.filter(i => i.id !== id))
   }
 
+  const handleIssueChange = val => {
+    setMaterialIssue(val)
+    if (val && val.items) {
+      setItems(
+        val.items.map(i => ({
+          id: Date.now() + Math.random(),
+          chemical: i.item_name || i.chemical_name || '',
+          chemicalId: i.item_id || i.chemical_id,
+          uom: i.uom || i.uom_name || '',
+          uomId: i.uom_id,
+          quantity: i.transfer_quantity || i.quantity || ''
+        }))
+      )
+    }
+  }
+
   // Save
   const handleSave = async () => {
-    if (!origin || !technician || !receiveDate || items.length === 0) {
+    if (!fromEmployee || !toEmployee || !receiveDate || items.length === 0) {
       showToast('warning', 'Fill all required fields')
       return
     }
@@ -190,17 +230,27 @@ const AddMaterialRequestReceivedPage = () => {
       setSaveLoading(true)
 
       const payload = {
-        company_id: origin.id,
-        technician_id: technician.id,
+        from_vehicle: fromEmployee.label,
+        from_vehicle_id: fromEmployee.id,
+        to_vehicle: toEmployee.label,
+        to_vehicle_id: toEmployee.id,
+        issue_id: materialIssue?.id || null,
+        employee_id: fromEmployee.id, // Primary employee
         receive_date: format(receiveDate, 'yyyy-MM-dd'),
         remarks,
-        items: items.map(i => ({
-          item_id: i.chemicalId,
-          item_name: i.chemical,
-          uom_id: i.uomId,
-          uom: i.uom,
-          quantity: Number(i.quantity)
-        }))
+        is_active: 1,
+        status: 1,
+        items: JSON.stringify(
+          items.map(i => ({
+            item_id: i.chemicalId,
+            item_name: i.chemical,
+            uom_id: i.uomId,
+            uom: i.uom,
+            quantity: Number(i.quantity),
+            is_active: 1,
+            status: 1
+          }))
+        )
       }
 
       await addMaterialReceive(payload)
@@ -232,16 +282,22 @@ const AddMaterialRequestReceivedPage = () => {
         {/* HEADER */}
         <Box px={4} py={3} position='relative'>
           {initLoading && (
-            <Box sx={{ position: 'absolute', inset: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1, bgcolor: 'rgba(255,255,255,0.7)' }}>
+            <Box
+              sx={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                zIndex: 1,
+                bgcolor: 'rgba(255,255,255,0.7)'
+              }}
+            >
               <CircularProgress />
             </Box>
           )}
 
           <Grid container spacing={3}>
-            <Grid item xs={12} md={4}>
-              <GlobalAutocomplete label='Origin' options={originOptions} value={origin} onChange={setOrigin} />
-            </Grid>
-
             <Grid item xs={12} md={4}>
               <AppReactDatepicker
                 selected={receiveDate}
@@ -249,13 +305,41 @@ const AddMaterialRequestReceivedPage = () => {
                 customInput={<DateInput label='Receive Date' />}
               />
             </Grid>
-
             <Grid item xs={12} md={4}>
-              <GlobalAutocomplete label='Technician' options={technicianOptions} value={technician} onChange={setTechnician} />
+              <GlobalAutocomplete
+                label='From Employee'
+                options={employeeOptions}
+                value={fromEmployee}
+                onChange={setFromEmployee}
+              />
             </Grid>
 
-            <Grid item xs={12}>
-              <GlobalTextField label='Remarks' multiline minRows={3} value={remarks} onChange={e => setRemarks(e.target.value)} />
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete
+                label='To Employee'
+                options={employeeOptions}
+                value={toEmployee}
+                onChange={setToEmployee}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete
+                label='Material Issued'
+                options={issueOptions}
+                value={materialIssue}
+                onChange={handleIssueChange}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={4}>
+              <GlobalTextField
+                label='Remarks'
+                multiline
+                minRows={3}
+                value={remarks}
+                onChange={e => setRemarks(e.target.value)}
+              />
             </Grid>
           </Grid>
         </Box>
@@ -266,13 +350,31 @@ const AddMaterialRequestReceivedPage = () => {
         <Box px={4} py={3}>
           <Grid container spacing={2} alignItems='flex-end'>
             <Grid item xs={12} md={4}>
-              <GlobalAutocomplete label='Chemical' options={chemicalOptions} value={chemical} onChange={setChemical} />
+              <GlobalAutocomplete
+                label='Chemical'
+                options={chemicalOptions}
+                value={chemical}
+                onChange={handleChemicalChange}
+              />
             </Grid>
             <Grid item xs={12} md={3}>
-              <GlobalAutocomplete label='UOM' options={uomOptions} value={uom} onChange={setUom} />
+              <GlobalTextField
+                label='UOM'
+                value={uom?.label || ''}
+                InputProps={{
+                  readOnly: true
+                }}
+                disabled
+                sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#f5f5f5' } }}
+              />
             </Grid>
             <Grid item xs={12} md={3}>
-              <GlobalTextField label='Quantity' type='number' value={quantity} onChange={e => setQuantity(e.target.value)} />
+              <GlobalTextField
+                label='Quantity'
+                type='number'
+                value={quantity}
+                onChange={e => setQuantity(e.target.value)}
+              />
             </Grid>
             <Grid item xs={12} md={2}>
               <GlobalButton
@@ -304,23 +406,29 @@ const AddMaterialRequestReceivedPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {items.length ? items.map((i, idx) => (
-                  <tr key={i.id}>
-                    <td>{idx + 1}</td>
-                    <td>{i.chemical}</td>
-                    <td>{i.uom}</td>
-                    <td align='right'>{i.quantity}</td>
-                    <td align='center'>
-                      <IconButton size='small' color='primary' onClick={() => handleEditItem(i)}>
-                        <EditIcon fontSize='small' />
-                      </IconButton>
-                      <IconButton size='small' color='error' onClick={() => handleRemoveItem(i.id)}>
-                        <DeleteIcon fontSize='small' />
-                      </IconButton>
+                {items.length ? (
+                  items.map((i, idx) => (
+                    <tr key={i.id}>
+                      <td>{idx + 1}</td>
+                      <td>{i.chemical}</td>
+                      <td>{i.uom}</td>
+                      <td align='right'>{i.quantity}</td>
+                      <td align='center'>
+                        <IconButton size='small' color='primary' onClick={() => handleEditItem(i)}>
+                          <EditIcon fontSize='small' />
+                        </IconButton>
+                        <IconButton size='small' color='error' onClick={() => handleRemoveItem(i.id)}>
+                          <DeleteIcon fontSize='small' />
+                        </IconButton>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} align='center'>
+                      No items
                     </td>
                   </tr>
-                )) : (
-                  <tr><td colSpan={5} align='center'>No items</td></tr>
                 )}
               </tbody>
             </table>
@@ -342,7 +450,6 @@ const AddMaterialRequestReceivedPage = () => {
     </StickyListLayout>
   )
 }
-
 
 export default function AddMaterialRequestReceivedWrapper() {
   return (

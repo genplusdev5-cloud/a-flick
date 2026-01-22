@@ -46,7 +46,7 @@ import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
 
 export default function Project() {
-  const [activeTab, setActiveTab] = useState('dashboard')
+  const [activeTab, setActiveTab] = useState('contract')
   const [openTerminate, setOpenTerminate] = useState(false)
   const [openHold, setOpenHold] = useState(false)
   const [openRenew, setOpenRenew] = useState(false)
@@ -112,8 +112,8 @@ export default function Project() {
 
   const renderTabContent = () => {
     switch (activeTab) {
-      case 'dashboard':
-        return <TabContentSwiper />
+      // case 'dashboard':
+      //   return <TabContentSwiper />
 
       case 'contract':
         return <ContractViewPage contract={contract} />
@@ -282,11 +282,11 @@ export default function Project() {
                     <div className='w-px h-6 bg-gray-400 mx-2' />
 
                     {/* Category / Package */}
-                    <Typography variant='h4' fontWeight='600' className='text-gray-800'>
+                    {/* <Typography variant='h4' fontWeight='600' className='text-gray-800'>
                       Pkg: {contract?.category || 'N/A'}
-                    </Typography>
+                    </Typography> */}
 
-                    <div className='w-px h-6 bg-gray-400 mx-2' />
+                    {/* <div className='w-px h-6 bg-gray-400 mx-2' /> */}
 
                     {/* Status */}
                     <Typography

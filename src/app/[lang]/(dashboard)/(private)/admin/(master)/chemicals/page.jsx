@@ -165,8 +165,8 @@ const ChemicalsPageContent = () => {
   }
 
   // Load Data
-  const loadData = async () => {
-    setLoading(true)
+  const loadData = async (showLoader = false) => {
+    if (showLoader) setLoading(true)
     try {
       const result = await getChemicalsList()
       const dataArray = result?.data || []
@@ -197,12 +197,12 @@ const ChemicalsPageContent = () => {
       console.error(err)
       showToast('error', 'Failed to load chemicals')
     } finally {
-      setLoading(false)
+      if (showLoader) setLoading(false)
     }
   }
 
   useEffect(() => {
-    loadData()
+    loadData(false)
     loadUoms()
   }, [pagination.pageIndex, pagination.pageSize, searchText])
 
@@ -553,10 +553,8 @@ const ChemicalsPageContent = () => {
                 }
                 disabled={loading}
                 onClick={async () => {
-                  setLoading(true)
                   setPagination(prev => ({ ...prev, pageSize: 25, pageIndex: 0 }))
-                  await loadData()
-                  setTimeout(() => setLoading(false), 500)
+                  await loadData(true)
                 }}
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
@@ -604,19 +602,10 @@ const ChemicalsPageContent = () => {
         />
         <Divider />
         {loading && (
-          <Box
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              bgcolor: 'rgba(255,255,255,0.8)',
-              backdropFilter: 'blur(2px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 10
-            }}
-          >
-            <ProgressCircularCustomization size={60} thickness={5} />
+          <Box sx={{ width: '100%', position: 'absolute', top: 0, left: 0, zIndex: 10 }}>
+            <div className='h-1 w-full bg-primary/20 overflow-hidden'>
+              <div className='h-full bg-primary animate-progress' style={{ width: '30%' }} />
+            </div>
           </Box>
         )}
 

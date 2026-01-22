@@ -79,9 +79,7 @@ const MaterialRequestIssuedPage = () => {
     { label: 'Completed', value: 'Completed' }
   ])
   const [selectedStatus, setSelectedStatus] = useState(null)
-
-  const [selectedOrigin, setSelectedOrigin] = useState(null)
-  const [selectedSupplier, setSelectedSupplier] = useState(null)
+  const [selectedTechnician, setSelectedTechnician] = useState(null)
 
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(false)
@@ -104,10 +102,7 @@ const MaterialRequestIssuedPage = () => {
   /* ───────── FETCH FILTERS ───────── */
   const fetchFilterData = async () => {
     try {
-      const [purchaseRes, materialRes] = await Promise.all([
-        getPurchaseFilters(),
-        getMaterialRequestDropdowns()
-      ])
+      const [purchaseRes, materialRes] = await Promise.all([getPurchaseFilters(), getMaterialRequestDropdowns()])
 
       const purchaseData = purchaseRes?.data || {}
       const materialData = materialRes?.data || materialRes
@@ -151,32 +146,35 @@ const MaterialRequestIssuedPage = () => {
         page_size: pagination.pageSize,
         search: searchText || undefined,
         status: selectedStatus?.value,
-        origin: selectedOrigin?.value
+        technician_id: selectedTechnician?.value
       })
 
       const data = res?.data?.data || res?.data || res
       setTotalCount(data?.count || 0)
 
-      const mapped =
-        (data?.results || []).map((item, index) => {
-          const originLabel = originOptions.find(o => o.value === item.company_id)?.label || item.company_name || '-'
-          const technicianLabel = technicianOptions.find(t => t.value === item.technician_id)?.label || item.technician_name || '-'
+      const mapped = (data?.results || []).map((item, index) => {
+        const originLabel = originOptions.find(o => o.value === item.company_id)?.label || item.company_name || '-'
+        const technicianLabel =
+          technicianOptions.find(t => t.value === item.technician_id)?.label || item.technician_name || '-'
 
-          return {
-            sno: pagination.pageIndex * pagination.pageSize + index + 1,
-            id: item.id,
-            origin: originLabel,
-            transferNo: item.num_series || '-',
-            transferDate: item.issue_date ? format(new Date(item.issue_date), 'dd/MM/yyyy') : '-',
-            rawDate: item.issue_date,
-            technicianName: technicianLabel,
-            contactEmail: item?.technician_details?.email || '-',
-            contactPhone: item?.technician_details?.phone || '-',
-            remarks: item.remarks || '-',
-            status: item.issue_status || 'Pending',
-            recordType: 'tm'
-          }
-        })
+        return {
+          sno: pagination.pageIndex * pagination.pageSize + index + 1,
+          id: item.id,
+          fromVehicle: item.from_vehicle || '-',
+          toVehicle: item.to_vehicle || '-',
+          issueNo: item.num_series || item.issue_number || '-',
+          issueDate: item.issue_date ? format(new Date(item.issue_date), 'dd/MM/yyyy') : '-',
+          requestNo: item.request_no || item.request_details?.num_series || item.request_details?.request_no || '-',
+          requestDate:
+            item.request_date || item.request_details?.request_date
+              ? format(new Date(item.request_date || item.request_details?.request_date), 'dd/MM/yyyy')
+              : '-',
+          noOfItems: (item.items || item.transfer_items || []).length,
+          rawDate: item.issue_date,
+          status: item.issue_status || 'Pending',
+          recordType: 'tm'
+        }
+      })
 
       // Frontend Date Filtering
       let filteredRows = mapped
@@ -203,9 +201,8 @@ const MaterialRequestIssuedPage = () => {
   }, [
     pagination.pageIndex,
     pagination.pageSize,
-    selectedOrigin,
-    selectedSupplier,
     selectedStatus,
+    selectedTechnician,
     searchText,
     uiDateFilter,
     uiDateRange
@@ -272,13 +269,13 @@ const MaterialRequestIssuedPage = () => {
         }
       }),
 
-      columnHelper.accessor('origin', { header: 'Origin' }),
-      columnHelper.accessor('transferNo', { header: 'TR No' }),
-      columnHelper.accessor('transferDate', { header: 'TR Date' }),
-      columnHelper.accessor('technicianName', { header: 'Technician' }),
-      columnHelper.accessor('contactEmail', { header: 'Contact Email' }),
-      columnHelper.accessor('contactPhone', { header: 'Contact Phone' }),
-      columnHelper.accessor('remarks', { header: 'Remarks' }),
+      columnHelper.accessor('fromVehicle', { header: 'From Vehicle' }),
+      columnHelper.accessor('toVehicle', { header: 'To Vehicle' }),
+      columnHelper.accessor('issueNo', { header: 'Issue No' }),
+      columnHelper.accessor('issueDate', { header: 'Issue Date' }),
+      columnHelper.accessor('requestNo', { header: 'Request No' }),
+      columnHelper.accessor('requestDate', { header: 'Request Date' }),
+      columnHelper.accessor('noOfItems', { header: 'No. of Items' }),
 
       columnHelper.accessor('status', {
         header: 'Status',
@@ -294,7 +291,6 @@ const MaterialRequestIssuedPage = () => {
     ],
     [router]
   )
-
 
   const table = useReactTable({
     data: rows,
@@ -355,19 +351,6 @@ const MaterialRequestIssuedPage = () => {
             </Box>
           </Box>
 
-          {/* Origin */}
-          <Box sx={{ width: 220 }}>
-            <GlobalAutocomplete
-              label='Origin'
-              options={originOptions}
-              value={selectedOrigin}
-              onChange={(_, v) => {
-                setSelectedOrigin(v)
-                setPagination(p => ({ ...p, pageIndex: 0 }))
-              }}
-            />
-          </Box>
-
           {/* Status */}
           <Box sx={{ width: 220 }}>
             <GlobalAutocomplete
@@ -381,25 +364,25 @@ const MaterialRequestIssuedPage = () => {
             />
           </Box>
 
-          {/* Supplier */}
-          <Box sx={{ width: 220 }}>
+          {/* Vehicle No (Technician) */}
+          {/* <Box sx={{ width: 220 }}>
             <GlobalAutocomplete
-              label='Supplier'
-              options={supplierOptions}
-              value={selectedSupplier}
+              label='Vehicle No'
+              placeholder='Select Technician'
+              options={technicianOptions}
+              value={selectedTechnician}
               onChange={(_, v) => {
-                setSelectedSupplier(v)
+                setSelectedTechnician(v)
                 setPagination(p => ({ ...p, pageIndex: 0 }))
               }}
             />
-          </Box>
+          </Box> */}
 
           {/* Refresh */}
           <GlobalButton
             startIcon={<RefreshIcon />}
             onClick={() => {
-              setSelectedOrigin(null)
-              setSelectedSupplier(null)
+              setSelectedTechnician(null)
               setSelectedStatus(null)
               setSearchText('')
               setUiDateFilter(false)
@@ -435,7 +418,7 @@ const MaterialRequestIssuedPage = () => {
 
           <GlobalTextField
             size='small'
-            placeholder='Search TR No'
+            placeholder='Search Issue No / Vehicle No'
             value={searchText}
             onChange={e => {
               setSearchText(e.target.value)

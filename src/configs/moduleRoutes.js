@@ -50,5 +50,6 @@ export const MODULE_ROUTES = {
   '/admin/sales-report': 'Sales Report',
   '/admin/pest-trending': 'Pest Trending',
   '/admin/customer-audit': 'Customer Audit',
-  '/admin/contracts-audit': 'Contracts Audit'
+  '/admin/contracts-audit': 'Contracts Audit',
+  '/admin/vehicle': 'Vehicle'
 }

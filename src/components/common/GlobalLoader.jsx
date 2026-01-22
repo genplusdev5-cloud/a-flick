@@ -13,17 +13,15 @@ const GlobalLoader = () => {
     <Box
       sx={{
         position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(255, 255, 255, 0.7)',
-        backdropFilter: 'blur(3px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 99999, // Highest possible z-index
-        transition: 'all 0.3s ease-in-out'
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 4, // Thin bar at the top
+        zIndex: 99999,
+        pointerEvents: 'none' // Don't block interaction
       }}
     >
-      <ProgressCircularCustomization size={60} thickness={5} label="Processing..." />
+      <ProgressCircularCustomization size={40} thickness={4} />
     </Box>
   )
 }

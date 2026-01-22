@@ -71,6 +71,7 @@ const EditMaterialRequestPage = () => {
   const [origin, setOrigin] = useState(null)
   const [fromEmployee, setFromEmployee] = useState(null)
   const [toEmployee, setToEmployee] = useState(null)
+  const [currentUser, setCurrentUser] = useState(null)
 
   // Item entry fields
   const [remarks, setRemarks] = useState('')
@@ -88,6 +89,17 @@ const EditMaterialRequestPage = () => {
   })
 
   useEffect(() => {
+    const stored = localStorage.getItem('user_info')
+    if (stored) {
+      try {
+        setCurrentUser(JSON.parse(stored))
+      } catch (e) {
+        console.error('Error parsing user_info', e)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
     const fetchData = async () => {
       try {
         setInitLoading(true)
@@ -99,50 +111,63 @@ const EditMaterialRequestPage = () => {
         ])
 
         // --- DROPDOWNS ---
-        const dd = dropdownRes?.data || dropdownRes || {}
+        const materialData = dropdownRes?.data || dropdownRes || {}
         const filterData = filterRes?.data || filterRes || {}
-
-        const employees =
-          dd.employee?.name?.map(item => ({
-            label: item.name,
-            value: item.id,
-            id: item.id
-          })) || []
-
-        const chemicals =
-          dd.chemicals?.name?.map(item => ({
-            label: item.name,
-            value: item.id,
-            id: item.id
-          })) || []
-
-        const uoms =
-          dd.uom?.name?.map(item => ({
-            label: item.name,
-            value: item.id,
-            id: item.id
-          })) || []
-
-        const suppliers =
-          dd.supplier?.name?.map(item => ({
-            label: item.name,
-            value: item.id,
-            id: item.id
-          })) || []
-
         const purchaseData = filterData?.data || filterData || {}
+
+        // 1. Origins
         const origins =
           purchaseData?.company?.name?.map(item => ({
             label: item.name,
             value: item.name,
             id: item.id
           })) || []
-
-        setEmployeeOptions(employees)
-        setChemicalOptions(chemicals)
-        setUomOptions(uoms)
-        setSupplierOptions(suppliers)
         setOriginOptions(origins)
+
+        // 2. Chemicals (PRIORITY: Specialized Purchase API)
+        let chemRaw = []
+        if (Array.isArray(purchaseData?.chemicals)) {
+          chemRaw = purchaseData.chemicals
+        } else if (Array.isArray(purchaseData?.chemicals?.name)) {
+          chemRaw = purchaseData.chemicals.name
+        } else if (Array.isArray(materialData?.chemicals?.name)) {
+          chemRaw = materialData.chemicals.name
+        }
+
+        const chemicals = chemRaw.map(c => ({
+          label: c.name,
+          value: c.name,
+          id: c.id,
+          uom: c.uom || c.uom_name || c.unit
+        }))
+        setChemicalOptions(chemicals)
+
+        // 3. UOM
+        const uomRaw = materialData?.uom?.name || materialData?.uom || []
+        const uoms = uomRaw.map(u => ({
+          label: u.name,
+          value: u.name,
+          id: u.id
+        }))
+        setUomOptions(uoms)
+
+        // 4. Employees
+        const employees =
+          (materialData?.employee?.name || []).map(item => ({
+            label: item.name,
+            value: item.id,
+            id: item.id
+          })) || []
+        setEmployeeOptions(employees)
+
+        // 5. Suppliers
+        const suppliers =
+          (materialData?.supplier?.name || []).map(item => ({
+            label: item.name,
+            value: item.id,
+            id: item.id
+          })) || []
+        setSupplierOptions(suppliers)
 
         // --- DETAILS ---
         const data = detailsRes?.data ?? detailsRes ?? {}
@@ -150,8 +175,8 @@ const EditMaterialRequestPage = () => {
         if (data.request_date) setRequestDate(new Date(data.request_date))
 
         setOrigin(origins.find(o => o.id == data.origin_id) || null)
-        setFromEmployee(employees.find(e => e.label === data.from_location) || (data.from_location ? { label: data.from_location, id: data.from_location } : null))
-        setToEmployee(employees.find(e => e.label === data.to_location) || (data.to_location ? { label: data.to_location, id: data.to_location } : null))
+        setFromEmployee(employees.find(e => e.label === data.from_vehicle) || (data.from_vehicle ? { label: data.from_vehicle, id: data.from_vehicle } : null))
+        setToEmployee(employees.find(e => e.label === data.to_vehicle) || (data.to_vehicle ? { label: data.to_vehicle, id: data.to_vehicle } : null))
         setRemarks(data.remarks || '')
 
         // --- ITEMS ---
@@ -186,13 +211,26 @@ const EditMaterialRequestPage = () => {
     }
   }, [decodedId])
 
+  const handleChemicalChange = val => {
+    setChemical(val)
+    if (val && val.uom) {
+      const uomStr = typeof val.uom === 'object' ? val.uom.label || val.uom.name : val.uom
+      const foundUom = uomOptions.find(u => u.label.toLowerCase() === uomStr.toLowerCase())
+      if (foundUom) {
+        setUom(foundUom)
+      } else {
+        setUom({ label: uomStr, value: uomStr, id: null })
+      }
+    } else {
+      setUom(null)
+    }
+  }
+
   const handleEditItem = row => {
     setEditId(row.id)
-    setChemical({ label: row.chemical, id: row.chemicalId })
+    setChemical({ label: row.chemical, id: row.chemicalId, uom: row.uom })
     setUom({ label: row.uom, id: row.uomId })
     setQuantity(row.quantity)
-    // In update, remarks for individual items might be handled differently, 
-    // but the user's focus is on header fields and UI alignment.
   }
 
   const handleAddItem = () => {
@@ -246,24 +284,43 @@ const EditMaterialRequestPage = () => {
       return
     }
 
+    if (!fromEmployee) {
+      showToast('error', 'Please select From Employee')
+      return
+    }
+
+    if (!toEmployee) {
+      showToast('error', 'Please select To Employee')
+      return
+    }
+
     try {
       setSaveLoading(true)
 
       const payload = {
         id: Number(decodedId),
         request_date: format(requestDate, 'yyyy-MM-dd'),
+        company_id: origin?.id || null,
         origin_id: origin?.id || null,
-        from_location: fromEmployee?.label || null,
-        to_location: toEmployee?.label || null,
+        employee_id: currentUser?.id || fromEmployee?.id || null,
+        from_vehicle: fromEmployee?.label || null,
+        from_vehicle_id: fromEmployee?.id || null,
+        to_vehicle: toEmployee?.label || null,
+        to_vehicle_id: toEmployee?.id || null,
+        supervisor_id: null,
         remarks: remarks,
-        items: items.map(item => ({
+        is_active: 1,
+        status: 1,
+        items: JSON.stringify(items.map(item => ({
           id: String(item.id).startsWith('temp') ? null : item.id,
           item_id: item.chemicalId,
           item_name: item.chemical,
           uom: item.uom,
           uom_id: item.uomId,
-          quantity: Number(item.quantity)
-        }))
+          quantity: Number(item.quantity),
+          is_active: 1,
+          status: 1
+        })))
       }
 
       await updateMaterialRequest(payload)
@@ -367,7 +424,7 @@ const EditMaterialRequestPage = () => {
               <GlobalTextField
                 label='Remarks'
                 multiline
-                minRows={1}
+                minRows={3}
                 value={remarks}
                 onChange={e => setRemarks(e.target.value)}
               />
@@ -381,11 +438,19 @@ const EditMaterialRequestPage = () => {
         <Box px={4} py={3}>
           <Grid container spacing={2} alignItems='flex-end'>
             <Grid item xs={12} md={3}>
-              <GlobalAutocomplete label='Chemical' options={chemicalOptions} value={chemical} onChange={setChemical} />
+              <GlobalAutocomplete label='Chemical' options={chemicalOptions} value={chemical} onChange={handleChemicalChange} />
             </Grid>
 
             <Grid item xs={12} md={2}>
-              <GlobalAutocomplete label='UOM' options={uomOptions} value={uom} onChange={setUom} />
+              <GlobalTextField
+                label='UOM'
+                value={uom?.label || ''}
+                InputProps={{
+                  readOnly: true
+                }}
+                disabled
+                sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#f5f5f5' } }}
+              />
             </Grid>
 
             <Grid item xs={12} md={3}>

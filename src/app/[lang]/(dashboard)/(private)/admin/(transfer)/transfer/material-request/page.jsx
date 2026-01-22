@@ -127,7 +127,7 @@ const MaterialRequestPageContent = () => {
   const loadData = async (showToastMsg = false) => {
     setLoading(true)
     try {
-      const response = await getTmMaterialRequestList(page)
+      const response = await getTmMaterialRequestList({ page })
       setTotalCount(response.count || 0)
       const data = response.data?.results || []
 
@@ -135,8 +135,8 @@ const MaterialRequestPageContent = () => {
         id: r.id,
         requestNo: r.request_no || `REQ-${r.id}`,
         requestDate: r.request_date,
-        fromEmployee: r.from_location || '',
-        toEmployee: r.to_location || '',
+        fromEmployee: r.from_vehicle || '',
+        toEmployee: r.to_vehicle || '',
         approvedStatus: r.is_approved === 1 ? 'Yes' : 'N/A',
         issuedStatus: r.is_issued === 1 ? 'Yes' : 'N/A',
         completedStatus: r.is_completed === 1 ? 'Yes' : 'No',

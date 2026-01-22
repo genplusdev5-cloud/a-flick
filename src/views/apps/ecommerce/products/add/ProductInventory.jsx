@@ -16,7 +16,7 @@ import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import Link from '@components/Link'
 
 export default function ProductInventory({ onTabChange }) {
-  const [activeTab, setActiveTab] = useState('dashboard')
+  const [activeTab, setActiveTab] = useState('contract')
   const [date, setDate] = useState(null)
 
   const theme = useTheme()
@@ -37,13 +37,13 @@ export default function ProductInventory({ onTabChange }) {
             pill='true'
             className='!items-start !justify-start text-left'
           >
-            <Tab
+            {/* <Tab
               value='dashboard'
               label='Dasbaord'
               icon={<i className='tabler-home' />}
               iconPosition='start'
               className='!justify-start !items-center text-left'
-            />
+            /> */}
 
             <Tab
               value='contract'

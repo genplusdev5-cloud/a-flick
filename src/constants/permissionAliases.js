@@ -141,6 +141,10 @@ export const PERMISSION_ALIASES = {
   'transfer_material_issued': 'Material Request Issued', // ✅ Correct Backend Key
   'Transfer/Material Issued': 'Material Request Issued', // 🔍 Friendly Name Variation
 
+  'Transfer/Vehicle': 'Vehicle',
+  'Master/Vehicle': 'Vehicle',
+  'Vehicle': 'Vehicle',
+
   // Stock
   'Stock/Suppliers': 'Suppliers',
   'Stock/Material Request': 'Material Request',

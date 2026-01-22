@@ -57,6 +57,7 @@ export default function AddMaterialRequestPage() {
   const [fromEmployee, setFromEmployee] = useState(null)
   const [toEmployee, setToEmployee] = useState(null)
   const [remarks, setRemarks] = useState('')
+  const [currentUser, setCurrentUser] = useState(null)
 
   // Item fields
   const [chemical, setChemical] = useState(null)
@@ -75,33 +76,78 @@ export default function AddMaterialRequestPage() {
   })
 
   useEffect(() => {
+    const stored = localStorage.getItem('user_info')
+    if (stored) {
+      try {
+        setCurrentUser(JSON.parse(stored))
+      } catch (e) {
+        console.error('Error parsing user_info', e)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
     const fetchOptions = async () => {
       try {
         setInitLoading(true)
-        const [mrRes, filterRes] = await Promise.all([
-          getMaterialRequestDropdowns(),
-          getPurchaseFilters()
-        ])
-        const data = mrRes?.data || mrRes
+        const [mrRes, filterRes] = await Promise.all([getMaterialRequestDropdowns(), getPurchaseFilters()])
+        const materialData = mrRes?.data || mrRes
         const filterData = filterRes?.data || filterRes
         const purchaseData = filterData?.data || filterData || {}
+
+        // 1. Origins
         const origins =
           purchaseData?.company?.name?.map(item => ({
             label: item.name,
             value: item.name,
             id: item.id
           })) || []
-
-        setChemicalOptions((data?.chemicals?.name || []).map(c => ({
-          label: c.name,
-          id: c.id,
-          value: c.id,
-          uom: c.uom || c.uom_name || c.unit
-        })))
-        setUomOptions((data?.uom?.name || []).map(u => ({ label: u.name, id: u.id, value: u.id })))
-        setSupplierOptions((data?.supplier?.name || []).map(s => ({ label: s.name, id: s.id, value: s.id })))
         setOriginOptions(origins)
-        setEmployeeOptions((data?.employee?.name || []).map(e => ({ label: e.name, id: e.id, value: e.id })))
+
+        // 2. Chemicals (PRIORITY: Specialized Purchase API)
+        let chemRaw = []
+        if (Array.isArray(purchaseData?.chemicals)) {
+          chemRaw = purchaseData.chemicals
+        } else if (Array.isArray(purchaseData?.chemicals?.name)) {
+          chemRaw = purchaseData.chemicals.name
+        } else if (Array.isArray(materialData?.chemicals?.name)) {
+          chemRaw = materialData.chemicals.name
+        }
+
+        const chemicals = chemRaw.map(c => ({
+          label: c.name,
+          value: c.name,
+          id: c.id,
+          uom: c.uom || c.uom_name || c.unit
+        }))
+        setChemicalOptions(chemicals)
+
+        // 3. UOM
+        const uomRaw = materialData?.uom?.name || materialData?.uom || []
+        const uoms = uomRaw.map(u => ({
+          label: u.name,
+          value: u.name,
+          id: u.id
+        }))
+        setUomOptions(uoms)
+
+        // 4. Employees
+        setEmployeeOptions(
+          (materialData?.employee?.name || []).map(e => ({
+            label: e.name,
+            id: e.id,
+            value: e.id
+          }))
+        )
+
+        // 5. Suppliers
+        setSupplierOptions(
+          (materialData?.supplier?.name || []).map(s => ({
+            label: s.name,
+            id: s.id,
+            value: s.id
+          }))
+        )
 
         // Set default origin if available
         const defaultOrigin = origins.find(o => o.label === 'A-Flick Pte Ltd') || origins[0]
@@ -121,11 +167,12 @@ export default function AddMaterialRequestPage() {
   const handleChemicalChange = val => {
     setChemical(val)
     if (val && val.uom) {
-      const foundUom = uomOptions.find(u => u.label.toLowerCase() === val.uom.toLowerCase())
+      const uomStr = typeof val.uom === 'object' ? val.uom.label || val.uom.name : val.uom
+      const foundUom = uomOptions.find(u => u.label.toLowerCase() === uomStr.toLowerCase())
       if (foundUom) {
         setUom(foundUom)
       } else {
-        setUom({ label: val.uom, value: val.uom, id: null })
+        setUom({ label: uomStr, value: uomStr, id: null })
       }
     } else {
       setUom(null)
@@ -134,7 +181,7 @@ export default function AddMaterialRequestPage() {
 
   const handleEditItem = row => {
     setEditId(row.id)
-    setChemical({ label: row.chemical, id: row.chemicalId })
+    setChemical({ label: row.chemical, id: row.chemicalId, uom: row.uom })
     setUom({ label: row.uom, id: row.uomId })
     setQuantity(row.quantity)
   }
@@ -190,21 +237,41 @@ export default function AddMaterialRequestPage() {
       return
     }
 
+    if (!fromEmployee) {
+      showToast('error', 'Please select From Employee')
+      return
+    }
+
+    if (!toEmployee) {
+      showToast('error', 'Please select To Employee')
+      return
+    }
+
     try {
       setSaveLoading(true)
       const payload = {
         request_date: format(requestDate, 'yyyy-MM-dd'),
         remarks: remarks,
+        company_id: origin?.id || null,
         origin_id: origin?.id || null,
-        from_location: fromEmployee?.label || null,
-        to_location: toEmployee?.label || null,
-        items: items.map(i => ({
+        employee_id: currentUser?.id || fromEmployee?.id || null,
+        from_vehicle: fromEmployee?.label || null,
+        from_vehicle_id: fromEmployee?.id || null,
+        to_vehicle: toEmployee?.label || null,
+        to_vehicle_id: toEmployee?.id || null,
+        supervisor_id: null,
+        request_status: 'Pending',
+        is_active: 1,
+        status: 1,
+        items: JSON.stringify(items.map(i => ({
           item_id: i.chemicalId,
           item_name: i.chemical,
           uom: i.uom,
           uom_id: i.uomId,
-          quantity: Number(i.quantity)
-        }))
+          quantity: Number(i.quantity),
+          is_active: 1,
+          status: 1
+        })))
       }
 
       await addMaterialRequest(payload)
@@ -270,18 +337,20 @@ export default function AddMaterialRequestPage() {
                 selected={requestDate}
                 onChange={date => setRequestDate(date)}
                 dateFormat='dd/MM/yyyy'
-                customInput={<PoDateInput label='Request Date' value={requestDate ? format(requestDate, 'dd/MM/yyyy') : ''} />}
+                customInput={
+                  <PoDateInput label='Request Date' value={requestDate ? format(requestDate, 'dd/MM/yyyy') : ''} />
+                }
               />
             </Grid>
 
-            <Grid item xs={12} md={4}>
+            {/* <Grid item xs={12} md={4}>
               <GlobalAutocomplete
                 label='Origin'
                 options={originOptions}
                 value={origin}
                 onChange={setOrigin}
               />
-            </Grid>
+            </Grid> */}
 
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
@@ -301,11 +370,11 @@ export default function AddMaterialRequestPage() {
               />
             </Grid>
 
-            <Grid item xs={12} md={8}>
+            <Grid item xs={12} md={4}>
               <GlobalTextField
                 label='Remarks'
                 multiline
-                minRows={1}
+                minRows={3}
                 value={remarks}
                 onChange={e => setRemarks(e.target.value)}
               />

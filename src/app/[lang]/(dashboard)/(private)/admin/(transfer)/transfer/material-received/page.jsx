@@ -35,6 +35,7 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import { showToast } from '@/components/common/Toasts'
 
 import { getMaterialReceiveList, deleteMaterialReceive } from '@/api/transfer/material_receive'
+import { getMaterialIssueList } from '@/api/transfer/material_issue'
 import { getMaterialRequestDropdowns } from '@/api/transfer/materialRequest/dropdown'
 import { getPurchaseFilters } from '@/api/purchase/purchase_order'
 
@@ -70,13 +71,14 @@ const MaterialRequestReceivedPage = () => {
   const router = useRouter()
 
   // FILTER OPTIONS
-  const [originOptions, setOriginOptions] = useState([])
-  const [technicianOptions, setTechnicianOptions] = useState([])
+  const [employeeOptions, setEmployeeOptions] = useState([])
   const [supplierOptions, setSupplierOptions] = useState([])
 
   // FILTER VALUES
-  const [selectedOrigin, setSelectedOrigin] = useState(null)
-  const [selectedSupplier, setSelectedSupplier] = useState(null)
+  const [selectedFromEmployee, setSelectedFromEmployee] = useState(null)
+  const [selectedToEmployee, setSelectedToEmployee] = useState(null)
+  const [selectedIssue, setSelectedIssue] = useState(null)
+  const [issueOptions, setIssueOptions] = useState([])
 
   // STATE
   const [rows, setRows] = useState([])
@@ -101,21 +103,31 @@ const MaterialRequestReceivedPage = () => {
   useEffect(() => {
     const fetchFilters = async () => {
       try {
-        const [purchaseRes, materialRes] = await Promise.all([
+        const [purchaseRes, materialRes, issueRes] = await Promise.all([
           getPurchaseFilters(),
-          getMaterialRequestDropdowns()
+          getMaterialRequestDropdowns(),
+          getMaterialIssueList({ page_size: 1000 })
         ])
 
         const purchaseData = purchaseRes?.data?.data || purchaseRes?.data || {}
         const materialData = materialRes?.data || materialRes
 
-        const companyList = purchaseData?.company?.name || []
-        const supplierList = purchaseData?.supplier?.name || []
         const techList = materialData?.employee?.name || []
 
-        setOriginOptions(companyList.map(c => ({ label: c.name, value: c.id })))
-        setSupplierOptions(supplierList.map(s => ({ label: s.name, value: s.id })))
-        setTechnicianOptions(techList.map(e => ({ label: e.name, value: e.id })))
+        setEmployeeOptions(techList.map(e => ({ label: e.name, id: e.id, value: e.id })))
+
+        const issues = (issueRes?.data?.results || issueRes?.results || []).map(i => {
+          const trNo = i.num_series || i.issue_number || `Issue #${i.id}`
+          const trDate =
+            i.receive_date || i.issue_date ? format(parseISO(i.receive_date || i.issue_date), 'dd/MM/yyyy') : ''
+          const tech = i.technician_name || i.technician || ''
+          return {
+            label: `${trNo}${trDate ? ` (${trDate})` : ''}${tech ? ` - ${tech}` : ''}`,
+            value: i.id,
+            id: i.id
+          }
+        })
+        setIssueOptions(issues)
       } catch (e) {
         console.error('Filter fetch failed', e)
       }
@@ -132,7 +144,7 @@ const MaterialRequestReceivedPage = () => {
 
       await deleteMaterialReceive(deleteDialog.row.id)
 
-      showToast('Material Received deleted successfully', 'delete')
+      showToast('Material Receive deleted successfully', 'delete')
 
       setDeleteDialog({ open: false, row: null })
       fetchList()
@@ -152,32 +164,29 @@ const MaterialRequestReceivedPage = () => {
       const res = await getMaterialReceiveList({
         page: pagination.pageIndex + 1,
         page_size: pagination.pageSize,
-        company_id: selectedOrigin?.value
+        from_vehicle_id: selectedFromEmployee?.id,
+        to_vehicle_id: selectedToEmployee?.id,
+        issue_id: selectedIssue?.id
       })
 
       const data = res?.data?.data || res?.data || res
       setTotalCount(data?.count || 0)
 
-      const mapped =
-        (data?.results || []).map((item, index) => {
-          const originLabel = originOptions.find(o => o.value === item.company_id)?.label || item.company_name || '-'
-          const technicianLabel = technicianOptions.find(t => t.value === item.technician_id)?.label || item.technician_name || '-'
-
-          return {
-            sno: pagination.pageIndex * pagination.pageSize + (index + 1),
-            id: item.id,
-            origin: originLabel,
-            transferInNo: item.num_series || item.receive_number || '-',
-            transferInDate: item.receive_date ? format(new Date(item.receive_date), 'dd/MM/yyyy') : '-',
-            rawDate: item.receive_date,
-            technicianName: technicianLabel,
-            contactEmail: item?.technician_details?.email || '-',
-            contactPhone: item?.technician_details?.phone || '-',
-            remarks: item.remarks || '-',
-            status: item.receive_status || item.status || 'Pending',
-            recordType: item.record_type || 'tm'
-          }
-        })
+      const mapped = (data?.results || []).map((item, index) => {
+        return {
+          sno: pagination.pageIndex * pagination.pageSize + (index + 1),
+          id: item.id,
+          fromEmployee: item.from_vehicle || '-',
+          toEmployee: item.to_vehicle || '-',
+          issueNo: item.issue_number || item.num_series_issue || (item.issue_id ? `Issue #${item.issue_id}` : '-'),
+          transferInNo: item.num_series || item.receive_number || '-',
+          transferInDate: item.receive_date ? format(new Date(item.receive_date), 'dd/MM/yyyy') : '-',
+          rawDate: item.receive_date,
+          remarks: item.remarks || '-',
+          status: item.receive_status || item.status || 'Pending',
+          recordType: item.record_type || 'tm'
+        }
+      })
 
       // Frontend Date Filtering
       let filteredRows = mapped
@@ -203,7 +212,15 @@ const MaterialRequestReceivedPage = () => {
 
   useEffect(() => {
     fetchList()
-  }, [pagination.pageIndex, pagination.pageSize, selectedOrigin, selectedSupplier, uiDateFilter, uiDateRange])
+  }, [
+    pagination.pageIndex,
+    pagination.pageSize,
+    selectedFromEmployee,
+    selectedToEmployee,
+    selectedIssue,
+    uiDateFilter,
+    uiDateRange
+  ])
 
   /* ───────── COLUMNS ───────── */
   const columns = useMemo(
@@ -221,7 +238,9 @@ const MaterialRequestReceivedPage = () => {
               <IconButton
                 size='small'
                 color='primary'
-                onClick={() => router.push(`/admin/transfer/material-received/update/${btoa(String(r.id))}?type=${r.recordType}`)}
+                onClick={() =>
+                  router.push(`/admin/transfer/material-received/update/${btoa(String(r.id))}?type=${r.recordType}`)
+                }
               >
                 <i className='tabler-edit' />
               </IconButton>
@@ -243,12 +262,11 @@ const MaterialRequestReceivedPage = () => {
         }
       }),
 
-      columnHelper.accessor('origin', { header: 'Origin' }),
+      columnHelper.accessor('fromEmployee', { header: 'From Employee' }),
+      columnHelper.accessor('toEmployee', { header: 'To Employee' }),
+      columnHelper.accessor('issueNo', { header: 'Issue No' }),
       columnHelper.accessor('transferInNo', { header: 'TR No.' }),
       columnHelper.accessor('transferInDate', { header: 'TR Date' }),
-      columnHelper.accessor('technicianName', { header: 'Technician' }),
-      columnHelper.accessor('contactEmail', { header: 'Contact Email' }),
-      columnHelper.accessor('contactPhone', { header: 'Contact Phone' }),
       columnHelper.accessor('remarks', { header: 'Remarks' }),
 
       columnHelper.accessor('status', {
@@ -266,7 +284,6 @@ const MaterialRequestReceivedPage = () => {
     [router]
   )
 
-
   const table = useReactTable({
     data: rows,
     columns,
@@ -281,13 +298,13 @@ const MaterialRequestReceivedPage = () => {
       header={
         <Breadcrumbs sx={{ mb: 2 }}>
           <Link href='/'>Dashboard</Link>
-          <Typography>Material Received</Typography>
+          <Typography>Material Receive</Typography>
         </Breadcrumbs>
       }
     >
       <Card sx={{ display: 'flex', flexDirection: 'column', maxHeight: '100%' }}>
         <CardHeader
-          title={<Typography variant='h5'>Material Received</Typography>}
+          title={<Typography variant='h5'>Material Receive</Typography>}
           action={
             <Box display='flex' gap={2}>
               <GlobalButton
@@ -312,7 +329,7 @@ const MaterialRequestReceivedPage = () => {
                 startIcon={<AddIcon />}
                 onClick={() => router.push('/admin/transfer/material-received/add')}
               >
-                Add Material Received
+                Add Material Receive
               </GlobalButton>
             </Box>
           }
@@ -347,29 +364,43 @@ const MaterialRequestReceivedPage = () => {
             />
           </Box>
 
-          {/* FROM COMPANY */}
+          {/* FROM EMPLOYEE */}
           <Box sx={{ width: 220 }}>
             <GlobalAutocomplete
-              label='From Company'
-              placeholder='Select From Company'
-              options={originOptions}
-              value={selectedOrigin}
+              label='From Employee'
+              placeholder='Select From Employee'
+              options={employeeOptions}
+              value={selectedFromEmployee}
               onChange={(_, val) => {
-                setSelectedOrigin(val)
+                setSelectedFromEmployee(val)
                 setPagination(p => ({ ...p, pageIndex: 0 }))
               }}
             />
           </Box>
 
-          {/* TO COMPANY */}
+          {/* TO EMPLOYEE */}
           <Box sx={{ width: 220 }}>
             <GlobalAutocomplete
-              label='To Company'
-              placeholder='Select To Company'
-              options={supplierOptions}
-              value={selectedSupplier}
+              label='To Employee'
+              placeholder='Select To Employee'
+              options={employeeOptions}
+              value={selectedToEmployee}
               onChange={(_, val) => {
-                setSelectedSupplier(val)
+                setSelectedToEmployee(val)
+                setPagination(p => ({ ...p, pageIndex: 0 }))
+              }}
+            />
+          </Box>
+
+          {/* MATERIAL ISSUE */}
+          <Box sx={{ width: 220 }}>
+            <GlobalAutocomplete
+              label='Material Issued'
+              placeholder='Select Issue'
+              options={issueOptions}
+              value={selectedIssue}
+              onChange={(_, val) => {
+                setSelectedIssue(val)
                 setPagination(p => ({ ...p, pageIndex: 0 }))
               }}
             />
@@ -382,8 +413,9 @@ const MaterialRequestReceivedPage = () => {
             startIcon={<RefreshIcon />}
             sx={{ height: 36 }}
             onClick={() => {
-              setSelectedOrigin(null)
-              setSelectedSupplier(null)
+              setSelectedFromEmployee(null)
+              setSelectedToEmployee(null)
+              setSelectedIssue(null)
               setUiDateFilter(false)
               setUiDateRange([null, null])
               setPagination(p => ({ ...p, pageIndex: 0 }))

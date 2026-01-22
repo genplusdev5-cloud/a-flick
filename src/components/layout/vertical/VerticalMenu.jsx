@@ -29,7 +29,8 @@ const MASTER_MODULES = [
   'Incident',
   'Todo Items',
   'Site Risk',
-  'Equipments'
+  'Equipments',
+  'Vehicle'
 ]
 
 const EMPLOYEE_MODULES = ['Department', 'Designation', 'Employee List', 'Employee Leave Type', 'User Privilege']
@@ -263,6 +264,10 @@ const VerticalMenu = ({ scrollMenu }) => {
           <PermissionItem module='Suppliers'>
             <MenuItem href={`/${locale}/admin/suppliers`}>Suppliers</MenuItem>
           </PermissionItem>
+
+          <PermissionItem module='Vehicle'>
+            <MenuItem href={`/${locale}/admin/vehicle`}>Vehicle</MenuItem>
+          </PermissionItem>
           <PermissionItem module='Purchase Order'>
             <MenuItem href={`/${locale}/admin/purchase/purchase-order`}>Purchase Order</MenuItem>
           </PermissionItem>
@@ -291,7 +296,7 @@ const VerticalMenu = ({ scrollMenu }) => {
           </PermissionItem>
 
           <PermissionItem module='Material Request Received'>
-            <MenuItem href={`/${locale}/admin/transfer/material-received`}>Material Received</MenuItem>
+            <MenuItem href={`/${locale}/admin/transfer/material-received`}>Material Receive</MenuItem>
           </PermissionItem>
 
           <PermissionItem module='Material Request Issued'>

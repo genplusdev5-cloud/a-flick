@@ -54,13 +54,13 @@ const EditMaterialRequestIssuedPage = () => {
   }, [id])
 
   /* ───── STATES ───── */
-  const [originOptions, setOriginOptions] = useState([])
-  const [technicianOptions, setTechnicianOptions] = useState([])
+  const [employeeOptions, setEmployeeOptions] = useState([])
   const [chemicalOptions, setChemicalOptions] = useState([])
   const [uomOptions, setUomOptions] = useState([])
 
-  const [origin, setOrigin] = useState(null)
-  const [technician, setTechnician] = useState(null)
+  const [requestNo, setRequestNo] = useState('')
+  const [fromEmployee, setFromEmployee] = useState(null)
+  const [toEmployee, setToEmployee] = useState(null)
   const [issueDate, setIssueDate] = useState(null)
   const [remarks, setRemarks] = useState('')
 
@@ -94,51 +94,50 @@ const EditMaterialRequestIssuedPage = () => {
         /* DROPDOWNS */
         const purchaseData = purchaseRes?.data?.data || purchaseRes?.data || purchaseRes || {}
 
-        const origins =
-          purchaseData?.company?.name?.map(i => ({
-            label: i.name,
-            value: i.id,
-            id: i.id
-          })) || []
+        const employees = (materialData?.employee?.name || []).map(e => ({
+          label: e.name,
+          value: e.id,
+          id: e.id
+        }))
+        setEmployeeOptions(employees)
 
-        setOriginOptions(origins)
+        // Chemicals
+        let chemRaw = []
+        if (Array.isArray(purchaseData?.chemicals)) {
+          chemRaw = purchaseData.chemicals
+        } else if (Array.isArray(purchaseData?.chemicals?.name)) {
+          chemRaw = purchaseData.chemicals.name
+        } else if (Array.isArray(materialData?.chemicals?.name)) {
+          chemRaw = materialData.chemicals.name
+        }
 
-        const materialData = materialRes?.data?.data || materialRes?.data || materialRes || {}
+        const chemicals = chemRaw.map(c => ({
+          label: c.name,
+          value: c.id,
+          id: c.id,
+          uom: c.uom || c.uom_name || c.unit
+        }))
+        setChemicalOptions(chemicals)
 
-        const techs =
-          materialData?.employee?.name?.map(e => ({
-            label: e.name,
-            value: e.id,
-            id: e.id
-          })) || []
-
-        setTechnicianOptions(techs)
-
-        setChemicalOptions(
-          materialData?.chemicals?.name?.map(c => ({
-            label: c.name,
-            value: c.id,
-            id: c.id
-          })) || []
-        )
-
-        setUomOptions(
-          materialData?.uom?.name?.map(u => ({
-            label: u.name,
-            value: u.id,
-            id: u.id
-          })) || []
-        )
+        // UOM
+        const uomRaw = materialData?.uom?.name || materialData?.uom || []
+        const uoms = uomRaw.map(u => ({
+          label: u.name,
+          value: u.id,
+          id: u.id
+        }))
+        setUomOptions(uoms)
 
         /* DETAILS */
         const detailJson = detailsRes?.data || detailsRes || {}
         const d = detailJson?.data || detailJson
 
+        setRequestNo(d.request_no || '')
         setIssueDate(d.issue_date ? parseISO(d.issue_date) : null)
         setRemarks(d.remarks || '')
 
-        setOrigin(origins.find(o => o.id === d.company_id) || null)
-        setTechnician(techs.find(t => t.id === d.technician_id) || null)
+        setFromEmployee(employees.find(e => e.id === d.from_employee_id) || null)
+        setToEmployee(employees.find(e => e.id === d.to_employee_id) || null)
 
         setItems(
           (d.items || d.transfer_items || d.transfer_in_items || []).map(item => ({
@@ -160,9 +159,24 @@ const EditMaterialRequestIssuedPage = () => {
     if (decodedId) fetchData()
   }, [decodedId, type])
 
+  const handleChemicalChange = val => {
+    setChemical(val)
+    if (val && val.uom) {
+      const uomStr = typeof val.uom === 'object' ? val.uom.label || val.uom.name : val.uom
+      const foundUom = uomOptions.find(u => u.label.toLowerCase() === uomStr.toLowerCase())
+      if (foundUom) {
+        setUom(foundUom)
+      } else {
+        setUom({ label: uomStr, value: uomStr, id: null })
+      }
+    } else {
+      setUom(null)
+    }
+  }
+
   const handleEditItem = row => {
     setEditId(row.id)
-    setChemical({ label: row.chemical, id: row.chemicalId })
+    setChemical({ label: row.chemical, id: row.chemicalId, uom: row.uom })
     setUom({ label: row.uom, id: row.uomId })
     setQuantity(row.quantity)
   }
@@ -215,7 +229,7 @@ const EditMaterialRequestIssuedPage = () => {
 
   /* ───── UPDATE ───── */
   const handleUpdate = async () => {
-    if (!origin || !technician || !issueDate || !items.length) {
+    if (!requestNo || !fromEmployee || !toEmployee || !issueDate || !items.length) {
       showToast('warning', 'Fill all required fields')
       return
     }
@@ -225,14 +239,14 @@ const EditMaterialRequestIssuedPage = () => {
 
       const payload = {
         id: decodedId,
-        company_id: origin.id,
-        technician_id: technician.id,
+        request_no: requestNo,
+        from_employee_id: fromEmployee.id,
+        to_employee_id: toEmployee.id,
         issue_date: format(issueDate, 'yyyy-MM-dd'),
         remarks,
         items: items.map(i => ({
           id: typeof i.id === 'number' && i.id < 1000000000000 ? i.id : null,
           item_id: i.chemicalId,
-          technician_id: technician.id,
           uom_id: i.uomId,
           quantity: Number(i.quantity)
         }))
@@ -282,11 +296,7 @@ const EditMaterialRequestIssuedPage = () => {
           )}
 
           <Grid container spacing={3}>
-            <Grid item md={4}>
-              <GlobalAutocomplete label='Origin' options={originOptions} value={origin} onChange={setOrigin} />
-            </Grid>
-
-            <Grid item md={4}>
+            <Grid item md={4} xs={12}>
               <AppReactDatepicker
                 selected={issueDate}
                 onChange={setIssueDate}
@@ -294,11 +304,33 @@ const EditMaterialRequestIssuedPage = () => {
               />
             </Grid>
 
-            <Grid item md={4}>
-              <GlobalAutocomplete label='Technician' options={technicianOptions} value={technician} onChange={setTechnician} />
+            <Grid item md={4} xs={12}>
+              <GlobalAutocomplete
+                label='From Employee'
+                options={employeeOptions}
+                value={fromEmployee}
+                onChange={setFromEmployee}
+              />
             </Grid>
 
-            <Grid item xs={12}>
+            <Grid item md={4} xs={12}>
+              <GlobalAutocomplete
+                label='To Employee'
+                options={employeeOptions}
+                value={toEmployee}
+                onChange={setToEmployee}
+              />
+            </Grid>
+
+            <Grid item md={4} xs={12}>
+              <GlobalTextField
+                label='Request No'
+                value={requestNo}
+                onChange={e => setRequestNo(e.target.value)}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={4}>
               <GlobalTextField
                 label='Remarks'
                 multiline
@@ -315,19 +347,32 @@ const EditMaterialRequestIssuedPage = () => {
         {/* ITEM ENTRY */}
         <Box px={4} py={3}>
           <Grid container spacing={2} alignItems='flex-end'>
-            <Grid item md={4}>
-              <GlobalAutocomplete label='Chemical' options={chemicalOptions} value={chemical} onChange={setChemical} />
+            <Grid item md={4} xs={12}>
+              <GlobalAutocomplete
+                label='Chemical'
+                options={chemicalOptions}
+                value={chemical}
+                onChange={handleChemicalChange}
+              />
             </Grid>
 
-            <Grid item md={3}>
-              <GlobalAutocomplete label='UOM' options={uomOptions} value={uom} onChange={setUom} />
+            <Grid item md={3} xs={12}>
+              <GlobalTextField
+                label='UOM'
+                value={uom?.label || ''}
+                InputProps={{
+                  readOnly: true
+                }}
+                disabled
+                sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#f5f5f5' } }}
+              />
             </Grid>
 
-            <Grid item md={3}>
+            <Grid item md={3} xs={12}>
               <GlobalTextField label='Quantity' type='number' value={quantity} onChange={e => setQuantity(e.target.value)} />
             </Grid>
 
-            <Grid item md={2}>
+            <Grid item md={2} xs={12}>
               <GlobalButton
                 variant='contained'
                 color={editId ? 'info' : 'primary'}
