@@ -42,12 +42,7 @@ import StickyListLayout from '@/components/common/StickyListLayout'
 
 import { showToast } from '@/components/common/Toasts'
 import classnames from 'classnames'
-import {
-  useReactTable,
-  getCoreRowModel,
-  flexRender,
-  createColumnHelper
-} from '@tanstack/react-table'
+import { useReactTable, getCoreRowModel, flexRender, createColumnHelper } from '@tanstack/react-table'
 import styles from '@core/styles/table.module.css'
 
 import { getVehicleList, addVehicle, updateVehicle, deleteVehicle } from '@/api/purchase/vehicle'
@@ -85,7 +80,7 @@ const VehiclePageContent = () => {
     id: null,
     vehicle_name: '',
     description: '',
-    status: 'Active'
+    is_active: 1
   })
 
   const nameRef = useRef(null)
@@ -102,11 +97,14 @@ const VehiclePageContent = () => {
 
       const data = res?.data || res
       const results = data?.results || []
-      
-      setRows(results.map((r, i) => ({
-        ...r,
-        sno: pagination.pageIndex * pagination.pageSize + i + 1
-      })))
+
+      setRows(
+        results.map((r, i) => ({
+          ...r,
+          sno: pagination.pageIndex * pagination.pageSize + i + 1,
+          is_active: r.is_active ?? (r.status === 'Active' ? 1 : 0) // Compatibility
+        }))
+      )
       setRowCount(data?.count || 0)
     } catch (err) {
       showToast('error', 'Failed to fetch vehicles')
@@ -122,7 +120,7 @@ const VehiclePageContent = () => {
   /* ---------- ACTIONS ---------- */
   const handleAdd = () => {
     setIsEdit(false)
-    setFormData({ id: null, vehicle_name: '', description: '', status: 'Active' })
+    setFormData({ id: null, vehicle_name: '', description: '', is_active: 1 })
     setDrawerOpen(true)
     setTimeout(() => nameRef.current?.focus(), 100)
   }
@@ -131,9 +129,9 @@ const VehiclePageContent = () => {
     setIsEdit(true)
     setFormData({
       id: row.id,
-      vehicle_name: row.vehicle_name,
+      vehicle_name: row.vehicle_name || row.name || '',
       description: row.description || '',
-      status: row.status || 'Active'
+      is_active: row.is_active ?? (row.status === 'Inactive' ? 0 : 1)
     })
     setDrawerOpen(true)
   }
@@ -155,19 +153,39 @@ const VehiclePageContent = () => {
 
   const handleSubmit = async e => {
     e.preventDefault()
+
+    // Validate
+    const vName = formData.vehicle_name?.trim()
+    if (!vName) {
+      showToast('warning', 'Please enter vehicle name')
+      return
+    }
+
     try {
       setSubmitLoading(true)
+
+      // ✅ Payload standardization: send both 'vehicle_name' and 'name'
+      // Many backend modules expecting one or the other, sending both avoids "missing" errors.
       const payload = {
-        vehicle_name: formData.vehicle_name,
-        description: formData.description,
-        status: formData.status
+        name: vName,
+        vehicle_name: vName,
+        description: formData.description?.trim() || '',
+        is_active: Number(formData.is_active),
+        status: 1 // 🔥 THIS FIXES THE DELETE ISSUE
       }
 
       if (isEdit) {
         await updateVehicle({ ...payload, id: formData.id })
         showToast('success', 'Vehicle updated successfully')
       } else {
-        await addVehicle(payload)
+        const res = await addVehicle(payload)
+
+        // Secondary check for cases where status 200 is returned with an error message
+        if (res?.status === 'missing' || res?.status === 'failed') {
+          showToast('error', res.message || 'Validation failed')
+          return
+        }
+
         showToast('success', 'Vehicle added successfully')
       }
 
@@ -185,7 +203,11 @@ const VehiclePageContent = () => {
     const headers = ['S.No', 'Vehicle Name', 'Description', 'Status']
     const csv = [
       headers.join(','),
-      ...rows.map(r => [r.sno, r.vehicle_name, `"${r.description || ''}"`, r.status].join(','))
+      ...rows.map(r =>
+        [r.sno, r.vehicle_name || r.name, `"${r.description || ''}"`, r.is_active === 1 ? 'Active' : 'Inactive'].join(
+          ','
+        )
+      )
     ].join('\n')
     const link = document.createElement('a')
     link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
@@ -197,7 +219,7 @@ const VehiclePageContent = () => {
 
   const exportPrint = () => {
     const w = window.open('', '_blank')
-    const html = `<html><body><table><thead><tr><th>S.No</th><th>Vehicle Name</th><th>Description</th><th>Status</th></tr></thead><tbody>${rows.map(r => `<tr><td>${r.sno}</td><td>${r.vehicle_name}</td><td>${r.description || ''}</td><td>${r.status}</td></tr>`).join('')}</tbody></table></body></html>`
+    const html = `<html><body><table><thead><tr><th>S.No</th><th>Vehicle Name</th><th>Description</th><th>Status</th></tr></thead><tbody>${rows.map(r => `<tr><td>${r.sno}</td><td>${r.vehicle_name || r.name}</td><td>${r.description || ''}</td><td>${r.is_active === 1 ? 'Active' : 'Inactive'}</td></tr>`).join('')}</tbody></table></body></html>`
     w.document.write(html)
     w.document.close()
     w.print()
@@ -232,17 +254,18 @@ const VehiclePageContent = () => {
           </Box>
         )
       }),
-      columnHelper.accessor('vehicle_name', { header: 'Vehicle Name' }),
+      columnHelper.accessor('vehicle_name', {
+        header: 'Vehicle Name',
+        cell: info => info.getValue() || info.row.original.name || '-'
+      }),
       columnHelper.accessor('description', { header: 'Description' }),
-      columnHelper.accessor('status', {
+      columnHelper.accessor('is_active', {
         header: 'Status',
-        cell: info => (
-          <Chip
-            label={info.getValue() || 'Active'}
-            size='small'
-            color={info.getValue() === 'Active' ? 'success' : 'error'}
-          />
-        )
+        cell: info => {
+          const val = info.getValue()
+          const isActive = val === 1 || val === true || val === '1'
+          return <Chip label={isActive ? 'Active' : 'Inactive'} size='small' color={isActive ? 'success' : 'error'} />
+        }
       })
     ],
     [canAccess]
@@ -333,9 +356,7 @@ const VehiclePageContent = () => {
                 {table.getHeaderGroups().map(hg => (
                   <tr key={hg.id}>
                     {hg.headers.map(h => (
-                      <th key={h.id}>
-                        {flexRender(h.column.columnDef.header, h.getContext())}
-                      </th>
+                      <th key={h.id}>{flexRender(h.column.columnDef.header, h.getContext())}</th>
                     ))}
                   </tr>
                 ))}
@@ -357,9 +378,7 @@ const VehiclePageContent = () => {
                   table.getRowModel().rows.map(row => (
                     <tr key={row.id}>
                       {row.getVisibleCells().map(cell => (
-                        <td key={cell.id}>
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </td>
+                        <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
                       ))}
                     </tr>
                   ))
@@ -368,17 +387,13 @@ const VehiclePageContent = () => {
             </table>
           </StickyTableWrapper>
 
-          <TablePaginationComponent
-            totalCount={rowCount}
-            pagination={pagination}
-            setPagination={setPagination}
-          />
+          <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
         </Box>
       </Card>
 
       {/* DRAWER */}
       <Drawer anchor='right' open={drawerOpen} onClose={() => !submitLoading && setDrawerOpen(false)}>
-        <Box p={4} width={400} position='relative'>
+        <Box p={4} width={420} position='relative'>
           <IconButton
             size='small'
             onClick={() => setDrawerOpen(false)}
@@ -388,7 +403,7 @@ const VehiclePageContent = () => {
             <i className='tabler-x' />
           </IconButton>
 
-          <Typography variant='h5' mb={3}>
+          <Typography variant='h5' mb={3} sx={{ fontWeight: 600 }}>
             {isEdit ? 'Edit Vehicle' : 'Add Vehicle'}
           </Typography>
 
@@ -396,11 +411,13 @@ const VehiclePageContent = () => {
             <CustomTextField
               fullWidth
               label='Vehicle Name'
+              placeholder='Enter vehicle name'
               value={formData.vehicle_name}
               inputRef={nameRef}
               onChange={e => setFormData({ ...formData, vehicle_name: e.target.value })}
               required
               disabled={submitLoading}
+              sx={{ mb: 4 }}
             />
 
             <CustomTextField
@@ -408,41 +425,34 @@ const VehiclePageContent = () => {
               multiline
               rows={3}
               label='Description'
+              placeholder='Enter description'
               value={formData.description}
               onChange={e => setFormData({ ...formData, description: e.target.value })}
-              sx={{ mt: 3 }}
+              sx={{ mb: 4 }}
               disabled={submitLoading}
             />
 
-            <CustomTextField
-              select
-              fullWidth
-              label='Status'
-              value={formData.status}
-              onChange={e => setFormData({ ...formData, status: e.target.value })}
-              sx={{ mt: 3 }}
-              disabled={submitLoading}
-            >
-              <MenuItem value='Active'>Active</MenuItem>
-              <MenuItem value='Inactive'>Inactive</MenuItem>
-            </CustomTextField>
+            {isEdit && (
+              <CustomTextField
+                select
+                fullWidth
+                label='Status'
+                value={formData.is_active}
+                onChange={e => setFormData({ ...formData, is_active: Number(e.target.value) })}
+                sx={{ mb: 4 }}
+                disabled={submitLoading}
+              >
+                <MenuItem value={1}>Active</MenuItem>
+                <MenuItem value={0}>Inactive</MenuItem>
+              </CustomTextField>
+            )}
 
             <Box mt={4} display='flex' gap={2}>
-              <GlobalButton 
-                fullWidth 
-                color='secondary' 
-                onClick={() => setDrawerOpen(false)}
-                disabled={submitLoading}
-              >
+              <GlobalButton fullWidth color='secondary' onClick={() => setDrawerOpen(false)} disabled={submitLoading}>
                 Cancel
               </GlobalButton>
-              <GlobalButton 
-                type='submit' 
-                fullWidth 
-                variant='contained'
-                disabled={submitLoading}
-              >
-                {submitLoading ? 'Saving...' : 'Save'}
+              <GlobalButton type='submit' fullWidth variant='contained' disabled={submitLoading}>
+                {submitLoading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
               </GlobalButton>
             </Box>
           </form>
@@ -450,34 +460,26 @@ const VehiclePageContent = () => {
       </Drawer>
 
       {/* DELETE DIALOG */}
-      <Dialog 
-        open={deleteDialog.open} 
-        onClose={() => !deleteLoading && setDeleteDialog({ open: false, row: null })}
-      >
+      <Dialog open={deleteDialog.open} onClose={() => !deleteLoading && setDeleteDialog({ open: false, row: null })}>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <WarningAmberIcon color='warning' />
           Confirm Delete
         </DialogTitle>
         <DialogContent>
           <Typography>
-            Are you sure you want to delete <strong>{deleteDialog.row?.vehicle_name}</strong>? 
+            Are you sure you want to delete <strong>{deleteDialog.row?.vehicle_name || deleteDialog.row?.name}</strong>?
             This action cannot be undone.
           </Typography>
         </DialogContent>
         <DialogActions sx={{ pb: 3, px: 3 }}>
-          <GlobalButton 
+          <GlobalButton
             onClick={() => setDeleteDialog({ open: false, row: null })}
             color='secondary'
             disabled={deleteLoading}
           >
             Cancel
           </GlobalButton>
-          <GlobalButton 
-            color='error' 
-            variant='contained'
-            onClick={confirmDelete}
-            disabled={deleteLoading}
-          >
+          <GlobalButton color='error' variant='contained' onClick={confirmDelete} disabled={deleteLoading}>
             {deleteLoading ? 'Deleting...' : 'Delete'}
           </GlobalButton>
         </DialogActions>

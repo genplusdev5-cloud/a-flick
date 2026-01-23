@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import { useParams } from 'next/navigation'
 import { useTheme } from '@mui/material/styles'
 import PerfectScrollbar from 'react-perfect-scrollbar'
@@ -89,6 +90,23 @@ const PestIcon = (
   </svg>
 )
 
+// ✅ Safe section header - Moved outside to prevent remounts
+const SectionHeader = ({ label }) => (
+  <MenuItem
+    disabled
+    className='uppercase tracking-wider'
+    style={{
+      fontSize: '11px',
+      fontWeight: 600,
+      letterSpacing: '0.05em',
+      opacity: 0.7,
+      cursor: 'default'
+    }}
+  >
+    {label}
+  </MenuItem>
+)
+
 const VerticalMenu = ({ scrollMenu }) => {
   const theme = useTheme()
   const verticalNavOptions = useVerticalNav()
@@ -98,44 +116,12 @@ const VerticalMenu = ({ scrollMenu }) => {
   const { lang: locale } = params
   const ScrollWrapper = isBreakpointReached ? 'div' : PerfectScrollbar
 
-  // ✅ Safe section header
-  const SectionHeader = ({ label }) => (
-    <MenuItem
-      disabled
-      className='uppercase tracking-wider'
-      style={{
-        fontSize: '11px',
-        fontWeight: 600,
-        letterSpacing: '0.05em',
-        opacity: 0.7,
-        cursor: 'default'
-      }}
-    >
-      {label}
-    </MenuItem>
-  )
-
   const showHeadings = !isCollapsed || isHovered
 
-  return (
-    <ScrollWrapper
-      {...(isBreakpointReached
-        ? {
-            className: 'bs-full overflow-y-auto overflow-x-hidden'
-            // onScroll: container => scrollMenu(container, false)
-          }
-        : {
-            options: { wheelPropagation: false, suppressScrollX: true }
-            // onScrollY: container => scrollMenu(container, true)
-          })}
-    >
-      <Menu
-        popoutMenuOffset={{ mainAxis: 23 }}
-        menuItemStyles={menuItemStyles(verticalNavOptions, theme)}
-        renderExpandIcon={({ open }) => <RenderExpandIcon open={open} transitionDuration={transitionDuration} />}
-        renderExpandedMenuItemIcon={{ icon: <i className='tabler-circle text-xs' /> }}
-        menuSectionStyles={menuSectionStyles(verticalNavOptions, theme)}
-      >
+  // ✅ Memoize the ENTIRE menu tree to prevent massive re-renders on every page state change
+  const menuContent = useMemo(
+    () => (
+      <>
         {/* ✅ Dashboard */}
         <PermissionItem module='Dashboard'>
           <MenuItem href={`/${locale}/admin/dashboards`} icon={<i className='tabler-home' />}>
@@ -287,10 +273,6 @@ const VerticalMenu = ({ scrollMenu }) => {
           icon={<i className='tabler-arrows-transfer-down' />}
           modules={TRANSFER_MODULES}
         >
-          {/* <PermissionItem module='Transfer Request'>
-            <MenuItem href={`/${locale}/admin/transfer/transfer-request`}>Transfer Request</MenuItem>
-          </PermissionItem> */}
-
           <PermissionItem module='Material Request'>
             <MenuItem href={`/${locale}/admin/transfer/material-request`}>Material Request</MenuItem>
           </PermissionItem>
@@ -306,13 +288,6 @@ const VerticalMenu = ({ scrollMenu }) => {
 
         {/* ✅ Stock Dropdown */}
         <PermissionSubMenu label='Stock' icon={<i className='tabler-package' />} modules={STOCK_MODULES}>
-          {/* <PermissionItem module='Stock Report'>
-            <MenuItem href={`/${locale}/admin/stock/report`}>Stock Report</MenuItem>
-          </PermissionItem> */}
-          {/* <PermissionItem module='Usage Report'>
-            <MenuItem href={`/${locale}/admin/stock/usage-report`}>Usage Report</MenuItem>
-          </PermissionItem> */}
-
           <PermissionItem module='Stock Summary'>
             <MenuItem href={`/${locale}/admin/stock/stock-summary`}>Stock Summary</MenuItem>
           </PermissionItem>
@@ -451,6 +426,29 @@ const VerticalMenu = ({ scrollMenu }) => {
             Contracts Audit
           </MenuItem>
         </PermissionItem>
+      </>
+    ),
+    [locale, showHeadings]
+  )
+
+  return (
+    <ScrollWrapper
+      {...(isBreakpointReached
+        ? {
+            className: 'bs-full overflow-y-auto overflow-x-hidden'
+          }
+        : {
+            options: { wheelPropagation: false, suppressScrollX: true }
+          })}
+    >
+      <Menu
+        popoutMenuOffset={{ mainAxis: 23 }}
+        menuItemStyles={menuItemStyles(verticalNavOptions, theme)}
+        renderExpandIcon={({ open }) => <RenderExpandIcon open={open} transitionDuration={transitionDuration} />}
+        renderExpandedMenuItemIcon={{ icon: <i className='tabler-circle text-xs' /> }}
+        menuSectionStyles={menuSectionStyles(verticalNavOptions, theme)}
+      >
+        {menuContent}
       </Menu>
     </ScrollWrapper>
   )

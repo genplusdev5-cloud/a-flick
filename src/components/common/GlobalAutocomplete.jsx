@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import CustomAutocomplete from '@core/components/mui/Autocomplete'
 import CustomTextField from '@core/components/mui/TextField'
 
@@ -17,45 +18,58 @@ const GlobalAutocomplete = ({
   ...props
 }) => {
   // ⭐ Normalize all options to { label, value }
-  const normalizedOptions = options.map((opt, i) => {
-    if (typeof opt === 'string') {
-      return {
-        label: opt,
-        value: opt,
-        _key: `${opt}-${i}`
-      }
-    }
+  const normalizedOptions = useMemo(
+    () =>
+      options.map((opt, i) => {
+        if (typeof opt === 'string') {
+          return {
+            label: opt,
+            value: opt,
+            _key: `${opt}-${i}`
+          }
+        }
 
-    return {
-      label: opt.label ?? opt.name ?? '',
-      value: opt.value ?? opt.id ?? '',
-      ...opt,
-      _key: `${opt.id ?? opt.value ?? i}-${i}`
-    }
-  })
+        return {
+          label: opt.label ?? opt.name ?? '',
+          value: opt.value ?? opt.id ?? '',
+          ...opt,
+          _key: `${opt.id ?? opt.value ?? i}-${i}`
+        }
+      }),
+    [options]
+  )
 
   // ⭐ Sync string-value selection
-  const normalizedValue =
-    typeof value === 'string' || typeof value === 'number'
-      ? normalizedOptions.find(o => String(o.value) === String(value) || o.label === value) || null
-      : value
+  const normalizedValue = useMemo(
+    () =>
+      typeof value === 'string' || typeof value === 'number'
+        ? normalizedOptions.find(o => String(o.value) === String(value) || o.label === value) || null
+        : value,
+    [value, normalizedOptions]
+  )
 
   // ⭐ Display text
-  const finalGetLabel =
-    getOptionLabel ??
-    (option => {
-      if (!option) return ''
-      return typeof option === 'object' ? option.label || '' : String(option)
-    })
+  const finalGetLabel = useMemo(
+    () =>
+      getOptionLabel ??
+      (option => {
+        if (!option) return ''
+        return typeof option === 'object' ? option.label || '' : String(option)
+      }),
+    [getOptionLabel]
+  )
 
   // ⭐ Equality check (for highlighting selected option)
-  const finalIsEqual =
-    isOptionEqualToValue ??
-    ((a, b) => {
-      if (!a || !b) return false
-      if (typeof a === 'object' && typeof b === 'object') return String(a.value) === String(b.value)
-      return a === b
-    })
+  const finalIsEqual = useMemo(
+    () =>
+      isOptionEqualToValue ??
+      ((a, b) => {
+        if (!a || !b) return false
+        if (typeof a === 'object' && typeof b === 'object') return String(a.value) === String(b.value)
+        return a === b
+      }),
+    [isOptionEqualToValue]
+  )
 
   return (
     <CustomAutocomplete
