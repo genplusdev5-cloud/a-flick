@@ -65,67 +65,69 @@ const EditPurchaseReturnPage = () => {
   const [purchaseInwardOptions, setPurchaseInwardOptions] = useState([])
   const [chemicalOptions, setChemicalOptions] = useState([])
   const [uomOptions, setUomOptions] = useState([])
- 
+  const [vehicleOptions, setVehicleOptions] = useState([])
+
   // Loading states
   const [initLoading, setInitLoading] = useState(false)
   const [saveLoading, setSaveLoading] = useState(false)
- 
+
   // Header fields
   const [origin, setOrigin] = useState(null)
   const [returnDate, setReturnDate] = useState(new Date())
- 
+
   const [supplier, setSupplier] = useState(null)
   const [purchaseInward, setPurchaseInward] = useState(null)
+  const [vehicle, setVehicle] = useState(null)
   const [remarks, setRemarks] = useState('')
   const [details, setDetails] = useState({})
- 
+
   // Item entry fields
   const [chemical, setChemical] = useState(null)
   const [uom, setUom] = useState(null)
   const [quantity, setQuantity] = useState('')
   const [editId, setEditId] = useState(null)
- 
+
   const [items, setItems] = useState([])
- 
+
   const PoDateInput = forwardRef(function PoDateInput(props, ref) {
     const { label, value, ...rest } = props
- 
+
     return <CustomTextField fullWidth inputRef={ref} label={label} value={value} {...rest} />
   })
- 
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         setInitLoading(true)
- 
+
         const [purchaseRes, materialRes, detailsRes] = await Promise.all([
           getPurchaseFilters(),
           getMaterialRequestDropdowns(),
           getPurchaseReturnDetails({ id: decodedId, type })
         ])
- 
+
         // Dropdowns
         const purchaseData = purchaseRes?.data?.data || {}
- 
+
         const origins =
           purchaseData?.company?.name?.map(item => ({
             label: item.name,
             value: item.name,
             id: item.id
           })) || []
- 
+
         const suppliers =
           purchaseData?.supplier?.name?.map(item => ({
             label: item.name,
             value: item.name,
             id: item.id
           })) || []
- 
+
         setOriginOptions(origins)
         setSupplierOptions(suppliers)
- 
+
         const materialData = materialRes?.data || materialRes
- 
+
         setChemicalOptions(
           materialData?.chemicals?.name?.map(c => ({
             label: c.name,
@@ -133,7 +135,7 @@ const EditPurchaseReturnPage = () => {
             id: c.id
           })) || []
         )
- 
+
         setUomOptions(
           materialData?.uom?.name?.map(u => ({
             label: u.name,
@@ -141,7 +143,16 @@ const EditPurchaseReturnPage = () => {
             id: u.id
           })) || []
         )
- 
+
+        const vehicles =
+          materialData?.employee?.name?.map(e => ({
+            label: e.name,
+            value: e.id,
+            id: e.id
+          })) || []
+
+        setVehicleOptions(vehicles)
+
         // 🔥 Purchase Inward Details
         let details = {}
         if (detailsRes?.return_items || detailsRes?.items) {
@@ -152,26 +163,37 @@ const EditPurchaseReturnPage = () => {
           details = detailsRes?.data?.data || detailsRes?.data || detailsRes || {}
         }
         setDetails(details)
- 
-        setReturnDate(details.pr_date || details.return_date ? parseISO(details.pr_date || details.return_date) : new Date())
- 
+
+        setReturnDate(
+          details.pr_date || details.return_date ? parseISO(details.pr_date || details.return_date) : new Date()
+        )
+
         setRemarks(details.remarks || '')
- 
+
         if (details.company_id) {
           const o = origins.find(x => x.id == details.company_id)
           if (o) setOrigin(o)
         }
- 
+
         if (details.supplier_id) {
           const s = suppliers.find(x => x.id == details.supplier_id)
           if (s) setSupplier(s)
         }
- 
+
         if (details.pi_id || details.po_id) {
           setPurchaseInward({
             label: String(details.num_series || details.pi_number || details.po_number || 'Loading...'),
             id: details.pi_id || details.po_id
           })
+        }
+
+        if (details.vehicle_id) {
+          setVehicle(
+            vehicles.find(x => x.id == details.vehicle_id) || {
+              label: details.vehicle_name || 'Vehicle',
+              id: details.vehicle_id
+            }
+          )
         }
 
         // 🔥 Inward items
@@ -207,18 +229,18 @@ const EditPurchaseReturnPage = () => {
         try {
           const res = await getPurchaseFilters({ supplier_id: supplier.id })
           const purchaseData = res?.data?.data || res?.data || {}
- 
+
           // Update: Map pi_number for options
           const rawPIs = purchaseData?.pi_number?.pi_number || []
- 
+
           const pis = rawPIs.map(item => ({
             label: String(item.pi_number || item.name || 'Unknown'),
             value: item.id,
             id: item.id
           }))
- 
+
           setPurchaseInwardOptions(pis)
- 
+
           // Sync the selected PI label if we had a skeleton
           if (purchaseInward?.id) {
             const matchingPI = pis.find(p => p.id === purchaseInward.id)
@@ -233,7 +255,7 @@ const EditPurchaseReturnPage = () => {
         if (!initLoading) setPurchaseInward(null)
       }
     }
- 
+
     if (supplier && !initLoading) {
       fetchPIs()
     }
@@ -308,6 +330,7 @@ const EditPurchaseReturnPage = () => {
         po_id: purchaseInward?.id || null, // Keeping po_id for compatibility or update
         purchase_order_id: items[0]?.poId || purchaseInward?.id || null,
         pi_id: purchaseInward?.id || null, // Explicit PI ID
+        vehicle_id: vehicle?.id || null,
         remarks,
         return_items_input: items.map(item => ({
           id: String(item.id).length > 10 ? null : item.id,
@@ -323,7 +346,7 @@ const EditPurchaseReturnPage = () => {
           is_active: 1
         }))
       }
- 
+
       await updatePurchaseReturn({ id: decodedId, payload })
 
       showToast('success', 'Purchase Return updated successfully')
@@ -377,10 +400,7 @@ const EditPurchaseReturnPage = () => {
           )}
 
           <Grid container spacing={3}>
-            <Grid item xs={12} md={4}>
-              <GlobalAutocomplete label='Origin' options={originOptions} value={origin} onChange={setOrigin} />
-            </Grid>
-
+            {/* 🔹 ROW 1 – Return Date + Origin */}
             <Grid item xs={12} md={4}>
               <AppReactDatepicker
                 selected={returnDate}
@@ -392,11 +412,19 @@ const EditPurchaseReturnPage = () => {
             </Grid>
 
             <Grid item xs={12} md={4}>
+              <GlobalAutocomplete label='Origin' options={originOptions} value={origin} onChange={setOrigin} />
+            </Grid>
+
+            {/* spacer to maintain grid */}
+            <Grid item xs={12} md={4} />
+
+            {/* 🔹 ROW 2 – Supplier + PI + Vehicle */}
+            <Grid item xs={12} md={4}>
               <GlobalTextField
                 label='Supplier'
                 value={supplier?.label || ''}
-                readOnly
                 fullWidth
+                InputProps={{ readOnly: true }}
               />
             </Grid>
 
@@ -409,6 +437,16 @@ const EditPurchaseReturnPage = () => {
               />
             </Grid>
 
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete
+                label='Vehicle/Warehouse'
+                options={vehicleOptions}
+                value={vehicle}
+                onChange={setVehicle}
+              />
+            </Grid>
+
+            {/* 🔹 Remarks – full width */}
             <Grid item xs={12}>
               <GlobalTextField
                 label='Remarks'
@@ -467,8 +505,12 @@ const EditPurchaseReturnPage = () => {
                     Action
                   </th>
                   <th style={{ width: '50%' }}>Chemical</th>
-                  <th align='left' style={{ width: '15%', textAlign: 'left' }}>UOM</th>
-                  <th align='left' style={{ width: '15%', textAlign: 'left' }}>Quantity</th>
+                  <th align='left' style={{ width: '15%', textAlign: 'left' }}>
+                    UOM
+                  </th>
+                  <th align='left' style={{ width: '15%', textAlign: 'left' }}>
+                    Quantity
+                  </th>
                 </tr>
               </thead>
 
@@ -486,8 +528,12 @@ const EditPurchaseReturnPage = () => {
                         </IconButton>
                       </td>
                       <td>{row.chemical}</td>
-                      <td align='left' style={{ textAlign: 'left' }}>{row.uom}</td>
-                      <td align='left' style={{ textAlign: 'left' }}>{row.quantity}</td>
+                      <td align='left' style={{ textAlign: 'left' }}>
+                        {row.uom}
+                      </td>
+                      <td align='left' style={{ textAlign: 'left' }}>
+                        {row.quantity}
+                      </td>
                     </tr>
                   ))
                 ) : (

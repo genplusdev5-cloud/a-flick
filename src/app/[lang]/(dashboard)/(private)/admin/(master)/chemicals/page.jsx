@@ -123,7 +123,9 @@ const ChemicalsPageContent = () => {
     defaultValues: {
       name: '',
       unit: '',
-      dosage: '',
+      store_unit: '',
+      unit_rate: '',
+      conversion_value: '',
       ingredients: '',
       status: 1
     }
@@ -145,7 +147,9 @@ const ChemicalsPageContent = () => {
         reset({
           name: '',
           unit: '',
-          dosage: '',
+          store_unit: '',
+          unit_rate: '',
+          conversion_value: '',
           ingredients: '',
           status: 1
         })
@@ -191,7 +195,8 @@ const ChemicalsPageContent = () => {
           name: item.name || '-',
           unit: item.uom || '-',
           unit_id: item.uom_id || item.uom,
-          store_unit: item.store_unit || '-',
+          store_unit: item.store_uom || '-',
+          store_unit_id: item.store_uom_id || item.store_uom,
           conversion_value: item.conversion_value || '-',
           unit_rate: item.unit_rate || '-',
           file: item.file_name || '-',
@@ -239,7 +244,9 @@ const ChemicalsPageContent = () => {
       reset({
         name: '',
         unit: '',
-        dosage: '',
+        store_unit: '',
+        unit_rate: '',
+        conversion_value: '',
         ingredients: '',
         status: 1
       })
@@ -259,8 +266,10 @@ const ChemicalsPageContent = () => {
         const data = result.data
         reset({
           name: data.name || '',
-          unit: data.uom_id || '',
-          dosage: String(data.unit_value || ''),
+          unit: data.uom_id || data.uom || '',
+          store_unit: data.store_uom_id || data.store_uom || '',
+          unit_rate: String(data.unit_rate || ''),
+          conversion_value: String(data.conversion_value || ''),
           ingredients: data.description || '',
           status: data.is_active ?? 1
         })
@@ -269,8 +278,10 @@ const ChemicalsPageContent = () => {
         // Fallback to row data
         reset({
           name: row.name !== '-' ? row.name : '',
-          unit: row.unit_id || '',
-          dosage: row.dosage !== '-' ? String(row.dosage) : '',
+          unit: row.unit_id || row.unit || '',
+          store_unit: row.store_unit_id || row.store_unit || '',
+          unit_rate: row.unit_rate !== '-' ? String(row.unit_rate) : '',
+          conversion_value: row.conversion_value !== '-' ? String(row.conversion_value) : '',
           ingredients: row.ingredients !== '-' ? row.ingredients : '',
           status: row.is_active
         })
@@ -315,7 +326,9 @@ const ChemicalsPageContent = () => {
         name: data.name,
         description: data.ingredients,
         uom: data.unit,
-        unit_value: data.dosage,
+        store_uom: data.store_unit,
+        unit_rate: data.unit_rate,
+        conversion_value: data.conversion_value,
         is_active: data.status,
         status: 1
       }
@@ -420,7 +433,12 @@ const ChemicalsPageContent = () => {
         }
       }),
       columnHelper.accessor('store_unit', {
-        header: 'Store Unit'
+        header: 'Store Unit',
+        cell: info => {
+          const val = info.getValue()
+          const matched = uoms.find(u => String(u.id) === String(val) || u.name === val)
+          return matched?.name || val || '-'
+        }
       }),
 
       columnHelper.accessor('conversion_value', {
@@ -428,7 +446,8 @@ const ChemicalsPageContent = () => {
       }),
 
       columnHelper.accessor('unit_rate', {
-        header: 'Unit Rate'
+        header: () => <div style={{ textAlign: 'right', width: '100%' }}>Unit Rate</div>,
+        cell: info => <div style={{ textAlign: 'right' }}>{info.getValue() || '-'}</div>
       }),
 
       columnHelper.accessor('file', {
@@ -775,52 +794,80 @@ const ChemicalsPageContent = () => {
                   name='unit'
                   control={control}
                   shouldUnregister={false}
-                  render={({ field }) => {
-                    // 🔥 Convert ID → normalized object expected by GlobalAutocomplete
-                    const selectedUnit =
-                      Array.isArray(uoms) && field.value ? uoms.find(u => String(u.id) === String(field.value)) : null
-
-                    return (
-                      <GlobalAutocomplete
-                        label='Unit'
-                        options={uoms}
-                        value={
-                          selectedUnit
-                            ? {
-                                ...selectedUnit,
-                                label: selectedUnit.name,
-                                value: selectedUnit.id
-                              }
-                            : null
-                        }
-                        onChange={val => field.onChange(val?.value ? String(val.value) : '')}
-                        disableClearable
-                        onBlur={field.onBlur}
-                        error={!!errors.unit}
-                        helperText={errors.unit?.message}
-                        fullWidth
-                      />
-                    )
-                  }}
+                  render={({ field }) => (
+                    <GlobalAutocomplete
+                      {...field}
+                      label='Unit'
+                      options={uoms}
+                      value={field.value}
+                      onChange={val => field.onChange(val?.value ? String(val.value) : '')}
+                      disableClearable
+                      onBlur={field.onBlur}
+                      error={!!errors.unit}
+                      helperText={errors.unit?.message}
+                      fullWidth
+                    />
+                  )}
                 />
               </Grid>
 
-              {/* Dosage */}
+              {/* Store Unit */}
               <Grid item xs={12}>
                 <Controller
-                  name='dosage'
+                  name='store_unit'
+                  control={control}
+                  shouldUnregister={false}
+                  render={({ field }) => (
+                    <GlobalAutocomplete
+                      {...field}
+                      label='Store Unit'
+                      options={uoms}
+                      value={field.value}
+                      onChange={val => field.onChange(val?.value ? String(val.value) : '')}
+                      onBlur={field.onBlur}
+                      error={!!errors.store_unit}
+                      helperText={errors.store_unit?.message}
+                      fullWidth
+                    />
+                  )}
+                />
+              </Grid>
+
+              {/* Unit Rate */}
+              <Grid item xs={12}>
+                <Controller
+                  name='unit_rate'
+                  control={control}
+                  render={({ field }) => (
+                    <GlobalTextField
+                      {...field}
+                      label='Unit Rate'
+                      type='number'
+                      fullWidth
+                      placeholder='Enter Unit Rate'
+                      error={!!errors.unit_rate}
+                      helperText={errors.unit_rate?.message}
+                    />
+                  )}
+                />
+              </Grid>
+
+              {/* Conversion */}
+              <Grid item xs={12}>
+                <Controller
+                  name='conversion_value'
                   control={control}
                   render={({ field }) => (
                     <GlobalTextField
                       {...field}
                       value={field.value ?? ''}
-                      onChange={e => field.onChange(String(e.target.value).replace(/\D/g, ''))}
-                      label='Dosage'
+                      onChange={e => field.onChange(String(e.target.value).replace(/[^\d.]/g, ''))}
+                      label='Conversion'
                       fullWidth
                       required
-                      placeholder='Enter The Dosage'
-                      error={!!errors.dosage}
-                      helperText={errors.dosage?.message}
+                      placeholder='Enter Conversion Value'
+                      error={!!errors.conversion_value}
+                      helperText={errors.conversion_value?.message}
                       sx={{
                         '& .MuiFormLabel-asterisk': {
                           color: '#e91e63 !important',

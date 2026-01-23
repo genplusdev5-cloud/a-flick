@@ -51,6 +51,7 @@ const AddPurchaseInwardPage = () => {
   const [supplierOptions, setSupplierOptions] = useState([])
   const [chemicalOptions, setChemicalOptions] = useState([])
   const [uomOptions, setUomOptions] = useState([])
+  const [vehicleOptions, setVehicleOptions] = useState([])
 
   const [purchaseOrderOptions, setPurchaseOrderOptions] = useState([])
   const [purchaseOrder, setPurchaseOrder] = useState(null)
@@ -63,6 +64,7 @@ const AddPurchaseInwardPage = () => {
   const [origin, setOrigin] = useState(null)
   const [poDate, setPoDate] = useState(new Date())
   const [supplier, setSupplier] = useState(null)
+  const [vehicle, setVehicle] = useState(null)
   const [remarks, setRemarks] = useState('')
 
   // Item fields
@@ -132,11 +134,19 @@ const AddPurchaseInwardPage = () => {
             id: u.id
           })) || []
 
+        const vehicles =
+          materialData?.employee?.name?.map(e => ({
+            label: e.name,
+            value: e.id,
+            id: e.id
+          })) || []
+
         setOriginOptions(origins)
         setSupplierOptions(suppliers)
         setPurchaseOrderOptions(purchaseOrders)
         setChemicalOptions(chemicals)
         setUomOptions(uoms)
+        setVehicleOptions(vehicles)
 
         if (origins.length > 0) {
           setOrigin(origins[0])
@@ -350,6 +360,7 @@ const AddPurchaseInwardPage = () => {
         inward_date: format(poDate, 'yyyy-MM-dd'),
         supplier_id: supplier.id,
         po_id: purchaseOrder?.id || null,
+        vehicle_id: vehicle?.id || null,
         remarks,
         inward_items: items.map(item => ({
           company_id: origin.id,
@@ -433,45 +444,75 @@ const AddPurchaseInwardPage = () => {
           )}
 
           <Grid container spacing={3}>
-            <Grid item xs={12} md={3}>
-              <GlobalAutocomplete label='Origin' options={originOptions} value={origin} onChange={setOrigin} />
-            </Grid>
+  {/* 🔹 ROW 1 – Date + Origin */}
+  <Grid item xs={12} md={4}>
+    <AppReactDatepicker
+      selected={poDate}
+      onChange={date => setPoDate(date)}
+      dateFormat='dd/MM/yyyy'
+      customInput={
+        <PoDateInput
+          label='Inward Date'
+          value={poDate ? format(poDate, 'dd/MM/yyyy') : ''}
+        />
+      }
+    />
+  </Grid>
 
-            <Grid item xs={12} md={3}>
-              <AppReactDatepicker
-                selected={poDate}
-                onChange={date => setPoDate(date)}
-                dateFormat='dd/MM/yyyy'
-                customInput={<PoDateInput label='Inward Date' value={poDate ? format(poDate, 'dd/MM/yyyy') : ''} />}
-              />
-            </Grid>
+  <Grid item xs={12} md={4}>
+    <GlobalAutocomplete
+      label='Origin'
+      options={originOptions}
+      value={origin}
+      onChange={setOrigin}
+    />
+  </Grid>
 
-            <Grid item xs={12} md={3}>
-              <GlobalAutocomplete label='Suppliers' options={supplierOptions} value={supplier} onChange={setSupplier} />
-            </Grid>
+  {/* Empty spacer to keep layout clean */}
+  <Grid item xs={12} md={4} />
 
-            {/* ✅ NEW – Purchase Order */}
-            <Grid item xs={12} md={3}>
-              <GlobalAutocomplete
-                label='Purchase Order'
-                options={purchaseOrderOptions}
-                value={purchaseOrder}
-                onChange={setPurchaseOrder}
-                placeholder='Select PO'
-              />
-            </Grid>
+  {/* 🔹 ROW 2 – Supplier + PO + Vehicle */}
+  <Grid item xs={12} md={4}>
+    <GlobalAutocomplete
+      label='Suppliers'
+      options={supplierOptions}
+      value={supplier}
+      onChange={setSupplier}
+    />
+  </Grid>
 
+  <Grid item xs={12} md={4}>
+    <GlobalAutocomplete
+      label='Purchase Order'
+      options={purchaseOrderOptions}
+      value={purchaseOrder}
+      onChange={setPurchaseOrder}
+      placeholder='Select PO'
+    />
+  </Grid>
 
-            <Grid item xs={12}>
-              <GlobalTextField
-                label='Remarks'
-                multiline
-                minRows={3}
-                value={remarks}
-                onChange={e => setRemarks(e.target.value)}
-              />
-            </Grid>
-          </Grid>
+  <Grid item xs={12} md={4}>
+    <GlobalAutocomplete
+      label='Vehicle/Warehouse'
+      options={vehicleOptions}
+      value={vehicle}
+      onChange={setVehicle}
+      placeholder='Select Vehicle/Warehouse'
+    />
+  </Grid>
+
+  {/* 🔹 Remarks – full width */}
+  <Grid item xs={12}>
+    <GlobalTextField
+      label='Remarks'
+      multiline
+      minRows={3}
+      value={remarks}
+      onChange={e => setRemarks(e.target.value)}
+    />
+  </Grid>
+</Grid>
+
         </Box>
 
         <Divider />
@@ -481,7 +522,12 @@ const AddPurchaseInwardPage = () => {
           <Grid container spacing={3}>
             {/* Row 1 */}
             <Grid item xs={12} md={3}>
-              <GlobalAutocomplete label='Chemicals' options={chemicalOptions} value={chemical} onChange={handleChemicalChange} />
+              <GlobalAutocomplete
+                label='Chemicals'
+                options={chemicalOptions}
+                value={chemical}
+                onChange={handleChemicalChange}
+              />
             </Grid>
 
             <Grid item xs={12} md={2}>
@@ -518,45 +564,39 @@ const AddPurchaseInwardPage = () => {
               <GlobalTextField label='Quantity' type='number' value={quantity} disabled />
             </Grid>
 
-           {/* Row 2 */}
-<Grid item xs={12} md={3}>
-  <GlobalTextField
-    label='Additional'
-    type='number'
-    value={additional}
-    onChange={e => setAdditional(e.target.value)}
-  />
-</Grid>
+            {/* Row 2 */}
+            <Grid item xs={12} md={3}>
+              <GlobalTextField
+                label='Additional'
+                type='number'
+                value={additional}
+                onChange={e => setAdditional(e.target.value)}
+              />
+            </Grid>
 
-<Grid item xs={12} md={3}>
-  <GlobalTextField
-    label='Total Qty'
-    type='number'
-    value={total_quantity}
-    disabled
-  />
-</Grid>
+            <Grid item xs={12} md={3}>
+              <GlobalTextField label='Total Qty' type='number' value={total_quantity} disabled />
+            </Grid>
 
-<Grid
-  item
-  xs={12}
-  md={3}
-  sx={{
-    display: 'flex',
-    alignItems: 'flex-end' // 🔥 key for vertical alignment
-  }}
->
-  <GlobalButton
-    fullWidth
-    variant='contained'
-    color={editId ? 'info' : 'primary'}
-    startIcon={editId ? <EditIcon /> : <AddIcon />}
-    onClick={handleAddItem}
-  >
-    {editId ? 'Update' : 'Add'}
-  </GlobalButton>
-</Grid>
-
+            <Grid
+              item
+              xs={12}
+              md={3}
+              sx={{
+                display: 'flex',
+                alignItems: 'flex-end' // 🔥 key for vertical alignment
+              }}
+            >
+              <GlobalButton
+                fullWidth
+                variant='contained'
+                color={editId ? 'info' : 'primary'}
+                startIcon={editId ? <EditIcon /> : <AddIcon />}
+                onClick={handleAddItem}
+              >
+                {editId ? 'Update' : 'Add'}
+              </GlobalButton>
+            </Grid>
           </Grid>
         </Box>
 
@@ -576,7 +616,7 @@ const AddPurchaseInwardPage = () => {
                     IN QTY
                   </th>
                   <th align='left' style={{ width: '10%', textAlign: 'left' }}>
-                    CONV.
+                    CONVERSION
                   </th>
                   <th align='left' style={{ width: '10%', textAlign: 'left' }}>
                     QTY
@@ -635,8 +675,6 @@ const AddPurchaseInwardPage = () => {
         </Box>
 
         <Divider />
-
-
 
         <Divider />
 

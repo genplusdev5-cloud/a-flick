@@ -51,6 +51,7 @@ const AddPurchaseReturnPage = () => {
   const [supplierOptions, setSupplierOptions] = useState([])
   const [chemicalOptions, setChemicalOptions] = useState([])
   const [uomOptions, setUomOptions] = useState([])
+  const [vehicleOptions, setVehicleOptions] = useState([])
 
   const [purchaseInwardOptions, setPurchaseInwardOptions] = useState([])
   const [purchaseInward, setPurchaseInward] = useState(null)
@@ -64,6 +65,7 @@ const AddPurchaseReturnPage = () => {
   const [returnDate, setReturnDate] = useState(new Date())
 
   const [supplier, setSupplier] = useState(null)
+  const [vehicle, setVehicle] = useState(null)
   const [remarks, setRemarks] = useState('')
 
   // Item fields
@@ -125,6 +127,15 @@ const AddPurchaseReturnPage = () => {
         setSupplierOptions(suppliers)
         setChemicalOptions(chemicals)
         setUomOptions(uoms)
+
+        const vehicles =
+          materialData?.employee?.name?.map(e => ({
+            label: e.name,
+            value: e.id,
+            id: e.id
+          })) || []
+
+        setVehicleOptions(vehicles)
 
         if (origins.length > 0) {
           setOrigin(origins[0])
@@ -296,6 +307,7 @@ const AddPurchaseReturnPage = () => {
         po_id: purchaseInward?.id || null, // Keeping po_id key but sending PI ID if backend treats it generically, or relying on item level po_id
         purchase_order_id: items[0]?.po_id || null, // Try to find linked PO ID from items
         pi_id: purchaseInward?.id || null, // Explicit PI ID
+        vehicle_id: vehicle?.id || null,
         remarks,
         // Send as return_items_input with robust field mapping
         return_items_input: items.map(item => ({
@@ -379,11 +391,8 @@ const AddPurchaseReturnPage = () => {
           )}
 
           <Grid container spacing={3}>
-            <Grid item xs={12} md={3}>
-              <GlobalAutocomplete label='Origin' options={originOptions} value={origin} onChange={setOrigin} />
-            </Grid>
-
-            <Grid item xs={12} md={3}>
+            {/* 🔹 ROW 1 – Return Date + Origin */}
+            <Grid item xs={12} md={4}>
               <AppReactDatepicker
                 selected={returnDate}
                 onChange={date => setReturnDate(date)}
@@ -394,11 +403,19 @@ const AddPurchaseReturnPage = () => {
               />
             </Grid>
 
-            <Grid item xs={12} md={3}>
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete label='Origin' options={originOptions} value={origin} onChange={setOrigin} />
+            </Grid>
+
+            {/* spacer for clean 3-column grid */}
+            <Grid item xs={12} md={4} />
+
+            {/* 🔹 ROW 2 – Supplier + PI + Vehicle */}
+            <Grid item xs={12} md={4}>
               <GlobalAutocomplete label='Suppliers' options={supplierOptions} value={supplier} onChange={setSupplier} />
             </Grid>
 
-            <Grid item xs={12} md={3}>
+            <Grid item xs={12} md={4}>
               <GlobalAutocomplete
                 label='Purchase Inward No'
                 options={purchaseInwardOptions}
@@ -408,6 +425,17 @@ const AddPurchaseReturnPage = () => {
               />
             </Grid>
 
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete
+                label='Vehicle/Warehouse'
+                options={vehicleOptions}
+                value={vehicle}
+                onChange={setVehicle}
+                placeholder='Select Vehicle/Warehouse'
+              />
+            </Grid>
+
+            {/* 🔹 Remarks – full width */}
             <Grid item xs={12}>
               <GlobalTextField
                 label='Remarks'
@@ -467,7 +495,9 @@ const AddPurchaseReturnPage = () => {
                     ACTION
                   </th>
                   <th style={{ width: '50%' }}>CHEMICAL</th>
-                  <th align='left' style={{ width: '15%', textAlign: 'left' }}>UOM</th>
+                  <th align='left' style={{ width: '15%', textAlign: 'left' }}>
+                    UOM
+                  </th>
 
                   <th align='left' style={{ width: '15%', textAlign: 'left' }}>
                     QTY
@@ -491,7 +521,9 @@ const AddPurchaseReturnPage = () => {
                       </td>
 
                       <td>{row.chemical}</td>
-                      <td align='left' style={{ textAlign: 'left' }}>{row.uom}</td>
+                      <td align='left' style={{ textAlign: 'left' }}>
+                        {row.uom}
+                      </td>
 
                       <td align='left' style={{ textAlign: 'left' }}>
                         {row.quantity}

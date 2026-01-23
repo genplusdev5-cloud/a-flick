@@ -66,6 +66,7 @@ const EditPurchaseInwardPage = () => {
   const [purchaseOrderOptions, setPurchaseOrderOptions] = useState([])
   const [chemicalOptions, setChemicalOptions] = useState([])
   const [uomOptions, setUomOptions] = useState([])
+  const [vehicleOptions, setVehicleOptions] = useState([])
 
   // Loading states
   const [initLoading, setInitLoading] = useState(false)
@@ -77,6 +78,7 @@ const EditPurchaseInwardPage = () => {
 
   const [supplier, setSupplier] = useState(null)
   const [purchaseOrder, setPurchaseOrder] = useState(null)
+  const [vehicle, setVehicle] = useState(null)
   const [remarks, setRemarks] = useState('')
 
   // Item entry fields
@@ -161,8 +163,16 @@ const EditPurchaseInwardPage = () => {
             id: u.id
           })) || []
 
+        const vehicles =
+          materialData?.employee?.name?.map(e => ({
+            label: e.name,
+            value: e.id,
+            id: e.id
+          })) || []
+
         setChemicalOptions(chemicals)
         setUomOptions(uoms)
+        setVehicleOptions(vehicles)
 
         // --- DETAILS ---
         let details = {}
@@ -189,6 +199,9 @@ const EditPurchaseInwardPage = () => {
         }
         if (details.po_id) {
           setPurchaseOrder(purchaseOrders.find(x => x.id == details.po_id) || null)
+        }
+        if (details.vehicle_id) {
+          setVehicle(vehicles.find(x => x.id == details.vehicle_id) || null)
         }
 
         // --- ITEMS ---
@@ -387,6 +400,7 @@ const EditPurchaseInwardPage = () => {
           supplier_id: supplier?.id || details.supplier_id,
           pi_id: decodedId || details.id,
           po_id: purchaseOrder?.id || item.po_id || null,
+          vehicle_id: vehicle?.id || null,
           tx_po_id: item.tx_po_id,
           item_id: item.item_id,
           item_name: item.item_name,
@@ -460,10 +474,7 @@ const EditPurchaseInwardPage = () => {
         {/* HEADER FORM */}
         <Box px={4} py={3} position='relative'>
           <Grid container spacing={3}>
-            <Grid item xs={12} md={4}>
-              <GlobalAutocomplete label='Origin' options={originOptions} value={origin} onChange={setOrigin} />
-            </Grid>
-
+            {/* 🔹 ROW 1 – Inward Date + Origin */}
             <Grid item xs={12} md={4}>
               <AppReactDatepicker
                 selected={poDate}
@@ -473,6 +484,14 @@ const EditPurchaseInwardPage = () => {
               />
             </Grid>
 
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete label='Origin' options={originOptions} value={origin} onChange={setOrigin} />
+            </Grid>
+
+            {/* spacer to keep 3-column grid */}
+            <Grid item xs={12} md={4} />
+
+            {/* 🔹 ROW 2 – Supplier + PO + Vehicle */}
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete label='Supplier' options={supplierOptions} value={supplier} onChange={setSupplier} />
             </Grid>
@@ -486,6 +505,16 @@ const EditPurchaseInwardPage = () => {
               />
             </Grid>
 
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete
+                label='Vehicle/Warehouse'
+                options={vehicleOptions}
+                value={vehicle}
+                onChange={setVehicle}
+              />
+            </Grid>
+
+            {/* 🔹 Remarks – full width */}
             <Grid item xs={12}>
               <GlobalTextField
                 label='Remarks'

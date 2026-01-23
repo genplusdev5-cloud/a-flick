@@ -348,16 +348,16 @@ const AddPurchaseOrderPage = () => {
         <Box px={4} py={3} position='relative'>
           <Grid container spacing={3}>
             <Grid item xs={12} md={4}>
-              <GlobalAutocomplete label='Origin' options={originOptions} value={origin} onChange={setOrigin} />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
               <AppReactDatepicker
                 selected={poDate}
                 onChange={date => setPoDate(date)}
                 dateFormat='dd/MM/yyyy'
                 customInput={<PoDateInput label='PO Date' value={poDate ? format(poDate, 'dd/MM/yyyy') : ''} />}
               />
+            </Grid>
+
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete label='Origin' options={originOptions} value={origin} onChange={setOrigin} />
             </Grid>
 
             <Grid item xs={12} md={4}>

@@ -5,12 +5,16 @@ export const chemicalsSchema = z.object({
   name: requiredString('Chemical Name'),
 
   unit: z.string().optional(),
-  
-  dosage: z.string().optional(), // 'unit_value' in payload
-  
+
+  conversion_value: z.string().optional(),
+
   ingredients: z.string().optional(), // 'description' in payload
 
-  // File is handled separately as FormData usually, 
+  store_unit: z.string().optional(),
+
+  unit_rate: z.string().optional(),
+
+  // File is handled separately as FormData usually,
   // but if we keep file name in state:
   file: z.any().optional(),
 
