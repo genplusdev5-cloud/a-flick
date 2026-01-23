@@ -35,10 +35,7 @@ import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import { showToast } from '@/components/common/Toasts'
 
-import {
-  getPurchaseInwardList,
-  deletePurchaseInward
-} from '@/api/purchase/purchase_inward'
+import { getPurchaseInwardList, deletePurchaseInward } from '@/api/purchase/purchase_inward'
 import { getPurchaseFilters } from '@/api/purchase/purchase_order'
 import { getSupplierList } from '@/api/stock/supplier'
 import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns'
@@ -88,7 +85,9 @@ const DUMMY_ROWS = [
 
 const statusOptions = [
   { id: 1, label: 'Pending', value: 'Pending' },
-  { id: 2, label: 'Completed', value: 'Completed' }
+  { id: 2, label: 'Approved', value: 'Approved' },
+  { id: 3, label: 'Completed', value: 'Completed' },
+  { id: 4, label: 'Canceled', value: 'Canceled' }
 ]
 
 const PurchaseInwardPage = () => {
@@ -98,7 +97,6 @@ const PurchaseInwardPage = () => {
 
   const [originOptions, setOriginOptions] = useState([])
   const [supplierOptions, setSupplierOptions] = useState([])
-
 
   const [deleteDialog, setDeleteDialog] = useState({
     open: false,
@@ -141,7 +139,7 @@ const PurchaseInwardPage = () => {
 
       const dropdownData = filterRes?.data?.data || filterRes?.data || filterRes || {}
       const companyList = dropdownData?.company?.name || []
-      
+
       const supplierData = supplierRes?.data
       let supplierList = []
       if (Array.isArray(supplierData?.data?.results)) {
@@ -310,7 +308,17 @@ const PurchaseInwardPage = () => {
 
   useEffect(() => {
     fetchPurchaseInwardList()
-  }, [pagination.pageIndex, pagination.pageSize, appliedOrigin, appliedSupplier, appliedStatus, appliedPiNo, appliedDateFilter, appliedDateRange, appliedSearchQuery])
+  }, [
+    pagination.pageIndex,
+    pagination.pageSize,
+    appliedOrigin,
+    appliedSupplier,
+    appliedStatus,
+    appliedPiNo,
+    appliedDateFilter,
+    appliedDateRange,
+    appliedSearchQuery
+  ])
 
   const columns = useMemo(
     () => [
@@ -346,10 +354,8 @@ const PurchaseInwardPage = () => {
 
                   const encodedId = btoa(String(rowData.id))
                   console.log('Navigating to edit:', { id: rowData.id, encodedId, type: rowData.recordType })
-                  
-                  router.push(
-                    `/${lang}/admin/purchase/purchase-inward/update/${encodedId}?type=${rowData.recordType}`
-                  )
+
+                  router.push(`/${lang}/admin/purchase/purchase-inward/update/${encodedId}?type=${rowData.recordType}`)
                 }}
               >
                 <i className='tabler-edit' />
@@ -380,7 +386,8 @@ const PurchaseInwardPage = () => {
       columnHelper.accessor('poNo', { header: 'PO No.' }),
       columnHelper.accessor('poDate', {
         header: 'PO Date',
-        cell: info => (info.getValue() && info.getValue() !== '-' ? format(new Date(info.getValue()), 'dd/MM/yyyy') : '-')
+        cell: info =>
+          info.getValue() && info.getValue() !== '-' ? format(new Date(info.getValue()), 'dd/MM/yyyy') : '-'
       }),
 
       columnHelper.accessor('status', {
@@ -511,7 +518,7 @@ const PurchaseInwardPage = () => {
               onChange={val => setFilterStatus(val)}
             />
           </Box>
- 
+
           {/* Supplier */}
           <Box sx={{ width: 220 }}>
             <GlobalAutocomplete
@@ -522,7 +529,7 @@ const PurchaseInwardPage = () => {
               onChange={val => setFilterSupplier(val)}
             />
           </Box>
- 
+
           {/* PI No Filter */}
           <Box sx={{ width: 220 }}>
             <GlobalAutocomplete
@@ -550,7 +557,16 @@ const PurchaseInwardPage = () => {
               setAppliedDateRange(uiDateRange)
               setAppliedSearchQuery(searchQuery)
               setPagination({ pageIndex: 0, pageSize: pagination.pageSize })
-              fetchPurchaseInwardList(filterOrigin, filterSupplier, filterStatus, filterPiNo, uiDateFilter, uiDateRange, searchQuery, 0)
+              fetchPurchaseInwardList(
+                filterOrigin,
+                filterSupplier,
+                filterStatus,
+                filterPiNo,
+                uiDateFilter,
+                uiDateRange,
+                searchQuery,
+                0
+              )
             }}
           >
             Refresh

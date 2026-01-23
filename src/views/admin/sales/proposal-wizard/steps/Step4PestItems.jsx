@@ -1,0 +1,381 @@
+import { useState, useMemo, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+
+import {
+  Grid,
+  Typography,
+  Button,
+  Box,
+  IconButton,
+  Chip,
+  Select,
+  MenuItem,
+  FormControl,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  FormControlLabel,
+  Checkbox,
+  RadioGroup,
+  Radio
+} from '@mui/material'
+import CustomTextField from '@core/components/mui/TextField'
+import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
+import TablePaginationComponent from '@/components/TablePaginationComponent'
+import DialogCloseButton from '@components/dialogs/DialogCloseButton'
+import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
+
+// Icons
+import DeleteIcon from '@mui/icons-material/Delete'
+import EditIcon from '@mui/icons-material/Edit'
+
+import styles from '@core/styles/table.module.css'
+
+export const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
+  const [value, setValue] = useState(initialValue)
+  useEffect(() => setValue(initialValue), [initialValue])
+  useEffect(() => {
+    const t = setTimeout(() => onChange(value), debounce)
+    return () => clearTimeout(t)
+  }, [value])
+  return <CustomTextField {...props} value={value} onChange={e => setValue(e.target.value)} />
+}
+
+export const TableSection = ({
+  title,
+  addButton,
+  searchText,
+  setSearchText,
+  pagination,
+  setPagination,
+  filteredCount,
+  children
+}) => (
+  <Box
+    sx={{
+      border: '1px solid #ddd',
+      borderRadius: 1,
+      overflow: 'hidden',
+      p: 2,
+      height: '100%',
+      bgcolor: 'background.paper'
+    }}
+  >
+    <Box
+      display='flex'
+      justifyContent='space-between'
+      alignItems='center'
+      mb={3}
+      sx={{
+        px: 2,
+        py: 1.5,
+        bgcolor: '#fafafa',
+        borderRadius: 1
+      }}
+    >
+      <Typography variant='h6' sx={{ textTransform: 'uppercase', fontWeight: 'bold' }}>
+        {title}
+      </Typography>
+      {addButton}
+    </Box>
+
+    <Box
+      sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Typography variant='body2' color='text.secondary'>
+          Show
+        </Typography>
+        <FormControl size='small' sx={{ width: 80 }}>
+          <Select
+            value={pagination.pageSize}
+            onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
+          >
+            {[5, 10, 25, 50, 100].map(s => (
+              <MenuItem key={s} value={s}>
+                {s}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <Typography variant='body2' color='text.secondary'>
+          entries
+        </Typography>
+      </Box>
+
+      <Box display='flex' alignItems='center' gap={1}>
+        <Typography variant='body2'>Search:</Typography>
+        <DebouncedInput
+          value={searchText}
+          onChange={v => setSearchText(String(v))}
+          placeholder=''
+          sx={{ width: 160 }}
+          size='small'
+        />
+      </Box>
+    </Box>
+
+    <Box sx={{ maxHeight: 400, overflowX: 'auto', borderTop: '1px solid #eee' }}>{children}</Box>
+
+    <Box sx={{ mt: 2 }}>
+      <TablePaginationComponent totalCount={filteredCount} pagination={pagination} setPagination={setPagination} />
+    </Box>
+  </Box>
+)
+
+const Step4PestItems = ({
+  currentPestItem,
+  handleCurrentPestItemChange,
+  handleCurrentPestItemAutocompleteChange,
+  dropdowns,
+  handleSavePestItem,
+  pestItems,
+  handleEditPestItem,
+  handleDeletePestItem,
+  editingItemId
+}) => {
+  // --- Independent States ---
+  const [pestSearch, setPestSearch] = useState('')
+  const [pestPagination, setPestPagination] = useState({ pageIndex: 0, pageSize: 5 })
+
+  // --- Dialog States ---
+  const [pestDialogOpen, setPestDialogOpen] = useState(false)
+
+  // --- Filtering Logic (Pests) ---
+  const filteredPests = useMemo(() => {
+    if (!Array.isArray(pestItems)) return []
+    if (!pestSearch) return pestItems
+    const lower = pestSearch.toLowerCase()
+    return pestItems.filter(i => Object.values(i).some(v => String(v).toLowerCase().includes(lower)))
+  }, [pestItems, pestSearch])
+
+  const paginatedPests = useMemo(() => {
+    const start = pestPagination.pageIndex * pestPagination.pageSize
+    return filteredPests.slice(start, start + pestPagination.pageSize)
+  }, [filteredPests, pestPagination])
+
+  // Helpers
+  const onSavePest = () => {
+    handleSavePestItem()
+    setPestDialogOpen(false)
+  }
+
+  return (
+    <Grid container spacing={2}>
+      <Grid item xs={12} display='flex' justifyContent='space-between' alignItems='center'>
+        <Typography variant='h6'>Add Pests & History</Typography>
+        <Box display='flex' alignItems='center' gap={1}>
+          <Typography variant='subtitle1' color='textSecondary'>
+            Total Contract Value ($)
+          </Typography>
+          <Typography variant='h6' color='primary.main'>
+            {pestItems.reduce((acc, curr) => acc + (Number(curr.totalValue) || 0), 0)}
+          </Typography>
+        </Box>
+      </Grid>
+
+      {/* PEST TABLE (Full Width) */}
+      <Grid item xs={12}>
+        <TableSection
+          title='PEST DETAILS'
+          addButton={
+            <Button
+              variant='contained'
+              size='small'
+              startIcon={<EditIcon sx={{ fontSize: 16 }} />}
+              onClick={() => setPestDialogOpen(true)}
+            >
+              Add New Pest
+            </Button>
+          }
+          searchText={pestSearch}
+          setSearchText={setPestSearch}
+          pagination={pestPagination}
+          setPagination={setPestPagination}
+          filteredCount={filteredPests.length}
+        >
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Action</th>
+                <th>Pest</th>
+                <th>Frequency</th>
+                <th>Chemicals</th>
+                <th>Pest Value</th>
+                <th>Total Value</th>
+                <th>Work Time(Hrs)</th>
+                <th>No Of Items</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedPests.length === 0 ? (
+                <tr>
+                  <td colSpan={9} align='center'>
+                    No pest items added
+                  </td>
+                </tr>
+              ) : (
+                paginatedPests.map((item, idx) => (
+                  <tr key={item.id}>
+                    <td>{idx + 1 + pestPagination.pageIndex * pestPagination.pageSize}</td>
+                    <td>
+                      <Box display='flex' gap={1}>
+                        <IconButton
+                          size='small'
+                          sx={{ color: '#28c76f', border: '1px solid #28c76f', borderRadius: 1, p: '4px' }}
+                          onClick={() => {
+                            handleEditPestItem(item)
+                            setPestDialogOpen(true)
+                          }}
+                        >
+                          <EditIcon fontSize='small' />
+                        </IconButton>
+                        <IconButton
+                          size='small'
+                          sx={{ color: '#ea5455', border: '1px solid #ea5455', borderRadius: 1, p: '4px' }}
+                          onClick={() => handleDeletePestItem(item.id)}
+                        >
+                          <DeleteIcon fontSize='small' />
+                        </IconButton>
+                      </Box>
+                    </td>
+                    <td>{item.pest}</td>
+                    <td>{item.frequency}</td>
+                    <td>
+                      <Chip
+                        label={item.chemicals || 'NA'}
+                        size='small'
+                        sx={{ bgcolor: '#28c76f', color: '#fff', borderRadius: '4px' }}
+                      />
+                    </td>
+                    <td>{item.pestValue}</td>
+                    <td>{item.totalValue}</td>
+                    <td>{item.workTime}</td>
+                    <td>{item.noOfItems}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </TableSection>
+      </Grid>
+
+      {/* --- ADD PEST DIALOG --- */}
+      <Dialog
+        open={pestDialogOpen}
+        onClose={() => setPestDialogOpen(false)}
+        maxWidth='md'
+        fullWidth
+        PaperProps={{ sx: { overflow: 'visible' } }}
+      >
+        <DialogTitle>
+          <Typography variant='h5' component='span'>
+            {editingItemId ? 'Edit Pest' : 'Add Pest'}
+          </Typography>
+          <DialogCloseButton onClick={() => setPestDialogOpen(false)} disableRipple>
+            <i className='tabler-x' />
+          </DialogCloseButton>
+        </DialogTitle>
+        <DialogContent sx={{ p: 6 }}>
+          <Grid container spacing={5}>
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete
+                label='Pest'
+                options={dropdowns.pests || []}
+                value={currentPestItem.pest}
+                onChange={(e, v) => handleCurrentPestItemAutocompleteChange('pest', v)}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete
+                label='Frequency'
+                options={dropdowns.frequencies || []}
+                value={currentPestItem.frequency}
+                onChange={(e, v) => handleCurrentPestItemAutocompleteChange('frequency', v)}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <CustomTextField
+                fullWidth
+                label='No of Units'
+                name='noOfItems'
+                type='number'
+                value={currentPestItem.noOfItems}
+                onChange={handleCurrentPestItemChange}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <CustomTextField
+                fullWidth
+                label='Pest Count'
+                name='pestCount'
+                type='number'
+                value={currentPestItem.pestCount}
+                onChange={handleCurrentPestItemChange}
+                sx={{ bgcolor: '#f5f5f5' }}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <CustomTextField
+                fullWidth
+                label='Pest Value'
+                name='pestValue'
+                type='number'
+                value={currentPestItem.pestValue}
+                onChange={handleCurrentPestItemChange}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <CustomTextField
+                fullWidth
+                label='Total'
+                name='total'
+                value={currentPestItem.total}
+                InputProps={{ readOnly: true }}
+                sx={{ bgcolor: '#f5f5f5' }}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete
+                label='Time'
+                options={['0:05', '0:10', '0:15', '0:30', '1:00']}
+                value={currentPestItem.time}
+                onChange={(e, v) => handleCurrentPestItemAutocompleteChange('time', v)}
+              />
+            </Grid>
+            <Grid item xs={12} md={8}>
+              <CustomTextField
+                fullWidth
+                label='Chemicals'
+                name='chemicals'
+                value={currentPestItem.chemicals}
+                onChange={handleCurrentPestItemChange}
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions sx={{ p: 6, justifyContent: 'flex-end' }}>
+          <Button
+            onClick={() => setPestDialogOpen(false)}
+            variant='tonal'
+            color='secondary'
+            sx={{ bgcolor: '#aaa', color: '#fff', '&:hover': { bgcolor: '#888' } }}
+          >
+            Close
+          </Button>
+          <Button
+            onClick={onSavePest}
+            variant='contained'
+            sx={{ bgcolor: '#00adef', '&:hover': { bgcolor: '#008dc4' } }}
+          >
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Grid>
+  )
+}
+
+export default Step4PestItems

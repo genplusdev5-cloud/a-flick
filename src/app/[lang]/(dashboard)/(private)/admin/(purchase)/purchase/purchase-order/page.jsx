@@ -82,14 +82,14 @@ const poStatusOptions = [
   { id: 1, label: 'Pending', value: 'Pending' },
   { id: 2, label: 'Approved', value: 'Approved' },
   { id: 3, label: 'Completed', value: 'Completed' },
-  { id: 4, label: 'Terminated', value: 'Terminated' }
+  { id: 4, label: 'Canceled', value: 'Canceled' }
 ]
 
 const poStatusColorMap = {
   Pending: 'warning',
   Approved: 'info',
   Completed: 'success',
-  Terminated: 'error'
+  Canceled: 'error'
 }
 
 /* ─────────────────────────────
@@ -151,7 +151,7 @@ const PurchaseOrderPage = () => {
       // Fix: Check if data is nested or direct
       // Robust fallback: filterRes.data.data -> filterRes.data -> filterRes
       const dropdownData = filterRes?.data?.data || filterRes?.data || filterRes || {}
-      
+
       // ✅ Origin (company)
       const origins =
         dropdownData?.company?.name?.map(item => ({
@@ -177,23 +177,21 @@ const PurchaseOrderPage = () => {
         supplierList = supplierData
       }
 
-      const suppliers =
-        supplierList.map(item => ({
-          label: item.name,
-          value: item.name,
-          id: item.id
-        }))
+      const suppliers = supplierList.map(item => ({
+        label: item.name,
+        value: item.name,
+        id: item.id
+      }))
 
       setOriginOptions(origins)
       setSupplierOptions(suppliers)
-      
+
       // Default Origin: A-Flick Pte Ltd
       const defaultOrigin = origins.find(o => o.label === 'A-Flick Pte Ltd')
       if (defaultOrigin) {
         setFilterOrigin(defaultOrigin)
         setAppliedFilterOrigin(defaultOrigin)
       }
-      
     } catch (err) {
       console.error('Filter fetch failed', err)
     }
@@ -297,8 +295,20 @@ const PurchaseOrderPage = () => {
         header: 'Supplier Name'
       }),
 
+      columnHelper.accessor('totalAmount', {
+        header: () => <div style={{ textAlign: 'right', width: '100%' }}>Total Amount</div>,
+        cell: info => <div style={{ textAlign: 'right' }}>{info.getValue() || '0.00'}</div>
+      }),
+
+
       columnHelper.accessor('noOfItems', {
-        header: 'No. of Items'
+        header: () => <div style={{ textAlign: 'right', width: '100%' }}>No. of Items</div>,
+        cell: info => <div style={{ textAlign: 'right' }}>{info.getValue() || 0}</div>
+      }),
+
+
+      columnHelper.accessor('remarks', {
+        header: 'Remarks'
       }),
 
       columnHelper.accessor('status', {
@@ -335,7 +345,17 @@ const PurchaseOrderPage = () => {
 
   useEffect(() => {
     fetchPurchaseOrders()
-  }, [pagination.pageIndex, pagination.pageSize, appliedFilterOrigin, appliedFilterSupplier, appliedFilterStatus, appliedFilterPoNo, appliedDateFilter, appliedDateRange, appliedSearchQuery])
+  }, [
+    pagination.pageIndex,
+    pagination.pageSize,
+    appliedFilterOrigin,
+    appliedFilterSupplier,
+    appliedFilterStatus,
+    appliedFilterPoNo,
+    appliedDateFilter,
+    appliedDateRange,
+    appliedSearchQuery
+  ])
 
   const confirmDelete = async () => {
     if (!deleteDialog.row?.id) return
@@ -378,7 +398,7 @@ const PurchaseOrderPage = () => {
 
       const params = {
         page: pageIdx + 1,
-        page_size: (dateFilter || status || origin || supplier || poNo) ? 500 : pagination.pageSize,
+        page_size: dateFilter || status || origin || supplier || poNo ? 500 : pagination.pageSize,
         company: origin?.id,
         company_id: origin?.id, // Fallback
         supplier_id: supplier?.id,
@@ -421,6 +441,8 @@ const PurchaseOrderPage = () => {
         poNo: item.po_number || item.num_series,
         poDate: item.po_date,
         rawDate: item.po_date, // Store raw date
+        totalAmount: item.total_amount,
+        remarks: item.remarks,
         noOfItems: item.no_of_items || item.order_items?.length || 0,
         status: item.po_status,
         recordType: item.record_type || 'tm' // Capture type
@@ -455,22 +477,24 @@ const PurchaseOrderPage = () => {
 
       // 3. Origin Filter
       if (origin?.id || origin?.name) {
-        finalRows = finalRows.filter(row =>
-          row.origin?.toLowerCase().includes(origin.name?.toLowerCase() || '') ||
-          String(row.origin_id) === String(origin.id)
+        finalRows = finalRows.filter(
+          row =>
+            row.origin?.toLowerCase().includes(origin.name?.toLowerCase() || '') ||
+            String(row.origin_id) === String(origin.id)
         )
       }
 
       // 4. Supplier Filter
       if (supplier?.id || supplier?.name) {
-        finalRows = finalRows.filter(row =>
-          row.supplierName?.toLowerCase().includes(supplier.name?.toLowerCase() || '') ||
-          String(row.supplier_id) === String(supplier.id)
+        finalRows = finalRows.filter(
+          row =>
+            row.supplierName?.toLowerCase().includes(supplier.name?.toLowerCase() || '') ||
+            String(row.supplier_id) === String(supplier.id)
         )
       }
 
       setRows(finalRows)
-      setTotalCount((dateFilter || status || origin || supplier || poNo) ? finalRows.length : res?.count || 0)
+      setTotalCount(dateFilter || status || origin || supplier || poNo ? finalRows.length : res?.count || 0)
     } catch (err) {
       console.error(err)
     } finally {
@@ -490,7 +514,16 @@ const PurchaseOrderPage = () => {
     setPagination({ pageIndex: 0, pageSize: pagination.pageSize })
 
     // Force fetch with current UI values to override useEffect's state check
-    fetchPurchaseOrders(filterOrigin, filterSupplier, filterStatus, filterPoNo, uiDateFilter, uiDateRange, searchQuery, 0)
+    fetchPurchaseOrders(
+      filterOrigin,
+      filterSupplier,
+      filterStatus,
+      filterPoNo,
+      uiDateFilter,
+      uiDateRange,
+      searchQuery,
+      0
+    )
   }
 
   return (
@@ -619,7 +652,7 @@ const PurchaseOrderPage = () => {
                 onChange={val => setFilterSupplier(val)}
               />
             </Box>
- 
+
             {/* PO No Filter */}
             <Box sx={{ width: 220 }}>
               <GlobalAutocomplete

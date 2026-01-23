@@ -13,6 +13,7 @@ const GlobalAutocomplete = ({
   isOptionEqualToValue,
   error,
   helperText,
+  inputRef,
   ...props
 }) => {
   // ⭐ Normalize all options to { label, value }
@@ -59,7 +60,7 @@ const GlobalAutocomplete = ({
   return (
     <CustomAutocomplete
       fullWidth
-      size="small"
+      size='small'
       options={normalizedOptions}
       value={normalizedValue}
       getOptionLabel={finalGetLabel}
@@ -88,6 +89,7 @@ const GlobalAutocomplete = ({
       renderInput={params => (
         <CustomTextField
           {...params}
+          ref={inputRef}
           label={label}
           placeholder={placeholder || label}
           error={error}

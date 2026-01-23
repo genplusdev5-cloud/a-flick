@@ -12,6 +12,8 @@ import {
   Divider,
   IconButton,
   Breadcrumbs,
+  FormControlLabel,
+  Checkbox,
   CircularProgress
 } from '@mui/material'
 
@@ -71,6 +73,10 @@ const EditPurchaseOrderPage = () => {
   const [chemical, setChemical] = useState(null)
   const [uom, setUom] = useState(null)
   const [quantity, setQuantity] = useState('')
+  const [rate, setRate] = useState('')
+  const [amount, setAmount] = useState('0')
+  const [isFoc, setIsFoc] = useState(false)
+  const [prevRate, setPrevRate] = useState('')
 
   const [editId, setEditId] = useState(null)
 
@@ -130,7 +136,8 @@ const EditPurchaseOrderPage = () => {
           label: c.name,
           value: c.name,
           id: c.id,
-          uom: c.uom || c.uom_name || c.unit
+          uom: c.uom || c.uom_name || c.unit,
+          rate: c.rate || c.unit_rate || c.price || 0
         }))
 
         const uoms =
@@ -179,6 +186,9 @@ const EditPurchaseOrderPage = () => {
           const foundChem = chemicals.find(c => String(c.id) === String(chemId))
           const foundUom = uoms.find(u => String(u.id) === String(uomId))
 
+          const qty = Number(item.quantity) || 0
+          const r = Number(item.unit_rate || item.rate) || 0
+
           return {
             id: item.id,
             chemical:
@@ -198,9 +208,11 @@ const EditPurchaseOrderPage = () => {
               (typeof item.uom === 'string' ? item.uom : item.uom?.name) ||
               '',
             uomId: uomId,
-            quantity: item.quantity,
-            rate: 0,
-            amount: 0,
+            quantity: qty,
+            rate: r,
+            amount: (qty * r).toFixed(2),
+            isFoc: r === 0,
+            prevRate: r === 0 ? foundChem?.rate || 0 : r,
             isNew: false
           }
         })
@@ -220,85 +232,146 @@ const EditPurchaseOrderPage = () => {
 
   const handleChemicalChange = val => {
     setChemical(val)
-    if (val && val.uom) {
-      const foundUom = uomOptions.find(u => u.label.toLowerCase() === val.uom.toLowerCase())
-      if (foundUom) {
-        setUom(foundUom)
+    if (val) {
+      // UOM logic
+      if (val.uom) {
+        const foundUom = uomOptions.find(u => u.label.toLowerCase() === val.uom.toLowerCase())
+        if (foundUom) {
+          setUom(foundUom)
+        } else {
+          setUom({ label: val.uom, value: val.uom, id: null })
+        }
       } else {
-        setUom({ label: val.uom, value: val.uom, id: null })
+        setUom(null)
       }
+
+      // Rate logic
+      const r = val.rate || ''
+      setRate(r)
+      setPrevRate(r)
+      setIsFoc(false)
     } else {
       setUom(null)
+      setRate('')
+      setPrevRate('')
+      setIsFoc(false)
     }
   }
 
+  const handleFocChange = checked => {
+    setIsFoc(checked)
+    if (checked) {
+      setPrevRate(rate)
+      setRate('0')
+    } else {
+      setRate(prevRate || '')
+    }
+  }
+
+  // Auto-calculate Amount
+  useEffect(() => {
+    const q = Number(quantity) || 0
+    const r = Number(rate) || 0
+    setAmount((q * r).toFixed(2))
+  }, [quantity, rate])
+
   const handleEditItem = row => {
     setEditId(row.id)
-    setChemical({ label: row.chemical, id: row.chemicalId })
+    setChemical({ label: row.chemical, id: row.chemicalId, rate: row.rate })
     setUom({ label: row.uom, id: row.uomId })
     setQuantity(row.quantity)
+    setRate(row.rate)
+    setIsFoc(row.isFoc)
+    setPrevRate(row.prevRate || row.rate)
   }
 
- const handleAddItem = () => {
-  if (!chemical) {
-    showToast('error', 'Please select a chemical')
-    return
-  }
-  if (!uom) {
-    showToast('error', 'Please select a UOM')
-    return
-  }
-  if (!quantity || Number(quantity) <= 0) {
-    showToast('error', 'Please enter valid quantity')
-    return
-  }
+  const handleAddItem = () => {
+    if (!chemical) {
+      showToast('error', 'Please select a chemical')
+      return
+    }
+    if (!uom) {
+      showToast('error', 'Please select a UOM')
+      return
+    }
+    if (!quantity || Number(quantity) <= 0) {
+      showToast('error', 'Please enter valid quantity')
+      return
+    }
 
-  const chemId = chemical.id
-  const uomId = uom.id
-  const qty = Number(quantity)
+    const chemId = chemical.id
+    const uomId = uom.id
+    const qty = Number(quantity)
 
-  // 🔍 Check SAME chemical + SAME UOM already exists
-  const existingIndex = items.findIndex(
-    item =>
-      String(item.chemicalId) === String(chemId) &&
-      String(item.uomId) === String(uomId)
-  )
-
-  // 🟢 CASE 1: Same chemical + same UOM → ADD quantity
-  if (existingIndex !== -1) {
-    setItems(prev =>
-      prev.map((item, index) =>
-        index === existingIndex
-          ? {
-              ...item,
-              quantity: Number(item.quantity) + qty
-            }
-          : item
-      )
+    // 🔍 Check SAME chemical + SAME UOM already exists
+    const existingIndex = items.findIndex(
+      item => String(item.chemicalId) === String(chemId) && String(item.uomId) === String(uomId)
     )
-  }
-  // 🟡 CASE 2: Different chemical OR different UOM → NEW ROW
-  else {
-    setItems(prev => [
-      ...prev,
-      {
-        id: Date.now(),
-        chemical: chemical.label,
-        chemicalId: chemId,
-        uom: uom.label,
-        uomId: uomId,
-        quantity: qty,
-        isNew: true
+
+    // 🔴 CASE 1: Same chemical + same UOM → ADD quantity
+    if (existingIndex !== -1 && !editId) {
+      setItems(prev =>
+        prev.map((item, index) =>
+          index === existingIndex
+            ? {
+                ...item,
+                quantity: Number(item.quantity) + qty,
+                amount: ((Number(item.quantity) + qty) * Number(item.rate || 0)).toFixed(2)
+              }
+            : item
+        )
+      )
+    }
+    // 🟡 CASE 2: Update existing or add new row
+    else {
+      if (editId) {
+        setItems(prev =>
+          prev.map(item =>
+            item.id === editId
+              ? {
+                  ...item,
+                  chemical: chemical.label,
+                  chemicalId: chemId,
+                  uom: uom.label,
+                  uomId: uomId,
+                  quantity: qty,
+                  rate,
+                  amount,
+                  isFoc,
+                  prevRate
+                }
+              : item
+          )
+        )
+        setEditId(null)
+      } else {
+        setItems(prev => [
+          ...prev,
+          {
+            id: Date.now(),
+            chemical: chemical.label,
+            chemicalId: chemId,
+            uom: uom.label,
+            uomId: uomId,
+            quantity: qty,
+            rate,
+            amount,
+            isFoc,
+            prevRate,
+            isNew: true
+          }
+        ])
       }
-    ])
+    }
+
+    // reset fields
+    setChemical(null)
+    setUom(null)
+    setQuantity('')
+    setRate('')
+    setIsFoc(false)
+    setPrevRate('')
   }
-
-  // reset fields
-  setChemical(null)
-  setUom(null)
-  setQuantity('')
-}
-
 
   const handleRemoveItem = id => {
     setItems(prev => prev.filter(i => i.id !== id))
@@ -331,7 +404,7 @@ const EditPurchaseOrderPage = () => {
             item_name: item.chemical,
             uom_id: item.uomId,
             quantity: Number(item.quantity),
-            unit_rate: item.unit_rate || 0,
+            unit_rate: Number(item.rate) || 0,
             is_active: 1,
             status: 1
           }
@@ -467,12 +540,38 @@ const EditPurchaseOrderPage = () => {
               />
             </Grid>
 
-            <Grid item xs={12} md={3}>
+            <Grid item xs={12} md={2}>
               <GlobalTextField
                 label='Quantity'
                 type='number'
                 value={quantity}
                 onChange={e => setQuantity(e.target.value)}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={2}>
+              <Box display='flex' flexDirection='column'>
+                <FormControlLabel
+                  control={<Checkbox checked={isFoc} onChange={e => handleFocChange(e.target.checked)} size='small' />}
+                  label='Rate [ FOC ]'
+                  sx={{ mb: -1, '& .MuiTypography-root': { fontSize: '0.75rem' } }}
+                />
+                <GlobalTextField
+                  placeholder='0.00'
+                  type='number'
+                  value={rate}
+                  onChange={e => setRate(e.target.value)}
+                />
+              </Box>
+            </Grid>
+
+            <Grid item xs={12} md={2}>
+              <GlobalTextField
+                label='Amount'
+                value={amount}
+                InputProps={{ readOnly: true }}
+                disabled
+                sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#f5f5f5' } }}
               />
             </Grid>
 
@@ -482,6 +581,7 @@ const EditPurchaseOrderPage = () => {
                 color={editId ? 'info' : 'primary'}
                 startIcon={editId ? <EditIcon /> : <AddIcon />}
                 onClick={handleAddItem}
+                fullWidth
               >
                 {editId ? 'Update' : 'Add'}
               </GlobalButton>
@@ -499,9 +599,11 @@ const EditPurchaseOrderPage = () => {
                   <th align='center' style={{ width: '100px', textAlign: 'center' }}>
                     Action
                   </th>
-                  <th style={{ width: '40%' }}>Chemical</th>
-                  <th style={{ width: '25%' }}>UOM</th>
-                  <th style={{ width: '25%', textAlign: 'left' }}>Quantity</th>
+                  <th style={{ width: '30%' }}>Chemical</th>
+                  <th style={{ width: '15%' }}>UOM</th>
+                  <th style={{ width: '15%', textAlign: 'right' }}>Quantity</th>
+                  <th style={{ width: '15%', textAlign: 'right' }}>Rate</th>
+                  <th style={{ width: '15%', textAlign: 'right' }}>Amount</th>
                 </tr>
               </thead>
 
@@ -533,12 +635,14 @@ const EditPurchaseOrderPage = () => {
                       </td>
                       <td>{row.chemical}</td>
                       <td>{row.uom}</td>
-                      <td style={{ textAlign: 'left' }}>{row.quantity}</td>
+                      <td style={{ textAlign: 'right' }}>{row.quantity}</td>
+                      <td style={{ textAlign: 'right' }}>{row.rate || '0.00'}</td>
+                      <td style={{ textAlign: 'right' }}>{row.amount || '0.00'}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5} style={{ textAlign: 'center', padding: 24 }}>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: 24 }}>
                       No items
                     </td>
                   </tr>

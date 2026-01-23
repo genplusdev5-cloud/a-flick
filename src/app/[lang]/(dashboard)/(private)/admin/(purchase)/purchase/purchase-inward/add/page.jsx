@@ -518,33 +518,45 @@ const AddPurchaseInwardPage = () => {
               <GlobalTextField label='Quantity' type='number' value={quantity} disabled />
             </Grid>
 
-            {/* Row 2 */}
-            <Grid item xs={12} md={3}>
-              <GlobalTextField
-                label='Additional'
-                type='number'
-                value={additional}
-                onChange={e => setAdditional(e.target.value)}
-              />
-            </Grid>
+           {/* Row 2 */}
+<Grid item xs={12} md={3}>
+  <GlobalTextField
+    label='Additional'
+    type='number'
+    value={additional}
+    onChange={e => setAdditional(e.target.value)}
+  />
+</Grid>
 
-            {/* 🔥 Reduced Width & Spacer */}
-            <Grid item xs={12} md={3}>
-              <GlobalTextField label='Total Qty' type='number' value={total_quantity} disabled />
-            </Grid>
-            <Grid item xs={12} md={3} />
+<Grid item xs={12} md={3}>
+  <GlobalTextField
+    label='Total Qty'
+    type='number'
+    value={total_quantity}
+    disabled
+  />
+</Grid>
 
-            <Grid item xs={12} md={3}>
-              <GlobalButton
-                fullWidth
-                variant='contained'
-                color={editId ? 'info' : 'primary'}
-                startIcon={editId ? <EditIcon /> : <AddIcon />}
-                onClick={handleAddItem}
-              >
-                {editId ? 'Update' : 'Add'}
-              </GlobalButton>
-            </Grid>
+<Grid
+  item
+  xs={12}
+  md={3}
+  sx={{
+    display: 'flex',
+    alignItems: 'flex-end' // 🔥 key for vertical alignment
+  }}
+>
+  <GlobalButton
+    fullWidth
+    variant='contained'
+    color={editId ? 'info' : 'primary'}
+    startIcon={editId ? <EditIcon /> : <AddIcon />}
+    onClick={handleAddItem}
+  >
+    {editId ? 'Update' : 'Add'}
+  </GlobalButton>
+</Grid>
+
           </Grid>
         </Box>
 

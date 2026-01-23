@@ -19,17 +19,53 @@ export const getDashboardCards = async () => {
   }
 }
 
-
 // 🔹 Today Service Requests
 export const getTodayServiceRequests = async () => {
-  const res = await api.get('/dashboard-filter/')
+  const res = await api.get('dashboard-filter/')
   return res.data
 }
 
 // 🔹 Today Followups (NEW API)
 export const getTodayFollowups = async () => {
-  const res = await api.get('/dashboard-followups')
+  const res = await api.get('dashboard-followups')
   return res.data
+}
+
+export const getDashboardRenewal = async () => {
+  try {
+    const res = await api.get('dashboard-renewal/')
+
+    return {
+      status: 'success',
+      data: res?.data?.data || []
+    }
+  } catch {
+    console.error('❌ Dashboard Renewal API Error')
+    return {
+      status: 'failed',
+      data: []
+    }
+  }
+}
+
+/* ======================================================
+   GET KVI FINDER
+====================================================== */
+export const getKviFinder = async () => {
+  try {
+    const res = await api.get('kvi-finder/')
+
+    return {
+      status: 'success',
+      data: res?.data?.data || []
+    }
+  } catch {
+    console.error('❌ KVI Finder API Error')
+    return {
+      status: 'failed',
+      data: []
+    }
+  }
 }
 
 /* ======================================================

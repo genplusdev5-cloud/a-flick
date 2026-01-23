@@ -39,10 +39,10 @@ import { showToast } from '@/components/common/Toasts'
 const EditPurchaseInwardPage = () => {
   const router = useRouter()
   const params = useParams()
-  const { lang, id} = params
+  const { lang, id } = params
   const searchParams = useSearchParams()
   const type = searchParams.get('type') || 'tm'
-  
+
   let decodedId = null
   try {
     if (id) {
@@ -195,7 +195,8 @@ const EditPurchaseInwardPage = () => {
         const itemsList = details.inward_items || details.items || []
 
         const mappedItems = itemsList.map(item => {
-          const chemId = item.chemical_id || item.item_id || item.chemical?.id || item.chemical_details?.id || item.chemical
+          const chemId =
+            item.chemical_id || item.item_id || item.chemical?.id || item.chemical_details?.id || item.chemical
           const uomId = item.uom_id || item.uom_details?.id || item.uom?.id || item.uom
 
           // Fallback lookup if name is null
@@ -504,7 +505,12 @@ const EditPurchaseInwardPage = () => {
           <Grid container spacing={3}>
             {/* Row 1 */}
             <Grid item xs={12} md={3}>
-              <GlobalAutocomplete label='Chemical' options={chemicalOptions} value={chemical} onChange={handleChemicalChange} />
+              <GlobalAutocomplete
+                label='Chemical'
+                options={chemicalOptions}
+                value={chemical}
+                onChange={handleChemicalChange}
+              />
             </Grid>
 
             <Grid item xs={12} md={2}>
@@ -551,13 +557,19 @@ const EditPurchaseInwardPage = () => {
               />
             </Grid>
 
-            {/* 🔥 Reduced Width & Spacer */}
             <Grid item xs={12} md={3}>
               <GlobalTextField label='Total Qty' type='number' value={total_quantity} disabled />
             </Grid>
-            <Grid item xs={12} md={3} />
 
-            <Grid item xs={12} md={3}>
+            <Grid
+              item
+              xs={12}
+              md={3}
+              sx={{
+                display: 'flex',
+                alignItems: 'flex-end' // 🔥 perfect vertical alignment
+              }}
+            >
               <GlobalButton
                 fullWidth
                 variant='contained'
@@ -578,14 +590,26 @@ const EditPurchaseInwardPage = () => {
               <thead>
                 <tr>
                   <th style={{ width: '50px', minWidth: '50px' }}>S.No</th>
-                  <th align='center' style={{ width: '80px' }}>ACTION</th>
+                  <th align='center' style={{ width: '80px' }}>
+                    ACTION
+                  </th>
                   <th style={{ width: '20%' }}>CHEMICAL</th>
                   <th style={{ width: '10%' }}>UOM</th>
-                  <th align='left' style={{ width: '10%', textAlign: 'left' }}>IN QTY</th>
-                  <th align='left' style={{ width: '10%', textAlign: 'left' }}>CONV.</th>
-                  <th align='left' style={{ width: '10%', textAlign: 'left' }}>QTY</th>
-                  <th align='left' style={{ width: '12%', textAlign: 'left' }}>ADDITIONAL</th>
-                  <th align='left' style={{ width: '15%', textAlign: 'left' }}>TOTAL QTY</th>
+                  <th align='left' style={{ width: '10%', textAlign: 'left' }}>
+                    IN QTY
+                  </th>
+                  <th align='left' style={{ width: '10%', textAlign: 'left' }}>
+                    CONV.
+                  </th>
+                  <th align='left' style={{ width: '10%', textAlign: 'left' }}>
+                    QTY
+                  </th>
+                  <th align='left' style={{ width: '12%', textAlign: 'left' }}>
+                    ADDITIONAL
+                  </th>
+                  <th align='left' style={{ width: '15%', textAlign: 'left' }}>
+                    TOTAL QTY
+                  </th>
                 </tr>
               </thead>
 
@@ -604,11 +628,21 @@ const EditPurchaseInwardPage = () => {
                       </td>
                       <td>{row.item_name}</td>
                       <td>{row.uom}</td>
-                      <td align='left' style={{ textAlign: 'left' }}>{row.in_quantity}</td>
-                      <td align='left' style={{ textAlign: 'left' }}>{row.conversion}</td>
-                      <td align='left' style={{ textAlign: 'left' }}>{row.quantity}</td>
-                      <td align='left' style={{ textAlign: 'left' }}>{row.additional}</td>
-                      <td align='left' style={{ textAlign: 'left' }}>{isNaN(row.total_quantity) ? '-' : row.total_quantity}</td>
+                      <td align='left' style={{ textAlign: 'left' }}>
+                        {row.in_quantity}
+                      </td>
+                      <td align='left' style={{ textAlign: 'left' }}>
+                        {row.conversion}
+                      </td>
+                      <td align='left' style={{ textAlign: 'left' }}>
+                        {row.quantity}
+                      </td>
+                      <td align='left' style={{ textAlign: 'left' }}>
+                        {row.additional}
+                      </td>
+                      <td align='left' style={{ textAlign: 'left' }}>
+                        {isNaN(row.total_quantity) ? '-' : row.total_quantity}
+                      </td>
                     </tr>
                   ))
                 ) : (

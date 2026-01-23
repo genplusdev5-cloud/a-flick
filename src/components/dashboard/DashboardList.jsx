@@ -22,7 +22,7 @@ import {
   Divider
 } from '@mui/material'
 
-import { getTodayServiceRequests, getTodayFollowups } from '@/api/dashboard'
+import { getTodayServiceRequests, getTodayFollowups, getDashboardRenewal, getKviFinder } from '@/api/dashboard'
 
 /* ---------------- STATUS CHIP ---------------- */
 const StatusChip = ({ status }) => {
@@ -36,41 +36,15 @@ const StatusChip = ({ status }) => {
   return <Chip label={status} color={color} size='small' variant='tonal' sx={{ fontWeight: 500 }} />
 }
 
-/* ---------------- DUMMY DATA (UI ONLY) ---------------- */
-const renewalPendingData = [
-  {
-    contract_no: 'CNT-10021',
-    customer_name: 'Pacificlight Power Pte Ltd',
-    end_date: '2026-02-15',
-    status: 'Pending'
-  },
-  {
-    contract_no: 'CNT-10022',
-    customer_name: 'Qin Ji Pte Ltd',
-    end_date: '2026-03-01',
-    status: 'Pending'
-  }
-]
-
-const kivData = [
-  {
-    ticket_no: 'KIV-55621',
-    ticket_date: '2026-01-22',
-    status: 'Pending'
-  },
-  {
-    ticket_no: 'KIV-55622',
-    ticket_date: '2026-01-22',
-    status: 'Pending'
-  }
-]
-
 /* ---------------- DASHBOARD LIST ---------------- */
 export default function DashboardList() {
   const [serviceRequests, setServiceRequests] = useState([])
   const [followups, setFollowups] = useState([])
   const [loading, setLoading] = useState(false)
   const [svcFilter, setSvcFilter] = useState('Pending')
+
+  const [renewals, setRenewals] = useState([])
+  const [kivList, setKivList] = useState([])
 
   useEffect(() => {
     fetchDashboardData()
@@ -80,10 +54,17 @@ export default function DashboardList() {
     try {
       setLoading(true)
 
-      const [serviceRes, followupRes] = await Promise.all([getTodayServiceRequests(), getTodayFollowups()])
+      const [serviceRes, followupRes, renewalRes, kivRes] = await Promise.all([
+        getTodayServiceRequests(),
+        getTodayFollowups(),
+        getDashboardRenewal(),
+        getKviFinder()
+      ])
 
       setServiceRequests(serviceRes?.data || [])
       setFollowups(followupRes?.data || [])
+      setRenewals(renewalRes?.data || [])
+      setKivList(kivRes?.data || [])
     } catch (error) {
       console.error('Dashboard API Error:', error)
     } finally {
@@ -223,17 +204,25 @@ export default function DashboardList() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {renewalPendingData.map((row, index) => (
-                    <TableRow key={index} hover>
-                      <TableCell>{index + 1}</TableCell>
-                      <TableCell>{row.contract_no}</TableCell>
-                      <TableCell>{row.customer_name}</TableCell>
-                      <TableCell>{row.end_date}</TableCell>
-                      <TableCell>
-                        <StatusChip status={row.status} />
+                  {renewals.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} align='center'>
+                        No renewal pending
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    renewals.map((row, index) => (
+                      <TableRow key={index} hover>
+                        <TableCell>{index + 1}</TableCell>
+                        <TableCell>{row.contract_no}</TableCell>
+                        <TableCell>{row.customer_name}</TableCell>
+                        <TableCell>{row.end_date}</TableCell>
+                        <TableCell>
+                          <StatusChip status={row.status} />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </TableContainer>
@@ -254,17 +243,26 @@ export default function DashboardList() {
                     <TableCell>Status</TableCell>
                   </TableRow>
                 </TableHead>
+
                 <TableBody>
-                  {kivData.map((row, index) => (
-                    <TableRow key={index} hover>
-                      <TableCell>{index + 1}</TableCell>
-                      <TableCell>{row.ticket_no}</TableCell>
-                      <TableCell>{row.ticket_date}</TableCell>
-                      <TableCell>
-                        <StatusChip status={row.status} />
+                  {kivList.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} align='center'>
+                        No KIV records
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    kivList.map((row, index) => (
+                      <TableRow key={index} hover>
+                        <TableCell>{index + 1}</TableCell>
+                        <TableCell>{row.ticket_no}</TableCell>
+                        <TableCell>{row.ticket_date}</TableCell>
+                        <TableCell>
+                          <StatusChip status={row.status} />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </TableContainer>

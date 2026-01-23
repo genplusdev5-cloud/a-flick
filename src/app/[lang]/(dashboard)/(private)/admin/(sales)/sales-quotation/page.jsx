@@ -60,7 +60,7 @@ const SalesQuotationPage = () => {
   const router = useRouter()
   const [filters, setFilters] = useState({
     date: '',
-    origin: '',
+    origin: 'aflick', // ✅ Set default Origin
     contractType: '',
     status: '',
     salesperson: '',
@@ -116,17 +116,16 @@ const SalesQuotationPage = () => {
         header: 'Actions',
         size: 100,
         cell: ({ row }) => {
-
           return (
             <Box sx={{ display: 'flex', gap: 1 }}>
               <IconButton
                 size='small'
                 color='primary'
                 onClick={() => {
-                  console.log('Row Data:', row.original);
-                  const id = row.original.proposal_id || row.original.id;
-                  const encodedId = encodeId(id);
-                  router.push(`/admin/sales-quotation/${encodedId}/edit`);
+                  console.log('Row Data:', row.original)
+                  const id = row.original.proposal_id || row.original.id
+                  const encodedId = encodeId(id)
+                  router.push(`/admin/sales-quotation/${encodedId}/edit`)
                 }}
               >
                 <i className='tabler-edit' />
@@ -161,6 +160,34 @@ const SalesQuotationPage = () => {
         header: 'Date',
         cell: info => <Typography>{info.getValue() || '-'}</Typography>
       }),
+      columnHelper.accessor(
+        row =>
+          row.address ||
+          row.service_address ||
+          row.bill_address ||
+          row.customer?.address ||
+          row.customer_address ||
+          '-',
+        {
+          id: 'address',
+          header: 'Address',
+          cell: info => <Typography>{info.getValue()}</Typography>
+        }
+      ),
+      columnHelper.accessor(
+        row =>
+          row.postal_code ||
+          row.zip_code ||
+          row.customer?.postal_code ||
+          row.customer?.zip_code ||
+          row.customer_postal_code ||
+          '-',
+        {
+          id: 'postal_code',
+          header: 'Postal Code',
+          cell: info => <Typography>{info.getValue()}</Typography>
+        }
+      ),
       columnHelper.accessor('status', {
         header: 'Status',
         cell: info => {
@@ -244,11 +271,31 @@ const SalesQuotationPage = () => {
         })
       }
 
+      const originOptions = mapToOptions(origins)
+
+      // ✅ FIND DEFAULT ORIGIN (A-Flick Pte Ltd)
+      const defaultOrigin = originOptions.find(o => o.label.toLowerCase().includes('a-flick'))
+      if (defaultOrigin) {
+        setFilters(prev => ({ ...prev, origin: defaultOrigin.value }))
+      }
+
       setFilterOptions({
-        origins: mapToOptions(origins),
+        origins: originOptions,
         customers: mapToOptions(customers),
-        contractTypes: mapToOptions(contractTypes),
-        statuses: mapToOptions(statuses),
+        // ✅ Hardcoded Proposal Contract Types
+        contractTypes: [
+          { label: 'Limited Contract', value: 'Limited Contract' },
+          { label: 'Job', value: 'Job' },
+          { label: 'Continuous Job', value: 'Continuous Job' },
+          { label: 'Warranty', value: 'Warranty' }
+        ],
+        // ✅ Hardcoded Proposal Statuses
+        statuses: [
+          { label: 'Pending', value: 'Pending' },
+          { label: 'Approved', value: 'Approved' },
+          { label: 'Declined', value: 'Declined' },
+          { label: 'Completed', value: 'Completed' }
+        ],
         salesPersons: mapToOptions(salesPersons)
       })
     } catch (err) {
@@ -282,19 +329,21 @@ const SalesQuotationPage = () => {
       const res = await getProposalList(params)
       const list = res?.data?.results || res?.results || []
 
-      const normalizeDate = (d) => {
-          if (!d) return '-'
-          try {
-              return format(new Date(d), 'dd/MM/yyyy')
-          } catch { return d }
+      const normalizeDate = d => {
+        if (!d) return '-'
+        try {
+          return format(new Date(d), 'dd/MM/yyyy')
+        } catch {
+          return d
+        }
       }
 
       const mappedRows = list.map((row, index) => ({
-          ...row,
-          // We need to override proposal_date display format
-          proposal_date: normalizeDate(row.proposal_date),
-          rawDate: row.proposal_date, // Store raw
-          sno: pagination.pageIndex * pagination.pageSize + index + 1
+        ...row,
+        // We need to override proposal_date display format
+        proposal_date: normalizeDate(row.proposal_date),
+        rawDate: row.proposal_date, // Store raw
+        sno: pagination.pageIndex * pagination.pageSize + index + 1
       }))
 
       // Frontend Date Filtering
@@ -426,7 +475,6 @@ const SalesQuotationPage = () => {
           <Divider />
 
           <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-
             {/* ================= FILTERS ================= */}
             <Box
               sx={{
