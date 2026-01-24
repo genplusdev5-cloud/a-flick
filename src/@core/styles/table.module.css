@@ -1,6 +1,6 @@
 .table {
   inline-size: 100%;
-    border-collapse: separate;   /* 🔥 IMPORTANT */
+  border-collapse: separate; /* 🔥 IMPORTANT */
   border-spacing: 0;
   font-size: 0.8125rem;
   white-space: nowrap;
@@ -71,8 +71,6 @@
         padding-inline: 1rem 1.5rem;
       }
     }
-
-
   }
 }
 
@@ -85,7 +83,6 @@
 .table tbody tr:last-child td {
   border-block-end: none;
 }
-
 
 /* ================================
    LIST PAGE – REUSABLE TABLE SCROLL
@@ -193,3 +190,76 @@
   display: none !important;
 }
 
+/* Specific sticky logic for tables WITH Select column */
+.customer-table.has-select .table th:nth-child(1),
+.customer-table.has-select .table td:nth-child(1) {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 6;
+  background-color: var(--mui-palette-background-paper) !important;
+  box-shadow: inset -1px 0 0 var(--border-color);
+  inline-size: 40px;
+  min-inline-size: 40px;
+  padding-inline: 0 !important;
+  text-align: center;
+}
+
+.customer-table.has-select .table th:nth-child(2),
+.customer-table.has-select .table td:nth-child(2) {
+  position: sticky;
+  inset-inline-start: 40px;
+  z-index: 6;
+  background-color: var(--mui-palette-background-paper) !important;
+  box-shadow: inset -1px 0 0 var(--border-color);
+  inline-size: 50px;
+  min-inline-size: 50px;
+  padding-inline: 4px !important;
+  text-align: center;
+}
+
+.customer-table.has-select .table th:nth-child(3),
+.customer-table.has-select .table td:nth-child(3) {
+  position: sticky;
+  inset-inline-start: 90px;
+  z-index: 6;
+  background-color: var(--mui-palette-background-paper) !important;
+  box-shadow: inset -1px 0 0 var(--border-color);
+  inline-size: 110px;
+  min-inline-size: 110px;
+  padding-inline: 8px !important;
+}
+
+/* Specific sticky logic for tables WITHOUT Select column */
+.customer-table:not(.has-select) .table th:nth-child(1),
+.customer-table:not(.has-select) .table td:nth-child(1) {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 6;
+  background-color: var(--mui-palette-background-paper) !important;
+  box-shadow: inset -1px 0 0 var(--border-color);
+  inline-size: 50px;
+  min-inline-size: 50px;
+  padding-inline: 4px !important;
+  text-align: center;
+}
+
+.customer-table:not(.has-select) .table th:nth-child(2),
+.customer-table:not(.has-select) .table td:nth-child(2) {
+  position: sticky;
+  inset-inline-start: 50px;
+  z-index: 6;
+  background-color: var(--mui-palette-background-paper) !important;
+  box-shadow: inset -1px 0 0 var(--border-color);
+  inline-size: 110px;
+  min-inline-size: 110px;
+  padding-inline: 8px !important;
+}
+
+/* Adjust header z-index for overlaps */
+.customer-table.has-select .table thead th:nth-child(1),
+.customer-table.has-select .table thead th:nth-child(2),
+.customer-table.has-select .table thead th:nth-child(3),
+.customer-table:not(.has-select) .table thead th:nth-child(1),
+.customer-table:not(.has-select) .table thead th:nth-child(2) {
+  z-index: 13;
+}

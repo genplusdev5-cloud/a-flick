@@ -171,7 +171,7 @@ const PurchaseInwardPage = () => {
       const defaultOrigin = origins.find(o => o.label === 'A-Flick Pte Ltd')
       if (defaultOrigin) {
         setFilterOrigin(defaultOrigin)
-        setAppliedOrigin(defaultOrigin)
+        // setAppliedOrigin(defaultOrigin) // ❌ REMOVED: Don't set initial applied filter
       }
     } catch (err) {
       console.error('Purchase filter error', err)

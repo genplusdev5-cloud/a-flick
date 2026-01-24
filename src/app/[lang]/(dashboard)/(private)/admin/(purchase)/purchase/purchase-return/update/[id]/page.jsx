@@ -12,7 +12,9 @@ import {
   Divider,
   IconButton,
   Breadcrumbs,
-  CircularProgress
+  CircularProgress,
+  FormControlLabel,
+  Checkbox
 } from '@mui/material'
 
 import StickyListLayout from '@/components/common/StickyListLayout'
@@ -33,6 +35,7 @@ import EditIcon from '@mui/icons-material/Edit'
 import styles from '@core/styles/table.module.css'
 import { getPurchaseFilters } from '@/api/purchase/purchase_inward'
 import { getPurchaseReturnDetails, updatePurchaseReturn } from '@/api/purchase/purchase_return'
+import { getChemicalsList } from '@/api/master/chemicals/list'
 
 import { getMaterialRequestDropdowns } from '@/api/transfer/materialRequest/dropdown'
 import { showToast } from '@/components/common/Toasts'
@@ -85,6 +88,12 @@ const EditPurchaseReturnPage = () => {
   const [chemical, setChemical] = useState(null)
   const [uom, setUom] = useState(null)
   const [quantity, setQuantity] = useState('')
+  // ✅ Rate & FOC
+  const [rate, setRate] = useState('')
+  const [amount, setAmount] = useState('0')
+  const [isFoc, setIsFoc] = useState(false)
+  const [prevRate, setPrevRate] = useState('')
+
   const [editId, setEditId] = useState(null)
 
   const [items, setItems] = useState([])
@@ -128,11 +137,28 @@ const EditPurchaseReturnPage = () => {
 
         const materialData = materialRes?.data || materialRes
 
+        // Chemicals (Fetching from Master to get Rates)
+        let chemRaw = []
+        try {
+          const chemRes = await getChemicalsList({ page_size: 1000 })
+          if (chemRes?.success && Array.isArray(chemRes?.data?.results)) {
+            chemRaw = chemRes.data.results
+          }
+        } catch (e) {
+          console.error('Failed to fetch master chemicals', e)
+          if (Array.isArray(purchaseData?.chemicals)) {
+            chemRaw = purchaseData.chemicals
+          }
+        }
+
         setChemicalOptions(
-          materialData?.chemicals?.name?.map(c => ({
+          chemRaw.map(c => ({
             label: c.name,
             value: c.name,
-            id: c.id
+            id: c.id,
+            uom: c.store_uom || c.uom || c.uom_name || c.unit,
+            rate: c.unit_rate || c.rate || c.price || 0,
+            isFoc: c.is_foc || Number(c.unit_rate || c.rate || 0) === 0
           })) || []
         )
 
@@ -266,6 +292,9 @@ const EditPurchaseReturnPage = () => {
     setChemical({ label: row.chemical, id: row.chemicalId })
     setUom({ label: row.uom, id: row.uomId })
     setQuantity(row.quantity)
+    setRate(row.rate || '0')
+    setPrevRate(row.prevRate || row.rate)
+    setIsFoc(row.isFoc)
   }
 
   // Rate/Amount calculation removed
@@ -286,7 +315,11 @@ const EditPurchaseReturnPage = () => {
                 chemicalId: chemical.id,
                 uom: uom.label,
                 uomId: uom.id,
-                quantity
+                quantity,
+                rate,
+                amount,
+                isFoc,
+                prevRate
               }
             : item
         )
@@ -301,7 +334,11 @@ const EditPurchaseReturnPage = () => {
           chemicalId: chemical.id,
           uom: uom.label,
           uomId: uom.id,
-          quantity
+          quantity,
+          rate,
+          amount,
+          isFoc,
+          prevRate
         }
       ])
     }
@@ -342,6 +379,8 @@ const EditPurchaseReturnPage = () => {
           po_id: item.poId || purchaseInward?.id || null, // Use preserved Item PO ID or fallback
           return_quantity: Number(item.quantity),
           quantity: Number(item.quantity),
+          unit_rate: Number(item.rate) || 0,
+          is_foc: item.isFoc ? 1 : 0,
           status: 1,
           is_active: 1
         }))
@@ -469,7 +508,7 @@ const EditPurchaseReturnPage = () => {
             </Grid>
 
             <Grid item xs={12} md={2}>
-              <GlobalAutocomplete label='UOM' options={uomOptions} value={uom} onChange={setUom} />
+              <GlobalAutocomplete label='Store UOM' options={uomOptions} value={uom} onChange={setUom} />
             </Grid>
 
             <Grid item xs={12} md={2}>
@@ -478,6 +517,33 @@ const EditPurchaseReturnPage = () => {
                 type='number'
                 value={quantity || ''}
                 onChange={e => setQuantity(e.target.value)}
+              />
+            </Grid>
+
+            {/* Rate & FOC */}
+            <Grid item xs={12} md={2}>
+              <Box display='flex' flexDirection='column'>
+                <FormControlLabel
+                  control={<Checkbox checked={isFoc} onChange={e => handleFocChange(e.target.checked)} size='small' />}
+                  label='Rate [ FOC ]'
+                  sx={{ mb: -1, '& .MuiTypography-root': { fontSize: '0.75rem' } }}
+                />
+                <GlobalTextField
+                  placeholder='0.00'
+                  type='number'
+                  value={rate}
+                  onChange={e => setRate(e.target.value)}
+                />
+              </Box>
+            </Grid>
+
+            <Grid item xs={12} md={2}>
+              <GlobalTextField
+                label='Amount'
+                value={amount}
+                InputProps={{ readOnly: true }}
+                disabled
+                sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#f5f5f5' } }}
               />
             </Grid>
 
@@ -506,10 +572,16 @@ const EditPurchaseReturnPage = () => {
                   </th>
                   <th style={{ width: '50%' }}>Chemical</th>
                   <th align='left' style={{ width: '15%', textAlign: 'left' }}>
-                    UOM
+                    STORE UOM
                   </th>
                   <th align='left' style={{ width: '15%', textAlign: 'left' }}>
                     Quantity
+                  </th>
+                  <th align='right' style={{ width: '10%', textAlign: 'right' }}>
+                    Rate
+                  </th>
+                  <th align='right' style={{ width: '12%', textAlign: 'right' }}>
+                    Amount
                   </th>
                 </tr>
               </thead>
@@ -533,6 +605,12 @@ const EditPurchaseReturnPage = () => {
                       </td>
                       <td align='left' style={{ textAlign: 'left' }}>
                         {row.quantity}
+                      </td>
+                      <td align='right' style={{ textAlign: 'right' }}>
+                        {row.rate || '0.00'}
+                      </td>
+                      <td align='right' style={{ textAlign: 'right' }}>
+                        {row.amount || '0.00'}
                       </td>
                     </tr>
                   ))

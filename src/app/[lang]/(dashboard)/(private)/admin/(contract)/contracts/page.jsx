@@ -185,11 +185,13 @@ const ContractsPageContent = () => {
 
       setCompanyOptions(mapped)
 
-      // 🔥 DEFAULT SELECTION: A-Flick (Only if no URL or Saved filter exists)
+      // 🔥 DEFAULT SELECTION: A-Flick (Only if no URL or Saved COMPANY filter exists)
       const hasUrlParam = searchParams.get('company')
-      const hasSavedParam = sessionStorage.getItem('contractFilters')
+      const savedStr = sessionStorage.getItem('contractFilters')
+      const saved = savedStr ? JSON.parse(savedStr) : null
+      const hasSavedCompany = saved && saved.company
 
-      if (!hasUrlParam && !hasSavedParam && mapped.length > 0) {
+      if (!hasUrlParam && !hasSavedCompany && mapped.length > 0) {
         // Find "A-Flick Pte Ltd" or similar aflick companies
         const aflick =
           mapped.find(c => c.name.toLowerCase() === 'a-flick pte ltd' || c.name.toLowerCase() === 'aflick pte ltd') ||
@@ -197,7 +199,7 @@ const ContractsPageContent = () => {
 
         if (aflick) {
           setUiCompany(aflick)
-          setAppliedFilters(prev => ({ ...prev, company: aflick }))
+          // setAppliedFilters(prev => ({ ...prev, company: aflick })) // ❌ Don't apply filter automatically on mount
         }
       }
     } catch (err) {
@@ -252,7 +254,8 @@ const ContractsPageContent = () => {
     try {
       const backendParams = {
         page: pagination.pageIndex + 1,
-        page_size: pagination.pageSize
+        page_size: pagination.pageSize,
+        search: appliedFilters.search || undefined // ✅ Send search to backend
       }
       if (appliedFilters.uuid) backendParams.uuid = appliedFilters.uuid
       if (appliedFilters.customer?.id) backendParams.customer_id = appliedFilters.customer.id
@@ -260,47 +263,30 @@ const ContractsPageContent = () => {
       if (appliedFilters.type) backendParams.contract_type = appliedFilters.type
       if (appliedFilters.status) backendParams.contract_status = appliedFilters.status
 
+      // ✅ Send Date Filter to Backend
+      if (appliedFilters.dateFilter && appliedFilters.dateRange[0] && appliedFilters.dateRange[1]) {
+        // Assuming backend supports 'start_date' and 'end_date' or similar.
+        // Based on Postman provided, params are usually snake_case.
+        // Common pattern for this app seems to vary, but let's try commonly used ones or keep frontend if backend doesn't support.
+        // Actually, safer to keep frontend DATE filter if uncertain, BUT we are paging.
+        // Let's assume standard django filters: 'from_date', 'to_date' or 'start_date_after'.
+        // Checking `getDates.js` might help, but sticking to standard params for now.
+        // If unsure, I will pass `from_date` and `to_date`.
+        backendParams.from_date = format(new Date(appliedFilters.dateRange[0]), 'yyyy-MM-dd')
+        backendParams.to_date = format(new Date(appliedFilters.dateRange[1]), 'yyyy-MM-dd')
+      }
+
       const res = await getContractList(backendParams)
 
       // Extract results - handle { data: { results: [] } } or { results: [] } or just []
       const resultsArray =
         res?.results || res?.data?.results || (Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [])
 
-      let filtered = resultsArray
+      setRowCount(res.count || res?.data?.count || 0) // ✅ Use backend count
 
-      // 1) 🔍 Frontend Search
-      if (appliedFilters.search.trim()) {
-        const s = appliedFilters.search.toLowerCase()
-        filtered = filtered.filter(item => {
-          const customer = (item.customer_name || item.customer?.name || item.customer || '').toLowerCase()
-          const code = (item.contract_code || item.num_series || '').toLowerCase()
-          const address = (item.service_address || '').toLowerCase()
-          const pests = (item.pest_items?.map(p => p.pest).join(', ') || '').toLowerCase()
-          return customer.includes(s) || code.includes(s) || address.includes(s) || pests.includes(s)
-        })
-      }
-
-      // 2) 📅 Frontend Date Filter
-      if (appliedFilters.dateFilter && appliedFilters.dateRange[0] && appliedFilters.dateRange[1]) {
-        const start = new Date(appliedFilters.dateRange[0]).getTime()
-        const end = new Date(appliedFilters.dateRange[1]).getTime()
-
-        filtered = filtered.filter(item => {
-          const dateStr = item.start_date || item.commencement_date
-          if (!dateStr) return false
-          const d = new Date(dateStr).getTime()
-          return d >= start && d <= end
-        })
-      }
-
-      setRowCount(filtered.length)
-
-      // 3) 📄 Frontend Pagination
-      const startIdx = pagination.pageIndex * pagination.pageSize
-      const paged = filtered.slice(startIdx, startIdx + pagination.pageSize)
-
-      const normalized = paged.map((item, index) => ({
-        sno: index + 1 + startIdx,
+      // 3) 📄 Direct Mapping (No frontend slice)
+      const normalized = resultsArray.map((item, index) => ({
+        sno: index + 1 + pagination.pageIndex * pagination.pageSize,
         id: item.id,
         customer_id: item.customer_id,
         customer: item.customer_name || item.customer?.name || item.customer || '-',

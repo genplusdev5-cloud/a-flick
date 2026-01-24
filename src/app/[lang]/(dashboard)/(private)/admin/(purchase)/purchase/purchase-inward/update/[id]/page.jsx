@@ -12,7 +12,9 @@ import {
   Divider,
   IconButton,
   Breadcrumbs,
-  CircularProgress
+  CircularProgress,
+  FormControlLabel,
+  Checkbox
 } from '@mui/material'
 
 import StickyListLayout from '@/components/common/StickyListLayout'
@@ -32,6 +34,7 @@ import EditIcon from '@mui/icons-material/Edit'
 
 import styles from '@core/styles/table.module.css'
 import { getPurchaseFilters, getPurchaseInwardDetails, updatePurchaseInward } from '@/api/purchase/purchase_inward'
+import { getChemicalsList } from '@/api/master/chemicals/list'
 import { getPurchaseOrderList } from '@/api/purchase/purchase_order'
 import { getMaterialRequestDropdowns } from '@/api/transfer/materialRequest/dropdown'
 import { showToast } from '@/components/common/Toasts'
@@ -87,6 +90,12 @@ const EditPurchaseInwardPage = () => {
   const [in_quantity, setInQuantity] = useState('')
   const [conversion, setConversion] = useState('')
   const [additional, setAdditional] = useState('')
+  // ✅ Rate & FOC
+  const [rate, setRate] = useState('')
+  const [amount, setAmount] = useState('0')
+  const [isFoc, setIsFoc] = useState(false)
+  const [prevRate, setPrevRate] = useState('')
+
   const [editId, setEditId] = useState(null)
 
   const [items, setItems] = useState([])
@@ -139,21 +148,29 @@ const EditPurchaseInwardPage = () => {
         // --- MATERIAL DROPDOWNS ---
         const materialData = materialRes?.data || materialRes
 
-        // 3. Chemicals (PRIORITY: Check multiple sources)
+        // 3. Chemicals (Fetching from Master to get Rates)
         let chemRaw = []
-        if (Array.isArray(purchaseData?.chemicals)) {
-          chemRaw = purchaseData.chemicals
-        } else if (Array.isArray(purchaseData?.chemicals?.name)) {
-          chemRaw = purchaseData.chemicals.name
-        } else if (Array.isArray(materialData?.chemicals?.name)) {
-          chemRaw = materialData.chemicals.name
+        try {
+          const chemRes = await getChemicalsList({ page_size: 1000 })
+          if (chemRes?.success && Array.isArray(chemRes?.data?.results)) {
+            chemRaw = chemRes.data.results
+          }
+        } catch (e) {
+          console.error('Failed to fetch master chemicals', e)
+          if (Array.isArray(purchaseData?.chemicals)) {
+            chemRaw = purchaseData.chemicals
+          }
         }
 
         const chemicals = chemRaw.map(c => ({
           label: c.name,
           value: c.name,
           id: c.id,
-          uom: c.uom || c.uom_name || c.unit
+          value: c.name,
+          id: c.id,
+          uom: c.store_uom || c.uom || c.uom_name || c.unit,
+          rate: c.unit_rate || c.rate || c.price || 0,
+          isFoc: c.is_foc || Number(c.unit_rate || c.rate || 0) === 0
         }))
 
         const uoms =
@@ -269,10 +286,37 @@ const EditPurchaseInwardPage = () => {
       } else {
         setUom({ label: val.uom, value: val.uom, id: null })
       }
+
+      // Rate logic
+      const r = val.rate || '0'
+      const focStatus = val.isFoc ?? Number(r) === 0
+      setRate(r)
+      setPrevRate(r)
+      setIsFoc(focStatus)
     } else {
       setUom(null)
+      setRate('')
+      setPrevRate('')
+      setIsFoc(false)
     }
   }
+
+  const handleFocChange = checked => {
+    setIsFoc(checked)
+    if (checked) {
+      setPrevRate(rate)
+      setRate('0')
+    } else {
+      setRate(prevRate || '')
+    }
+  }
+
+  // Auto-calculate Amount
+  useEffect(() => {
+    const q = Number(quantity) || 0
+    const r = Number(rate) || 0
+    setAmount((q * r).toFixed(2))
+  }, [quantity, rate])
 
   useEffect(() => {
     const fetchPOs = async () => {
@@ -312,7 +356,11 @@ const EditPurchaseInwardPage = () => {
     setUom({ label: row.uom, id: row.uom_id })
     setInQuantity(row.in_quantity || '')
     setConversion(row.conversion || '')
+    setConversion(row.conversion || '')
     setAdditional(row.additional || '')
+    setRate(row.rate || '0')
+    setPrevRate(row.prevRate || row.rate)
+    setIsFoc(row.isFoc)
   }
 
   const quantity = useMemo(() => {
@@ -346,7 +394,11 @@ const EditPurchaseInwardPage = () => {
                 conversion: conversion,
                 quantity: quantity,
                 additional: additional,
-                total_quantity: total_quantity
+                total_quantity: total_quantity,
+                rate,
+                amount,
+                isFoc,
+                prevRate
               }
             : item
         )
@@ -365,7 +417,11 @@ const EditPurchaseInwardPage = () => {
           conversion: conversion,
           quantity: quantity,
           additional: additional,
-          total_quantity: total_quantity
+          total_quantity: total_quantity,
+          rate,
+          amount,
+          isFoc,
+          prevRate
         }
       ])
     }
@@ -409,6 +465,8 @@ const EditPurchaseInwardPage = () => {
           in_quantity: Number(item.in_quantity),
           conversion: Number(item.conversion),
           quantity: Number(item.quantity),
+          unit_rate: Number(item.rate) || 0,
+          is_foc: item.isFoc ? 1 : 0,
           additional: Number(item.additional) || 0,
           total_quantity: Number(item.total_quantity),
           is_active: item.is_active || 1,
@@ -428,6 +486,8 @@ const EditPurchaseInwardPage = () => {
           in_quantity: Number(item.in_quantity),
           conversion: Number(item.conversion),
           quantity: Number(item.quantity),
+          unit_rate: Number(item.rate) || 0,
+          is_foc: item.isFoc ? 1 : 0,
           additional: Number(item.additional) || 0,
           total_quantity: Number(item.total_quantity),
           is_active: item.is_active || 1,
@@ -544,7 +604,7 @@ const EditPurchaseInwardPage = () => {
 
             <Grid item xs={12} md={2}>
               <GlobalTextField
-                label='UOM'
+                label='Store UOM'
                 value={uom?.label || ''}
                 InputProps={{
                   readOnly: true
@@ -590,6 +650,33 @@ const EditPurchaseInwardPage = () => {
               <GlobalTextField label='Total Qty' type='number' value={total_quantity} disabled />
             </Grid>
 
+            {/* Row 3: Rate & FOC */}
+            <Grid item xs={12} md={3}>
+              <Box display='flex' flexDirection='column'>
+                <FormControlLabel
+                  control={<Checkbox checked={isFoc} onChange={e => handleFocChange(e.target.checked)} size='small' />}
+                  label='Rate [ FOC ]'
+                  sx={{ mb: -1, '& .MuiTypography-root': { fontSize: '0.75rem' } }}
+                />
+                <GlobalTextField
+                  placeholder='0.00'
+                  type='number'
+                  value={rate}
+                  onChange={e => setRate(e.target.value)}
+                />
+              </Box>
+            </Grid>
+
+            <Grid item xs={12} md={3}>
+              <GlobalTextField
+                label='Amount'
+                value={amount}
+                InputProps={{ readOnly: true }}
+                disabled
+                sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#f5f5f5' } }}
+              />
+            </Grid>
+
             <Grid
               item
               xs={12}
@@ -623,7 +710,7 @@ const EditPurchaseInwardPage = () => {
                     ACTION
                   </th>
                   <th style={{ width: '20%' }}>CHEMICAL</th>
-                  <th style={{ width: '10%' }}>UOM</th>
+                  <th style={{ width: '10%' }}>STORE UOM</th>
                   <th align='left' style={{ width: '10%', textAlign: 'left' }}>
                     IN QTY
                   </th>
@@ -638,6 +725,12 @@ const EditPurchaseInwardPage = () => {
                   </th>
                   <th align='left' style={{ width: '15%', textAlign: 'left' }}>
                     TOTAL QTY
+                  </th>
+                  <th align='right' style={{ width: '10%', textAlign: 'right' }}>
+                    RATE
+                  </th>
+                  <th align='right' style={{ width: '12%', textAlign: 'right' }}>
+                    AMOUNT
                   </th>
                 </tr>
               </thead>
@@ -671,6 +764,12 @@ const EditPurchaseInwardPage = () => {
                       </td>
                       <td align='left' style={{ textAlign: 'left' }}>
                         {isNaN(row.total_quantity) ? '-' : row.total_quantity}
+                      </td>
+                      <td align='right' style={{ textAlign: 'right' }}>
+                        {row.rate || '0.00'}
+                      </td>
+                      <td align='right' style={{ textAlign: 'right' }}>
+                        {row.amount || '0.00'}
                       </td>
                     </tr>
                   ))

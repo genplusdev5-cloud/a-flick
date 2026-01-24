@@ -54,6 +54,8 @@ import { IconButton, Chip } from '@mui/material'
 
 // ✅ APIs
 import { getProposalList, getProposalFilters, deleteProposal } from '@/api/sales/proposal'
+import { getAllEmployees } from '@/api/employee/getAllEmployees'
+import { getCustomerList } from '@/api/customer_group/customer'
 import { encodeId } from '@/utils/urlEncoder'
 
 const SalesQuotationPage = () => {
@@ -61,6 +63,17 @@ const SalesQuotationPage = () => {
   const [filters, setFilters] = useState({
     date: '',
     origin: 'aflick', // ✅ Set default Origin
+    contractType: '',
+    status: '',
+    salesperson: '',
+    customer: '',
+    search: ''
+  })
+
+  // ✅ Applied Filters (Only updates on Refresh)
+  const [appliedFilters, setAppliedFilters] = useState({
+    date: '',
+    origin: '', // ✅ Start empty so it doesn't filter on load
     contractType: '',
     status: '',
     salesperson: '',
@@ -223,8 +236,15 @@ const SalesQuotationPage = () => {
   // ---------------- FETCH FILTERS ----------------
   const fetchFilters = async () => {
     try {
-      const res = await getProposalFilters()
-      console.log('🔍 PROPOSAL FILTERS RAW:', res)
+      const [filterRes, employeeList, customerRes] = await Promise.all([
+        getProposalFilters(),
+        getAllEmployees(),
+        getCustomerList({ page_size: 1000 }) // Fetch a large number of customers
+      ])
+
+      console.log('🔍 PROPOSAL FILTERS RAW:', filterRes)
+      console.log('🔍 EMPLOYEE LIST RAW:', employeeList)
+      console.log('🔍 CUSTOMER LIST RAW:', customerRes)
 
       // ✅ RECURSIVE DATA HUNTER (FIND LISTS ANYWHERE)
       const findList = (obj, targetKey) => {
@@ -239,6 +259,7 @@ const SalesQuotationPage = () => {
 
         // 3. Recursive deep search
         for (const key in obj) {
+          const customers = customerRes?.results || []
           if (typeof obj[key] === 'object') {
             const found = findList(obj[key], targetKey)
             if (found) return found
@@ -247,41 +268,53 @@ const SalesQuotationPage = () => {
         return null
       }
 
-      const body = res?.data || res || {}
+      const body = filterRes?.data || filterRes || {}
 
       const origins = findList(body, 'company') || findList(body, 'companies') || []
-      const customers = findList(body, 'customer') || findList(body, 'customers') || []
-      const contractTypes = findList(body, 'proposalContractTypes') || findList(body, 'contract_types') || []
-      const statuses = findList(body, 'statuses') || findList(body, 'status') || []
-      const salesPersons =
-        findList(body, 'sales') || // 🔥 THIS IS THE KEY
-        findList(body, 'salesPersons') ||
-        findList(body, 'sales_person') ||
-        findList(body, 'employees') ||
-        []
 
-      const mapToOptions = list => {
+      // Use direct API results for Employees and Customers
+      const salesPersons = employeeList || []
+      const customers = customerRes?.data?.results || customerRes?.results || []
+
+      const mapToOptions = (list, keyHint) => {
         if (!Array.isArray(list)) return []
         return list.map(item => {
           if (typeof item === 'string') return { label: item, value: item }
-          return {
-            label: String(item.name || item.label || item.company_name || item.customer_name || item).trim(),
-            value: item.id || item.value || item
-          }
+          const label = (
+            item.name ||
+            item.label ||
+            item.company_name ||
+            item.customer_name ||
+            item.employee_name ||
+            item.full_name ||
+            String(item)
+          ).trim()
+          const value = item.id || item.value || item.company_id || item.customer_id || item
+          return { label, value }
         })
       }
 
-      const originOptions = mapToOptions(origins)
+      const originOptions = mapToOptions(origins, 'origins')
+      const customerOptions = mapToOptions(customers, 'customers')
+      const salesPersonOptions = mapToOptions(salesPersons, 'salesPersons')
 
-      // ✅ FIND DEFAULT ORIGIN (A-Flick Pte Ltd)
+      console.log('✅ PROCESSED FILTER OPTIONS:', {
+        origins: originOptions,
+        customers: customerOptions,
+        salesPersons: salesPersonOptions
+      })
+
+      // ✅ FIND DEFAULT ORIGIN
       const defaultOrigin = originOptions.find(o => o.label.toLowerCase().includes('a-flick'))
       if (defaultOrigin) {
         setFilters(prev => ({ ...prev, origin: defaultOrigin.value }))
+        // setAppliedFilters(prev => ({ ...prev, origin: defaultOrigin.value })) // ❌ Don't auto-apply
       }
 
       setFilterOptions({
         origins: originOptions,
-        customers: mapToOptions(customers),
+        customers: customerOptions,
+        salesPersons: salesPersonOptions,
         // ✅ Hardcoded Proposal Contract Types
         contractTypes: [
           { label: 'Limited Contract', value: 'Limited Contract' },
@@ -295,8 +328,7 @@ const SalesQuotationPage = () => {
           { label: 'Approved', value: 'Approved' },
           { label: 'Declined', value: 'Declined' },
           { label: 'Completed', value: 'Completed' }
-        ],
-        salesPersons: mapToOptions(salesPersons)
+        ]
       })
     } catch (err) {
       console.error('❌ Failed to fetch filters:', err)
@@ -313,12 +345,12 @@ const SalesQuotationPage = () => {
       const params = {
         page: pagination.pageIndex + 1,
         page_size: pagination.pageSize,
-        search: filters.search || undefined,
-        company_id: filters.origin || undefined,
-        proposal_contract_type: filters.contractType || undefined,
-        status: filters.status || undefined,
-        sales_person: filters.salesperson || undefined,
-        customer_id: filters.customer || undefined,
+        search: appliedFilters.search || undefined, // ✅ Use appliedFilters
+        company_id: appliedFilters.origin || undefined,
+        proposal_contract_type: appliedFilters.contractType || undefined,
+        status: appliedFilters.status || undefined,
+        sales_person: appliedFilters.salesperson || undefined,
+        customer_id: appliedFilters.customer || undefined,
 
         // 🔥 SORTING PARAMS
         ordering: sort ? `${sort.desc ? '-' : ''}${sort.id}` : undefined
@@ -382,18 +414,24 @@ const SalesQuotationPage = () => {
     pagination.pageSize,
     appliedDateFilter,
     appliedDateRange,
-    filters.origin,
-    filters.contractType,
-    filters.status,
-    filters.salesperson,
-    filters.customer
+    // ✅ Watch appliedFilters instead of UI filters
+    appliedFilters.origin,
+    appliedFilters.contractType,
+    appliedFilters.status,
+    appliedFilters.salesperson,
+    appliedFilters.customer,
+    appliedFilters.search // Added search to dependency if needed, or handle in refresh
   ])
 
   const handleRefresh = () => {
     setAppliedDateFilter(uiDateFilter)
     setAppliedDateRange(uiDateRange)
     setPagination(p => ({ ...p, pageIndex: 0 }))
-    if (!uiDateFilter) loadData() // Manual trigger if date filter didn't change but refresh was clicked
+
+    // ✅ Apply UI filters to Applied Filters
+    setAppliedFilters(filters)
+
+    // loadData will automatically trigger due to dependency change
   }
 
   const table = useReactTable({

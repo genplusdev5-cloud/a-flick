@@ -18,13 +18,16 @@ import {
   TableCell,
   TableBody,
   Breadcrumbs,
-  CircularProgress
+  CircularProgress,
+  FormControlLabel,
+  Checkbox
 } from '@mui/material'
 
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
 import { getPurchaseFilters, addPurchaseInward } from '@/api/purchase/purchase_inward'
+import { getChemicalsList } from '@/api/master/chemicals/list'
 import { getPurchaseOrderList, getPurchaseOrderDetails } from '@/api/purchase/purchase_order'
 
 import StickyListLayout from '@/components/common/StickyListLayout'
@@ -73,6 +76,12 @@ const AddPurchaseInwardPage = () => {
   const [in_quantity, setInQuantity] = useState('')
   const [conversion, setConversion] = useState('')
   const [additional, setAdditional] = useState('')
+  // ✅ Rate & FOC
+  const [rate, setRate] = useState('')
+  const [amount, setAmount] = useState('0')
+  const [isFoc, setIsFoc] = useState(false)
+  const [prevRate, setPrevRate] = useState('')
+
   const [editId, setEditId] = useState(null)
 
   // Items list
@@ -110,21 +119,29 @@ const AddPurchaseInwardPage = () => {
 
         const materialData = materialRes?.data || materialRes
 
-        // 3. Chemicals (PRIORITY: Check multiple sources)
+        // 3. Chemicals (Fetching from Master to get Rates)
         let chemRaw = []
-        if (Array.isArray(purchaseData?.chemicals)) {
-          chemRaw = purchaseData.chemicals
-        } else if (Array.isArray(purchaseData?.chemicals?.name)) {
-          chemRaw = purchaseData.chemicals.name
-        } else if (Array.isArray(materialData?.chemicals?.name)) {
-          chemRaw = materialData.chemicals.name
+        try {
+          const chemRes = await getChemicalsList({ page_size: 1000 })
+          if (chemRes?.success && Array.isArray(chemRes?.data?.results)) {
+            chemRaw = chemRes.data.results
+          }
+        } catch (e) {
+          console.error('Failed to fetch master chemicals', e)
+          if (Array.isArray(purchaseData?.chemicals)) {
+            chemRaw = purchaseData.chemicals
+          }
         }
 
         const chemicals = chemRaw.map(c => ({
           label: c.name,
           value: c.name,
           id: c.id,
-          uom: c.uom || c.uom_name || c.unit
+          value: c.name,
+          id: c.id,
+          uom: c.store_uom || c.uom || c.uom_name || c.unit,
+          rate: c.unit_rate || c.rate || c.price || 0,
+          isFoc: c.is_foc || Number(c.unit_rate || c.rate || 0) === 0
         }))
 
         const uoms =
@@ -172,8 +189,28 @@ const AddPurchaseInwardPage = () => {
       } else {
         setUom({ label: val.uom, value: val.uom, id: null })
       }
+
+      // Rate logic
+      const r = val.rate || '0'
+      const focStatus = val.isFoc ?? Number(r) === 0
+      setRate(r)
+      setPrevRate(r)
+      setIsFoc(focStatus)
     } else {
       setUom(null)
+      setRate('')
+      setPrevRate('')
+      setIsFoc(false)
+    }
+  }
+
+  const handleFocChange = checked => {
+    setIsFoc(checked)
+    if (checked) {
+      setPrevRate(rate)
+      setRate('0')
+    } else {
+      setRate(prevRate || '')
     }
   }
 
@@ -270,7 +307,12 @@ const AddPurchaseInwardPage = () => {
     setUom({ label: row.uom, id: row.uom_id })
     setInQuantity(row.in_quantity || '')
     setConversion(row.conversion || '')
+    setInQuantity(row.in_quantity || '')
+    setConversion(row.conversion || '')
     setAdditional(row.additional || '')
+    setRate(row.rate || '0')
+    setPrevRate(row.prevRate || row.rate)
+    setIsFoc(row.isFoc)
   }
 
   const PoDateInput = forwardRef(function PoDateInput(props, ref) {
@@ -284,6 +326,13 @@ const AddPurchaseInwardPage = () => {
     const c = Number(conversion)
     return q && c ? q * c : 0
   }, [in_quantity, conversion])
+
+  // Auto-calculate Amount
+  useEffect(() => {
+    const q = Number(quantity) || 0
+    const r = Number(rate) || 0
+    setAmount((q * r).toFixed(2))
+  }, [quantity, rate])
 
   const total_quantity = useMemo(() => {
     const a = Number(additional) || 0
@@ -310,7 +359,11 @@ const AddPurchaseInwardPage = () => {
                 conversion: conversion,
                 quantity: quantity,
                 additional: additional,
-                total_quantity: total_quantity
+                total_quantity: total_quantity,
+                rate,
+                amount,
+                isFoc,
+                prevRate
               }
             : item
         )
@@ -329,7 +382,11 @@ const AddPurchaseInwardPage = () => {
           conversion: conversion,
           quantity: quantity,
           additional: additional,
-          total_quantity: total_quantity
+          total_quantity: total_quantity,
+          rate,
+          amount,
+          isFoc,
+          prevRate
         }
       ])
     }
@@ -377,6 +434,8 @@ const AddPurchaseInwardPage = () => {
           in_quantity: Number(item.in_quantity),
           conversion: Number(item.conversion),
           quantity: Number(item.quantity),
+          unit_rate: Number(item.rate) || 0,
+          is_foc: item.isFoc ? 1 : 0,
 
           additional: Number(item.additional) || 0,
           total_quantity: Number(item.total_quantity),
@@ -444,75 +503,59 @@ const AddPurchaseInwardPage = () => {
           )}
 
           <Grid container spacing={3}>
-  {/* 🔹 ROW 1 – Date + Origin */}
-  <Grid item xs={12} md={4}>
-    <AppReactDatepicker
-      selected={poDate}
-      onChange={date => setPoDate(date)}
-      dateFormat='dd/MM/yyyy'
-      customInput={
-        <PoDateInput
-          label='Inward Date'
-          value={poDate ? format(poDate, 'dd/MM/yyyy') : ''}
-        />
-      }
-    />
-  </Grid>
+            {/* 🔹 ROW 1 – Date + Origin */}
+            <Grid item xs={12} md={4}>
+              <AppReactDatepicker
+                selected={poDate}
+                onChange={date => setPoDate(date)}
+                dateFormat='dd/MM/yyyy'
+                customInput={<PoDateInput label='Inward Date' value={poDate ? format(poDate, 'dd/MM/yyyy') : ''} />}
+              />
+            </Grid>
 
-  <Grid item xs={12} md={4}>
-    <GlobalAutocomplete
-      label='Origin'
-      options={originOptions}
-      value={origin}
-      onChange={setOrigin}
-    />
-  </Grid>
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete label='Origin' options={originOptions} value={origin} onChange={setOrigin} />
+            </Grid>
 
-  {/* Empty spacer to keep layout clean */}
-  <Grid item xs={12} md={4} />
+            {/* Empty spacer to keep layout clean */}
+            <Grid item xs={12} md={4} />
 
-  {/* 🔹 ROW 2 – Supplier + PO + Vehicle */}
-  <Grid item xs={12} md={4}>
-    <GlobalAutocomplete
-      label='Suppliers'
-      options={supplierOptions}
-      value={supplier}
-      onChange={setSupplier}
-    />
-  </Grid>
+            {/* 🔹 ROW 2 – Supplier + PO + Vehicle */}
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete label='Suppliers' options={supplierOptions} value={supplier} onChange={setSupplier} />
+            </Grid>
 
-  <Grid item xs={12} md={4}>
-    <GlobalAutocomplete
-      label='Purchase Order'
-      options={purchaseOrderOptions}
-      value={purchaseOrder}
-      onChange={setPurchaseOrder}
-      placeholder='Select PO'
-    />
-  </Grid>
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete
+                label='Purchase Order'
+                options={purchaseOrderOptions}
+                value={purchaseOrder}
+                onChange={setPurchaseOrder}
+                placeholder='Select PO'
+              />
+            </Grid>
 
-  <Grid item xs={12} md={4}>
-    <GlobalAutocomplete
-      label='Vehicle/Warehouse'
-      options={vehicleOptions}
-      value={vehicle}
-      onChange={setVehicle}
-      placeholder='Select Vehicle/Warehouse'
-    />
-  </Grid>
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete
+                label='Vehicle/Warehouse'
+                options={vehicleOptions}
+                value={vehicle}
+                onChange={setVehicle}
+                placeholder='Select Vehicle/Warehouse'
+              />
+            </Grid>
 
-  {/* 🔹 Remarks – full width */}
-  <Grid item xs={12}>
-    <GlobalTextField
-      label='Remarks'
-      multiline
-      minRows={3}
-      value={remarks}
-      onChange={e => setRemarks(e.target.value)}
-    />
-  </Grid>
-</Grid>
-
+            {/* 🔹 Remarks – full width */}
+            <Grid item xs={12}>
+              <GlobalTextField
+                label='Remarks'
+                multiline
+                minRows={3}
+                value={remarks}
+                onChange={e => setRemarks(e.target.value)}
+              />
+            </Grid>
+          </Grid>
         </Box>
 
         <Divider />
@@ -532,7 +575,7 @@ const AddPurchaseInwardPage = () => {
 
             <Grid item xs={12} md={2}>
               <GlobalTextField
-                label='UOM'
+                label='Store UOM'
                 value={uom?.label || ''}
                 InputProps={{
                   readOnly: true
@@ -578,6 +621,33 @@ const AddPurchaseInwardPage = () => {
               <GlobalTextField label='Total Qty' type='number' value={total_quantity} disabled />
             </Grid>
 
+            {/* Row 3: Rate & FOC */}
+            <Grid item xs={12} md={3}>
+              <Box display='flex' flexDirection='column'>
+                <FormControlLabel
+                  control={<Checkbox checked={isFoc} onChange={e => handleFocChange(e.target.checked)} size='small' />}
+                  label='Rate [ FOC ]'
+                  sx={{ mb: -1, '& .MuiTypography-root': { fontSize: '0.75rem' } }}
+                />
+                <GlobalTextField
+                  placeholder='0.00'
+                  type='number'
+                  value={rate}
+                  onChange={e => setRate(e.target.value)}
+                />
+              </Box>
+            </Grid>
+
+            <Grid item xs={12} md={3}>
+              <GlobalTextField
+                label='Amount'
+                value={amount}
+                InputProps={{ readOnly: true }}
+                disabled
+                sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#f5f5f5' } }}
+              />
+            </Grid>
+
             <Grid
               item
               xs={12}
@@ -611,7 +681,7 @@ const AddPurchaseInwardPage = () => {
                     ACTION
                   </th>
                   <th style={{ width: '20%' }}>CHEMICAL</th>
-                  <th style={{ width: '10%' }}>UOM</th>
+                  <th style={{ width: '10%' }}>STORE UOM</th>
                   <th align='left' style={{ width: '10%', textAlign: 'left' }}>
                     IN QTY
                   </th>
@@ -626,6 +696,12 @@ const AddPurchaseInwardPage = () => {
                   </th>
                   <th align='left' style={{ width: '15%', textAlign: 'left' }}>
                     TOTAL QTY
+                  </th>
+                  <th align='right' style={{ width: '10%', textAlign: 'right' }}>
+                    RATE
+                  </th>
+                  <th align='right' style={{ width: '12%', textAlign: 'right' }}>
+                    AMOUNT
                   </th>
                 </tr>
               </thead>
@@ -659,6 +735,12 @@ const AddPurchaseInwardPage = () => {
                       </td>
                       <td align='left' style={{ textAlign: 'left' }}>
                         {row.total_quantity}
+                      </td>
+                      <td align='right' style={{ textAlign: 'right' }}>
+                        {row.rate || '0.00'}
+                      </td>
+                      <td align='right' style={{ textAlign: 'right' }}>
+                        {row.amount || '0.00'}
                       </td>
                     </tr>
                   ))

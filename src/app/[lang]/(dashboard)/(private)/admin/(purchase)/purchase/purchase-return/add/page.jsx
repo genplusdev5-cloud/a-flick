@@ -18,14 +18,19 @@ import {
   TableCell,
   TableBody,
   Breadcrumbs,
-  CircularProgress
+  CircularProgress,
+  FormControlLabel,
+  Checkbox
 } from '@mui/material'
 
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
 import { getPurchaseFilters, getPurchaseInwardList, getPurchaseInwardDetails } from '@/api/purchase/purchase_inward'
+import { getPurchaseFilters, getPurchaseInwardList, getPurchaseInwardDetails } from '@/api/purchase/purchase_inward'
 import { addPurchaseReturn } from '@/api/purchase/purchase_return'
+import { getChemicalsList } from '@/api/master/chemicals/list'
+import { getChemicalsList } from '@/api/master/chemicals/list'
 
 import StickyListLayout from '@/components/common/StickyListLayout'
 import GlobalButton from '@/components/common/GlobalButton'
@@ -79,6 +84,12 @@ const AddPurchaseReturnPage = () => {
   const [additional, setAdditional] = useState('')
   const [total_quantity, setTotalQuantity] = useState('') // Auto-calculated
 
+  // ✅ Rate & FOC
+  const [rate, setRate] = useState('')
+  const [amount, setAmount] = useState('0')
+  const [isFoc, setIsFoc] = useState(false)
+  const [prevRate, setPrevRate] = useState('')
+
   const [editId, setEditId] = useState(null)
 
   // Items list
@@ -109,12 +120,19 @@ const AddPurchaseReturnPage = () => {
 
         const materialData = materialRes?.data || materialRes
 
-        const chemicals =
-          materialData?.chemicals?.name?.map(c => ({
-            label: c.name,
-            value: c.name,
-            id: c.id
-          })) || []
+        // 3. Chemicals (Fetching from Master to get Rates)
+        let chemRaw = []
+        try {
+          const chemRes = await getChemicalsList({ page_size: 1000 })
+          if (chemRes?.success && Array.isArray(chemRes?.data?.results)) {
+            chemRaw = chemRes.data.results
+          }
+        } catch (e) {
+          console.error('Failed to fetch master chemicals', e)
+          if (Array.isArray(purchaseData?.chemicals)) {
+            chemRaw = purchaseData.chemicals
+          }
+        }
 
         const uoms =
           materialData?.uom?.name?.map(u => ({
@@ -211,7 +229,7 @@ const AddPurchaseReturnPage = () => {
             id: Date.now() + index,
             chemical: item.item_name,
             chemicalId: item.item_id,
-            uom: item.uom,
+            uom: item.store_uom || item.uom,
             uomId: item.uom_id,
 
             // Map Inward Fields
@@ -252,6 +270,9 @@ const AddPurchaseReturnPage = () => {
     setInQuantity(row.in_quantity || '')
     setConversion(row.conversion || '')
     setAdditional(row.additional || '')
+    setRate(row.rate || '0')
+    setPrevRate(row.prevRate || row.rate)
+    setIsFoc(row.isFoc)
   }
 
   const PoDateInput = forwardRef(function PoDateInput(props, ref) {
@@ -275,10 +296,33 @@ const AddPurchaseReturnPage = () => {
     }
 
     if (editId) {
-      setItems(prev => prev.map(item => (item.id === editId ? { ...item, ...newItem } : item)))
+      setItems(prev =>
+        prev.map(item =>
+          item.id === editId
+            ? {
+                ...item,
+                ...newItem,
+                rate,
+                amount,
+                isFoc,
+                prevRate
+              }
+            : item
+        )
+      )
       setEditId(null)
     } else {
-      setItems(prev => [...prev, { id: Date.now(), ...newItem }])
+      setItems(prev => [
+        ...prev,
+        {
+          id: Date.now(),
+          ...newItem,
+          rate,
+          amount,
+          isFoc,
+          prevRate
+        }
+      ])
     }
 
     setChemical(null)
@@ -458,7 +502,7 @@ const AddPurchaseReturnPage = () => {
             </Grid>
 
             <Grid item xs={12} md={3}>
-              <GlobalAutocomplete label='UOM' options={uomOptions} value={uom} onChange={setUom} />
+              <GlobalAutocomplete label='Store UOM' options={uomOptions} value={uom} onChange={setUom} />
             </Grid>
 
             <Grid item xs={12} md={3}>
@@ -467,6 +511,33 @@ const AddPurchaseReturnPage = () => {
                 type='number'
                 value={quantity}
                 onChange={e => setQuantity(e.target.value)}
+              />
+            </Grid>
+
+            {/* Row 2: Rate & FOC */}
+            <Grid item xs={12} md={3}>
+              <Box display='flex' flexDirection='column'>
+                <FormControlLabel
+                  control={<Checkbox checked={isFoc} onChange={e => handleFocChange(e.target.checked)} size='small' />}
+                  label='Rate [ FOC ]'
+                  sx={{ mb: -1, '& .MuiTypography-root': { fontSize: '0.75rem' } }}
+                />
+                <GlobalTextField
+                  placeholder='0.00'
+                  type='number'
+                  value={rate}
+                  onChange={e => setRate(e.target.value)}
+                />
+              </Box>
+            </Grid>
+
+            <Grid item xs={12} md={3}>
+              <GlobalTextField
+                label='Amount'
+                value={amount}
+                InputProps={{ readOnly: true }}
+                disabled
+                sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#f5f5f5' } }}
               />
             </Grid>
 
@@ -496,11 +567,17 @@ const AddPurchaseReturnPage = () => {
                   </th>
                   <th style={{ width: '50%' }}>CHEMICAL</th>
                   <th align='left' style={{ width: '15%', textAlign: 'left' }}>
-                    UOM
+                    STORE UOM
                   </th>
 
                   <th align='left' style={{ width: '15%', textAlign: 'left' }}>
                     QTY
+                  </th>
+                  <th align='right' style={{ width: '10%', textAlign: 'right' }}>
+                    RATE
+                  </th>
+                  <th align='right' style={{ width: '12%', textAlign: 'right' }}>
+                    AMOUNT
                   </th>
                 </tr>
               </thead>
@@ -527,6 +604,12 @@ const AddPurchaseReturnPage = () => {
 
                       <td align='left' style={{ textAlign: 'left' }}>
                         {row.quantity}
+                      </td>
+                      <td align='right' style={{ textAlign: 'right' }}>
+                        {row.rate || '0.00'}
+                      </td>
+                      <td align='right' style={{ textAlign: 'right' }}>
+                        {row.amount || '0.00'}
                       </td>
                     </tr>
                   ))

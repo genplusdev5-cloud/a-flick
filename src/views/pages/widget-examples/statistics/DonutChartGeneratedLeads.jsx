@@ -21,7 +21,8 @@ const BarChartRevenueGrowth = props => {
     total = '4,350',
     series = [32, 41, 41, 70],
     labels = ['Electronic', 'Sports', 'Decor', 'Fashion'],
-    customColors
+    customColors,
+    size = 120
   } = props
 
   // Hook
@@ -60,7 +61,7 @@ const BarChartRevenueGrowth = props => {
     },
     plotOptions: {
       pie: {
-        customScale: 0.9,
+        customScale: 1.0,
         expandOnClick: false,
         donut: {
           size: '73%',
@@ -105,7 +106,7 @@ const BarChartRevenueGrowth = props => {
             <Typography variant='h4'>{total}</Typography>
           </div>
         </div>
-        <AppReactApexCharts type='donut' width={120} height={120} series={series} options={options} />
+        <AppReactApexCharts type='donut' width={size} height={size} series={series} options={options} />
       </CardContent>
     </Card>
   )

@@ -1,7 +1,7 @@
 import api from '@/utils/axiosInstance'
 
-export const salesAgreementDetails = id => {
-  return api.get('/sales_agreement-details/', {
+export const proposalPestDetails = id => {
+  return api.get('/proposal_pest-details/', {
     params: { id }
   })
 }

@@ -1,5 +1,5 @@
 import api from '@/utils/axiosInstance'
 
-export const deleteProposalPest = data => {
-  return api.patch('/proposal_pest-delete/', data)
+export const deleteSalesAgreement = data => {
+  return api.patch('/sales_agreement-delete/', data)
 }

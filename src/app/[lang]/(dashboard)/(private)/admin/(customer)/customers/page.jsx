@@ -138,52 +138,49 @@ const CustomersPageContent = () => {
   // Sync pagination state to URL search params
   const isFirstRender = useRef(true)
 
- const handleMyobExport = async () => {
-  if (selectedIds.length === 0) {
-    showToast('warning', 'Select at least one customer')
-    return
+  const handleMyobExport = async () => {
+    if (selectedIds.length === 0) {
+      showToast('warning', 'Select at least one customer')
+      return
+    }
+
+    try {
+      setLoading(true)
+
+      // 🔥 Convert array → comma separated string
+      const items = selectedIds.join(',')
+
+      const res = await exportMyob(items)
+
+      // 🔥 FILE DOWNLOAD
+      const blob = new Blob([res.data], {
+        type: res.headers['content-type'] || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      })
+
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+
+      link.href = url
+      link.download = 'MYOB_Customers.xlsx'
+      document.body.appendChild(link)
+      link.click()
+
+      link.remove()
+      window.URL.revokeObjectURL(url)
+
+      showToast('success', 'MYOB export completed')
+
+      // reset
+      setSelectedIds([])
+      setFilterMyob(null)
+      handleRefresh()
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'MYOB export failed')
+    } finally {
+      setLoading(false)
+    }
   }
-
-  try {
-    setLoading(true)
-
-    // 🔥 Convert array → comma separated string
-    const items = selectedIds.join(',')
-
-    const res = await exportMyob(items)
-
-    // 🔥 FILE DOWNLOAD
-    const blob = new Blob([res.data], {
-      type:
-        res.headers['content-type'] ||
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    })
-
-    const url = window.URL.createObjectURL(blob)
-    const link = document.createElement('a')
-
-    link.href = url
-    link.download = 'MYOB_Customers.xlsx'
-    document.body.appendChild(link)
-    link.click()
-
-    link.remove()
-    window.URL.revokeObjectURL(url)
-
-    showToast('success', 'MYOB export completed')
-
-    // reset
-    setSelectedIds([])
-    setFilterMyob(null)
-    handleRefresh()
-  } catch (err) {
-    console.error(err)
-    showToast('error', 'MYOB export failed')
-  } finally {
-    setLoading(false)
-  }
-}
-
 
   const handleRefresh = () => {
     setAppliedSearchText(searchText)
@@ -352,33 +349,35 @@ const CustomersPageContent = () => {
   const columns = useMemo(
     () => [
       // ✅ 0) CHECKBOX COLUMN (ONLY FOR NOT EXPORTED)
-      columnHelper.display({
-        id: 'select',
-        header: () =>
-          filterMyob?.value === 'Not Exported' ? (
-            <Checkbox
-              checked={rows.length > 0 && selectedIds.length === rows.length}
-              indeterminate={selectedIds.length > 0 && selectedIds.length < rows.length}
-              onChange={e => {
-                setSelectedIds(e.target.checked ? rows.map(r => r.id) : [])
-              }}
-            />
-          ) : null,
-
-        cell: info =>
-          filterMyob?.value === 'Not Exported' ? (
-            <Checkbox
-              checked={selectedIds.includes(info.row.original.id)}
-              onChange={e => {
-                const id = info.row.original.id
-                setSelectedIds(prev => (e.target.checked ? [...prev, id] : prev.filter(x => x !== id)))
-              }}
-            />
-          ) : null
-      }),
+      ...(filterMyob?.value === 'Not Exported'
+        ? [
+            columnHelper.display({
+              id: 'select',
+              header: () => (
+                <Checkbox
+                  checked={rows.length > 0 && selectedIds.length === rows.length}
+                  indeterminate={selectedIds.length > 0 && selectedIds.length < rows.length}
+                  onChange={e => {
+                    setSelectedIds(e.target.checked ? rows.map(r => r.id) : [])
+                  }}
+                />
+              ),
+              cell: info => (
+                <Checkbox
+                  checked={selectedIds.includes(info.row.original.id)}
+                  onChange={e => {
+                    const id = info.row.original.id
+                    setSelectedIds(prev => (e.target.checked ? [...prev, id] : prev.filter(x => x !== id)))
+                  }}
+                />
+              )
+            })
+          ]
+        : []),
 
       // 1) S.No
       columnHelper.accessor('sno', {
+        id: 'sno',
         header: 'S.No'
       }),
 
@@ -387,7 +386,7 @@ const CustomersPageContent = () => {
         id: 'actions',
         header: 'Action',
         cell: info => (
-          <Box sx={{ display: 'flex', gap: 1 }}>
+          <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
             {/* CONTRACT */}
             <IconButton
               size='small'
@@ -423,11 +422,13 @@ const CustomersPageContent = () => {
 
       // 3) Origin
       columnHelper.accessor('origin', {
+        id: 'origin',
         header: 'Origin'
       }),
 
       // 4) Customer Code
       columnHelper.accessor('cardId', {
+        id: 'cardId',
         header: 'Customer Code'
       }),
 
@@ -674,6 +675,7 @@ const CustomersPageContent = () => {
                 series={[summary.total_active, summary.total_inactive]}
                 labels={['Active', 'Inactive']}
                 customColors={['var(--mui-palette-success-main)', 'var(--mui-palette-error-main)']}
+                size={180}
               />
             </Grid>
           </Grid>
@@ -897,50 +899,52 @@ const CustomersPageContent = () => {
           </Box>
 
           <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-            <StickyTableWrapper rowCount={rows.length}>
-              <table className={styles.table}>
-                <thead>
-                  {table.getHeaderGroups().map(hg => (
-                    <tr key={hg.id}>
-                      {hg.headers.map(h => (
-                        <th key={h.id}>
-                          <div
-                            className={classnames({
-                              'flex items-center': h.column.getIsSorted(),
-                              'cursor-pointer select-none': h.column.getCanSort()
-                            })}
-                            onClick={h.column.getToggleSortingHandler()}
-                          >
-                            {flexRender(h.column.columnDef.header, h.getContext())}
-                            {{
-                              asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
-                              desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
-                            }[h.column.getIsSorted()] ?? null}
-                          </div>
-                        </th>
-                      ))}
-                    </tr>
-                  ))}
-                </thead>
-                <tbody>
-                  {rows.length ? (
-                    table.getRowModel().rows.map(row => (
-                      <tr key={row.id}>
-                        {row.getVisibleCells().map(cell => (
-                          <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+            <div className={classnames('customer-table', { 'has-select': filterMyob?.value === 'Not Exported' })}>
+              <StickyTableWrapper rowCount={rows.length}>
+                <table className={styles.table}>
+                  <thead>
+                    {table.getHeaderGroups().map(hg => (
+                      <tr key={hg.id}>
+                        {hg.headers.map(h => (
+                          <th key={h.id}>
+                            <div
+                              className={classnames({
+                                'flex items-center': h.column.getIsSorted(),
+                                'cursor-pointer select-none': h.column.getCanSort()
+                              })}
+                              onClick={h.column.getToggleSortingHandler()}
+                            >
+                              {flexRender(h.column.columnDef.header, h.getContext())}
+                              {{
+                                asc: <ChevronRight fontSize='1.25rem' className='-rotate-90' />,
+                                desc: <ChevronRight fontSize='1.25rem' className='rotate-90' />
+                              }[h.column.getIsSorted()] ?? null}
+                            </div>
+                          </th>
                         ))}
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={columns.length} className='text-center py-4'>
-                        {loading ? 'Loading customers...' : 'No results found'}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </StickyTableWrapper>
+                    ))}
+                  </thead>
+                  <tbody>
+                    {rows.length ? (
+                      table.getRowModel().rows.map(row => (
+                        <tr key={row.id}>
+                          {row.getVisibleCells().map(cell => (
+                            <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                          ))}
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={columns.length} className='text-center py-4'>
+                          {loading ? 'Loading customers...' : 'No results found'}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </StickyTableWrapper>
+            </div>
           </Box>
 
           <Box sx={{ flexShrink: 0, mt: 'auto' }}>

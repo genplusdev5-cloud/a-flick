@@ -190,7 +190,7 @@ const PurchaseOrderPage = () => {
       const defaultOrigin = origins.find(o => o.label === 'A-Flick Pte Ltd')
       if (defaultOrigin) {
         setFilterOrigin(defaultOrigin)
-        setAppliedFilterOrigin(defaultOrigin)
+        // setAppliedFilterOrigin(defaultOrigin)  // ❌ REMOVED: Don't filter on mount
       }
     } catch (err) {
       console.error('Filter fetch failed', err)
@@ -300,12 +300,10 @@ const PurchaseOrderPage = () => {
         cell: info => <div style={{ textAlign: 'right' }}>{info.getValue() || '0.00'}</div>
       }),
 
-
       columnHelper.accessor('noOfItems', {
         header: () => <div style={{ textAlign: 'right', width: '100%' }}>No. of Items</div>,
         cell: info => <div style={{ textAlign: 'right' }}>{info.getValue() || 0}</div>
       }),
-
 
       columnHelper.accessor('remarks', {
         header: 'Remarks'

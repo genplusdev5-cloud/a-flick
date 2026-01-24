@@ -58,7 +58,6 @@ export const TableSection = ({
       borderRadius: 1,
       overflow: 'hidden',
       p: 2,
-      height: '100%',
       bgcolor: 'background.paper'
     }}
   >
@@ -125,6 +124,7 @@ export const TableSection = ({
 )
 
 const Step4PestItems = ({
+  id, // ✅ Add id
   currentPestItem,
   handleCurrentPestItemChange,
   handleCurrentPestItemAutocompleteChange,
@@ -133,7 +133,9 @@ const Step4PestItems = ({
   pestItems,
   handleEditPestItem,
   handleDeletePestItem,
-  editingItemId
+  editingItemId,
+  handleKeyDown,
+  refs
 }) => {
   // --- Independent States ---
   const [pestSearch, setPestSearch] = useState('')
@@ -175,19 +177,144 @@ const Step4PestItems = ({
         </Box>
       </Grid>
 
+      {/* --- INLINE ADD FORM (ONLY FOR ADD MODE) --- */}
+      {!id && (
+        <Grid item xs={12}>
+          <Box
+            sx={{
+              p: 4,
+              bgcolor: '#fff',
+              borderRadius: 1,
+              border: '1px solid #e0e0e0',
+              mb: 4
+            }}
+          >
+            <Typography
+              variant='subtitle2'
+              sx={{ mb: 3, fontWeight: 'bold', color: '#8b0000', textTransform: 'uppercase' }}
+            >
+              {editingItemId ? 'Update Pest Item' : 'Enter Pest Details'}
+            </Typography>
+            <Grid container spacing={4} alignItems='flex-end'>
+              <Grid item xs={12} md={2}>
+                <GlobalAutocomplete
+                  label='Pest'
+                  options={dropdowns.pests || []}
+                  value={currentPestItem.pestId} // ✅ ID
+                  onChange={v => handleCurrentPestItemAutocompleteChange('pest', v, refs.pestInputRef)}
+                  inputRef={refs.pestInputRef}
+                />
+              </Grid>
+              <Grid item xs={12} md={2}>
+                <GlobalAutocomplete
+                  label='Billing Frequency'
+                  options={dropdowns.frequencies || []}
+                  value={currentPestItem.frequencyId} // ✅ ID
+                  onChange={v => handleCurrentPestItemAutocompleteChange('frequency', v, refs.frequencyInputRef)}
+                  inputRef={refs.frequencyInputRef}
+                />
+              </Grid>
+              <Grid item xs={12} md={2}>
+                <CustomTextField
+                  fullWidth
+                  label='Pest Count'
+                  name='pestCount'
+                  value={currentPestItem.pestCount}
+                  InputProps={{ readOnly: true }}
+                  sx={{ '& .MuiInputBase-root': { bgcolor: '#f8f9fa' } }}
+                />
+              </Grid>
+              <Grid item xs={12} md={2}>
+                <CustomTextField
+                  fullWidth
+                  label='Pest Value'
+                  name='pestValue'
+                  type='number'
+                  value={currentPestItem.pestValue}
+                  onChange={handleCurrentPestItemChange}
+                  inputRef={refs.currentPestValueRef}
+                  onKeyDown={e => handleKeyDown(e, refs.currentPestValueRef)}
+                />
+              </Grid>
+              <Grid item xs={12} md={2}>
+                <CustomTextField
+                  fullWidth
+                  label='Total'
+                  name='total'
+                  value={currentPestItem.total}
+                  InputProps={{ readOnly: true }}
+                  sx={{ '& .MuiInputBase-root': { bgcolor: '#f8f9fa' } }}
+                />
+              </Grid>
+              <Grid item xs={12} md={2}>
+                <GlobalAutocomplete
+                  label='Time'
+                  options={['0:05', '0:10', '0:15', '0:30', '1:00']}
+                  value={currentPestItem.time}
+                  onChange={v => handleCurrentPestItemAutocompleteChange('time', v, refs.timeInputRef)}
+                  inputRef={refs.timeInputRef}
+                />
+              </Grid>
+
+              {/* Row 2 */}
+              <Grid item xs={12} md={6}>
+                <GlobalAutocomplete
+                  label='Chemicals'
+                  options={dropdowns.chemicals || []}
+                  value={currentPestItem.chemicalId} // ✅ FIX
+                  onChange={v => handleCurrentPestItemAutocompleteChange('chemical', v, refs.currentChemicalsRef)}
+                  inputRef={refs.currentChemicalsRef}
+                />
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <CustomTextField
+                  fullWidth
+                  label='No of Items'
+                  name='noOfItems'
+                  type='number'
+                  value={currentPestItem.noOfItems}
+                  onChange={handleCurrentPestItemChange}
+                  inputRef={refs.currentNoOfItemsRef}
+                  onKeyDown={e => handleKeyDown(e, refs.currentNoOfItemsRef)}
+                />
+              </Grid>
+              <Grid item xs={12} md={3} display='flex' justifyContent='flex-end'>
+                <Button
+                  variant='contained'
+                  onClick={handleSavePestItem}
+                  fullWidth
+                  ref={refs.addPestButtonRef}
+                  sx={{
+                    bgcolor: '#00adef',
+                    height: 40,
+                    fontWeight: 600,
+                    fontSize: '15px',
+                    '&:hover': { bgcolor: '#008dc4' }
+                  }}
+                >
+                  {editingItemId ? 'UPDATE PEST' : '+ ADD PEST'}
+                </Button>
+              </Grid>
+            </Grid>
+          </Box>
+        </Grid>
+      )}
+
       {/* PEST TABLE (Full Width) */}
       <Grid item xs={12}>
         <TableSection
           title='PEST DETAILS'
           addButton={
-            <Button
-              variant='contained'
-              size='small'
-              startIcon={<EditIcon sx={{ fontSize: 16 }} />}
-              onClick={() => setPestDialogOpen(true)}
-            >
-              Add New Pest
-            </Button>
+            id && ( // Only show in UPDATE mode
+              <Button
+                variant='contained'
+                size='small'
+                startIcon={<EditIcon sx={{ fontSize: 16 }} />}
+                onClick={() => setPestDialogOpen(true)}
+              >
+                Add New Pest
+              </Button>
+            )
           }
           searchText={pestSearch}
           setSearchText={setPestSearch}
@@ -198,14 +325,14 @@ const Step4PestItems = ({
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>ID</th>
+                <th>#</th>
                 <th>Action</th>
                 <th>Pest</th>
-                <th>Frequency</th>
-                <th>Chemicals</th>
+                <th>Billing Frequency</th>
                 <th>Pest Value</th>
                 <th>Total Value</th>
-                <th>Work Time(Hrs)</th>
+                <th>Work Time</th>
+                <th>Chemicals</th>
                 <th>No Of Items</th>
               </tr>
             </thead>
@@ -227,7 +354,7 @@ const Step4PestItems = ({
                           sx={{ color: '#28c76f', border: '1px solid #28c76f', borderRadius: 1, p: '4px' }}
                           onClick={() => {
                             handleEditPestItem(item)
-                            setPestDialogOpen(true)
+                            if (id) setPestDialogOpen(true) // Open dialog in UPDATE mode
                           }}
                         >
                           <EditIcon fontSize='small' />
@@ -243,16 +370,16 @@ const Step4PestItems = ({
                     </td>
                     <td>{item.pest}</td>
                     <td>{item.frequency}</td>
+                    <td>{item.pestValue}</td>
+                    <td>{item.totalValue}</td>
+                    <td>{item.workTime}</td>
                     <td>
                       <Chip
-                        label={item.chemicals || 'NA'}
+                        label={item.chemical || item.chemicals || 'NA'}
                         size='small'
                         sx={{ bgcolor: '#28c76f', color: '#fff', borderRadius: '4px' }}
                       />
                     </td>
-                    <td>{item.pestValue}</td>
-                    <td>{item.totalValue}</td>
-                    <td>{item.workTime}</td>
                     <td>{item.noOfItems}</td>
                   </tr>
                 ))
@@ -262,118 +389,119 @@ const Step4PestItems = ({
         </TableSection>
       </Grid>
 
-      {/* --- ADD PEST DIALOG --- */}
-      <Dialog
-        open={pestDialogOpen}
-        onClose={() => setPestDialogOpen(false)}
-        maxWidth='md'
-        fullWidth
-        PaperProps={{ sx: { overflow: 'visible' } }}
-      >
-        <DialogTitle>
-          <Typography variant='h5' component='span'>
-            {editingItemId ? 'Edit Pest' : 'Add Pest'}
-          </Typography>
-          <DialogCloseButton onClick={() => setPestDialogOpen(false)} disableRipple>
-            <i className='tabler-x' />
-          </DialogCloseButton>
-        </DialogTitle>
-        <DialogContent sx={{ p: 6 }}>
-          <Grid container spacing={5}>
-            <Grid item xs={12} md={4}>
-              <GlobalAutocomplete
-                label='Pest'
-                options={dropdowns.pests || []}
-                value={currentPestItem.pest}
-                onChange={(e, v) => handleCurrentPestItemAutocompleteChange('pest', v)}
-              />
+      {/* --- ADD PEST DIALOG (ONLY FOR UPDATE MODE) --- */}
+      {id && (
+        <Dialog
+          open={pestDialogOpen}
+          onClose={() => setPestDialogOpen(false)}
+          maxWidth='md'
+          fullWidth
+          PaperProps={{ sx: { overflow: 'visible' } }}
+        >
+          <DialogTitle>
+            <Typography variant='h5' component='span'>
+              {editingItemId ? 'Edit Pest' : 'Add Pest'}
+            </Typography>
+            <DialogCloseButton onClick={() => setPestDialogOpen(false)} disableRipple>
+              <i className='tabler-x' />
+            </DialogCloseButton>
+          </DialogTitle>
+          <DialogContent sx={{ p: 6 }}>
+            <Grid container spacing={5}>
+              <Grid item xs={12} md={4}>
+                <GlobalAutocomplete
+                  label='Pest'
+                  options={dropdowns.pests || []}
+                  value={currentPestItem.pestId}
+                  onChange={v => handleCurrentPestItemAutocompleteChange('pest', v)}
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <GlobalAutocomplete
+                  label='Billing Frequency'
+                  options={dropdowns.frequencies || []}
+                  value={currentPestItem.frequencyId}
+                  onChange={v => handleCurrentPestItemAutocompleteChange('frequency', v)}
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <CustomTextField
+                  fullWidth
+                  label='No of Units'
+                  name='noOfItems'
+                  type='number'
+                  value={currentPestItem.noOfItems}
+                  onChange={handleCurrentPestItemChange}
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <CustomTextField
+                  fullWidth
+                  label='Pest Count'
+                  name='pestCount'
+                  type='number'
+                  value={currentPestItem.pestCount}
+                  onChange={handleCurrentPestItemChange}
+                  sx={{ bgcolor: '#f5f5f5' }}
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <CustomTextField
+                  fullWidth
+                  label='Pest Value'
+                  name='pestValue'
+                  type='number'
+                  value={currentPestItem.pestValue}
+                  onChange={handleCurrentPestItemChange}
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <CustomTextField
+                  fullWidth
+                  label='Total'
+                  name='total'
+                  value={currentPestItem.total}
+                  InputProps={{ readOnly: true }}
+                  sx={{ bgcolor: '#f5f5f5' }}
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <GlobalAutocomplete
+                  label='Time'
+                  options={['0:05', '0:10', '0:15', '0:30', '1:00']}
+                  value={currentPestItem.time}
+                  onChange={v => handleCurrentPestItemAutocompleteChange('time', v)}
+                />
+              </Grid>
+              <Grid item xs={12} md={8}>
+                <GlobalAutocomplete
+                  label='Chemicals'
+                  options={dropdowns.chemicals || []}
+                  value={currentPestItem.chemicalId} // ✅ FIX
+                  onChange={v => handleCurrentPestItemAutocompleteChange('chemical', v)}
+                />
+              </Grid>
             </Grid>
-            <Grid item xs={12} md={4}>
-              <GlobalAutocomplete
-                label='Frequency'
-                options={dropdowns.frequencies || []}
-                value={currentPestItem.frequency}
-                onChange={(e, v) => handleCurrentPestItemAutocompleteChange('frequency', v)}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <CustomTextField
-                fullWidth
-                label='No of Units'
-                name='noOfItems'
-                type='number'
-                value={currentPestItem.noOfItems}
-                onChange={handleCurrentPestItemChange}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <CustomTextField
-                fullWidth
-                label='Pest Count'
-                name='pestCount'
-                type='number'
-                value={currentPestItem.pestCount}
-                onChange={handleCurrentPestItemChange}
-                sx={{ bgcolor: '#f5f5f5' }}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <CustomTextField
-                fullWidth
-                label='Pest Value'
-                name='pestValue'
-                type='number'
-                value={currentPestItem.pestValue}
-                onChange={handleCurrentPestItemChange}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <CustomTextField
-                fullWidth
-                label='Total'
-                name='total'
-                value={currentPestItem.total}
-                InputProps={{ readOnly: true }}
-                sx={{ bgcolor: '#f5f5f5' }}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <GlobalAutocomplete
-                label='Time'
-                options={['0:05', '0:10', '0:15', '0:30', '1:00']}
-                value={currentPestItem.time}
-                onChange={(e, v) => handleCurrentPestItemAutocompleteChange('time', v)}
-              />
-            </Grid>
-            <Grid item xs={12} md={8}>
-              <CustomTextField
-                fullWidth
-                label='Chemicals'
-                name='chemicals'
-                value={currentPestItem.chemicals}
-                onChange={handleCurrentPestItemChange}
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions sx={{ p: 6, justifyContent: 'flex-end' }}>
-          <Button
-            onClick={() => setPestDialogOpen(false)}
-            variant='tonal'
-            color='secondary'
-            sx={{ bgcolor: '#aaa', color: '#fff', '&:hover': { bgcolor: '#888' } }}
-          >
-            Close
-          </Button>
-          <Button
-            onClick={onSavePest}
-            variant='contained'
-            sx={{ bgcolor: '#00adef', '&:hover': { bgcolor: '#008dc4' } }}
-          >
-            Save
-          </Button>
-        </DialogActions>
-      </Dialog>
+          </DialogContent>
+          <DialogActions sx={{ p: 6, justifyContent: 'flex-end' }}>
+            <Button
+              onClick={() => setPestDialogOpen(false)}
+              variant='tonal'
+              color='secondary'
+              sx={{ bgcolor: '#aaa', color: '#fff', '&:hover': { bgcolor: '#888' } }}
+            >
+              Close
+            </Button>
+            <Button
+              onClick={onSavePest}
+              variant='contained'
+              sx={{ bgcolor: '#00adef', '&:hover': { bgcolor: '#008dc4' } }}
+            >
+              Save
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
     </Grid>
   )
 }

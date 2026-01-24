@@ -34,6 +34,7 @@ import EditIcon from '@mui/icons-material/Edit'
 
 import styles from '@core/styles/table.module.css'
 import { getPurchaseFilters, getPurchaseOrderDetails, updatePurchaseOrder } from '@/api/purchase/purchase_order'
+import { getChemicalsList } from '@/api/master/chemicals/list'
 import { getSupplierList } from '@/api/stock/supplier'
 import { getMaterialRequestDropdowns } from '@/api/transfer/materialRequest/dropdown'
 import { showToast } from '@/components/common/Toasts'
@@ -122,22 +123,27 @@ const EditPurchaseOrderPage = () => {
 
         const materialData = materialRes?.data || materialRes
 
-        // Chemicals (PRIORITY: Specialized Purchase API)
+        // Chemicals (Fetching from Master to get Rates)
         let chemRaw = []
-        if (Array.isArray(purchaseData?.chemicals)) {
-          chemRaw = purchaseData.chemicals
-        } else if (Array.isArray(purchaseData?.chemicals?.name)) {
-          chemRaw = purchaseData.chemicals.name
-        } else if (Array.isArray(materialData?.chemicals?.name)) {
-          chemRaw = materialData.chemicals.name
+        try {
+          const chemRes = await getChemicalsList({ page_size: 1000 })
+          if (chemRes?.success && Array.isArray(chemRes?.data?.results)) {
+            chemRaw = chemRes.data.results
+          }
+        } catch (e) {
+          console.error('Failed to fetch master chemicals', e)
+          if (Array.isArray(purchaseData?.chemicals)) {
+            chemRaw = purchaseData.chemicals
+          }
         }
 
         const chemicals = chemRaw.map(c => ({
           label: c.name,
           value: c.name,
           id: c.id,
-          uom: c.uom || c.uom_name || c.unit,
-          rate: c.rate || c.unit_rate || c.price || 0
+          uom: c.store_uom || c.uom || c.uom_name || c.unit,
+          rate: c.unit_rate || c.rate || c.price || 0,
+          isFoc: c.is_foc || Number(c.unit_rate || c.rate || 0) === 0
         }))
 
         const uoms =
@@ -246,10 +252,11 @@ const EditPurchaseOrderPage = () => {
       }
 
       // Rate logic
-      const r = val.rate || ''
+      const r = val.rate || '0'
+      const focStatus = val.isFoc ?? Number(r) === 0
       setRate(r)
       setPrevRate(r)
-      setIsFoc(false)
+      setIsFoc(focStatus)
     } else {
       setUom(null)
       setRate('')
@@ -405,6 +412,7 @@ const EditPurchaseOrderPage = () => {
             uom_id: item.uomId,
             quantity: Number(item.quantity),
             unit_rate: Number(item.rate) || 0,
+            is_foc: item.isFoc ? 1 : 0,
             is_active: 1,
             status: 1
           }
@@ -530,7 +538,7 @@ const EditPurchaseOrderPage = () => {
 
             <Grid item xs={12} md={2}>
               <GlobalTextField
-                label='UOM'
+                label='Store UOM'
                 value={uom?.label || ''}
                 InputProps={{
                   readOnly: true

@@ -46,17 +46,13 @@ import EditIcon from '@mui/icons-material/Edit'
 import styles from '@core/styles/table.module.css'
 
 // API
-import { addProposal, updateProposal, getProposalDetails, getProposalList } from '@/api/sales/proposal' // Added getProposalList
-import {
-  getContractDropdowns,
-  getContractDates,
-  getInvoiceCount,
-  getPestCount,
-  getInvoiceRemark
-} from '@/api/contract_group/contract'
+import { addProposal, updateProposal, getProposalDetails, getProposalList } from '@/api/sales/proposal'
+import { getContractDates, getInvoiceCount, getPestCount, getInvoiceRemark } from '@/api/contract_group/contract'
+import { getAllDropdowns } from '@/api/contract_group/contract/dropdowns'
 import { getCustomerDetails } from '@/api/customer_group/customer'
-import { listCallLogs } from '@/api/contract_group/contract/details/call_log' // Added listCallLogs
+import { listCallLogs } from '@/api/contract_group/contract/details/call_log'
 import { decodeId } from '@/utils/urlEncoder'
+import addContractFile from '@/api/contract_group/contract/details/contract_file/add'
 
 // Steps
 import Step1DealType from './steps/Step1DealType'
@@ -80,6 +76,45 @@ const StyledStep = styled(Step)({
   }
 })
 
+// 💡 UPDATED: Helper to format date for API (DD/MM/YYYY)
+const formatDate = date => {
+  if (!date) return ''
+  const d = new Date(date)
+  const day = String(d.getDate()).padStart(2, '0')
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const year = d.getFullYear()
+  return `${day}/${month}/${year}`
+}
+
+// 💡 NEW: Helper to format date locally (YYYY-MM-DD) for MUI pickers if needed
+const formatDateToLocal = date => {
+  if (!date) return ''
+  const d = new Date(date)
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const formatPhoneNumber = value => {
+  if (!value) return ''
+  const cleaned = value.replace(/\D/g, '').slice(0, 10)
+  if (cleaned.length > 5) {
+    return `${cleaned.slice(0, 5)} ${cleaned.slice(5)}`
+  }
+  return cleaned
+}
+
+// 💡 NEW: Helper to convert file to base64
+const fileToBase64 = file => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.readAsDataURL(file)
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = error => reject(error)
+  })
+}
+
 export default function ProposalWizard({ id }) {
   const router = useRouter()
   const [activeStep, setActiveStep] = useState(0)
@@ -94,11 +129,12 @@ export default function ProposalWizard({ id }) {
   // ----------------------------------------------------------------------
   const [formData, setFormData] = useState({
     // Step 1
-    origin: '',
+    company: '',
+    companyId: '', // ✅ Add companyId
     salesMode: '', // Keeping for safe removal or backward compat if needed
     contractType: '',
     proposalStatus: 'Draft',
-    contractName: '',
+    name: '', // Renamed from contractName
     contractCode: '',
     // Additional Step 1 Fields
     customer: '',
@@ -132,7 +168,6 @@ export default function ProposalWizard({ id }) {
     mobile: '',
     callType: '',
     callTypeId: '',
-    category: '', // New
     startDate: null,
     endDate: null,
     reminderDate: null,
@@ -149,26 +184,15 @@ export default function ProposalWizard({ id }) {
     technicianId: '',
     supervisor: '',
     supervisorId: '',
-    billingFrequency: '',
-    invoiceCount: '',
-    invoiceRemarks: [],
-    uploadedFile: null,
-    uploadedFileName: '',
+    billingFrequencyId: '',
+    invoiceCount: 0,
+    invoiceRemarks: [], // Selected remarks (strings)
+    invoiceRemarksOptions: [], // Suggested remarks from API
+    riskAssessment: '',
     copyCustomerAddress: false,
     reportBlock: '', // New
     contractValue: '',
-    technician: '',
-    technicianId: '',
-    paymentTerm: '',
-    salesPerson: '',
-    salesPersonId: '',
-    supervisor: '',
-    supervisorId: '',
     billingFrequency: '',
-    billingFrequencyId: '',
-    invoiceCount: '',
-    poNumber: '',
-    poExpiry: null,
     // Files
     file: null,
     uploadedFileName: '',
@@ -209,6 +233,7 @@ export default function ProposalWizard({ id }) {
     total: '',
     time: '',
     chemicals: '',
+    chemical: '',
     chemicalId: '',
     noOfItems: ''
   })
@@ -226,6 +251,7 @@ export default function ProposalWizard({ id }) {
 
   const [dropdowns, setDropdowns] = useState({
     customers: [],
+    companies: [], // ✅ Add companies dropdown
     callTypes: [],
     industries: [],
     technicians: [],
@@ -234,14 +260,16 @@ export default function ProposalWizard({ id }) {
     billingFrequencies: [],
     serviceFrequencies: [],
     pests: [],
-    chemicals: []
+    chemicals: [],
+    // Added for safety
+    frequencies: []
   })
 
   // Refs for focusing (simplified for Wizard, can expand if needed)
   const refs = {
     salesModeInputRef: useRef(null),
     contractTypeInputRef: useRef(null),
-    contractNameRef: useRef(null),
+    nameRef: useRef(null), // Renamed from contractNameRef
     // ... add more as needed for critical focus points
 
     // Pest Item Refs
@@ -254,7 +282,128 @@ export default function ProposalWizard({ id }) {
     currentChemicalsRef: useRef(null),
     currentNoOfItemsRef: useRef(null),
     addPestButtonRef: useRef(null),
-    fileUploadButtonRef: useRef(null)
+    fileUploadButtonRef: useRef(null),
+
+    // Step 1
+    companyRef: useRef(null),
+    customerRef: useRef(null),
+    contractTypeRef: useRef(null),
+    billingNameRef: useRef(null),
+    billingAddressRef: useRef(null),
+    billingPostalCodeRef: useRef(null),
+    customerCodeRef: useRef(null),
+    groupCodeRef: useRef(null),
+    accCodeRef: useRef(null),
+    picContactNameRef: useRef(null),
+    picEmailRef: useRef(null),
+    picPhoneRef: useRef(null),
+    billingContactNameRef: useRef(null),
+    billingEmailRef: useRef(null),
+    billingPhoneRef: useRef(null),
+
+    // Step 2
+    serviceAddressRef: useRef(null),
+    postalCodeRef: useRef(null),
+    coveredLocationRef: useRef(null),
+    poNumberRef: useRef(null),
+    poExpiryRef: useRef(null),
+    preferredTimeRef: useRef(null),
+    reportEmailRef: useRef(null),
+    contactPersonRef: useRef(null),
+    sitePhoneRef: useRef(null),
+    mobileRef: useRef(null),
+    callTypeRef: useRef(null),
+    startDateRef: useRef(null),
+    endDateRef: useRef(null),
+    reminderDateRef: useRef(null),
+    industryRef: useRef(null),
+    paymentTermRef: useRef(null),
+    salesPersonRef: useRef(null),
+    latitudeRef: useRef(null),
+    longitudeRef: useRef(null),
+
+    // Step 3
+    billingFrequencyRef: useRef(null),
+    reportBlockRef: useRef(null),
+    technicianRef: useRef(null),
+    supervisorRef: useRef(null)
+  }
+
+  const focusableElementRefs = useMemo(
+    () => [
+      // Step 0
+      refs.companyRef,
+      refs.customerRef,
+      refs.contractTypeRef,
+      refs.nameRef,
+      refs.billingNameRef,
+      refs.billingAddressRef,
+      refs.billingPostalCodeRef,
+      refs.customerCodeRef,
+      refs.groupCodeRef,
+      refs.accCodeRef,
+      refs.picContactNameRef,
+      refs.picEmailRef,
+      refs.picPhoneRef,
+      refs.billingContactNameRef,
+      refs.billingEmailRef,
+      refs.billingPhoneRef,
+
+      // Step 1
+      refs.serviceAddressRef,
+      refs.postalCodeRef,
+      refs.coveredLocationRef,
+      refs.poNumberRef,
+      refs.poExpiryRef,
+      refs.preferredTimeRef,
+      refs.reportEmailRef,
+      refs.contactPersonRef,
+      refs.sitePhoneRef,
+      refs.mobileRef,
+      refs.callTypeRef,
+      refs.startDateRef,
+      refs.endDateRef,
+      refs.reminderDateRef,
+      refs.industryRef,
+      refs.paymentTermRef,
+      refs.salesPersonRef,
+      refs.latitudeRef,
+      refs.longitudeRef,
+
+      // Step 2
+      refs.billingFrequencyRef,
+      refs.reportBlockRef,
+      refs.technicianRef,
+      refs.supervisorRef,
+
+      // Pest Item
+      refs.pestInputRef,
+      refs.frequencyInputRef,
+      refs.currentPestValueRef,
+      refs.timeInputRef,
+      refs.currentChemicalsRef,
+      refs.currentNoOfItemsRef,
+      refs.addPestButtonRef
+    ],
+    [refs]
+  )
+
+  const focusNextElement = useCallback(
+    currentRef => {
+      const currentIndex = focusableElementRefs.findIndex(ref => ref === currentRef)
+      if (currentIndex !== -1 && currentIndex < focusableElementRefs.length - 1) {
+        const nextRef = focusableElementRefs[currentIndex + 1]
+        nextRef.current?.focus()
+      }
+    },
+    [focusableElementRefs]
+  )
+
+  const handleKeyDown = (e, currentRef) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      focusNextElement(currentRef)
+    }
   }
 
   // ----------------------------------------------------------------------
@@ -338,20 +487,25 @@ export default function ProposalWizard({ id }) {
 
   const loadDropdowns = async () => {
     try {
-      const res = await getContractDropdowns()
-      const data = res?.data?.data?.data || {}
+      const data = await getAllDropdowns()
+
       setDropdowns({
-        customers: data.customer?.name || [],
-        callTypes: data.calltype?.name || [],
-        industries: data.industry?.name || [],
-        technicians: data.technician?.name || [],
-        supervisors: data.supervisor?.name || [],
-        salesPersons: data.sales?.name || [],
-        billingFrequencies: data.billing_frequency?.name || [],
-        serviceFrequencies: data.service_frequency?.name || [],
-        pests: data.pest?.name || [],
-        chemicals: data.chemicals?.name || []
+        ...data,
+        billingFrequencies: data.billingFreq,
+        serviceFrequencies: data.serviceFreq,
+        frequencies: data.billingFreq, // Updated to use Billing Frequency as per user request
+        salesPersons: data.salesPeople
       })
+
+      // ✅ Default Origin to A-Flick if New Entry
+      if (!id) {
+        const aflick = data.companies?.find(
+          c => c.label?.toLowerCase().includes('a-flick') || c.name?.toLowerCase().includes('a-flick')
+        )
+        if (aflick) {
+          setFormData(prev => ({ ...prev, company: aflick.label || aflick.name, companyId: aflick.id || aflick.value }))
+        }
+      }
     } catch (err) {
       console.error(err)
       showToast('error', 'Failed to load dropdowns')
@@ -368,10 +522,11 @@ export default function ProposalWizard({ id }) {
         setFormData(prev => ({
           ...prev,
           id: data.id,
+          companyId: data.company_id,
           salesMode: data.sales_mode?.replace(/_/g, ' ')?.replace(/\b\w/g, l => l.toUpperCase()) || '',
           customerId: data.customer_id,
           customer: data.customer,
-          contractName: data.name || '',
+          name: data.name || '',
           contractType: data.contract_type?.replace(/_/g, ' ')?.replace(/\b\w/g, l => l.toUpperCase()) || '',
           contractCode: data.contract_code || '',
           serviceAddress: data.service_address || '',
@@ -427,6 +582,7 @@ export default function ProposalWizard({ id }) {
               pestValue: item.pest_value,
               totalValue: item.total_value,
               workTime: convertMinutesToTime(item.work_time),
+              chemical: item.chemical_name || item.chemical || '',
               chemicals: item.chemical_name || item.chemical || '',
               chemicalId: item.chemical_id,
               noOfItems: item.pest_service_count
@@ -464,13 +620,69 @@ export default function ProposalWizard({ id }) {
     const [h, m] = str.split(':').map(Number)
     return h * 60 + m
   }
-  const formatDate = date => (date ? date.toLocaleDateString('en-CA') : '')
+  const formatDate = date => {
+    if (!date) return ''
+    return new Date(date).toISOString().split('T')[0]
+  }
+
+  useEffect(() => {
+    const fetchInvoiceCount = async () => {
+      if (!formData.billingFrequencyId || !formData.startDate || !formData.endDate) {
+        setFormData(prev => ({ ...prev, invoiceCount: '' }))
+        return
+      }
+
+      try {
+        const payload = {
+          billing_frequency_id: Number(formData.billingFrequencyId),
+          start_date: formatDate(formData.startDate),
+          end_date: formatDate(formData.endDate)
+        }
+
+        const res = await getInvoiceCount(payload)
+
+        if (res?.status === 'success') {
+          setFormData(prev => ({
+            ...prev,
+            invoiceCount: res.invoice_count ?? res.data?.invoice_count ?? 0
+          }))
+        }
+      } catch (err) {
+        console.error('Invoice Count Fetch Error', err)
+      }
+    }
+
+    fetchInvoiceCount()
+  }, [formData.billingFrequencyId, formData.startDate, formData.endDate])
 
   // ----------------------------------------------------------------------
   // ACTION HANDLERS
   // ----------------------------------------------------------------------
 
+  const validateStep = step => {
+    if (step === 0) {
+      if (!formData.name) {
+        showToast('error', 'Contract Name is required!')
+        return false
+      }
+      if (!formData.customerId) {
+        showToast('error', 'Customer is required!')
+        return false
+      }
+    }
+
+    if (step === 1) {
+      if (!formData.startDate || !formData.endDate) {
+        showToast('warning', 'Please enter Start Date and End Date!')
+        return false
+      }
+    }
+    return true
+  }
+
   const handleNext = () => {
+    if (!validateStep(activeStep)) return
+
     if (activeStep < steps.length - 1) {
       setActiveStep(prev => prev + 1)
     } else {
@@ -482,15 +694,23 @@ export default function ProposalWizard({ id }) {
     if (activeStep > 0) setActiveStep(prev => prev - 1)
   }
 
-  const handleChange = e => setFormData({ ...formData, [e.target.name]: e.target.value })
+  const handleChange = e => {
+    const { name, value } = e.target
+    if (['picPhone', 'billingPhone', 'sitePhone', 'mobile'].includes(name)) {
+      setFormData({ ...formData, [name]: formatPhoneNumber(value) })
+    } else {
+      setFormData({ ...formData, [name]: value })
+    }
+  }
 
-  const handleAutocompleteChange = (name, newValue, inputRef) => {
-    const isObj = typeof newValue === 'object' && newValue !== null
+  const handleAutocompleteChange = (name, newValue, ref) => {
+    const isObject = typeof newValue === 'object' && newValue !== null
     setFormData(prev => ({
       ...prev,
-      [name]: isObj ? newValue.name || '' : newValue,
-      [`${name}Id`]: isObj ? newValue.id || '' : ''
+      [name]: isObject ? newValue.label || newValue.name || '' : newValue,
+      [`${name}Id`]: isObject ? newValue.value || newValue.id || '' : ''
     }))
+    if (ref) focusNextElement(ref)
   }
 
   const handleDateChange = async (name, date) => {
@@ -536,30 +756,45 @@ export default function ProposalWizard({ id }) {
     })
   }
 
-  const handleCurrentPestItemAutocompleteChange = (name, newValue) => {
+  const handleCurrentPestItemAutocompleteChange = (name, newValue, ref) => {
     const isObject = typeof newValue === 'object' && newValue !== null
     setCurrentPestItem(prev => ({
       ...prev,
-      [name]: isObject ? newValue.name || '' : newValue,
-      [`${name}Id`]: isObject ? newValue.id || '' : ''
+      [name]: isObject ? newValue.label || newValue.name || '' : newValue,
+      [`${name}Id`]: isObject ? newValue.value || newValue.id || '' : ''
     }))
+    if (ref) focusNextElement(ref)
   }
 
   // --- Auto-calculate Pest Count ---
   useEffect(() => {
-    if (currentPestItem.noOfItems && currentPestItem.frequencyId) {
+    const { pestId, frequencyId } = currentPestItem
+    const { startDate, endDate } = formData
+
+    if (pestId && frequencyId && startDate && endDate) {
+      console.log('Fetching Pest Count with:', {
+        pest_id: pestId,
+        service_frequency_id: frequencyId,
+        start_date: formatDateToLocal(startDate),
+        end_date: formatDateToLocal(endDate)
+      })
+
       getPestCount({
-        no_of_units: currentPestItem.noOfItems,
-        frequency: currentPestItem.frequencyId
+        pest_id: Number(pestId),
+        service_frequency_id: Number(frequencyId),
+        billing_frequency_id: Number(frequencyId), // Added this as we are using Billing Frequencies now
+        start_date: formatDateToLocal(startDate),
+        end_date: formatDateToLocal(endDate)
       })
         .then(res => {
+          console.log('Pest Count API Response:', res)
           if (res?.status === 'success') {
-            const count = res.data || '0'
+            const count = res.data?.pest_count ?? '0'
             setCurrentPestItem(prev => {
               const totalNum = Number(count) * Number(prev.pestValue || 0)
               return {
                 ...prev,
-                pestCount: count,
+                pestCount: String(count),
                 total: isNaN(totalNum) ? '0' : totalNum.toString()
               }
             })
@@ -567,7 +802,7 @@ export default function ProposalWizard({ id }) {
         })
         .catch(err => console.error('Pest Count Error:', err))
     }
-  }, [currentPestItem.noOfItems, currentPestItem.frequencyId])
+  }, [currentPestItem.pestId, currentPestItem.frequencyId, formData.startDate, formData.endDate])
 
   const handleSavePestItem = () => {
     if (!formData.startDate || !formData.endDate || !currentPestItem.pest || !currentPestItem.frequency) {
@@ -589,20 +824,23 @@ export default function ProposalWizard({ id }) {
       setPestItems(prev => [...prev, { ...itemPayload, id: Date.now().toString(36) }])
     }
 
-    // Reset
-    setCurrentPestItem({
+    // Reset selective fields
+    setCurrentPestItem(prev => ({
       pest: '',
       pestId: '',
-      frequency: '',
-      frequencyId: '',
-      pestCount: '',
+      frequency: prev.frequency,
+      frequencyId: prev.frequencyId,
+      pestCount: prev.pestCount,
       pestValue: '',
       total: '',
       time: '',
       chemicals: '',
+      chemical: '',
       chemicalId: '',
       noOfItems: ''
-    })
+    }))
+    // Focus back to pest field
+    setTimeout(() => refs.pestInputRef.current?.focus(), 100)
   }
 
   const handleEditPestItem = item => {
@@ -615,6 +853,7 @@ export default function ProposalWizard({ id }) {
       pestValue: item.pestValue,
       total: item.totalValue,
       time: item.workTime || '0:00',
+      chemical: item.chemical || item.chemicals,
       chemicals: item.chemicals,
       chemicalId: item.chemicalId,
       noOfItems: item.noOfItems
@@ -674,7 +913,7 @@ export default function ProposalWizard({ id }) {
       if (res?.status === 'success' && Array.isArray(res?.data)) {
         setFormData(prev => ({
           ...prev,
-          invoiceRemarks: res.data
+          invoiceRemarksOptions: res.data // Use as options
         }))
       }
     } catch (err) {
@@ -724,78 +963,127 @@ export default function ProposalWizard({ id }) {
 
   // --- SUBMIT ---
   const handleSubmit = async () => {
-    if (!formData.contractName || !formData.customerId) {
-      showToast('error', 'Contract Name and Customer are required!')
+    if (!formData.name) {
+      showToast('error', `Contract Name is required!`)
+      return
+    }
+    if (!formData.customerId) {
+      showToast('error', `Customer is required!`)
+      return
+    }
+    if (pestItems.length === 0) {
+      showToast('error', 'Please add at least one Pest Item!')
       return
     }
 
+    const totalValueSum = pestItems.reduce((acc, curr) => acc + (Number(curr.totalValue) || 0), 0)
+
     const payload = {
-      name: formData.contractName,
+      id: id ? decodeId(id) || id : null, // Add numeric ID to root
+      name: formData.name || '',
+      company_id: String(formData.companyId || ''),
       customer_id: Number(formData.customerId),
-      sales_mode: formData.salesMode?.toLowerCase().replace(/\s+/g, '_'),
-      contract_code: formData.contractCode,
-      contract_type: formData.contractType?.toLowerCase().replace(/\s+/g, '_'),
-      service_address: formData.serviceAddress,
-      postal_code: formData.postalCode,
-      covered_location: formData.coveredLocation,
-      po_number: formData.poNumber,
-      po_expiry_date: formatDate(formData.poExpiry),
-      preferred_time: formData.preferredTime?.toTimeString().slice(0, 8),
-      report_email: formData.reportEmail,
-      contact_person_name: formData.contactPerson,
-      phone: formData.sitePhone,
-      mobile: formData.mobile,
-      call_type_id: Number(formData.callTypeId),
-      grouping_code: formData.groupCode,
-      start_date: formatDate(formData.startDate),
-      end_date: formatDate(formData.endDate),
-      reminder_date: formatDate(formData.reminderDate),
-      industry_id: Number(formData.industryId),
-      contract_value: Number(formData.contractValue),
-      technician_id: Number(formData.technicianId),
-      billing_term: Number(formData.paymentTerm?.replace(/\D/g, '')),
-      sales_person_id: Number(formData.salesPersonId),
-      supervisor_id: Number(formData.supervisorId),
-      billing_frequency_id: Number(formData.billingFrequencyId),
-      invoice_count: Number(formData.invoiceCount),
-      invoice_remarks: formData.invoiceRemarks?.join?.(', ') || '',
-      latitude: Number(formData.latitude),
-      longitude: Number(formData.longitude),
-      billing_remarks: formData.billingRemarks,
-      agreement_add_1: formData.agreement1,
-      agreement_add_2: formData.agreement2,
-      technician_remarks: formData.technicianRemarks,
-      appointment_remarks: formData.appointmentRemarks,
+      sales_mode: formData.salesMode?.toLowerCase().replace(/\s+/g, '_') || null,
+      contract_code: formData.contractCode || null,
+      contract_type: formData.contractType?.toLowerCase().replace(/\s+/g, '_') || null,
+      service_address: formData.serviceAddress || null,
+      postal_address: formData.postalCode || null,
+      postal_code: formData.postalCode || null,
+      covered_location: formData.coveredLocation || null,
+      po_number: formData.poNumber || null,
+      po_expiry_date: formatDate(formData.poExpiry) || null,
+      proposal_date: formatDate(new Date()),
+      preferred_time: formData.preferredTime ? formData.preferredTime.toTimeString().slice(0, 8) : '09:00:00',
+      report_email: formData.reportEmail || null,
+      contact_person_name: formData.contactPerson || null,
+      phone: formData.sitePhone || null,
+      mobile: formData.mobile || null,
+      call_type_id: formData.callTypeId ? Number(formData.callTypeId) : null,
+      grouping_code: formData.groupCode || null,
+      start_date: formatDate(formData.startDate) || null,
+      end_date: formatDate(formData.endDate) || null,
+      reminder_date: formatDate(formData.reminderDate) || null,
+      industry_id: formData.industryId ? Number(formData.industryId) : null,
+      contract_value: Number(totalValueSum),
+      technician_id: formData.technicianId ? Number(formData.technicianId) : null,
+      billing_term: formData.paymentTerm ? Number(formData.paymentTerm.replace(/\D/g, '')) : null,
+      sales_person_id: formData.salesPersonId ? Number(formData.salesPersonId) : null,
+      supervisor_id: formData.supervisorId ? Number(formData.supervisorId) : null,
+      billing_frequency_id: formData.billingFrequencyId ? Number(formData.billingFrequencyId) : null,
+      invoice_count: formData.invoiceCount ? Number(formData.invoiceCount) : 0,
+      invoice_remarks: formData.invoiceRemarks?.join?.(', ') || null,
+      latitude: formData.latitude ? Number(formData.latitude) : null,
+      longitude: formData.longitude ? Number(formData.longitude) : null,
+      billing_remarks: formData.billingRemarks || null,
+      agreement_add_1: formData.agreement1 || null,
+      agreement_add_2: formData.agreement2 || null,
+      technician_remarks: formData.technicianRemarks || null,
+      appointment_remarks: formData.appointmentRemarks || null,
+
+      // Flags
+      is_new: id ? 0 : 1, // 0 for update, 1 for new
+      is_active: true,
+      status: 1,
+
+      // Step 1 Additional Fields
+      billing_name: formData.billingName || null,
+      billing_address: formData.billingAddress || null,
+      billing_postal_address: formData.billingPostalCode || null,
+      cust_code: formData.customerCode || null,
+      acc_code: formData.accCode || null,
+      pic_contact_name: formData.picContactName || null,
+      pic_email: formData.picEmail || null,
+      pic_phone: formData.picPhone || null,
+      billing_contact_name: formData.billingContactName || null,
+      billing_email: formData.billingEmail || null,
+      billing_phone: formData.billingPhone || null,
+
+      floor_plan_file: formData.file ? await fileToBase64(formData.file) : null,
+
       pest_items: pestItems.map(i => ({
-        id: i.item_id ? Number(i.item_id) : null,
+        customer_id: Number(formData.customerId),
         pest_id: Number(i.pestId),
         frequency_id: Number(i.frequencyId),
-        chemical_id: Number(i.chemicalId),
+        chemical_id: i.chemicalId ? Number(i.chemicalId) : null,
+        pest: i.pest,
+        frequency: i.frequency,
+        chemical_name: i.chemicals || i.chemical || null,
         no_location: Number(i.pestCount),
         pest_value: Number(i.pestValue),
         pest_service_count: Number(i.noOfItems),
         total_value: Number(i.totalValue),
-        work_time: convertTimeToMinutes(i.workTime)
+        work_time: convertTimeToMinutes(i.workTime),
+        remarks: '',
+        is_active: 1,
+        status: 1
       }))
     }
+
+    console.log('🚀 SUBMITTING PROPOSAL (JSON):', JSON.stringify(payload, null, 2))
 
     try {
       let res
       if (id) {
-        res = await updateProposal(id, payload)
+        const decodedId = decodeId(id) || id
+        res = await updateProposal(decodedId, payload)
       } else {
         res = await addProposal(payload)
       }
 
-      if (res?.status === 'success') {
+      console.log('✅ API RESPONSE:', res)
+
+      const proposalId = res?.data?.id || res?.id
+      if (res?.status === 'success' || res?.status === 200 || proposalId) {
         showToast('success', `Proposal ${id ? 'Updated' : 'Added'} Successfully!`)
         router.push('/admin/sales-quotation')
       } else {
+        console.error('❌ API FAILURE (Logic):', res)
         showToast('error', res?.message || 'Operation failed')
       }
     } catch (e) {
-      console.error(e)
-      showToast('error', 'API Request Failed')
+      console.error('❌ API ERROR (Exception):', e)
+      console.error('❌ RESPONSE DATA:', e.response?.data)
+      showToast('error', e.response?.data?.message || e.message || 'API Request Failed')
     }
   }
 
@@ -810,8 +1098,9 @@ export default function ProposalWizard({ id }) {
             formData={formData}
             handleChange={handleChange}
             handleAutocompleteChange={handleAutocompleteChange}
-            handleKeyDown={() => {}} // simplified
+            handleKeyDown={handleKeyDown}
             refs={refs}
+            dropdowns={dropdowns}
           />
         )
       case 1:
@@ -820,30 +1109,32 @@ export default function ProposalWizard({ id }) {
             formData={formData}
             handleChange={handleChange}
             handleAutocompleteChange={handleAutocompleteChange}
+            handleDateChange={handleDateChange}
             dropdowns={dropdowns}
             copyFromCustomer={copyFromCustomer}
-            copyCustomerAddress={formData.copyCustomerAddress} // Using formData to track this is better if you want persistence, or local state in step
+            copyCustomerAddress={formData.copyCustomerAddress}
             setCopyCustomerAddress={val => setFormData(p => ({ ...p, copyCustomerAddress: val }))}
+            handleKeyDown={handleKeyDown}
+            refs={refs}
           />
         )
       case 2:
         return (
           <Step3ServiceDetails
             formData={formData}
-            setFormData={setFormData} // ✅ Pass setFormData
             handleChange={handleChange}
-            handleDateChange={handleDateChange}
             handleAutocompleteChange={handleAutocompleteChange}
             handleNativeFileChange={handleNativeFileChange}
             handleViewFile={() => setOpenDialog(true)}
             dropdowns={dropdowns}
+            handleKeyDown={handleKeyDown}
             refs={refs}
           />
         )
-
       case 3:
         return (
           <Step4PestItems
+            id={id}
             currentPestItem={currentPestItem}
             handleCurrentPestItemChange={handleCurrentPestItemChange}
             handleCurrentPestItemAutocompleteChange={handleCurrentPestItemAutocompleteChange}
@@ -853,6 +1144,8 @@ export default function ProposalWizard({ id }) {
             handleEditPestItem={handleEditPestItem}
             handleDeletePestItem={handleDeletePestItem}
             editingItemId={editingItemId}
+            handleKeyDown={handleKeyDown}
+            refs={refs}
           />
         )
       case 4:
@@ -869,12 +1162,23 @@ export default function ProposalWizard({ id }) {
       <Card className='flex flex-col md:flex-row'>
         <CardContent className='max-md:border-be md:border-ie md:min-is-[300px]'>
           <Typography variant='h5' className='m-4 mb-6 font-bold'>
-            {id ? 'Update Proposal' : 'Add Proposal'}
+            {id ? 'Update Proposal' : 'Add Proposal'} <span style={{ fontSize: '12px', color: '#999' }}>(v1.1)</span>
           </Typography>
           <StepperWrapper>
             <Stepper activeStep={activeStep} orientation='vertical' className='flex flex-col gap-4 min-is-[220px]'>
               {steps.map((label, index) => (
-                <StyledStep key={index} onClick={() => setActiveStep(index)}>
+                <StyledStep
+                  key={index}
+                  onClick={() => {
+                    // Prevent jumping ahead if current step isn't valid
+                    if (index > activeStep) {
+                      if (!validateStep(activeStep)) return
+                      // If jumping multiple, we might want to check all in between,
+                      // but for now, validate at least current.
+                    }
+                    setActiveStep(index)
+                  }}
+                >
                   <StepLabel icon={<></>} className='p-1 cursor-pointer'>
                     <div className='step-label'>
                       <CustomAvatar
@@ -930,109 +1234,125 @@ export default function ProposalWizard({ id }) {
       </Card>
 
       {/* --- EXTRA CARDS BELOW WIZARD --- */}
-      <Grid container spacing={2} sx={{ mt: 2 }}>
-        {/* CALL LOG CARD */}
-        <Grid item xs={12} md={6}>
-          <TableSection
-            title='CALL LOGS'
-            addButton={
-              <Button variant='contained' size='small' onClick={() => setCallLogDialogOpen(true)}>
-                Add Log
-              </Button>
-            }
-            searchText={callLogSearch}
-            setSearchText={setCallLogSearch}
-            pagination={callLogPagination}
-            setPagination={setCallLogPagination}
-            filteredCount={filteredCallLogs.length}
-          >
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Reminder</th>
-                  <th>Entry Date</th>
-                  <th>Reminder Date</th>
-                  <th>Remarks</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedCallLogs.length === 0 ? (
+      {id && (
+        <Grid container spacing={2} sx={{ mt: 2 }}>
+          {/* CALL LOG CARD */}
+          <Grid item xs={12} md={6}>
+            <TableSection
+              title='CALL LOGS'
+              addButton={
+                <Button variant='contained' size='small' onClick={() => setCallLogDialogOpen(true)}>
+                  Add Log
+                </Button>
+              }
+              searchText={callLogSearch}
+              setSearchText={setCallLogSearch}
+              pagination={callLogPagination}
+              setPagination={setCallLogPagination}
+              filteredCount={filteredCallLogs.length}
+            >
+              <table className={styles.table}>
+                <thead>
                   <tr>
-                    <td colSpan={5} align='center'>
-                      No call logs found
-                    </td>
+                    <th>#</th>
+                    <th>Reminder</th>
+                    <th>Entry Date</th>
+                    <th>Reminder Date</th>
+                    <th>Remarks</th>
                   </tr>
-                ) : (
-                  paginatedCallLogs.map((log, idx) => (
-                    <tr key={idx}>
-                      <td>{idx + 1 + callLogPagination.pageIndex * callLogPagination.pageSize}</td>
-                      <td>
-                        {log.reminder ? <Chip label='Active' color='error' size='small' variant='outlined' /> : 'No'}
+                </thead>
+                <tbody>
+                  {paginatedCallLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} align='center'>
+                        No call logs found
                       </td>
-                      <td>{log.entry_date || '-'}</td>
-                      <td>{log.reminder_date || '-'}</td>
-                      <td>{log.remarks || '-'}</td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </TableSection>
-        </Grid>
+                  ) : (
+                    paginatedCallLogs.map((log, idx) => (
+                      <tr key={idx}>
+                        <td>{idx + 1 + callLogPagination.pageIndex * callLogPagination.pageSize}</td>
+                        <td>
+                          {log.reminder ? <Chip label='Active' color='error' size='small' variant='outlined' /> : 'No'}
+                        </td>
+                        <td>{log.entry_date || '-'}</td>
+                        <td>{log.reminder_date || '-'}</td>
+                        <td>{log.remarks || '-'}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </TableSection>
+          </Grid>
 
-        {/* PROPOSALS CARD */}
-        <Grid item xs={12} md={6}>
-          <TableSection
-            title='SALES PROPOSAL'
-            addButton={
-              <Button variant='contained' size='small' onClick={() => router.push('/admin/proposal-editor')}>
-                Add Proposal
-              </Button>
-            }
-            searchText={propSearch}
-            setSearchText={setPropSearch}
-            pagination={propPagination}
-            setPagination={setPropPagination}
-            filteredCount={filteredProposals.length}
-          >
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Date</th>
-                  <th>Title</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedProposals.length === 0 ? (
+          {/* PROPOSALS CARD */}
+          <Grid item xs={12} md={6}>
+            <TableSection
+              title='SALES PROPOSAL'
+              addButton={
+                <Button
+                  variant='contained'
+                  size='small'
+                  onClick={() => {
+                    const realId = decodeId(id) || id
+                    router.push(`/admin/proposal-editor?proposal_id=${realId}`)
+                  }}
+                >
+                  Add Proposal
+                </Button>
+              }
+              searchText={propSearch}
+              setSearchText={setPropSearch}
+              pagination={propPagination}
+              setPagination={setPropPagination}
+              filteredCount={filteredProposals.length}
+            >
+              <table className={styles.table}>
+                <thead>
                   <tr>
-                    <td colSpan={4} align='center'>
-                      No proposals found
-                    </td>
+                    <th>ID</th>
+                    <th>Date</th>
+                    <th>Title</th>
+                    <th>Status</th>
                   </tr>
-                ) : (
-                  paginatedProposals.map((prop, idx) => (
-                    <tr key={prop.id || idx}>
-                      <td>{prop.proposal_code || prop.id}</td>
-                      <td>{prop.proposal_date || '-'}</td>
-                      <td>{prop.title || '-'}</td>
-                      <td>
-                        <Chip
-                          label={prop.status || 'Active'}
-                          size='small'
-                          sx={{ bgcolor: '#dff7e9', color: '#28c76f', fontWeight: 600 }}
-                        />
+                </thead>
+                <tbody>
+                  {paginatedProposals.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} align='center'>
+                        No proposals found
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </TableSection>
+                  ) : (
+                    paginatedProposals.map((prop, idx) => (
+                      <tr
+                        key={prop.id || idx}
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => {
+                          const realId = decodeId(id) || id
+                          router.push(`/admin/proposal-editor?proposal_id=${realId}`)
+                        }}
+                      >
+                        <td>{prop.proposal_code || prop.id}</td>
+                        <td>{prop.proposal_date || '-'}</td>
+                        <td>{prop.title || '-'}</td>
+                        <td>
+                          <Chip
+                            label={prop.status || 'Active'}
+                            size='small'
+                            sx={{ bgcolor: '#dff7e9', color: '#28c76f', fontWeight: 600 }}
+                          />
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </TableSection>
+          </Grid>
         </Grid>
-      </Grid>
+      )}
 
       {/* --- CALL LOG DIALOG --- */}
       <Dialog
@@ -1127,7 +1447,7 @@ export default function ProposalWizard({ id }) {
             Close
           </Button>
           <Button
-            onClick={onSaveCallLog}
+            onClick={handleSaveCallLog}
             variant='contained'
             sx={{ bgcolor: '#00adef', '&:hover': { bgcolor: '#008dc4' } }}
           >

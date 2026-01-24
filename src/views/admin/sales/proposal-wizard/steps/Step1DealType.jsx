@@ -13,71 +13,54 @@ const Step1DealType = ({
   return (
     <Grid container spacing={4}>
       <Grid item xs={12}>
-        <Typography variant='h6' sx={{ mb: 2 }}>
-          Deal Type & Contact Information
-        </Typography>
+        <Divider sx={{ my: 1 }}> Contract Information </Divider>
       </Grid>
 
-      {/* --- ROW 1 --- */}
       {/* Origin */}
-      <Grid item xs={12} md={4}>
+      <Grid item xs={12} md={3}>
         <GlobalAutocomplete
           label='Origin'
-          options={['Sales', 'Enquiry']} // Example options, or pass from dropdowns
-          value={formData.origin}
-          onChange={(e, v) => handleAutocompleteChange('origin', v)}
+          options={dropdowns?.companies || []}
+          value={formData.companyId}
+          onChange={v => handleAutocompleteChange('company', v, refs.companyRef)}
+          inputRef={refs.companyRef}
         />
       </Grid>
 
       {/* Customer (Moved from Step 2) */}
-      <Grid item xs={12} md={4}>
+      <Grid item xs={12} md={3}>
         <GlobalAutocomplete
-          label='Customer'
+          label='Customer *'
           options={dropdowns?.customers || []}
-          value={formData.customer}
-          onChange={(e, v) => handleAutocompleteChange('customer', v)}
+          value={formData.customerId}
+          onChange={v => handleAutocompleteChange('customer', v, refs.customerRef)}
+          inputRef={refs.customerRef}
         />
       </Grid>
 
       {/* Contract Type */}
-      <Grid item xs={12} md={4}>
+      <Grid item xs={12} md={3}>
         <GlobalAutocomplete
           label='Contract Type'
           options={['Continuous Contract', 'Limited Contract', 'Continuous Job', 'Job', 'Warranty']}
           value={formData.contractType}
-          onChange={(e, v) => handleAutocompleteChange('contractType', v)}
+          onChange={v => handleAutocompleteChange('contractType', v, refs.contractTypeRef)}
+          inputRef={refs.contractTypeRef}
         />
       </Grid>
 
-      {/* --- ROW 2 --- */}
-      {/* Proposal Status */}
-      <Grid item xs={12} md={4}>
-        <GlobalAutocomplete
-          label='Proposal Status'
-          options={['Draft', 'Sent', 'Approved', 'Rejected']}
-          value={formData.proposalStatus}
-          onChange={(e, v) => handleAutocompleteChange('proposalStatus', v)}
-        />
-      </Grid>
-
-      {/* Business Name */}
-      <Grid item xs={12} md={4}>
+      <Grid item xs={12} md={3}>
         <CustomTextField
           fullWidth
-          label='Business Name'
-          name='businessName'
-          value={formData.businessName}
+          label='Contract Name '
+          name='name'
+          placeholder='Contract Name'
+          value={formData.name}
           onChange={handleChange}
-        />
-      </Grid>
-
-      {/* BG Testing */}
-      <Grid item xs={12} md={4}>
-        <GlobalAutocomplete
-          label='BG Testing'
-          options={['Yes', 'No']}
-          value={formData.bgTesting}
-          onChange={(e, v) => handleAutocompleteChange('bgTesting', v)}
+          ref={refs.nameRef}
+          onKeyDown={e => handleKeyDown(e, refs.nameRef)}
+          required
+          sx={{ '& .MuiInputBase-root': { bgcolor: '#fffde7' } }}
         />
       </Grid>
 
@@ -93,6 +76,8 @@ const Step1DealType = ({
           name='billingName'
           value={formData.billingName}
           onChange={handleChange}
+          inputRef={refs.billingNameRef}
+          onKeyDown={e => handleKeyDown(e, refs.billingNameRef)}
         />
       </Grid>
       <Grid item xs={12} md={4}>
@@ -102,6 +87,8 @@ const Step1DealType = ({
           name='billingAddress'
           value={formData.billingAddress}
           onChange={handleChange}
+          inputRef={refs.billingAddressRef}
+          onKeyDown={e => handleKeyDown(e, refs.billingAddressRef)}
         />
       </Grid>
       <Grid item xs={12} md={4}>
@@ -111,6 +98,8 @@ const Step1DealType = ({
           name='billingPostalCode'
           value={formData.billingPostalCode}
           onChange={handleChange}
+          inputRef={refs.billingPostalCodeRef}
+          onKeyDown={e => handleKeyDown(e, refs.billingPostalCodeRef)}
         />
       </Grid>
 
@@ -122,6 +111,8 @@ const Step1DealType = ({
           name='customerCode'
           value={formData.customerCode}
           onChange={handleChange}
+          inputRef={refs.customerCodeRef}
+          onKeyDown={e => handleKeyDown(e, refs.customerCodeRef)}
         />
       </Grid>
       <Grid item xs={12} md={4}>
@@ -131,10 +122,20 @@ const Step1DealType = ({
           name='groupCode'
           value={formData.groupCode}
           onChange={handleChange}
+          inputRef={refs.groupCodeRef}
+          onKeyDown={e => handleKeyDown(e, refs.groupCodeRef)}
         />
       </Grid>
       <Grid item xs={12} md={4}>
-        <CustomTextField fullWidth label='Acc. Code' name='accCode' value={formData.accCode} onChange={handleChange} />
+        <CustomTextField
+          fullWidth
+          label='Acc. Code'
+          name='accCode'
+          value={formData.accCode}
+          onChange={handleChange}
+          inputRef={refs.accCodeRef}
+          onKeyDown={e => handleKeyDown(e, refs.accCodeRef)}
+        />
       </Grid>
 
       {/* --- ROW 5: PIC Contact --- */}
@@ -149,6 +150,8 @@ const Step1DealType = ({
           name='picContactName'
           value={formData.picContactName}
           onChange={handleChange}
+          inputRef={refs.picContactNameRef}
+          onKeyDown={e => handleKeyDown(e, refs.picContactNameRef)}
         />
       </Grid>
       <Grid item xs={12} md={4}>
@@ -158,6 +161,8 @@ const Step1DealType = ({
           name='picEmail'
           value={formData.picEmail}
           onChange={handleChange}
+          inputRef={refs.picEmailRef}
+          onKeyDown={e => handleKeyDown(e, refs.picEmailRef)}
         />
       </Grid>
       <Grid item xs={12} md={4}>
@@ -167,6 +172,8 @@ const Step1DealType = ({
           name='picPhone'
           value={formData.picPhone}
           onChange={handleChange}
+          inputRef={refs.picPhoneRef}
+          onKeyDown={e => handleKeyDown(e, refs.picPhoneRef)}
         />
       </Grid>
 
@@ -182,6 +189,8 @@ const Step1DealType = ({
           name='billingContactName'
           value={formData.billingContactName}
           onChange={handleChange}
+          inputRef={refs.billingContactNameRef}
+          onKeyDown={e => handleKeyDown(e, refs.billingContactNameRef)}
         />
       </Grid>
       <Grid item xs={12} md={4}>
@@ -191,6 +200,8 @@ const Step1DealType = ({
           name='billingEmail'
           value={formData.billingEmail}
           onChange={handleChange}
+          inputRef={refs.billingEmailRef}
+          onKeyDown={e => handleKeyDown(e, refs.billingEmailRef)}
         />
       </Grid>
       <Grid item xs={12} md={4}>
@@ -200,6 +211,8 @@ const Step1DealType = ({
           name='billingPhone'
           value={formData.billingPhone}
           onChange={handleChange}
+          inputRef={refs.billingPhoneRef}
+          onKeyDown={e => handleKeyDown(e, refs.billingPhoneRef)}
         />
       </Grid>
     </Grid>

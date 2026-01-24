@@ -140,7 +140,7 @@ const PurchaseReturnPage = () => {
 
       const dropdownData = filterRes?.data?.data || filterRes?.data || filterRes || {}
       const companyList = dropdownData?.company?.name || []
-      
+
       const supplierData = supplierRes?.data
       let supplierList = []
       if (Array.isArray(supplierData?.data?.results)) {
@@ -172,7 +172,7 @@ const PurchaseReturnPage = () => {
       const defaultOrigin = origins.find(o => o.label === 'A-Flick Pte Ltd')
       if (defaultOrigin) {
         setFilterOrigin(defaultOrigin)
-        setAppliedOrigin(defaultOrigin)
+        // setAppliedOrigin(defaultOrigin) // ❌ REMOVED: Don't filter on mount
       }
     } catch (err) {
       console.error('Purchase filter error', err)
@@ -273,7 +273,7 @@ const PurchaseReturnPage = () => {
 
       setTotalCount(res?.data?.count || 0)
 
-      const formatDateSafe = (dateValue) => {
+      const formatDateSafe = dateValue => {
         if (!dateValue) return '-'
         const date = new Date(dateValue)
         return isNaN(date.getTime()) ? '-' : format(date, 'dd/MM/yyyy')
@@ -292,7 +292,10 @@ const PurchaseReturnPage = () => {
           supplierName: item.supplier,
           contactEmail: item?.supplier_details?.email || '-',
           contactPhone: item?.supplier_details?.phone || '-',
-          noOfItems: (item.return_items || item.items || []).reduce((acc, curr) => acc + Number(curr.quantity || curr.return_quantity || 0), 0),
+          noOfItems: (item.return_items || item.items || []).reduce(
+            (acc, curr) => acc + Number(curr.quantity || curr.return_quantity || 0),
+            0
+          ),
           remarks: item.remarks || '-',
           status: item.pr_status || item.return_status || 'Pending',
           recordType: 'tm'
@@ -308,7 +311,17 @@ const PurchaseReturnPage = () => {
 
   useEffect(() => {
     fetchPurchaseReturnList()
-  }, [pagination.pageIndex, pagination.pageSize, appliedOrigin, appliedSupplier, appliedStatus, appliedPiNo, appliedDateFilter, appliedDateRange, appliedSearchQuery])
+  }, [
+    pagination.pageIndex,
+    pagination.pageSize,
+    appliedOrigin,
+    appliedSupplier,
+    appliedStatus,
+    appliedPiNo,
+    appliedDateFilter,
+    appliedDateRange,
+    appliedSearchQuery
+  ])
 
   const columns = useMemo(
     () => [
@@ -336,7 +349,9 @@ const PurchaseReturnPage = () => {
                 size='small'
                 color='primary'
                 onClick={() => {
-                  router.push(`/${lang}/admin/purchase/purchase-return/update/${btoa(rowData.id)}?type=${rowData.recordType}`)
+                  router.push(
+                    `/${lang}/admin/purchase/purchase-return/update/${btoa(rowData.id)}?type=${rowData.recordType}`
+                  )
                 }}
               >
                 <i className='tabler-edit' />
@@ -497,7 +512,7 @@ const PurchaseReturnPage = () => {
               onChange={val => setFilterStatus(val)}
             />
           </Box>
- 
+
           {/* Supplier */}
           <Box sx={{ width: 220 }}>
             <GlobalAutocomplete
@@ -508,7 +523,7 @@ const PurchaseReturnPage = () => {
               onChange={val => setFilterSupplier(val)}
             />
           </Box>
- 
+
           {/* PI No Filter */}
           <Box sx={{ width: 220 }}>
             <GlobalAutocomplete
@@ -536,7 +551,16 @@ const PurchaseReturnPage = () => {
               setAppliedDateRange(uiDateRange)
               setAppliedSearchQuery(searchQuery)
               setPagination({ pageIndex: 0, pageSize: pagination.pageSize })
-              fetchPurchaseReturnList(filterOrigin, filterSupplier, filterStatus, filterPiNo, uiDateFilter, uiDateRange, searchQuery, 0)
+              fetchPurchaseReturnList(
+                filterOrigin,
+                filterSupplier,
+                filterStatus,
+                filterPiNo,
+                uiDateFilter,
+                uiDateRange,
+                searchQuery,
+                0
+              )
             }}
           >
             Refresh
