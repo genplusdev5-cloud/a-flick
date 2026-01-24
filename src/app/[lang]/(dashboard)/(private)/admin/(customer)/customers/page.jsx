@@ -154,14 +154,14 @@ const CustomersPageContent = () => {
 
       // 🔥 FILE DOWNLOAD
       const blob = new Blob([res.data], {
-        type: res.headers['content-type'] || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        type: 'text/csv;charset=utf-8;' // ✅ Changed to CSV
       })
 
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
 
       link.href = url
-      link.download = 'MYOB_Customers.xlsx'
+      link.download = 'MYOB_Customers.csv' // ✅ Changed extension
       document.body.appendChild(link)
       link.click()
 
@@ -704,6 +704,16 @@ const CustomersPageContent = () => {
                   Export
                 </GlobalButton>
               )}
+
+              <GlobalButton
+                variant='contained'
+                color='secondary'
+                onClick={e => setExportAnchorEl(e.currentTarget)}
+                startIcon={<FileDownloadIcon />}
+                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+              >
+                Export
+              </GlobalButton>
 
               <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
                 <MenuItem
