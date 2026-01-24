@@ -59,11 +59,19 @@ import { showToast } from '@/components/common/Toasts'
 // ──────────────────────────────────────────────────────────────
 const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...props }) => {
   const [value, setValue] = useState(initialValue)
+  const isFirstRender = useRef(true)
+
   useEffect(() => setValue(initialValue), [initialValue])
+
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false
+      return
+    }
     const t = setTimeout(() => onChange(value), debounce)
     return () => clearTimeout(t)
   }, [value])
+
   return <CustomTextField {...props} value={value} onChange={e => setValue(e.target.value)} />
 }
 
@@ -92,6 +100,7 @@ const StockSummaryPageContent = () => {
   // -- FILTER OPTIONS --
   const [originOptions, setOriginOptions] = useState([])
   const [selectedOrigin, setSelectedOrigin] = useState(null)
+  const [appliedOrigin, setAppliedOrigin] = useState(null) // ✅ Applied Filter State
 
   const [sorting, setSorting] = useState([])
   const fileInputRef = useRef(null)
@@ -183,7 +192,7 @@ const StockSummaryPageContent = () => {
         page,
         page_size: pageSize,
         search: searchText || undefined,
-        company_id: selectedOrigin?.id || undefined
+        company_id: appliedOrigin?.id || undefined // ✅ Use Applied Origin
       }
 
       if (enableDateFilter && startDate && endDate) {
@@ -257,7 +266,7 @@ const StockSummaryPageContent = () => {
 
   useEffect(() => {
     loadData(false)
-  }, [page, appliedFilters, selectedOrigin, pageSize])
+  }, [page, appliedFilters, appliedOrigin, pageSize]) // ✅ Depend on appliedOrigin
 
   const exportCSV = () => {
     const headers = columns.map(c => c.header).filter(h => typeof h === 'string')
@@ -443,35 +452,6 @@ const StockSummaryPageContent = () => {
               <Typography variant='h5' sx={{ fontWeight: 600 }}>
                 Stock Summary List
               </Typography>
-              <Button
-                variant='contained'
-                color='primary'
-                startIcon={
-                  <RefreshIcon
-                    sx={{
-                      animation: loading ? 'spin 1s linear infinite' : 'none',
-                      '@keyframes spin': {
-                        '0%': { transform: 'rotate(0deg)' },
-                        '100%': { transform: 'rotate(360deg)' }
-                      }
-                    }}
-                  />
-                }
-                disabled={loading}
-                onClick={() => {
-                  setPage(1)
-                  setAppliedFilters({
-                    enableDateFilter: uiEnableDateFilter,
-                    startDate: uiStartDate,
-                    endDate: uiEndDate,
-                    searchText: uiSearchText
-                  })
-                  showToast('info', 'Refreshing data...')
-                }}
-                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-              >
-                {loading ? 'Refreshing...' : 'Refresh'}
-              </Button>
             </Box>
           }
           action={
@@ -551,6 +531,37 @@ const StockSummaryPageContent = () => {
                 onChange={val => setSelectedOrigin(val)}
               />
             </Box>
+
+            <Button
+              variant='contained'
+              color='primary'
+              startIcon={
+                <RefreshIcon
+                  sx={{
+                    animation: loading ? 'spin 1s linear infinite' : 'none',
+                    '@keyframes spin': {
+                      '0%': { transform: 'rotate(0deg)' },
+                      '100%': { transform: 'rotate(360deg)' }
+                    }
+                  }}
+                />
+              }
+              disabled={loading}
+              onClick={() => {
+                setPage(1)
+                setAppliedOrigin(selectedOrigin) // ✅ Apply Origin on Refresh
+                setAppliedFilters({
+                  enableDateFilter: uiEnableDateFilter,
+                  startDate: uiStartDate,
+                  endDate: uiEndDate,
+                  searchText: uiSearchText
+                })
+                showToast('info', 'Refreshing data...')
+              }}
+              sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+            >
+              {loading ? 'Refreshing...' : 'Refresh'}
+            </Button>
           </Box>
 
           <Divider sx={{ mb: 3 }} />

@@ -1162,7 +1162,7 @@ export default function ProposalWizard({ id }) {
       <Card className='flex flex-col md:flex-row'>
         <CardContent className='max-md:border-be md:border-ie md:min-is-[300px]'>
           <Typography variant='h5' className='m-4 mb-6 font-bold'>
-            {id ? 'Update Proposal' : 'Add Proposal'} <span style={{ fontSize: '12px', color: '#999' }}>(v1.1)</span>
+            {id ? 'Update Proposal' : 'Add Proposal'} <span style={{ fontSize: '12px', color: '#999' }}>`</span>
           </Typography>
           <StepperWrapper>
             <Stepper activeStep={activeStep} orientation='vertical' className='flex flex-col gap-4 min-is-[220px]'>

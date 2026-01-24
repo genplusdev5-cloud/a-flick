@@ -449,7 +449,7 @@ const CustomersPageContent = () => {
 
       // 7) ABSS Customer Name
       columnHelper.accessor('abssName', {
-        header: 'ABSS Customer Name'
+        header: 'Business Name'
       }),
 
       // 8) Email
@@ -610,7 +610,7 @@ const CustomersPageContent = () => {
           </Breadcrumbs>
 
           {/* Stats Section */}
-          <Grid container spacing={6}>
+          <Grid container spacing={3} sx={{ mb: 6 }}>
             <Grid item xs={12} md={9}>
               <Card className='h-full'>
                 <CardHeader title='' />
