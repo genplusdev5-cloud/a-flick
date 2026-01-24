@@ -194,9 +194,17 @@ const StockSummaryPageContent = () => {
       const response = await getStockSummary(params)
 
       const resData = response?.data?.data || response?.data || response
-      const items = Array.isArray(resData?.results) ? resData.results : Array.isArray(resData) ? resData : []
 
-      setTotalCount(resData?.count || items.length || 0)
+      // ✅ Robust extraction: Handle nested data (results.data) or direct array
+      const items = Array.isArray(resData?.results?.data)
+        ? resData.results.data
+        : Array.isArray(resData?.results)
+          ? resData.results
+          : Array.isArray(resData)
+            ? resData
+            : []
+
+      setTotalCount(resData?.count || resData?.results?.count || items.length || 0)
 
       const mapped = items.map((r, i) => ({
         id: r.item_id || i,
@@ -543,7 +551,7 @@ const StockSummaryPageContent = () => {
                 onChange={val => setSelectedOrigin(val)}
               />
             </Box>
-            </Box>
+          </Box>
 
           <Divider sx={{ mb: 3 }} />
 
