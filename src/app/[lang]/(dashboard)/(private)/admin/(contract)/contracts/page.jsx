@@ -22,7 +22,6 @@ import {
   FormControlLabel,
   FormControl,
   Select,
-  CircularProgress,
   InputAdornment,
   Checkbox
 } from '@mui/material'
@@ -31,6 +30,7 @@ import PermissionGuard from '@/components/auth/PermissionGuard'
 import { usePermission } from '@/hooks/usePermission'
 import PresetDateRangePicker from '@/components/common/PresetDateRangePicker'
 import { getCompanyList } from '@/api/master/company'
+import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 
 import { getContractList, deleteContract } from '@/api/contract_group/contract'
 import api from '@/utils/axiosInstance'
@@ -56,8 +56,6 @@ import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
 import GlobalDateRange from '@/components/common/GlobalDateRange'
 import { showToast } from '@/components/common/Toasts'
 
-import DialogCloseButton from '@components/dialogs/DialogCloseButton'
-import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import EditIcon from '@mui/icons-material/Edit'
@@ -67,7 +65,7 @@ import FileDownloadIcon from '@mui/icons-material/FileDownload'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
-import { useRouter, useSearchParams, usePathname } from 'next/navigation'
+import { useRouter, useSearchParams, usePathname, useParams } from 'next/navigation'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 import ServicePlanDrawer from './service-plan/ServicePlanDrawer'
 import { getTicketBackendDataApi } from '@/api/service_group/schedule'
@@ -131,9 +129,13 @@ const ContractsPageContent = () => {
     setPlanDrawer({ open: false, contract: null, pestOptions: [] })
   }
 
+
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
+  const { lang: locale } = useParams()
+  const lang = locale || 'en'
+
   const [companyOptions, setCompanyOptions] = useState([])
   const [uiCompany, setUiCompany] = useState(null)
 
@@ -466,7 +468,7 @@ const ContractsPageContent = () => {
   }, [appliedFilters, pagination.pageIndex, pagination.pageSize])
 
   const handleEdit = row => {
-    router.push(`/admin/contracts/${row.uuid}/edit`)
+    router.push(`/${lang}/admin/contracts/edit/${row.uuid}`)
   }
 
   const confirmDelete = async () => {
@@ -506,7 +508,8 @@ const ContractsPageContent = () => {
               }}
             >
               {/* 👁 VIEW */}
-              <IconButton size='small' color='info' onClick={() => router.push(`/admin/contracts/${item.uuid}/view`)}>
+              {/* 👁 VIEW */}
+              <IconButton size='small' color='info' onClick={() => router.push(`/${lang}/admin/contracts/view/${item.uuid}`)}>
                 <i className='tabler-eye ' />
               </IconButton>
 
@@ -581,7 +584,7 @@ const ContractsPageContent = () => {
                   const encodedContractId = encodeId(item.id)
                   const encodedCustomerId = encodeId(item.customer_id)
 
-                  router.push(`/en/admin/service-request?customer=${encodedCustomerId}&contract=${encodedContractId}`)
+                  router.push(`/${lang}/admin/service-request?customer=${encodedCustomerId}&contract=${encodedContractId}`)
                 }}
               >
                 Service
@@ -608,7 +611,7 @@ const ContractsPageContent = () => {
                   const encodedContractId = encodeId(item.id)
                   const encodedCustomerId = encodeId(item.customer_id)
 
-                  router.push(`/en/admin/invoice?customer=${encodedCustomerId}&contract=${encodedContractId}`)
+                  router.push(`/${lang}/admin/invoice?customer=${encodedCustomerId}&contract=${encodedContractId}`)
                 }}
               >
                 Invoice
@@ -884,7 +887,7 @@ const ContractsPageContent = () => {
                 <GlobalButton
                   variant='contained'
                   startIcon={<AddIcon />}
-                  onClick={() => router.push('/admin/contracts/add')}
+                  onClick={() => router.push(`/${lang}/admin/contracts/add`)}
                   sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
                 >
                   Add Contract
@@ -988,17 +991,7 @@ const ContractsPageContent = () => {
             <GlobalButton
               variant='contained'
               color='primary'
-              startIcon={
-                <RefreshIcon
-                  sx={{
-                    animation: loading ? 'spin 1s linear infinite' : 'none',
-                    '@keyframes spin': {
-                      '0%': { transform: 'rotate(0deg)' },
-                      '100%': { transform: 'rotate(360deg)' }
-                    }
-                  }}
-                />
-              }
+                startIcon={<RefreshIcon />}
               disabled={loading}
               onClick={() => {
                 const newFilters = {
@@ -1018,7 +1011,7 @@ const ContractsPageContent = () => {
               }}
               sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
             >
-              {loading ? 'Refreshing...' : 'Refresh'}
+              Refresh
             </GlobalButton>
           </Box>
 
@@ -1082,22 +1075,6 @@ const ContractsPageContent = () => {
           </Box>
 
           <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-            {loading && (
-              <Box
-                sx={{
-                  position: 'absolute',
-                  inset: 0,
-                  bgcolor: 'rgba(255,255,255,0.8)',
-                  backdropFilter: 'blur(2px)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 20
-                }}
-              >
-                <ProgressCircularCustomization size={60} thickness={5} />
-              </Box>
-            )}
 
             <StickyTableWrapper rowCount={rows.length}>
               <table className={styles.table}>
@@ -1136,7 +1113,7 @@ const ContractsPageContent = () => {
                   ) : (
                     <tr>
                       <td colSpan={columns.length} className='text-center py-4'>
-                        {loading ? 'Loading contracts...' : 'No results found'}
+                        No results found
                       </td>
                     </tr>
                   )}
@@ -1211,7 +1188,7 @@ const ContractsPageContent = () => {
             disabled={loading}
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
           >
-            {loading ? 'Deleting...' : 'Delete'}
+            Delete
           </GlobalButton>
         </DialogActions>
       </Dialog>

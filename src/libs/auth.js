@@ -21,20 +21,36 @@ export const authOptions = {
       async authorize(credentials) {
         const { email, password } = credentials ?? {}
 
-        // normalize email for demo matching
-        const normalized = (email || '').toLowerCase().trim()
+        if (!email || !password) return null
 
-        // ✅ Demo logins (no backend required)
-        if ((normalized === 'admin@a-flick.com.sg' || normalized === 'admin@aflcik.com.sg') && password === '123456') {
-          return { id: 1, name: 'Admin', email: normalized }
+        try {
+          // Use the absolute URL from .env or fallback to the one provided by the user
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://aflick.genpest360.com/api/'
+          const response = await fetch(`${apiUrl}auth/login/`, {
+            method: 'POST',
+            body: JSON.stringify({ email, password }),
+            headers: { 'Content-Type': 'application/json' }
+          })
+
+          const data = await response.json()
+
+          if (data.status === 'success' && data.data) {
+            // Return user object for next-auth session
+            return {
+              id: data.data.user_id || data.data.id,
+              name: data.data.name,
+              email: data.data.email,
+              access_token: data.data.access,
+              refresh_token: data.data.refresh,
+              user_data: data.data // Keep the full data for JWT callback
+            }
+          }
+
+          return null
+        } catch (error) {
+          console.error('Auth Error:', error)
+          return null
         }
-
-        if (normalized === 'stark@gmail.com' && password === '123456') {
-          return { id: 2, name: 'Stark', email: normalized }
-        }
-
-        // ❌ No match => return null
-        return null
       }
     }),
 
@@ -54,12 +70,14 @@ export const authOptions = {
   },
 
   callbacks: {
-    async jwt({ token, user, account }) {
+    async jwt({ token, user }) {
       if (user) {
         token.name = user.name
         token.email = user.email
-        // Add role information to token if needed
-        token.role = user.role || 'user'
+        token.id = user.id
+        token.access_token = user.access_token
+        token.refresh_token = user.refresh_token
+        token.user_data = user.user_data
       }
       return token
     },
@@ -67,8 +85,10 @@ export const authOptions = {
       if (session.user) {
         session.user.name = token.name
         session.user.email = token.email
-        // Add role information to session if needed
-        session.user.role = token.role
+        session.user.id = token.id
+        session.access_token = token.access_token
+        session.refresh_token = token.refresh_token
+        session.user_data = token.user_data
       }
       return session
     },

@@ -49,7 +49,6 @@ import PresetDateRangePicker from '@/components/common/PresetDateRangePicker'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
 
-import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import CustomTextField from '@core/components/mui/TextField'
 import CustomAutocomplete from '@core/components/mui/Autocomplete'
@@ -1174,7 +1173,7 @@ const ServiceRequestPageContent = () => {
                   ) : (
                     <tr>
                       <td colSpan={columns.length} className='text-center py-6'>
-                        {loading ? 'Fetching report list...' : 'No results found'}
+                        No results found
                       </td>
                     </tr>
                   )}
@@ -1250,7 +1249,7 @@ const ServiceRequestPageContent = () => {
             disabled={loading}
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
           >
-            {loading ? 'Deleting...' : 'Delete'}
+            Delete
           </GlobalButton>
         </DialogActions>
       </Dialog>
@@ -1275,11 +1274,7 @@ const ServiceRequestPageContent = () => {
           </DialogCloseButton>
         </DialogTitle>
         <DialogContent dividers sx={{ p: 6 }}>
-          {editDialog.loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-              <ProgressCircularCustomization size={40} />
-            </Box>
-          ) : editDialog.details ? (
+          {editDialog.details ? (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, pt: 2 }}>
               {/* SECTION 1: DATES & TIMES */}
               <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3 }}>
@@ -1570,7 +1565,7 @@ const ServiceRequestPageContent = () => {
             Close
           </Button>
           <Button onClick={handleSave} variant='contained' disabled={loading}>
-            {loading ? 'Saving...' : 'Save Changes'}
+            Save Changes
           </Button>
         </DialogActions>
       </Dialog>

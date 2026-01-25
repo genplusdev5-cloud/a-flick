@@ -36,7 +36,6 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import GlobalButton from '@/components/common/GlobalButton'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
-import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import { showToast } from '@/components/common/Toasts'
 import PermissionGuard from '@/components/auth/PermissionGuard'
 import { usePermission } from '@/hooks/usePermission'
@@ -265,7 +264,7 @@ const CompanyOriginListContent = () => {
                 Company Origin
               </Typography>
               <GlobalButton
-                startIcon={<RefreshIcon sx={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />}
+                startIcon={<RefreshIcon />}
                 disabled={loading}
                 onClick={loadData}
               >
@@ -342,23 +341,6 @@ const CompanyOriginListContent = () => {
         />
         <Divider />
 
-        {/* Loading Overlay */}
-        {loading && (
-          <Box
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              bgcolor: 'rgba(255,255,255,0.8)',
-              backdropFilter: 'blur(2px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 10
-            }}
-          >
-            <ProgressCircularCustomization size={60} thickness={5} />
-          </Box>
-        )}
 
         <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {/* Show Entries + Search */}

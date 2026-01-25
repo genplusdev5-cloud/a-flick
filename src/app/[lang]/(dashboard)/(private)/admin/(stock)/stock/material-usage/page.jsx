@@ -199,7 +199,7 @@ const MaterialUsagePageContent = () => {
       const suppData = suppRes?.data?.data?.results || suppRes?.data?.results || []
       setSupplierOptions(suppData.map(s => ({ id: s.id, label: s.supplier_name })))
       if (chemRes?.success) {
-        setChemicalOptions(chemRes.data.map(c => ({ id: c.id, label: c.chemical_name })))
+        setChemicalOptions((chemRes.data.results || []).map(c => ({ id: c.id, label: c.name })))
       }
     } catch (err) {
       console.error('Failed to fetch filter options:', err)

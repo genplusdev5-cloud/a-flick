@@ -14,6 +14,7 @@ import GlobalButton from '@/components/common/GlobalButton'
 import GlobalTextField from '@/components/common/GlobalTextField'
 import CKEditorField from '@/components/common/CKEditorField'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
+import { decodeId } from '@/utils/urlEncoder'
 
 const ProposalEditorContent = () => {
   const router = useRouter()
@@ -26,7 +27,8 @@ const ProposalEditorContent = () => {
   useEffect(() => {
     if (urlProposalId) {
       console.log('✅ URL HAS ID:', urlProposalId)
-      setActiveProposalId(urlProposalId)
+      const decoded = decodeId(urlProposalId) || urlProposalId
+      setActiveProposalId(decoded)
     }
   }, [urlProposalId])
 
@@ -42,9 +44,14 @@ const ProposalEditorContent = () => {
       getSalesAgreementContent(activeProposalId)
         .then(res => {
           console.log('✅ AGREEMENT API RESPONSE:', res)
-          if (res?.data?.status === 'success' || res?.data) {
-            const data = res.data.data || res.data
-            if (data.description) setDescription(data.description)
+          // Handle { status: 'success', data: { description: '...' } }
+          const apiResponse = res?.data || res
+          if (apiResponse?.status === 'success' || apiResponse?.data) {
+            const data = apiResponse.data || apiResponse
+            if (data.description) {
+              console.log('✍️ SETTING DESCRIPTION:', data.description.substring(0, 50) + '...')
+              setDescription(data.description)
+            }
 
             // Fallback for title/date if present here
             if (data.title && !title) setTitle(data.title)
@@ -60,9 +67,11 @@ const ProposalEditorContent = () => {
       getProposalDetails(activeProposalId)
         .then(res => {
           console.log('✅ PROPOSAL DETAILS RESPONSE:', res)
-          const data = res?.status === 'success' || res ? res.data || res : null
-          if (data) {
-            if (data.name) setTitle(data.name || data.title || '')
+          // details.js already does res.data, so res IS the data object { status: 'success', data: {...} }
+          const apiResponse = res
+          if (apiResponse?.status === 'success' || apiResponse?.data) {
+            const data = apiResponse.data || apiResponse
+            if (data.name || data.title) setTitle(data.name || data.title || '')
             if (data.proposal_date || data.start_date) {
               const d = new Date(data.proposal_date || data.start_date)
               if (!isNaN(d.getTime())) setProposalDate(d)
@@ -115,7 +124,7 @@ const ProposalEditorContent = () => {
               }
             }}
           >
-            <CKEditorField value={description} onChange={data => setDescription(data)} />
+            <CKEditorField key={description ? 'loaded' : 'loading'} value={description} onChange={data => setDescription(data)} />
           </Box>
         </Grid>
 

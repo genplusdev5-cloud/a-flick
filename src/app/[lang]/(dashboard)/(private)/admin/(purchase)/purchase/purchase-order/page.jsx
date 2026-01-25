@@ -26,7 +26,6 @@ import {
   Select,
   FormControl,
   InputLabel,
-  CircularProgress,
   FormControlLabel, // ✅ ADD
   Checkbox, // ✅ ADD
   InputAdornment // ✅ ALSO REQUIRED (you use it in Search)
@@ -759,13 +758,7 @@ const PurchaseOrderPage = () => {
               </thead>
 
               <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={columns.length} style={{ textAlign: 'center', padding: 24 }}>
-                      Loading...
-                    </td>
-                  </tr>
-                ) : table.getRowModel().rows.length ? (
+                {table.getRowModel().rows.length ? (
                   table.getRowModel().rows.map(row => (
                     <tr key={row.id}>
                       {row.getVisibleCells().map(cell => (
@@ -847,7 +840,7 @@ const PurchaseOrderPage = () => {
               disabled={loading}
               sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
             >
-              {loading ? 'Deleting...' : 'Delete'}
+              Delete
             </GlobalButton>
           </DialogActions>
         </Dialog>

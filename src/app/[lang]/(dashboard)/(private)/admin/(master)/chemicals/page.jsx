@@ -40,7 +40,6 @@ import {
 import { getUomList } from '@/api/master/uom'
 
 import { showToast } from '@/components/common/Toasts'
-import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import CloseIcon from '@mui/icons-material/Close'
@@ -576,17 +575,7 @@ const ChemicalsPageContent = () => {
               <GlobalButton
                 variant='contained'
                 color='primary'
-                startIcon={
-                  <RefreshIcon
-                    sx={{
-                      animation: loading ? 'spin 1s linear infinite' : 'none',
-                      '@keyframes spin': {
-                        '0%': { transform: 'rotate(0deg)' },
-                        '100%': { transform: 'rotate(360deg)' }
-                      }
-                    }}
-                  />
-                }
+                startIcon={<RefreshIcon />}
                 disabled={loading}
                 onClick={async () => {
                   setPagination(prev => ({ ...prev, pageSize: 25, pageIndex: 0 }))
@@ -594,7 +583,7 @@ const ChemicalsPageContent = () => {
                 }}
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
-                {loading ? 'Refreshing...' : 'Refresh'}
+                Refresh
               </GlobalButton>
             </Box>
           }
@@ -637,13 +626,6 @@ const ChemicalsPageContent = () => {
           }}
         />
         <Divider />
-        {loading && (
-          <Box sx={{ width: '100%', position: 'absolute', top: 0, left: 0, zIndex: 10 }}>
-            <div className='h-1 w-full bg-primary/20 overflow-hidden'>
-              <div className='h-full bg-primary animate-progress' style={{ width: '30%' }} />
-            </div>
-          </Box>
-        )}
 
         <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <Box

@@ -12,8 +12,7 @@ import {
   IconButton,
   Dialog,
   DialogContent,
-  Breadcrumbs,
-  CircularProgress
+  Breadcrumbs
 } from '@mui/material'
 
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
@@ -204,13 +203,6 @@ export default function CompanyOriginEditPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <Box display='flex' justifyContent='center' alignItems='center' minHeight='70vh'>
-        <CircularProgress />
-      </Box>
-    )
-  }
 
   if (!formData) return null
 
@@ -448,7 +440,6 @@ export default function CompanyOriginEditPage() {
             variant='contained'
             onClick={handleSave}
             disabled={saving}
-            startIcon={saving ? <CircularProgress size={20} color='inherit' /> : null}
           >
             {saving ? 'Updating...' : 'Update Company'}
           </Button>

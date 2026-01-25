@@ -232,6 +232,8 @@ export default function AddMaterialRequestPage() {
   }
 
   const handleSaveAll = async () => {
+    if (saveLoading) return
+
     if (items.length === 0) {
       showToast('warning', 'Please add at least one chemical')
       return
@@ -496,7 +498,12 @@ export default function AddMaterialRequestPage() {
           <GlobalButton color='secondary' onClick={() => router.push(`/${lang}/admin/transfer/material-request`)}>
             Close
           </GlobalButton>
-          <GlobalButton variant='contained' onClick={handleSaveAll} disabled={saveLoading || items.length === 0}>
+          <GlobalButton
+            variant='contained'
+            onClick={handleSaveAll}
+            disabled={saveLoading || items.length === 0}
+            startIcon={saveLoading ? <CircularProgress size={20} color='inherit' /> : null}
+          >
             {saveLoading ? 'Saving...' : 'Save Request'}
           </GlobalButton>
         </Box>

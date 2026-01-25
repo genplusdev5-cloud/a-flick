@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams, usePathname } from 'next/navigation'
+import { useRouter, useSearchParams, usePathname, useParams } from 'next/navigation'
 
 import {
   Box,
@@ -67,8 +67,9 @@ import StickyListLayout from '@/components/common/StickyListLayout'
 import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 import CustomTextField from '@core/components/mui/TextField'
 import { format } from 'date-fns'
-import { showToast } from '@/components/common/Toasts' // ← Idhu add pannu (exact path unakku theriyum)
+import { showToast } from '@/components/common/Toasts' 
 import GlobalDateRange from '@/components/common/GlobalDateRange'
+import { encodeId, decodeId } from '@/utils/urlEncoder'
 
 // ----------------------------------------------------------
 
@@ -81,6 +82,7 @@ const initialDropdowns = {
 
 // ───────────────────────────────────────────
 const AttendancePageContent = () => {
+  const { lang } = useParams()
   const [rows, setRows] = useState([])
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 })
   // -- UI (TEMPORARY) FILTER STATES --
@@ -165,8 +167,9 @@ const AttendancePageContent = () => {
   }
 
   useEffect(() => {
-    const openScheduleId = searchParams.get('openScheduleId')
-    if (!openScheduleId) return
+    const rawId = searchParams.get('openScheduleId')
+    if (!rawId) return
+    const openScheduleId = decodeId(rawId) || rawId
 
     // already injected → skip
     if (rows.some(r => String(r.id) === String(openScheduleId))) return
@@ -239,8 +242,9 @@ const AttendancePageContent = () => {
   }, [])
 
   useEffect(() => {
-    const openScheduleId = searchParams.get('openScheduleId')
-    if (!openScheduleId) return
+    const rawId = searchParams.get('openScheduleId')
+    if (!rawId) return
+    const openScheduleId = decodeId(rawId) || rawId
 
     // Already opened → skip
     if (autoOpenedRef.current) return
@@ -299,7 +303,7 @@ const AttendancePageContent = () => {
       header={
         <Box sx={{ mb: 2 }}>
           <Box sx={{ mb: 2 }}>
-            <Link href='/admin/dashboards' className='text-primary'>
+            <Link href={`/${lang}/admin/dashboards`} className='text-primary'>
               Dashboard
             </Link>{' '}
             / <Typography component='span'>Attendance</Typography>
@@ -404,7 +408,7 @@ const AttendancePageContent = () => {
                 variant='contained'
                 startIcon={<AddIcon />}
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-                onClick={() => router.push('/admin/attendance/attendance/add')}
+                onClick={() => router.push(`/${lang}/admin/attendance/attendance/add`)}
               >
                 Add Attendance
               </GlobalButton>
@@ -532,7 +536,7 @@ const AttendancePageContent = () => {
           </Box>
 
           <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-            {loading && (
+            {/* {loading && (
               <Box
                 sx={{
                   position: 'absolute',
@@ -547,7 +551,7 @@ const AttendancePageContent = () => {
               >
                 <ProgressCircularCustomization size={60} thickness={5} />
               </Box>
-            )}
+            )} */}
 
             <StickyTableWrapper rowCount={rows.length}>
               <table className={styles.table}>
@@ -571,7 +575,10 @@ const AttendancePageContent = () => {
                             <IconButton
                               size='small'
                               color='primary'
-                              onClick={() => router.push(`/admin/attendance/attendance/edit/${row.id}`)}
+                              onClick={() => {
+                                const encodedId = encodeId(row.id)
+                                router.push(`/${lang}/admin/attendance/attendance/edit/${encodedId}`)
+                              }}
                             >
                               <i className='tabler-edit' />
                             </IconButton>
@@ -707,7 +714,8 @@ export default function AttendancePage() {
       <Suspense
         fallback={
           <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-            <CircularProgress />
+             // No visible fallback as per user request to remove progress bars
+             null
           </Box>
         }
       >

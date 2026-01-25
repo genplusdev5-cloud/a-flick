@@ -1,10 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Box, Grid, Card, Divider, Typography } from '@mui/material'
-import { useRouter } from 'next/navigation'
+import { Box, Grid, Card, Divider, Typography, Breadcrumbs } from '@mui/material'
+import { useRouter, useParams } from 'next/navigation'
+import Link from 'next/link'
 
 import ContentLayout from '@/components/layout/ContentLayout'
+import StickyListLayout from '@/components/common/StickyListLayout'
 import GlobalButton from '@/components/common/GlobalButton'
 import GlobalTextField from '@/components/common/GlobalTextField'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
@@ -16,12 +18,12 @@ import { getPestList, addProposalItem } from '@/api/sales/proposal_item'
 
 const AddProposalItemPage = () => {
   const router = useRouter()
+  const { lang = 'en' } = useParams()
 
   const [loading, setLoading] = useState(false)
   const [pestOptions, setPestOptions] = useState([])
 
   const [form, setForm] = useState({
-    type: 'MASTER',
     pestId: '',
     position: 'After',
     sort_order: '0',
@@ -58,13 +60,8 @@ const AddProposalItemPage = () => {
 
   const handleSave = async () => {
     // ───────── VALIDATIONS ─────────
-    if (!form.type) {
-      showToast('error', 'Type is required')
-      return
-    }
-
-    if (form.type === 'PEST' && !form.pestId) {
-      showToast('error', 'Pest is required for PEST type')
+    if (!form.pestId) {
+      showToast('error', 'Pest is required')
       return
     }
 
@@ -90,7 +87,7 @@ const AddProposalItemPage = () => {
       // NOTE: 'type' is removed because it's likely a filter-only property and not a model field.
       // 'is_default' is sent as 1/0 to match the backend response format.
       const payload = {
-        pest_id: form.type === 'PEST' ? Number(form.pestId) : null,
+        pest_id: Number(form.pestId),
         content_position: form.position || null,
         sort_order: form.sort_order ? Number(form.sort_order) : null,
         is_default: form.is_default === 'Yes' ? 1 : 0,
@@ -107,7 +104,7 @@ const AddProposalItemPage = () => {
       // ───────── SUCCESS ─────────
       if (res?.status === 'success' || res?.status === 200 || res?.status === 201) {
         showToast('success', 'Proposal Item added successfully')
-        router.push('/admin/proposal-item')
+        router.push(`/${lang}/admin/proposal-item`)
         return
       }
 
@@ -126,13 +123,19 @@ const AddProposalItemPage = () => {
   // UI
   // ───────────────────────────────────────
   return (
-    <ContentLayout
-      title={<Box sx={{ m: 2 }}>Add Proposal Content</Box>}
-      breadcrumbs={[
-        { label: 'Dashboard', href: '/' },
-        { label: 'Proposal Item', href: '/admin/proposal-item' },
-        { label: 'Add Proposal Content' }
-      ]}
+    <StickyListLayout
+      header={
+        <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
+          <Link underline='hover' color='inherit' href={`/${lang}`}>
+            Home
+          </Link>
+          <Typography color='text.secondary'>Sales</Typography>
+          <Link underline='hover' color='inherit' href={`/${lang}/admin/proposal-item`}>
+            Proposal Item
+          </Link>
+          <Typography color='text.primary'>Add Proposal Content</Typography>
+        </Breadcrumbs>
+      }
     >
       <Card sx={{ p: 5, boxShadow: 'none' }} elevation={0}>
         <Grid container spacing={6}>
@@ -144,38 +147,20 @@ const AddProposalItemPage = () => {
             <Divider sx={{ mt: 2 }} />
           </Grid>
 
-          {/* Type */}
+          {/* Pest */}
           <Grid item xs={12} md={3}>
             <GlobalAutocomplete
-              label='Type'
-              options={['MASTER', 'PEST']}
-              value={form.type}
+              label='Pest *'
+              options={pestOptions}
+              value={form.pestId}
               onChange={val =>
                 setForm(prev => ({
                   ...prev,
-                  type: val?.value || '',
-                  pestId: '' // reset pest if type changes
+                  pestId: val?.value || ''
                 }))
               }
             />
           </Grid>
-
-          {/* Pest (Conditional) */}
-          {form.type === 'PEST' && (
-            <Grid item xs={12} md={3}>
-              <GlobalAutocomplete
-                label='Pest'
-                options={pestOptions}
-                value={form.pestId}
-                onChange={val =>
-                  setForm(prev => ({
-                    ...prev,
-                    pestId: val?.value || ''
-                  }))
-                }
-              />
-            </Grid>
-          )}
 
           {/* Position */}
           <Grid item xs={12} md={3}>
@@ -266,7 +251,7 @@ const AddProposalItemPage = () => {
           </Grid>
         </Grid>
       </Card>
-    </ContentLayout>
+    </StickyListLayout>
   )
 }
 

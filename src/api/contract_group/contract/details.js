@@ -5,19 +5,44 @@ export const getContractDetails = async id => {
     // Check if the id is a UUID
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
     
+    // Use 'uuid' param for UUIDs (matches Postman), 'id' for integers
     const params = isUuid ? { uuid: id } : { id: id }
 
-    console.log('📡 Fetching Contract Details:', { id, isUuid, params })
+    console.log('📡 Fetching Contract Details via List (Attempt 1):', { id, isUuid, params })
     
-    const res = await api.get('contract-details/', { params })
+    // Switch to contract-list/ as contract-details/ is returning 404
+    let res = await api.get('contract-list/', { params })
+    
+    // Handle response structure: data.data.results or data.results
+    let data = res.data
+    let results = data?.data?.results || data?.results || []
 
-    return res.data?.data || null
-  } catch (error) {
-    console.error('❌ getContractDetails FAILED')
-    console.error('👉 URL:', error.config?.url)
-    console.error('👉 Status:', error.response?.status)
-    console.error('👉 Data:', JSON.stringify(error.response?.data, null, 2))
+    if (results.length > 0) {
+      return results[0]
+    }
+
+    // FALLBACK: Try 'search' param if strict uuid/id param returned nothing
+    console.log('⚠️ Attempt 1 Empty. Retrying with SEARCH param...')
+    const searchParams = { search: id }
+    res = await api.get('contract-list/', { params: searchParams })
     
-    throw error
+    data = res.data
+    results = data?.data?.results || data?.results || []
+    
+    if (results.length > 0) {
+         console.log('✅ Found via SEARCH param')
+         return results[0]
+    }
+    
+    console.error('❌ Contract not found in LIST either')
+    return null
+  } catch (error) {
+    console.error('❌ getContractDetails FAILED:', error.message)
+    console.error('👉 URL:', error.config?.url)
+    console.error('👉 Params:', error.config?.params)
+    console.error('👉 Status:', error.response?.status)
+    console.error('👉 Data:', error.response?.data)
+    
+    throw error // Re-throw so the caller can handle it
   }
 }

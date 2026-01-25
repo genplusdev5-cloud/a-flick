@@ -10,7 +10,7 @@ import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
 import FileCopyIcon from '@mui/icons-material/FileCopy'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns'
 
 import { createColumnHelper, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table'
@@ -60,6 +60,7 @@ import { encodeId } from '@/utils/urlEncoder'
 
 const SalesQuotationPage = () => {
   const router = useRouter()
+  const { lang = 'en' } = useParams()
   const [filters, setFilters] = useState({
     date: '',
     origin: 'aflick', // ✅ Set default Origin
@@ -138,7 +139,7 @@ const SalesQuotationPage = () => {
                   console.log('Row Data:', row.original)
                   const id = row.original.proposal_id || row.original.id
                   const encodedId = encodeId(id)
-                  router.push(`/admin/sales-quotation/${encodedId}/edit`)
+                  router.push(`/${lang}/admin/sales-quotation/update/${encodedId}`)
                 }}
               >
                 <i className='tabler-edit' />
@@ -502,7 +503,7 @@ const SalesQuotationPage = () => {
                 <GlobalButton
                   variant='contained'
                   startIcon={<AddIcon />}
-                  onClick={() => router.push('/admin/sales-quotation/add')}
+                  onClick={() => router.push(`/${lang}/admin/sales-quotation/add`)}
                 >
                   Add Proposal
                 </GlobalButton>

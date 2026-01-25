@@ -1,8 +1,8 @@
 'use client'
 
-import { updateCustomer, getCustomerDetails, getCustomerOrigins } from '@/api/customer_group/customer'
+import { updateCustomer, getCustomerDetails } from '@/api/customer_group/customer'
 import { getCustomerOrigin } from '@/api/customer_group/customer/origin'
-import { getContractDropdowns } from '@/api/contract_group/contract'
+import { getAllDropdowns } from '@/api/contract_group/contract/dropdowns'
 import { getAllEmployees } from '@/api/employee'
 
 import { useState, useEffect, useRef } from 'react'
@@ -59,6 +59,7 @@ const initialFormData = {
 export default function EditCustomerPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { lang } = useParams()
 
   // decode base64 ID
 
@@ -295,7 +296,7 @@ export default function EditCustomerPage() {
     setMiniEmailError(false)
   }
 
-  const handleFinalCancel = () => router.push('/admin/customers')
+  const handleFinalCancel = () => router.push(`/${lang}/admin/customers`)
 
   const handleFinalSave = async () => {
     if (saving) return
@@ -344,7 +345,7 @@ export default function EditCustomerPage() {
 
       if (res.status === 'success') {
         showToast('success', 'Customer updated successfully')
-        setTimeout(() => router.push('/admin/customers'), 600)
+        setTimeout(() => router.push(`/${lang}/admin/customers`), 600)
       } else {
         showToast('error', res.message || 'Update failed')
       }
@@ -378,15 +379,7 @@ export default function EditCustomerPage() {
     { key: 'miniPhone', header: 'Phone', align: 'left', render: r => r.miniPhone || '-' }
   ]
 
-  if (loading) {
-    return (
-      <ContentLayout title='Loading...'>
-        <Box display='flex' justifyContent='center' p={4}>
-          <Typography>Loading customer data...</Typography>
-        </Box>
-      </ContentLayout>
-    )
-  }
+  // if (loading) return null
 
   if (notFound) {
     return (
@@ -405,8 +398,8 @@ export default function EditCustomerPage() {
         <ContentLayout
           title={<Box sx={{ m: 2 }}>Update Customer Details</Box>}
           breadcrumbs={[
-            { label: 'Home', href: '/' },
-            { label: 'Customer', href: '/admin/customers' },
+            { label: 'Home', href: `/${lang}` },
+            { label: 'Customer', href: `/${lang}/admin/customers` },
             { label: 'Update Customer' }
           ]}
         >
@@ -817,7 +810,7 @@ export default function EditCustomerPage() {
                     Cancel
                   </GlobalButton>
                   <GlobalButton variant='contained' onClick={handleFinalSave} disabled={saving}>
-                    {saving ? 'Updating...' : 'Update Customer'}
+                    Update Customer
                   </GlobalButton>
                 </Box>
               </Card>

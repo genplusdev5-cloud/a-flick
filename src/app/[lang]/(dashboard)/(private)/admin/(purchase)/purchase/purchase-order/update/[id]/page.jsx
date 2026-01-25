@@ -13,8 +13,7 @@ import {
   IconButton,
   Breadcrumbs,
   FormControlLabel,
-  Checkbox,
-  CircularProgress
+  Checkbox
 } from '@mui/material'
 
 import StickyListLayout from '@/components/common/StickyListLayout'
@@ -467,24 +466,6 @@ const EditPurchaseOrderPage = () => {
 
         {/* HEADER FORM */}
         <Box px={4} py={3} position='relative'>
-          {initLoading && (
-            <Box
-              sx={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                bgcolor: 'rgba(255,255,255,0.7)',
-                zIndex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <CircularProgress size={40} />
-            </Box>
-          )}
 
           <Grid container spacing={3}>
             <Grid item xs={12} md={4}>
@@ -668,7 +649,7 @@ const EditPurchaseOrderPage = () => {
             Cancel
           </GlobalButton>
           <GlobalButton variant='contained' onClick={handleUpdate} disabled={saveLoading}>
-            {saveLoading ? 'Updating...' : 'Update'}
+            Update
           </GlobalButton>
         </Box>
       </Card>

@@ -24,7 +24,6 @@ import {
   Autocomplete,
   FormControl,
   Select,
-  CircularProgress,
   InputAdornment
 } from '@mui/material'
 
@@ -440,15 +439,7 @@ export default function ChemicalsPage() {
                 variant='contained'
                 color='primary'
                 startIcon={
-                  <RefreshIcon
-                    sx={{
-                      animation: loading ? 'spin 1s linear infinite' : 'none',
-                      '@keyframes spin': {
-                        '0%': { transform: 'rotate(0deg)' },
-                        '100%': { transform: 'rotate(360deg)' }
-                      }
-                    }}
-                  />
+                    <RefreshIcon />
                 }
                 disabled={loading}
                 onClick={async () => {
@@ -458,7 +449,7 @@ export default function ChemicalsPage() {
                 }}
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
-                {loading ? 'Refreshing...' : 'Refresh'}
+                Refresh
               </Button>
 
               <Button
@@ -710,7 +701,7 @@ export default function ChemicalsPage() {
             </Grid>
             <Box mt={4} display='flex' gap={2}>
               <Button type='submit' variant='contained' fullWidth disabled={loading}>
-                {loading ? 'Saving...' : isEdit ? 'Update' : 'Save'}
+                {isEdit ? 'Update' : 'Save'}
               </Button>
               <Button variant='outlined' fullWidth onClick={toggleDrawer}>
                 Cancel

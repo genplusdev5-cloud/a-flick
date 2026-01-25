@@ -1,6 +1,7 @@
-import { Grid, Typography, Divider } from '@mui/material'
+import { Grid, Typography, Divider, Button, Box } from '@mui/material'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
 import CustomTextField from '@core/components/mui/TextField'
+import { useRouter, useParams } from 'next/navigation'
 
 const Step1DealType = ({
   formData,
@@ -10,10 +11,26 @@ const Step1DealType = ({
   dropdowns, // Ensure dropdowns are passed
   refs
 }) => {
+  const router = useRouter()
+  const { lang } = useParams()
+
   return (
     <Grid container spacing={4}>
       <Grid item xs={12}>
-        <Divider sx={{ my: 1 }}> Contract Information </Divider>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+            <Typography variant='h6'>Contract Information</Typography>
+            <Button
+                variant='contained'
+                color='success'
+                size='small'
+                startIcon={<i className='tabler-file-export' />}
+                onClick={() => router.push(`/${lang}/admin/contracts/add`)}
+                sx={{ textTransform: 'none', fontWeight: 600 }}
+            >
+                Convert to Contract
+            </Button>
+        </Box>
+        <Divider />
       </Grid>
 
       {/* Origin */}

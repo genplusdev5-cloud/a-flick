@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams, usePathname } from 'next/navigation'
+import { useRouter, useSearchParams, usePathname, useParams } from 'next/navigation'
 import { openDB } from 'idb'
 import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns'
 import {
@@ -26,7 +26,6 @@ import {
   TextField,
   FormControl,
   FormControlLabel,
-  CircularProgress,
   InputAdornment,
   Checkbox
 } from '@mui/material'
@@ -52,7 +51,6 @@ import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
 import FileCopyIcon from '@mui/icons-material/FileCopy'
 
 import { showToast } from '@/components/common/Toasts'
-import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import EditIcon from '@mui/icons-material/Edit'
@@ -106,6 +104,7 @@ const CustomersPageContent = () => {
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
+  const { lang } = useParams()
 
   const [selectedIds, setSelectedIds] = useState([])
 
@@ -305,7 +304,7 @@ const CustomersPageContent = () => {
 
   const handleEdit = id => {
     const encodedId = btoa(id.toString())
-    router.push(`/en/admin/customers/edit?id=${encodedId}`)
+    router.push(`/${lang}/admin/customers/edit?id=${encodedId}`)
   }
 
   const confirmDelete = async () => {
@@ -393,7 +392,7 @@ const CustomersPageContent = () => {
               color='success'
               onClick={() => {
                 const encodedId = btoa(info.row.original.id.toString())
-                router.push(`/en/admin/contracts?customer=${encodedId}`)
+                router.push(`/${lang}/admin/contracts?customer=${encodedId}`)
               }}
             >
               <i className='tabler-file-text' />
@@ -603,7 +602,7 @@ const CustomersPageContent = () => {
       header={
         <>
           <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
-            <Link underline='hover' color='inherit' href='/'>
+            <Link underline='hover' color='inherit' href={`/${lang}`}>
               Dashboard
             </Link>
             <Typography color='text.primary'>Customer List</Typography>
@@ -766,7 +765,7 @@ const CustomersPageContent = () => {
                 <GlobalButton
                   variant='contained'
                   startIcon={<AddIcon />}
-                  onClick={() => router.push('/admin/customers/add')}
+                  onClick={() => router.push(`/${lang}/admin/customers/add`)}
                   sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
                 >
                   Add Customer
@@ -842,22 +841,12 @@ const CustomersPageContent = () => {
             <GlobalButton
               variant='contained'
               color='primary'
-              startIcon={
-                <RefreshIcon
-                  sx={{
-                    animation: loading ? 'spin 1s linear infinite' : 'none',
-                    '@keyframes spin': {
-                      '0%': { transform: 'rotate(0deg)' },
-                      '100%': { transform: 'rotate(360deg)' }
-                    }
-                  }}
-                />
-              }
+                startIcon={<RefreshIcon />}
               disabled={loading}
               onClick={handleRefresh}
               sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
             >
-              {loading ? 'Refreshing...' : 'Refresh'}
+              Refresh
             </GlobalButton>
           </Box>
 
@@ -947,7 +936,7 @@ const CustomersPageContent = () => {
                     ) : (
                       <tr>
                         <td colSpan={columns.length} className='text-center py-4'>
-                          {loading ? 'Loading customers...' : 'No results found'}
+                          No results found
                         </td>
                       </tr>
                     )}
@@ -1024,7 +1013,7 @@ const CustomersPageContent = () => {
             disabled={loading}
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
           >
-            {loading ? 'Deleting...' : 'Delete'}
+            Delete
           </GlobalButton>
         </DialogActions>
       </Dialog>

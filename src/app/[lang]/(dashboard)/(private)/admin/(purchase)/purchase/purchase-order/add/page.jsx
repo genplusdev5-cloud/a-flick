@@ -19,8 +19,7 @@ import {
   TableBody,
   Breadcrumbs,
   FormControlLabel,
-  Checkbox,
-  CircularProgress
+  Checkbox
 } from '@mui/material'
 
 import AddIcon from '@mui/icons-material/Add'

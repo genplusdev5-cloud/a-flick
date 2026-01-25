@@ -4,11 +4,11 @@ import { addCustomer } from '@/api/customer_group/customer'
 import { getCustomerOrigin } from '@/api/customer_group/customer/origin'
 import { useState, useEffect, useRef } from 'react'
 import { Box, Button, Grid, Typography, Card, Autocomplete, IconButton, Divider } from '@mui/material'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams, useParams } from 'next/navigation'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
 
-import { getContractDropdowns } from '@/api/contract_group/contract/dropdowns'
+import { getAllDropdowns } from '@/api/contract_group/contract/dropdowns'
 import { getAllEmployees } from '@/api/employee'
 import { showToast } from '@/components/common/Toasts'
 
@@ -62,6 +62,7 @@ const initialFormData = {
 export default function AddCustomerPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { lang } = useParams()
   const customerId = searchParams.get('id')
 
   const [formData, setFormData] = useState(initialFormData)
@@ -233,7 +234,7 @@ export default function AddCustomerPage() {
     setMiniEmailError(false)
   }
 
-  const handleFinalCancel = () => router.push('/admin/customers')
+  const handleFinalCancel = () => router.push(`/${lang}/admin/customers`)
 
   const handleFinalSave = async () => {
     if (isSaving) return
@@ -275,7 +276,7 @@ export default function AddCustomerPage() {
 
       if (res.status === 'success') {
         showToast('success', 'Customer added successfully')
-        setTimeout(() => router.push('/admin/customers'), 600)
+        setTimeout(() => router.push(`/${lang}/admin/customers`), 600)
       } else {
         showToast('error', res.message || 'Failed to create customer')
       }
@@ -315,8 +316,8 @@ export default function AddCustomerPage() {
         <ContentLayout
           title={<Box sx={{ m: 2 }}>{pageTitle} Details</Box>}
           breadcrumbs={[
-            { label: 'Home', href: '/' },
-            { label: 'Customer', href: '/admin/customers' },
+            { label: 'Home', href: `/${lang}` },
+            { label: 'Customer', href: `/${lang}/admin/customers` },
             { label: pageTitle }
           ]}
         >
@@ -733,7 +734,7 @@ export default function AddCustomerPage() {
                     Cancel
                   </GlobalButton>
                   <GlobalButton variant='contained' onClick={handleFinalSave} disabled={isSaving}>
-                    {isEditMode ? 'Update Customer' : isSaving ? 'Saving...' : 'Save'}
+                    {isEditMode ? 'Update Customer' : 'Save'}
                   </GlobalButton>
                 </Box>
               </Box>

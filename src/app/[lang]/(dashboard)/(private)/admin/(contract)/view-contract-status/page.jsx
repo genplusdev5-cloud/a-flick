@@ -36,14 +36,14 @@ import { showToast } from '@/components/common/Toasts'
 import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns'
 import { encodeId } from '@/utils/urlEncoder'
 
-import { getContractList, getContractDetails, getContractViewStatus } from '@/api/contract_group/contract/viewStatus'
+import { getContractList, getContractDetails, getContractView } from '@/api/contract_group/contract/viewStatus'
 
 import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
 import MoreVertIcon from '@mui/icons-material/MoreVert'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { usePermission } from '@/hooks/usePermission'
 import { toast } from 'react-toastify'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
@@ -97,6 +97,7 @@ const renewalOptions = [
 // ───────────────────────────────────────────
 const ContractStatusPageContent = () => {
   const router = useRouter()
+  const { lang } = useParams()
   const { canAccess } = usePermission()
   const [rows, setRows] = useState([])
   const [rowCount, setRowCount] = useState(0)
@@ -194,6 +195,7 @@ const ContractStatusPageContent = () => {
         return {
           sno: index + 1 + pagination.pageIndex * pagination.pageSize,
           id: item.id,
+          customer_id: item.customer_id, // ⭐ Add for buttons
 
           customer: item.customer_name || '—',
           services: item.call_type_id || item.category || item.sales_mode || '—',
@@ -336,7 +338,7 @@ const ContractStatusPageContent = () => {
                 sx={{ p: 0.8 }}
                 onClick={() => {
                   const encodedId = encodeId(item.id)
-                  router.push(`/admin/contracts/${encodedId}/view`)
+                  router.push(`/${lang}/admin/contracts/view/${encodedId}`)
                 }}
               >
                 <i className='tabler-eye' />
@@ -356,7 +358,79 @@ const ContractStatusPageContent = () => {
         }
       }),
       columnHelper.accessor('customer', { header: 'Customer', meta: { width: '150px' } }),
-      columnHelper.accessor('services', { header: 'Services', meta: { width: '160px' } }),
+      // ✅ Added Service/Invoice buttons (Like Contract Page)
+      columnHelper.display({
+        id: 'services',
+        header: 'Services',
+        meta: { width: '140px', align: 'center' },
+
+        cell: ({ row }) => {
+          const item = row.original
+
+          return (
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 0.5
+              }}
+            >
+              <Button
+                variant='outlined'
+                size='small'
+                sx={{
+                  minWidth: 80,
+                  height: 26,
+                  color: '#2e7d32',
+                  borderColor: '#66bb6a',
+                  textTransform: 'none',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  '&:hover': {
+                    bgcolor: '#e8f5e9',
+                    borderColor: '#2e7d32'
+                  }
+                }}
+                onClick={() => {
+                  const encodedContractId = encodeId(item.id)
+                  const encodedCustomerId = encodeId(item.customer_id)
+
+                  router.push(`/${lang}/admin/service-request?customer=${encodedCustomerId}&contract=${encodedContractId}`)
+                }}
+              >
+                Service
+              </Button>
+
+              <Button
+                variant='outlined'
+                size='small'
+                sx={{
+                  minWidth: 80,
+                  height: 26,
+                  color: '#c62828',
+                  borderColor: '#ef5350',
+                  textTransform: 'none',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  '&:hover': {
+                    bgcolor: '#ffebee',
+                    borderColor: '#c62828'
+                  }
+                }}
+                onClick={() => {
+                  const encodedContractId = encodeId(item.id)
+                  const encodedCustomerId = encodeId(item.customer_id)
+
+                  router.push(`/${lang}/admin/invoice?customer=${encodedCustomerId}&contract=${encodedContractId}`)
+                }}
+              >
+                Invoice
+              </Button>
+            </Box>
+          )
+        }
+      }),
       columnHelper.accessor('contractCode', { header: 'Contract Code', meta: { width: '120px' } }),
       columnHelper.accessor('type', { header: 'Type', meta: { width: '120px' } }),
       columnHelper.accessor('serviceAddress', { header: 'Service Address', meta: { width: '200px' } }),
@@ -536,7 +610,7 @@ const ContractStatusPageContent = () => {
       header={
         <Box sx={{ mb: 2 }}>
           <Breadcrumbs aria-label='breadcrumb' sx={{ mb: 2 }}>
-            <Link underline='hover' color='inherit' href='/admin/dashboard'>
+            <Link underline='hover' color='inherit' href={`/${lang}/admin/dashboard`}>
               Dashboard
             </Link>
             <Typography color='text.primary'>View Contract Status</Typography>
@@ -603,7 +677,7 @@ const ContractStatusPageContent = () => {
                   variant='contained'
                   color='primary'
                   startIcon={<AddIcon />}
-                  onClick={() => router.push('/admin/contracts/add')}
+                  onClick={() => router.push(`/${lang}/admin/contracts/add`)}
                   sx={{
                     textTransform: 'none',
                     fontWeight: 500,

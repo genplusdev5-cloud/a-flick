@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 
 import {
   Box,
@@ -55,7 +55,6 @@ import StickyListLayout from '@/components/common/StickyListLayout'
 import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 import GlobalButton from '@/components/common/GlobalButton'
-import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
 import { showToast } from '@/components/common/Toasts'
 
@@ -66,10 +65,11 @@ import { encodeId } from '@/utils/urlEncoder'
 const ProposalItemPage = () => {
   // ---------------- STATE ----------------
   const [filters, setFilters] = useState({
-    type: '',
     pest: '',
     search: ''
   })
+
+  const { lang = 'en' } = useParams()
 
   const [rows, setRows] = useState([])
   const [rowCount, setRowCount] = useState(0)
@@ -125,7 +125,7 @@ const ProposalItemPage = () => {
               <IconButton
                 size='small'
                 color='primary'
-                onClick={() => router.push(`/admin/proposal-item/${encodedId}/edit`)}
+                onClick={() => router.push(`/${lang}/admin/proposal-item/update/${encodedId}`)}
               >
                 <i className='tabler-edit' />
               </IconButton>
@@ -216,7 +216,6 @@ const ProposalItemPage = () => {
         page: pagination.pageIndex + 1,
         page_size: pagination.pageSize,
         search: filters.search || undefined,
-        type: filters.type || undefined,
         pest: filters.pest || undefined
       }
 
@@ -245,10 +244,10 @@ const ProposalItemPage = () => {
   // 1. When filters change, reset back to page 1
   useEffect(() => {
     setPagination(p => ({ ...p, pageIndex: 0 }))
-  }, [filters.type, filters.pest, filters.search])
+  }, [filters.pest, filters.search])
 
   // Helper to trigger effects only when pagination or filters change
-  const appliedFiltersSync = `${filters.type}-${filters.pest}-${filters.search}`
+  const appliedFiltersSync = `${filters.pest}-${filters.search}`
 
   // 2. Load data when page or filters change
   useEffect(() => {
@@ -299,17 +298,7 @@ const ProposalItemPage = () => {
                 </Typography>
 
                 <GlobalButton
-                  startIcon={
-                    <RefreshIcon
-                      sx={{
-                        animation: loading ? 'spin 1s linear infinite' : 'none',
-                        '@keyframes spin': {
-                          '0%': { transform: 'rotate(0deg)' },
-                          '100%': { transform: 'rotate(360deg)' }
-                        }
-                      }}
-                    />
-                  }
+                  startIcon={<RefreshIcon />}
                   onClick={handleRefresh}
                   disabled={loading}
                 >
@@ -348,7 +337,7 @@ const ProposalItemPage = () => {
                 <GlobalButton
                   variant='contained'
                   startIcon={<AddIcon />}
-                  onClick={() => router.push('/admin/proposal-item/add')}
+                  onClick={() => router.push(`/${lang}/admin/proposal-item/add`)}
                 >
                   Add Proposal Content
                 </GlobalButton>
@@ -360,45 +349,9 @@ const ProposalItemPage = () => {
 
           {/* ================= BODY ================= */}
           <Box sx={{ p: 4, flexGrow: 1, position: 'relative' }}>
-            {loading && (
-              <Box
-                sx={{
-                  position: 'absolute',
-                  inset: 0,
-                  bgcolor: 'rgba(255,255,255,0.7)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 10
-                }}
-              >
-                <ProgressCircularCustomization size={60} />
-              </Box>
-            )}
 
             {/* ---------- FILTERS ---------- */}
             <Grid container spacing={3} mb={4}>
-              <Grid item xs={12} md={3}>
-                <GlobalAutocomplete
-                  label='Type'
-                  placeholder='Select Type'
-                  options={[
-                    { label: 'MASTER', value: 'MASTER' },
-                    { label: 'PEST', value: 'PEST' }
-                  ]}
-                  value={filters.type ? { label: filters.type, value: filters.type } : null}
-                  isOptionEqualToValue={(a, b) => a?.value === b?.value}
-                  getOptionLabel={opt => opt?.label || ''}
-                  onChange={val =>
-                    setFilters(f => ({
-                      ...f,
-                      type: val?.value || '',
-                      pest: '' // 🔥 reset pest when type changes
-                    }))
-                  }
-                />
-              </Grid>
-
               <Grid item xs={12} md={3}>
                 <GlobalAutocomplete
                   label='Pest'
@@ -414,7 +367,6 @@ const ProposalItemPage = () => {
                       pest: v?.value || ''
                     }))
                   }
-                  disabled={filters.type !== 'PEST'} // 🔥 UX best practice
                 />
               </Grid>
             </Grid>
@@ -579,7 +531,7 @@ const ProposalItemPage = () => {
                   disabled={loading}
                   sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
                 >
-                  {loading ? 'Deleting...' : 'Delete'}
+                  Delete
                 </GlobalButton>
               </DialogActions>
             </Dialog>

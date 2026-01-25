@@ -243,7 +243,7 @@ const NonPreScheduleReportPageContent = () => {
   // --- simple delete (local only) ---
   const handleEdit = id => {
     // mimic: navigate to edit page (you can wire actual route if exists)
-    router.push(`/admin/contracts/${id}/edit`)
+    router.push(`/admin/contracts/edit/${id}`)
   }
 
   const confirmDelete = () => {

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import {
   Card,
   CardContent,
@@ -24,7 +24,8 @@ import {
   FormControlLabel,
   Checkbox,
   RadioGroup,
-  Radio
+  Radio,
+  CircularProgress
 } from '@mui/material'
 import { styled } from '@mui/material/styles'
 import classnames from 'classnames'
@@ -51,7 +52,7 @@ import { getContractDates, getInvoiceCount, getPestCount, getInvoiceRemark } fro
 import { getAllDropdowns } from '@/api/contract_group/contract/dropdowns'
 import { getCustomerDetails } from '@/api/customer_group/customer'
 import { listCallLogs } from '@/api/contract_group/contract/details/call_log'
-import { decodeId } from '@/utils/urlEncoder'
+import { decodeId, encodeId } from '@/utils/urlEncoder'
 import addContractFile from '@/api/contract_group/contract/details/contract_file/add'
 
 // Steps
@@ -117,8 +118,10 @@ const fileToBase64 = file => {
 
 export default function ProposalWizard({ id }) {
   const router = useRouter()
+  const { lang = 'en' } = useParams()
   const [activeStep, setActiveStep] = useState(0)
   const [loading, setLoading] = useState(!!id)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [editingItemId, setEditingItemId] = useState(null)
 
   // File Dialog
@@ -1075,7 +1078,7 @@ export default function ProposalWizard({ id }) {
       const proposalId = res?.data?.id || res?.id
       if (res?.status === 'success' || res?.status === 200 || proposalId) {
         showToast('success', `Proposal ${id ? 'Updated' : 'Added'} Successfully!`)
-        router.push('/admin/sales-quotation')
+        router.push(`/${lang}/admin/sales-quotation`)
       } else {
         console.error('❌ API FAILURE (Logic):', res)
         showToast('error', res?.message || 'Operation failed')
@@ -1084,6 +1087,8 @@ export default function ProposalWizard({ id }) {
       console.error('❌ API ERROR (Exception):', e)
       console.error('❌ RESPONSE DATA:', e.response?.data)
       showToast('error', e.response?.data?.message || e.message || 'API Request Failed')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -1208,11 +1213,17 @@ export default function ProposalWizard({ id }) {
           <Box sx={{ flexGrow: 1, p: 2 }}>{getStepContent(activeStep)}</Box>
 
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4, p: 2 }}>
-            <Button variant='outlined' color='secondary' disabled={activeStep === 0} onClick={handlePrev}>
+            <Button variant='outlined' color='secondary' disabled={activeStep === 0 || isSubmitting} onClick={handlePrev}>
               Previous
             </Button>
-            <Button variant='contained' color='primary' onClick={handleNext}>
-              {activeStep === steps.length - 1 ? (id ? 'Update Proposal' : 'Submit Proposal') : 'Next'}
+            <Button 
+              variant='contained' 
+              color='primary' 
+              onClick={handleNext} 
+              disabled={isSubmitting}
+              startIcon={isSubmitting && activeStep === steps.length - 1 ? <CircularProgress size={20} color='inherit' /> : null}
+            >
+              {activeStep === steps.length - 1 ? (isSubmitting ? 'Submitting...' : (id ? 'Update Proposal' : 'Submit Proposal')) : 'Next'}
             </Button>
           </Box>
         </CardContent>
@@ -1296,7 +1307,8 @@ export default function ProposalWizard({ id }) {
                   size='small'
                   onClick={() => {
                     const realId = decodeId(id) || id
-                    router.push(`/admin/proposal-editor?proposal_id=${realId}`)
+                    const encodedId = encodeId(realId)
+                    router.push(`/${lang}/admin/proposal-editor?proposal_id=${encodedId}`)
                   }}
                 >
                   Add Proposal
@@ -1330,8 +1342,9 @@ export default function ProposalWizard({ id }) {
                         key={prop.id || idx}
                         style={{ cursor: 'pointer' }}
                         onClick={() => {
-                          const realId = decodeId(id) || id
-                          router.push(`/admin/proposal-editor?proposal_id=${realId}`)
+                          const realId = prop.id
+                          const encodedId = encodeId(realId)
+                          router.push(`/${lang}/admin/proposal-editor?proposal_id=${encodedId}`)
                         }}
                       >
                         <td>{prop.proposal_code || prop.id}</td>

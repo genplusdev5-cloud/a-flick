@@ -18,7 +18,6 @@ import {
   Chip,
   TextField,
   MenuItem,
-  CircularProgress,
   Menu,
   Select,
   FormControl
@@ -362,13 +361,7 @@ const VehiclePageContent = () => {
                 ))}
               </thead>
               <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={columns.length} align='center' style={{ padding: '24px' }}>
-                      <CircularProgress size={24} />
-                    </td>
-                  </tr>
-                ) : rows.length === 0 ? (
+                {rows.length === 0 ? (
                   <tr>
                     <td colSpan={columns.length} align='center' style={{ padding: '24px' }}>
                       No vehicles found.
@@ -452,7 +445,7 @@ const VehiclePageContent = () => {
                 Cancel
               </GlobalButton>
               <GlobalButton type='submit' fullWidth variant='contained' disabled={submitLoading}>
-                {submitLoading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
+                {isEdit ? 'Update' : 'Save'}
               </GlobalButton>
             </Box>
           </form>
@@ -479,9 +472,9 @@ const VehiclePageContent = () => {
           >
             Cancel
           </GlobalButton>
-          <GlobalButton color='error' variant='contained' onClick={confirmDelete} disabled={deleteLoading}>
-            {deleteLoading ? 'Deleting...' : 'Delete'}
-          </GlobalButton>
+            <GlobalButton color='error' variant='contained' onClick={confirmDelete} disabled={deleteLoading}>
+              Delete
+            </GlobalButton>
         </DialogActions>
       </Dialog>
     </StickyListLayout>

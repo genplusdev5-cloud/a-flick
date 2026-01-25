@@ -13,7 +13,6 @@ import {
   Button,
   Checkbox,
   FormControlLabel,
-  CircularProgress,
   Box,
   IconButton
 } from '@mui/material'
@@ -380,11 +379,7 @@ const EmployeeFormDialog = ({ open, mode, employeeId, onClose, onSuccess }) => {
       </DialogTitle>
 
       <DialogContent sx={{ p: 6, pb: 4 }}>
-        {fetching ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', p: 10 }}>
-            <CircularProgress />
-          </Box>
-        ) : (
+        {fetching ? null : (
           <Grid container spacing={6}>
             {/* Row 1 */}
             {renderAC(
@@ -637,7 +632,7 @@ const EmployeeFormDialog = ({ open, mode, employeeId, onClose, onSuccess }) => {
           Close
         </GlobalButton>
         <GlobalButton variant='contained' onClick={handleSave} disabled={loading || fetching}>
-          {loading ? 'Saving...' : mode === 'add' ? 'Save Changes' : 'Update'}
+          {mode === 'add' ? 'Save Changes' : 'Update'}
         </GlobalButton>
       </DialogActions>
 

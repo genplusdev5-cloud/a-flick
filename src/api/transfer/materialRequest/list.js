@@ -10,10 +10,18 @@ export const getTmMaterialRequestList = async (params = {}) => {
       return acc
     }, {})
 
-    const res = await api.get(`tm_material_request-list/`, { params: cleanParams })
+    const res = await api.get('tm_material_request-list/', { params: cleanParams })
     return res.data
   } catch (error) {
-    console.error('Material request list API error:', error)
-    return { data: { results: [] }, count: 0 }
+    console.error('Material request list API error details:', {
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data,
+      config: {
+        url: error.config?.url,
+        params: error.config?.params
+      }
+    })
+    throw error
   }
 }

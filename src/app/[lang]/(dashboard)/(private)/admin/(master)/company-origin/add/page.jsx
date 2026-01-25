@@ -12,15 +12,13 @@ import {
   IconButton,
   Dialog,
   DialogContent,
-  Breadcrumbs,
-  CircularProgress
+  Breadcrumbs
 } from '@mui/material'
 
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import CloseIcon from '@mui/icons-material/Close'
-import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 
 import CustomTextField from '@core/components/mui/TextField'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
@@ -212,22 +210,6 @@ export default function CompanyOriginAddPage() {
 
   return (
     <Box>
-      {loading && (
-        <Box
-          sx={{
-            position: 'fixed',
-            inset: 0,
-            bgcolor: 'rgba(255,255,255,0.8)',
-            backdropFilter: 'blur(2px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999
-          }}
-        >
-          <ProgressCircularCustomization size={60} thickness={5} />
-        </Box>
-      )}
 
       {/* Breadcrumb */}
       <Box sx={{ mb: 4 }}>
@@ -256,7 +238,7 @@ export default function CompanyOriginAddPage() {
           <Button
             variant='contained'
             color='primary'
-            startIcon={loading ? <CircularProgress size={20} color='inherit' /> : <RefreshIcon />}
+            startIcon={<RefreshIcon />}
             onClick={handleRefresh}
             disabled={loading}
           >
@@ -516,7 +498,6 @@ export default function CompanyOriginAddPage() {
             variant='contained'
             onClick={handleSave}
             disabled={loading}
-            startIcon={loading ? <CircularProgress size={20} color='inherit' /> : null}
           >
             {loading ? 'Saving...' : 'Save Company'}
           </Button>

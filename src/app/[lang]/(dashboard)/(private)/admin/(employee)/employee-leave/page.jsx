@@ -25,7 +25,6 @@ import {
   Autocomplete,
   FormControl,
   Select, // ADD THIS LINE
-  CircularProgress,
   InputAdornment
 } from '@mui/material'
 
@@ -44,7 +43,6 @@ import { getEmployeeList } from '@/api/employee'
 import { getLeaveTypeList } from '@/api/employee/leaveType'
 
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
-import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import EditIcon from '@mui/icons-material/Edit'
@@ -639,17 +637,7 @@ const EmployeeLeavePageContent = () => {
               <GlobalButton
                 variant='contained'
                 color='primary'
-                startIcon={
-                  <RefreshIcon
-                    sx={{
-                      animation: loading ? 'spin 1s linear infinite' : 'none',
-                      '@keyframes spin': {
-                        '0%': { transform: 'rotate(0deg)' },
-                        '100%': { transform: 'rotate(360deg)' }
-                      }
-                    }}
-                  />
-                }
+                startIcon={<RefreshIcon />}
                 disabled={loading}
                 onClick={async () => {
                   setLoading(true)
@@ -658,7 +646,7 @@ const EmployeeLeavePageContent = () => {
                 }}
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
-                {loading ? 'Refreshing...' : 'Refresh'}
+                Refresh
               </GlobalButton>
             </Box>
           }
@@ -732,22 +720,6 @@ const EmployeeLeavePageContent = () => {
             </Box>
           }
         />
-        {loading && (
-          <Box
-            sx={{
-              position: 'fixed',
-              inset: 0,
-              bgcolor: 'rgba(255,255,255,0.8)',
-              backdropFilter: 'blur(2px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 9999
-            }}
-          >
-            <ProgressCircularCustomization size={60} thickness={5} />
-          </Box>
-        )}
 
         <Divider />
         <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>

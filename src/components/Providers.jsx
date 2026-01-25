@@ -37,7 +37,7 @@ const Providers = async props => {
           <SettingsProvider settingsCookie={settingsCookie} mode={mode}>
             <ThemeProvider direction={direction} systemMode={systemMode}>
               <ReduxProvider>
-                <GlobalLoader />
+                {/* <GlobalLoader /> */}
                 {children}
               </ReduxProvider>
               <AppReactToastify direction={direction} hideProgressBar />

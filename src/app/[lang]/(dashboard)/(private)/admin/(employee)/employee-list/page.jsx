@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useParams } from 'next/navigation'
 import {
   Box,
   Button,
@@ -22,7 +22,6 @@ import {
   TextField,
   FormControl,
   Select,
-  CircularProgress,
   InputAdornment
 } from '@mui/material'
 
@@ -41,7 +40,6 @@ import FileCopyIcon from '@mui/icons-material/FileCopy'
 
 import { showToast } from '@/components/common/Toasts'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
-import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import EditIcon from '@mui/icons-material/Edit'
@@ -66,7 +64,6 @@ import ChevronRight from '@menu/svg/ChevronRight'
 import { loadRowOrder, saveRowOrder } from '@/utils/tableUtils'
 import StickyListLayout from '@/components/common/StickyListLayout'
 import StickyTableWrapper from '@/components/common/StickyTableWrapper'
-import EmployeeFormDialog from './EmployeeFormDialog'
 
 const getEmployees = async () => {
   const db = await openDBInstance()
@@ -90,6 +87,7 @@ import { usePermission } from '@/hooks/usePermission'
 const EmployeePageContent = () => {
   const { canAccess } = usePermission()
   const searchParams = useSearchParams()
+  const { lang } = useParams()
 
   const [department, setDepartment] = useState(null)
   const [designation, setDesignation] = useState(null)
@@ -115,9 +113,7 @@ const EmployeePageContent = () => {
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
 
-  const [openEmployeeDialog, setOpenEmployeeDialog] = useState(false)
-  const [dialogMode, setDialogMode] = useState('add')
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState(null)
+
 
   // Load Filter Options
   useEffect(() => {
@@ -248,11 +244,7 @@ const EmployeePageContent = () => {
     loadData()
   }, [pagination.pageIndex, pagination.pageSize, searchText])
 
-  const handleEdit = id => {
-    setDialogMode('edit')
-    setSelectedEmployeeId(id)
-    setOpenEmployeeDialog(true)
-  }
+
   const confirmDelete = async () => {
     if (deleteDialog.row) {
       try {
@@ -284,9 +276,11 @@ const EmployeePageContent = () => {
         cell: info => (
           <Box sx={{ display: 'flex', gap: 1 }}>
             {canAccess('Employee List', 'update') && (
-              <IconButton size='small' color='primary' onClick={() => handleEdit(info.row.original.id)}>
-                <i className='tabler-edit' />
-              </IconButton>
+              <Link href={`/${lang}/admin/employee-list/update/${encodeURIComponent(btoa(info.row.original.id))}`}>
+                <IconButton size='small' color='primary'>
+                    <i className='tabler-edit' />
+                </IconButton>
+              </Link>
             )}
             {canAccess('Employee List', 'delete') && (
               <IconButton
@@ -633,18 +627,15 @@ const EmployeePageContent = () => {
               </Menu>
 
               {canAccess('Employee List', 'create') && (
-                <GlobalButton
-                  variant='contained'
-                  startIcon={<AddIcon />}
-                  onClick={() => {
-                    setDialogMode('add')
-                    setSelectedEmployeeId(null)
-                    setOpenEmployeeDialog(true)
-                  }}
-                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-                >
-                  Add Employee
-                </GlobalButton>
+                <Link href={`/${lang}/admin/employee-list/add`}>
+                    <GlobalButton
+                    variant='contained'
+                    startIcon={<AddIcon />}
+                    sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+                    >
+                    Add Employee
+                    </GlobalButton>
+                </Link>
               )}
             </Box>
           }
@@ -720,17 +711,7 @@ const EmployeePageContent = () => {
           <GlobalButton
             variant='contained'
             color='primary'
-            startIcon={
-              <RefreshIcon
-                sx={{
-                  animation: loading ? 'spin 1s linear infinite' : 'none',
-                  '@keyframes spin': {
-                    '0%': { transform: 'rotate(0deg)' },
-                    '100%': { transform: 'rotate(360deg)' }
-                  }
-                }}
-              />
-            }
+                startIcon={<RefreshIcon />}
             disabled={loading}
             onClick={() => {
               setPagination(p => ({ ...p, pageIndex: 0 }))
@@ -738,7 +719,7 @@ const EmployeePageContent = () => {
             }}
             sx={{ height: 36, textTransform: 'none' }}
           >
-            {loading ? 'Refreshing...' : 'Refresh'}
+            Refresh
           </GlobalButton>
         </Box>
 
@@ -784,22 +765,6 @@ const EmployeePageContent = () => {
           </Box>
 
           <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-            {loading && (
-              <Box
-                sx={{
-                  position: 'absolute',
-                  inset: 0,
-                  bgcolor: 'rgba(255,255,255,0.8)',
-                  backdropFilter: 'blur(2px)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 20
-                }}
-              >
-                <ProgressCircularCustomization size={60} thickness={5} />
-              </Box>
-            )}
 
             <StickyTableWrapper rowCount={rows.length}>
               <table className={styles.table}>
@@ -838,7 +803,7 @@ const EmployeePageContent = () => {
                   ) : (
                     <tr>
                       <td colSpan={columns.length} className='text-center py-4'>
-                        {loading ? 'Loading employees...' : 'No results found'}
+                        No results found
                       </td>
                     </tr>
                   )}
@@ -906,13 +871,7 @@ const EmployeePageContent = () => {
         </DialogActions>
       </Dialog>
 
-      <EmployeeFormDialog
-        open={openEmployeeDialog}
-        mode={dialogMode}
-        employeeId={selectedEmployeeId}
-        onClose={() => setOpenEmployeeDialog(false)}
-        onSuccess={() => loadData()}
-      />
+
     </StickyListLayout>
   )
 }

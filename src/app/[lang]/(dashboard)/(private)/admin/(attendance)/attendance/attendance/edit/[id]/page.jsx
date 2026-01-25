@@ -29,6 +29,7 @@ import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 import CustomTextField from '@core/components/mui/TextField'
 import { Autocomplete } from '@mui/material'
 import { showToast } from '@/components/common/Toasts'
+import { decodeId } from '@/utils/urlEncoder'
 
 import {
   getAttendanceDropdowns,
@@ -38,7 +39,7 @@ import {
 
 export default function EditAttendancePage() {
   const router = useRouter()
-  const { id } = useParams()
+  const { id, lang } = useParams()
 
   const [dropdowns, setDropdowns] = useState({
     customers: [],
@@ -104,7 +105,8 @@ export default function EditAttendancePage() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [dropdownRes, detailRes] = await Promise.all([getAttendanceDropdowns(), getAttendanceDetails(id)])
+        const decodedId = decodeId(id) || id
+        const [dropdownRes, detailRes] = await Promise.all([getAttendanceDropdowns(), getAttendanceDetails(decodedId)])
 
         // Parse dropdowns (same as Add page)
         let apiData = dropdownRes?.data?.data?.data || dropdownRes?.data?.data || dropdownRes?.data || dropdownRes
@@ -222,9 +224,10 @@ export default function EditAttendancePage() {
         )
       }
 
-      await updateAttendance(id, payload)
+      const decodedId = decodeId(id) || id
+      await updateAttendance(decodedId, payload)
       showToast('success', 'Attendance updated successfully!')
-      router.push('/admin/attendance/attendance')
+      router.push(`/${lang}/admin/attendance/attendance`)
     } catch (error) {
       showToast('error', error?.response?.data?.message || 'Update failed')
     }
@@ -234,8 +237,8 @@ export default function EditAttendancePage() {
     <ContentLayout
       title={<Box sx={{ m: 2 }}>Edit Attendance</Box>}
       breadcrumbs={[
-        { label: 'Dashboard', href: '/admin/dashboards' },
-        { label: 'Attendance', href: '/admin/attendance/attendance' },
+        { label: 'Dashboard', href: `/${lang}/admin/dashboards` },
+        { label: 'Attendance', href: `/${lang}/admin/attendance/attendance` },
         { label: 'Edit Attendance' }
       ]}
     >
@@ -567,7 +570,7 @@ export default function EditAttendancePage() {
           <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
             <GlobalButton
               color='secondary'
-              onClick={() => router.push('/admin/attendance/attendance')}
+              onClick={() => router.push(`/${lang}/admin/attendance/attendance`)}
             >
               Close
             </GlobalButton>

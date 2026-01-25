@@ -24,7 +24,6 @@ import {
   TextField,
   Select,
   FormControl,
-  CircularProgress,
   Autocomplete
 } from '@mui/material'
 
@@ -460,15 +459,7 @@ const SupplierPageContent = () => {
 
               <GlobalButton
                 startIcon={
-                  <RefreshIcon
-                    sx={{
-                      animation: loading ? 'spin 1s linear infinite' : 'none',
-                      '@keyframes spin': {
-                        '0%': { transform: 'rotate(0deg)' },
-                        '100%': { transform: 'rotate(360deg)' }
-                      }
-                    }}
-                  />
+                    <RefreshIcon />
                 }
                 disabled={loading}
                 onClick={async () => {
@@ -478,7 +469,7 @@ const SupplierPageContent = () => {
                   setTimeout(() => setLoading(false), 800)
                 }}
               >
-                {loading ? 'Refreshing...' : 'Refresh'}
+                Refresh
               </GlobalButton>
             </Box>
           }
@@ -767,7 +758,7 @@ const SupplierPageContent = () => {
               </GlobalButton>
 
               <GlobalButton type='submit' variant='contained' fullWidth disabled={loading}>
-                {loading ? 'Saving...' : isEdit ? 'Update' : 'Save'}
+                {isEdit ? 'Update' : 'Save'}
               </GlobalButton>
             </Box>
           </form>

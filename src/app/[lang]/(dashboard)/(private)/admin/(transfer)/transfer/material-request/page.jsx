@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import {
   Box,
   Button,
@@ -63,6 +63,7 @@ import { showToast } from '@/components/common/Toasts'
 
 const MaterialRequestPageContent = () => {
   const router = useRouter()
+  const { lang = 'en' } = useParams()
   const PAGE_SIZE = 25
 
   const [rows, setRows] = useState([])
@@ -127,11 +128,16 @@ const MaterialRequestPageContent = () => {
   const loadData = async (showToastMsg = false) => {
     setLoading(true)
     try {
-      const response = await getTmMaterialRequestList({ page })
-      setTotalCount(response.count || 0)
-      const data = response.data?.results || []
+      const response = await getTmMaterialRequestList({ 
+        page,
+        page_size: PAGE_SIZE 
+      })
+      
+      const apiData = response?.data?.data || response?.data || response
+      setTotalCount(apiData?.count || 0)
+      const results = apiData?.results || []
 
-      const mapped = data.map(r => ({
+      const mapped = results.map(r => ({
         id: r.id,
         requestNo: r.request_no || `REQ-${r.id}`,
         requestDate: r.request_date,
@@ -262,7 +268,7 @@ const MaterialRequestPageContent = () => {
               <IconButton
                 size='small'
                 color='primary'
-                onClick={() => router.push(`/admin/transfer/material-request/${encodedId}/edit`)}
+                onClick={() => router.push(`/${lang}/admin/transfer/material-request/update/${encodedId}`)}
               >
                 <i className='tabler-edit' />
               </IconButton>
@@ -318,7 +324,7 @@ const MaterialRequestPageContent = () => {
       <StickyListLayout
         header={
           <Box sx={{ mb: 2 }}>
-            <Link href='/admin/dashboards' className='text-primary'>
+            <Link href={`/${lang}/admin/dashboards`} className='text-primary'>
               Dashboard
             </Link>{' '}
             / <Typography component='span'>Material Request</Typography>
@@ -346,7 +352,7 @@ const MaterialRequestPageContent = () => {
                   variant='contained'
                   color='primary'
                   startIcon={<AddIcon />}
-                  onClick={() => router.push('/admin/transfer/material-request/add')}
+                  onClick={() => router.push(`/${lang}/admin/transfer/material-request/add`)}
                   sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
                 >
                   Add Request

@@ -23,7 +23,6 @@ import {
   TextField,
   Select,
   FormControl,
-  CircularProgress,
   InputAdornment
 } from '@mui/material'
 
@@ -35,7 +34,6 @@ import {
   deleteDepartment
 } from '@/api/employee/departments'
 
-import ProgressCircularCustomization from '@/components/common/ProgressCircularCustomization'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import EditIcon from '@mui/icons-material/Edit'
@@ -464,17 +462,7 @@ const DepartmentPageContent = () => {
               <GlobalButton
                 variant='contained'
                 color='primary'
-                startIcon={
-                  <RefreshIcon
-                    sx={{
-                      animation: loading ? 'spin 1s linear infinite' : 'none',
-                      '@keyframes spin': {
-                        '0%': { transform: 'rotate(0deg)' },
-                        '100%': { transform: 'rotate(360deg)' }
-                      }
-                    }}
-                  />
-                }
+                startIcon={<RefreshIcon />}
                 disabled={loading}
                 onClick={async () => {
                   setLoading(true)
@@ -483,7 +471,7 @@ const DepartmentPageContent = () => {
                 }}
                 sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
               >
-                {loading ? 'Refreshing...' : 'Refresh'}
+                Refresh
               </GlobalButton>
             </Box>
           }
@@ -565,22 +553,6 @@ const DepartmentPageContent = () => {
           }}
         />
         <Divider />
-        {loading && (
-          <Box
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              bgcolor: 'rgba(255,255,255,0.8)',
-              backdropFilter: 'blur(2px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 10
-            }}
-          >
-            <ProgressCircularCustomization size={60} thickness={5} />
-          </Box>
-        )}
 
         <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <Box
@@ -771,7 +743,7 @@ const DepartmentPageContent = () => {
               </GlobalButton>
 
               <GlobalButton type='submit' variant='contained' fullWidth disabled={loading}>
-                {loading ? (isEdit ? 'Updating...' : 'Saving...') : isEdit ? 'Update' : 'Save'}
+                {isEdit ? 'Update' : 'Save'}
               </GlobalButton>
             </Box>
           </form>

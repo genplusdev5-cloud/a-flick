@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 
 import {
   Box,
@@ -30,9 +30,11 @@ import { format } from 'date-fns'
 
 // IMPORT FROM ATTENDANCE API (CORRECT WAY)
 import { getAttendanceDropdowns, addAttendance } from '@/api/attendance_group/attendance'
+import { encodeId } from '@/utils/urlEncoder'
 
 export default function AddAttendancePage() {
   const router = useRouter()
+  const { lang } = useParams()
 
   const [dropdowns, setDropdowns] = useState({
     customers: [],
@@ -193,34 +195,43 @@ export default function AddAttendancePage() {
       if (!formData.customer_id) return showToast('warning', 'Customer is required')
       if (!formData.startDate) return showToast('warning', 'Start date is required')
 
-      const payload = {
-        customer_id: formData.customer_id,
-        covered_location: formData.coveredLocation || '',
-        service_address: formData.serviceAddress || '',
-        postal_code: formData.postalCode || '',
-        contact_person_name: formData.siteContactPerson || '',
-        report_email: formData.serviceReportEmail || '',
-        phone: formData.siteInchargePhone || '',
-        mobile: formData.mobile || '',
-        supervisor_id: formData.supervisor_id || '',
-        start_date: format(formData.startDate, 'yyyy-MM-dd'),
-        end_date: formData.endDate ? format(formData.endDate, 'yyyy-MM-dd') : '',
-        reminder_date: formData.reminderDate ? format(formData.reminderDate, 'yyyy-MM-dd') : '',
-        technician_id: formData.technician_id || '',
-        latitude: formData.latitude || '',
-        longitude: formData.longitude || '',
-        radius: formData.radius || '',
-        technician_remarks: formData.remarksTechnician || '',
-        attendance_remarks: formData.remarksOffice || '',
-        slot: slots.map(s => ({
-          slot_id: dropdowns.slots.find(x => x.name === s.slot)?.id,
-          frequency_id: 1,
-          start_time: s.startTime + ':00',
-          end_time: s.endTime + ':00',
-          lunch: Number(s.lunchMinutes) || 0,
-          work_time: String(s.slotValue || '1'),
-          slot_value: Number(s.slotValue) || 0
-        }))
+      const payload = new FormData()
+
+      payload.append('customer_id', formData.customer_id)
+      payload.append('covered_location', formData.coveredLocation || '')
+      payload.append('service_address', formData.serviceAddress || '')
+      payload.append('postal_code', formData.postalCode || '')
+      payload.append('contact_person_name', formData.siteContactPerson || '')
+      payload.append('report_email', formData.serviceReportEmail || '')
+      payload.append('phone', formData.siteInchargePhone || '')
+      payload.append('mobile', formData.mobile || '')
+      payload.append('supervisor_id', formData.supervisor_id || '')
+      payload.append('technician_id', formData.technician_id || '')
+      payload.append('latitude', formData.latitude || '')
+      payload.append('longitude', formData.longitude || '')
+      payload.append('radius', formData.radius || '')
+      payload.append('technician_remarks', formData.remarksTechnician || '')
+      payload.append('attendance_remarks', formData.remarksOffice || '')
+
+      if (formData.startDate) payload.append('start_date', format(formData.startDate, 'yyyy-MM-dd'))
+      if (formData.endDate) payload.append('end_date', format(formData.endDate, 'yyyy-MM-dd'))
+      if (formData.reminderDate) payload.append('reminder_date', format(formData.reminderDate, 'yyyy-MM-dd'))
+
+      if (formData.floorPlanFile) payload.append('floor_plan', formData.floorPlanFile)
+
+      if (slots.length > 0) {
+        payload.append(
+          'slots',
+          JSON.stringify(
+            slots.map(s => ({
+              slot: s.slot,
+              slot_value: s.slotValue,
+              start_time: s.startTime,
+              end_time: s.endTime,
+              lunch_minutes: s.lunchMinutes || 0
+            }))
+          )
+        )
       }
 
       const response = await addAttendance(payload)
@@ -235,22 +246,23 @@ export default function AddAttendancePage() {
 
       showToast('success', 'Attendance added successfully')
 
-      // 🔥 Redirect with simple ID parameter as requested
-      router.push(`/admin/attendance/attendance?openScheduleId=${newId}`)
+      // 🔥 Redirect with encoded ID for auto-opening schedule drawer
+      const encodedId = encodeId(newId)
+      router.push(`/${lang}/admin/attendance/attendance?openScheduleId=${encodedId}`)
     } catch (error) {
       console.error(error)
       showToast('error', 'Failed to save attendance')
     }
   }
 
-  const handleClose = () => router.push('/admin/attendance/attendance')
+  const handleClose = () => router.push(`/${lang}/admin/attendance/attendance`)
 
   return (
     <ContentLayout
       title={<Box sx={{ m: 2 }}>Add Attendance</Box>}
       breadcrumbs={[
-        { label: 'Dashboard', href: '/admin/dashboards' },
-        { label: 'Attendance', href: '/admin/attendance/attendance' },
+        { label: 'Dashboard', href: `/${lang}/admin/dashboards` },
+        { label: 'Attendance', href: `/${lang}/admin/attendance/attendance` },
 
         { label: 'Add Attendance' }
       ]}

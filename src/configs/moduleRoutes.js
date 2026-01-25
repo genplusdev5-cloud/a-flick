@@ -27,7 +27,7 @@ export const MODULE_ROUTES = {
   '/admin/invoice': 'Invoice',
   '/admin/suppliers': 'Suppliers',
   '/admin/transfer/material-request': 'Material Request',
-  '/admin/transfer/material-received': 'Material Request Received',
+  '/admin/transfer/material-receive': 'Material Request Received',
   '/admin/transfer/material-issued': 'Material Request Issued',
   '/admin/stock/report': 'Stock Report',
   '/admin/stock/usage-report': 'Usage Report',
