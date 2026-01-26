@@ -32,9 +32,10 @@ import PresetDateRangePicker from '@/components/common/PresetDateRangePicker'
 import { getCompanyList } from '@/api/master/company'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 
-import { getContractList, deleteContract } from '@/api/contract_group/contract'
+import { getContractList, deleteContract, getContractDetails, duplicateContract } from '@/api/contract_group/contract'
 import api from '@/utils/axiosInstance'
 import { encodeId, decodeId } from '@/utils/urlEncoder'
+import DuplicateProposalDialog from '@/views/admin/sales/proposal-wizard/steps/DuplicateProposalDialog'
 
 import VisibilityIcon from '@mui/icons-material/Visibility'
 
@@ -129,7 +130,6 @@ const ContractsPageContent = () => {
     setPlanDrawer({ open: false, contract: null, pestOptions: [] })
   }
 
-
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
@@ -144,6 +144,8 @@ const ContractsPageContent = () => {
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
   const [loading, setLoading] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
+  const [duplicateDialog, setDuplicateDialog] = useState({ open: false, row: null, details: null })
+
   const [exportAnchorEl, setExportAnchorEl] = useState(null)
   const [customerOptions, setCustomerOptions] = useState([])
 
@@ -481,6 +483,69 @@ const ContractsPageContent = () => {
     setDeleteDialog({ open: false, row: null })
   }
 
+  // --- DUPLICATE ---
+  const handleDuplicateClick = async row => {
+    try {
+      setLoading(true)
+      const res = await getContractDetails(row.uuid || row.id)
+      if (res) {
+        setDuplicateDialog({
+          open: true,
+          row,
+          details: res
+        })
+      }
+    } catch (err) {
+      console.error('❌ Fetch Details Error:', err)
+      showToast('error', 'Failed to fetch contract details for duplication')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleGenerateDuplicate = async customDates => {
+    if (!duplicateDialog.details) return
+
+    try {
+      setLoading(true)
+      const details = duplicateDialog.details
+
+      const formatDateToLocal = date => {
+        if (!date) return null
+        const d = new Date(date)
+        const year = d.getFullYear()
+        const month = String(d.getMonth() + 1).padStart(2, '0')
+        const day = String(d.getDate()).padStart(2, '0')
+        return `${year}-${month}-${day}`
+      }
+
+      // Payload matching Postman for contracts
+      const dupPayload = new FormData()
+      dupPayload.append('contract_id', String(details.id))
+      dupPayload.append('customer_id', String(details.customer_id))
+      dupPayload.append('start_date', formatDateToLocal(customDates?.startDate || details.start_date))
+      dupPayload.append('end_date', formatDateToLocal(customDates?.endDate || details.end_date))
+      dupPayload.append('reminder_date', formatDateToLocal(customDates?.reminderDate || details.reminder_date))
+      dupPayload.append('preferred_time', details.preferred_time || '09:00:00')
+
+      const res = await duplicateContract(dupPayload)
+
+      if (res?.status === 'success' || res?.data?.id) {
+        showToast('success', 'Contract Duplicated Successfully!')
+        const newId = res?.data?.uuid || res?.uuid || res?.data?.id || res?.id
+        const encodedNewId = encodeId(newId)
+        router.push(`/${lang}/admin/contracts/edit/${encodedNewId}`)
+      } else {
+        showToast('error', res?.message || 'Duplication failed')
+      }
+    } catch (e) {
+      console.error('❌ Duplication Error:', e)
+      showToast('error', e.response?.data?.message || 'Failed to duplicate contract')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // --- Table ---
   const columnHelper = createColumnHelper()
   const columns = useMemo(
@@ -509,7 +574,11 @@ const ContractsPageContent = () => {
             >
               {/* 👁 VIEW */}
               {/* 👁 VIEW */}
-              <IconButton size='small' color='info' onClick={() => router.push(`/${lang}/admin/contracts/view/${item.uuid}`)}>
+              <IconButton
+                size='small'
+                color='info'
+                onClick={() => router.push(`/${lang}/admin/contracts/view/${item.uuid}`)}
+              >
                 <i className='tabler-eye ' />
               </IconButton>
 
@@ -523,6 +592,9 @@ const ContractsPageContent = () => {
               {/* 📅 SCHEDULE */}
               <IconButton size='small' onClick={() => openPlanDrawer(item)}>
                 <i className='tabler-calendar text-green-600 text-[18px]' />
+              </IconButton>
+              <IconButton size='small' color='secondary' onClick={() => handleDuplicateClick(item)}>
+                <i className='tabler-copy' />
               </IconButton>
 
               {/* 🗑 DELETE */}
@@ -584,7 +656,9 @@ const ContractsPageContent = () => {
                   const encodedContractId = encodeId(item.id)
                   const encodedCustomerId = encodeId(item.customer_id)
 
-                  router.push(`/${lang}/admin/service-request?customer=${encodedCustomerId}&contract=${encodedContractId}`)
+                  router.push(
+                    `/${lang}/admin/service-request?customer=${encodedCustomerId}&contract=${encodedContractId}`
+                  )
                 }}
               >
                 Service
@@ -991,7 +1065,7 @@ const ContractsPageContent = () => {
             <GlobalButton
               variant='contained'
               color='primary'
-                startIcon={<RefreshIcon />}
+              startIcon={<RefreshIcon />}
               disabled={loading}
               onClick={() => {
                 const newFilters = {
@@ -1075,7 +1149,6 @@ const ContractsPageContent = () => {
           </Box>
 
           <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-
             <StickyTableWrapper rowCount={rows.length}>
               <table className={styles.table}>
                 <thead>
@@ -1120,13 +1193,21 @@ const ContractsPageContent = () => {
                 </tbody>
               </table>
             </StickyTableWrapper>
-          </Box>
-
-          <Box sx={{ flexShrink: 0, mt: 'auto' }}>
-            <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+            {/* --- PAGINATION --- */}
+            <Box sx={{ mt: 'auto', pt: 4 }}>
+              <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
+            </Box>
           </Box>
         </Box>
       </Card>
+
+      <DuplicateProposalDialog
+        open={duplicateDialog.open}
+        handleClose={() => setDuplicateDialog({ open: false, row: null, details: null })}
+        onGenerate={handleGenerateDuplicate}
+        contractType={duplicateDialog.details?.contract_type}
+        frequency={duplicateDialog.details?.billing_frequency}
+      />
 
       <Dialog
         onClose={() => setDeleteDialog({ open: false })}
