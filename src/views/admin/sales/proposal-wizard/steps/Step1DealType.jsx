@@ -1,7 +1,10 @@
-import { Grid, Typography, Divider, Button, Box } from '@mui/material'
+import { useState } from 'react'
+import { Grid, Typography, Divider, Button, Box, IconButton } from '@mui/material'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
 import CustomTextField from '@core/components/mui/TextField'
 import { useRouter, useParams } from 'next/navigation'
+import { encodeId } from '@/utils/urlEncoder'
+import AddCustomerDialog from './AddCustomerDialog'
 
 const Step1DealType = ({
   formData,
@@ -14,21 +17,63 @@ const Step1DealType = ({
   const router = useRouter()
   const { lang } = useParams()
 
+  const [openCustomerDialog, setOpenCustomerDialog] = useState(false)
+  const [addedCustomers, setAddedCustomers] = useState([])
+
+  const handleCustomerAdded = newCustomer => {
+    // Add to local list to ensure it appears in dropdown immediately
+    setAddedCustomers(prev => [...prev, newCustomer])
+
+    // Select the new customer
+    // GlobalAutocomplete expects { label, value } or similar object
+    // newCustomer should be { label: 'Name', value: 'ID', ... }
+    handleAutocompleteChange('customer', newCustomer, refs.customerRef)
+  }
+
+  // Merge parent dropdowns with locally added customers
+  const customerOptions = [...(dropdowns?.customers || []), ...addedCustomers]
+
   return (
     <Grid container spacing={4}>
       <Grid item xs={12}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-            <Typography variant='h6'>Contract Information</Typography>
+          <Typography variant='h6'>Contract Information</Typography>
+          <Box sx={{ display: 'flex', gap: 2 }}>
             <Button
-                variant='contained'
-                color='success'
-                size='small'
-                startIcon={<i className='tabler-file-export' />}
-                onClick={() => router.push(`/${lang}/admin/contracts/add`)}
-                sx={{ textTransform: 'none', fontWeight: 600 }}
+              variant='contained'
+              color='success'
+              size='small'
+              startIcon={<i className='tabler-file-export' />}
+              onClick={() => {
+                if (formData.id) {
+                  const encodedId = encodeId(formData.id)
+                  router.push(`/${lang}/admin/contracts/add?from_proposal=${encodedId}`)
+                } else {
+                  // Fallback or alert if no ID (should rely on isSubmitting or disabled state if new)
+                  console.warn('No proposal ID found to convert')
+                }
+              }}
+              sx={{ textTransform: 'none', fontWeight: 600 }}
             >
-                Convert to Contract
+              Convert to Contract
             </Button>
+
+            {/* Duplicate Button (Update Mode Only) */}
+            {formData.id && (
+              <Button
+                variant='contained'
+                color='secondary'
+                size='small'
+                startIcon={<i className='tabler-copy' />}
+                onClick={() => {
+                  console.log('Duplicate clicked')
+                }}
+                sx={{ textTransform: 'none', fontWeight: 600 }}
+              >
+                Duplicate
+              </Button>
+            )}
+          </Box>
         </Box>
         <Divider />
       </Grid>
@@ -47,8 +92,24 @@ const Step1DealType = ({
       {/* Customer (Moved from Step 2) */}
       <Grid item xs={12} md={3}>
         <GlobalAutocomplete
-          label='Customer *'
-          options={dropdowns?.customers || []}
+          label={
+            <Box component='span' sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              Customer *
+              {!formData.id && (
+                <i
+                  className='tabler-user-plus'
+                  style={{ cursor: 'pointer', fontSize: '1.2rem', color: '#7367f0' }} // Primary color
+                  onClick={e => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                    setOpenCustomerDialog(true)
+                  }}
+                />
+              )}
+            </Box>
+          }
+          placeholder='Customer'
+          options={customerOptions}
           value={formData.customerId}
           onChange={v => handleAutocompleteChange('customer', v, refs.customerRef)}
           inputRef={refs.customerRef}
@@ -232,6 +293,12 @@ const Step1DealType = ({
           onKeyDown={e => handleKeyDown(e, refs.billingPhoneRef)}
         />
       </Grid>
+
+      <AddCustomerDialog
+        open={openCustomerDialog}
+        onClose={() => setOpenCustomerDialog(false)}
+        onCustomerAdded={handleCustomerAdded}
+      />
     </Grid>
   )
 }

@@ -36,6 +36,7 @@ import { showToast } from '@/components/common/Toasts'
 // Components
 import CustomTextField from '@core/components/mui/TextField'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
+import GlobalButton from '@/components/common/GlobalButton'
 import TablePaginationComponent from '@/components/TablePaginationComponent'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
@@ -43,15 +44,18 @@ import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 // Icons
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
+import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 
 import styles from '@core/styles/table.module.css'
 
 // API
 import { addProposal, updateProposal, getProposalDetails, getProposalList } from '@/api/sales/proposal'
+import { listSalesAgreement, deleteSalesAgreement } from '@/api/sales/proposal/agreement'
 import { getContractDates, getInvoiceCount, getPestCount, getInvoiceRemark } from '@/api/contract_group/contract'
 import { getAllDropdowns } from '@/api/contract_group/contract/dropdowns'
 import { getCustomerDetails } from '@/api/customer_group/customer'
-import { listCallLogs } from '@/api/contract_group/contract/details/call_log'
+import { listCallLogs, addCallLog, updateCallLog, deleteCallLog } from '@/api/contract_group/contract/details/call_log'
+import { addProposalPest, updateProposalPest, deleteProposalPest } from '@/api/sales/proposal/pest'
 import { decodeId, encodeId } from '@/utils/urlEncoder'
 import addContractFile from '@/api/contract_group/contract/details/contract_file/add'
 
@@ -220,11 +224,17 @@ export default function ProposalWizard({ id }) {
 
   const [callLogSearch, setCallLogSearch] = useState('')
   const [propSearch, setPropSearch] = useState('')
+  const [pestSearch, setPestSearch] = useState('')
 
   const [callLogPagination, setCallLogPagination] = useState({ pageIndex: 0, pageSize: 5 })
   const [propPagination, setPropPagination] = useState({ pageIndex: 0, pageSize: 5 })
+  const [pestPagination, setPestPagination] = useState({ pageIndex: 0, pageSize: 5 })
 
   const [callLogDialogOpen, setCallLogDialogOpen] = useState(false)
+  const [pestDialogOpen, setPestDialogOpen] = useState(false)
+  const [isEditCallLog, setIsEditCallLog] = useState(false)
+  const [deleteProposalDialog, setDeleteProposalDialog] = useState({ open: false, row: null })
+  const [deleteCallLogDialog, setDeleteCallLogDialog] = useState({ open: false, row: null })
 
   const [currentPestItem, setCurrentPestItem] = useState({
     pest: '',
@@ -428,34 +438,72 @@ export default function ProposalWizard({ id }) {
     init()
   }, [id])
 
-  // Load Call Logs and Proposals when customer is available
+  // Load Call Logs when proposal ID is available
   useEffect(() => {
-    if (formData.customerId) {
-      if (callLogs.length === 0) {
-        listCallLogs({ customer_id: formData.customerId })
-          .then(res => {
-            if (res?.data?.status === 'success') {
-              setCallLogs(Array.isArray(res.data.data) ? res.data.data : [])
-            }
-          })
-          .catch(err => console.error('Fetch Logs Error:', err))
-      }
-
-      if (proposals.length === 0) {
-        getProposalList({ customer_id: formData.customerId })
-          .then(res => {
-            if (res?.status === 'success') {
-              setProposals(Array.isArray(res.data) ? res.data : [])
-            }
-          })
-          .catch(err => console.error('Fetch Proposals Error:', err))
-      }
+    if (id) {
+      fetchCallLogs()
     } else {
-      // Clear logs/proposals if no customer is selected
       if (callLogs.length > 0) setCallLogs([])
+    }
+  }, [id])
+
+  // --- Filtering Logic (Pests) ---
+  const filteredPests = useMemo(() => {
+    if (!Array.isArray(pestItems)) return []
+    if (!pestSearch) return pestItems
+    const lower = pestSearch.toLowerCase()
+    return pestItems.filter(i => Object.values(i).some(v => String(v).toLowerCase().includes(lower)))
+  }, [pestItems, pestSearch])
+
+  const paginatedPests = useMemo(() => {
+    const start = pestPagination.pageIndex * pestPagination.pageSize
+    return filteredPests.slice(start, start + pestPagination.pageSize)
+  }, [filteredPests, pestPagination])
+
+  const fetchCallLogs = async () => {
+    try {
+      const decodedProposalId = decodeId(id) || id
+      console.log('🔄 FETCHING CALL LOGS FOR:', decodedProposalId)
+      const res = await listCallLogs({ contract_id: String(decodedProposalId) })
+
+      const apiResponse = res?.data || res
+      const apiData =
+        apiResponse?.data?.results ||
+        apiResponse?.results ||
+        (Array.isArray(apiResponse?.data) ? apiResponse.data : Array.isArray(apiResponse) ? apiResponse : [])
+
+      if (Array.isArray(apiData)) {
+        setCallLogs(apiData)
+      }
+    } catch (err) {
+      console.error('Fetch Logs Error:', err)
+      // No notification for error here to avoid annoying popups if it's just an empty results case
+    }
+  }
+
+  // ✅ Fetch Sales Agreements (Generated Proposals) for the CURRENT proposal independently
+  useEffect(() => {
+    if (id) {
+      const decodedProposalId = decodeId(id) || id
+      console.log('🔍 FETCHING PROPOSALS FOR:', decodedProposalId)
+      listSalesAgreement({ proposal_id: Number(decodedProposalId) })
+        .then(res => {
+          // ✅ Highly robust mapping to handle multiple API response formats
+          const apiResponse = res?.data || res
+          const apiData =
+            apiResponse?.data?.results ||
+            apiResponse?.results ||
+            (Array.isArray(apiResponse?.data) ? apiResponse.data : Array.isArray(apiResponse) ? apiResponse : [])
+
+          if (Array.isArray(apiData)) {
+            setProposals(apiData)
+          }
+        })
+        .catch(err => console.error('Fetch Agreements Error:', err))
+    } else {
       if (proposals.length > 0) setProposals([])
     }
-  }, [formData.customerId, callLogs.length, proposals.length])
+  }, [id])
 
   // --- External Tables Logic (Call Logs) ---
   const filteredCallLogs = useMemo(() => {
@@ -486,6 +534,37 @@ export default function ProposalWizard({ id }) {
   const onSaveCallLog = () => {
     handleSaveCallLog()
     setCallLogDialogOpen(false)
+  }
+
+  const handleDeleteProposalClick = row => {
+    setDeleteProposalDialog({ open: true, row })
+  }
+
+  const confirmDeleteSalesProposal = async () => {
+    const propId = deleteProposalDialog.row?.id
+    if (!propId) return
+
+    try {
+      await deleteSalesAgreement({ id: propId })
+      showToast('delete', 'Proposal agreement deleted successfully')
+
+      // Refresh list
+      const decodedProposalId = decodeId(id) || id
+      console.log('🔄 REFRESHING PROPOSALS FOR:', decodedProposalId)
+      const res = await listSalesAgreement({ proposal_id: Number(decodedProposalId) })
+      const apiResponse = res?.data || res
+      const apiData =
+        apiResponse?.data?.results ||
+        apiResponse?.results ||
+        (Array.isArray(apiResponse?.data) ? apiResponse.data : Array.isArray(apiResponse) ? apiResponse : [])
+
+      if (Array.isArray(apiData)) setProposals(apiData)
+    } catch (err) {
+      console.error('Delete error:', err)
+      showToast('error', 'Failed to delete proposal agreement')
+    } finally {
+      setDeleteProposalDialog({ open: false, row: null })
+    }
   }
 
   const loadDropdowns = async () => {
@@ -581,14 +660,14 @@ export default function ProposalWizard({ id }) {
               pestId: item.pest_id,
               frequency: item.frequency,
               frequencyId: item.frequency_id,
-              pestCount: item.no_location,
-              pestValue: item.pest_value,
-              totalValue: item.total_value,
+              pestCount: item.no_location || '',
+              pestValue: item.pest_value || '',
+              totalValue: item.total_value || '',
               workTime: convertMinutesToTime(item.work_time),
               chemical: item.chemical_name || item.chemical || '',
               chemicals: item.chemical_name || item.chemical || '',
               chemicalId: item.chemical_id,
-              noOfItems: item.pest_service_count
+              noOfItems: item.pest_service_count || ''
             }))
           )
         }
@@ -625,7 +704,11 @@ export default function ProposalWizard({ id }) {
   }
   const formatDate = date => {
     if (!date) return ''
-    return new Date(date).toISOString().split('T')[0]
+    const d = new Date(date)
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${day}/${month}/${year}`
   }
 
   useEffect(() => {
@@ -759,139 +842,345 @@ export default function ProposalWizard({ id }) {
     })
   }
 
+  // --- Auto-calculate Pest Count ---
+
   const handleCurrentPestItemAutocompleteChange = (name, newValue, ref) => {
     const isObject = typeof newValue === 'object' && newValue !== null
-    setCurrentPestItem(prev => ({
-      ...prev,
-      [name]: isObject ? newValue.label || newValue.name || '' : newValue,
-      [`${name}Id`]: isObject ? newValue.value || newValue.id || '' : ''
-    }))
-    if (ref) focusNextElement(ref)
-  }
+    const newLabel = isObject ? newValue.label || newValue.name || '' : newValue
+    const newId = isObject ? newValue.value || newValue.id || '' : ''
 
-  // --- Auto-calculate Pest Count ---
-  useEffect(() => {
-    const { pestId, frequencyId } = currentPestItem
+    setCurrentPestItem(prev => {
+      const next = {
+        ...prev,
+        [name]: newLabel,
+        [`${name}Id`]: newId
+      }
+      return next
+    })
+
+    // Determine the *effective* pestId and frequencyId for the API call
+    let pestId = currentPestItem.pestId
+    let frequencyId = currentPestItem.frequencyId
+
+    if (name === 'pest') pestId = newId
+    if (name === 'frequency') frequencyId = newId
+
     const { startDate, endDate } = formData
 
-    if (pestId && frequencyId && startDate && endDate) {
-      console.log('Fetching Pest Count with:', {
+    // Explicit debug message
+    console.log('🐞 Attempting to fetch pest count with:', { pestId, frequencyId, startDate, endDate })
+
+    if (!pestId) {
+      // showToast('info', 'Select a pest to fetch count')
+      return // Wait for pest
+    }
+    if (!frequencyId) {
+      // showToast('info', 'Select a frequency to fetch count')
+      return // Wait for frequency
+    }
+    if (!startDate) {
+      showToast('warning', 'Start Date is missing. Please set contract dates first.')
+      return
+    }
+    if (!endDate) {
+      showToast('warning', 'End Date is missing. Please set contract dates first.')
+      return
+    }
+
+    // Check for ID (contract_id/proposal_id) - user requested contract_id
+    const contractId = id ? decodeId(id) || id : null
+
+    // Updated Condition: We need pestId, frequencyId. Dates are good, but contractId might be key.
+    // User says: "frequency id and contract id send panni pest count fetch pannnanum"
+    // So if we have contractId, we might not need dates? But usually we do.
+    // Let's send EVERYTHING available to be safe.
+
+    if (pestId && frequencyId && (contractId || (startDate && endDate))) {
+      console.log('✅ Fetching Pest Count with:', {
         pest_id: pestId,
         service_frequency_id: frequencyId,
-        start_date: formatDateToLocal(startDate),
-        end_date: formatDateToLocal(endDate)
+        contract_id: contractId,
+        start_date: startDate ? formatDateToLocal(startDate) : null,
+        end_date: endDate ? formatDateToLocal(endDate) : null
       })
+
+      showToast('info', 'Fetching pest count...')
 
       getPestCount({
         pest_id: Number(pestId),
         service_frequency_id: Number(frequencyId),
-        billing_frequency_id: Number(frequencyId), // Added this as we are using Billing Frequencies now
-        start_date: formatDateToLocal(startDate),
-        end_date: formatDateToLocal(endDate)
+        billing_frequency_id: Number(frequencyId),
+        contract_id: contractId, // Added as requested
+        start_date: startDate ? formatDateToLocal(startDate) : null,
+        end_date: endDate ? formatDateToLocal(endDate) : null
       })
         .then(res => {
-          console.log('Pest Count API Response:', res)
-          if (res?.status === 'success') {
-            const count = res.data?.pest_count ?? '0'
+          console.log('✅ Pest Count API Response:', res)
+          if (res?.status === 'success' || (res && res.pest_count !== undefined)) {
+            // Handle different responses
+            const count = (res.data?.pest_count ?? res.pest_count ?? '0').toString()
+            console.log('✅ Pest Count Found:', count)
+
+            // Check if 0 came back but expected non-zero?
+            if (count === '0') showToast('info', 'Pest count returned 0')
+
             setCurrentPestItem(prev => {
               const totalNum = Number(count) * Number(prev.pestValue || 0)
               return {
                 ...prev,
-                pestCount: String(count),
+                pestCount: count,
                 total: isNaN(totalNum) ? '0' : totalNum.toString()
               }
             })
+          } else {
+            console.error('❌ Pest Count API Response unsuccessful:', res)
+            showToast('error', 'Failed to fetch pest count')
           }
         })
-        .catch(err => console.error('Pest Count Error:', err))
+        .catch(err => {
+          console.error('❌ Pest Count Error:', err)
+          showToast('error', 'Error fetching pest count')
+        })
     }
-  }, [currentPestItem.pestId, currentPestItem.frequencyId, formData.startDate, formData.endDate])
 
-  const handleSavePestItem = () => {
+    if (ref) focusNextElement(ref)
+  }
+
+  const handleSavePestItem = async () => {
     if (!formData.startDate || !formData.endDate || !currentPestItem.pest || !currentPestItem.frequency) {
       showToast('warning', 'Dates, Pest, and Frequency are required.')
       return
     }
+
+    const totalValueSum = (Number(currentPestItem.total) || 0).toString()
+
     const itemPayload = {
-      ...currentPestItem,
-      totalValue: currentPestItem.total || '0',
-      workTime: currentPestItem.time || '0:00'
+      proposal_id: id ? decodeId(id) || id : null,
+      pest_id: Number(currentPestItem.pestId),
+      frequency_id: Number(currentPestItem.frequencyId),
+      chemical_id: currentPestItem.chemicalId ? Number(currentPestItem.chemicalId) : null,
+      pest: currentPestItem.pest,
+      frequency: currentPestItem.frequency,
+      chemical_name: currentPestItem.chemicals || currentPestItem.chemical || '',
+      no_location: String(currentPestItem.pestCount || '0'),
+      pest_value: String(currentPestItem.pestValue || '0'),
+      pest_service_count: String(currentPestItem.noOfItems || '0'),
+      total_value: totalValueSum,
+      work_time: convertTimeToMinutes(currentPestItem.time || '0:00'),
+      remarks: '',
+      is_active: 1,
+      status: 1
     }
 
-    if (editingItemId) {
-      setPestItems(prev =>
-        prev.map(item => (item.id === editingItemId ? { ...item, ...itemPayload, id: editingItemId } : item))
-      )
+    try {
+      if (id) {
+        let res
+        if (editingItemId && currentPestItem.item_id) {
+          // Update existing item
+          res = await updateProposalPest(currentPestItem.item_id, itemPayload)
+        } else {
+          // Add new item to existing proposal
+          res = await addProposalPest(itemPayload)
+        }
+
+        if (res?.status === 'success' || res) {
+          showToast('success', `Pest item ${editingItemId ? 'updated' : 'added'} successfully`)
+          await loadDetails(id) // Refresh all details to get the new list
+        }
+      } else {
+        // Local mode for new proposal
+        if (editingItemId) {
+          setPestItems(prev =>
+            prev.map(item =>
+              item.id === editingItemId
+                ? {
+                    ...item,
+                    ...currentPestItem,
+                    id: editingItemId,
+                    totalValue: totalValueSum,
+                    workTime: currentPestItem.time || '0:00'
+                  }
+                : item
+            )
+          )
+          setEditingItemId(null)
+        } else {
+          setPestItems(prev => [
+            ...prev,
+            {
+              ...currentPestItem,
+              id: Date.now().toString(36),
+              totalValue: totalValueSum,
+              workTime: currentPestItem.time || '0:00'
+            }
+          ])
+        }
+      }
+
+      // Reset selective fields
+      setCurrentPestItem(prev => ({
+        pest: '',
+        pestId: '',
+        frequency: prev.frequency,
+        frequencyId: prev.frequencyId,
+        pestCount: prev.pestCount,
+        pestValue: '',
+        total: '',
+        time: '',
+        chemicals: '',
+        chemical: '',
+        chemicalId: '',
+        noOfItems: ''
+      }))
       setEditingItemId(null)
-    } else {
-      setPestItems(prev => [...prev, { ...itemPayload, id: Date.now().toString(36) }])
-    }
+      setPestDialogOpen(false)
 
-    // Reset selective fields
-    setCurrentPestItem(prev => ({
-      pest: '',
-      pestId: '',
-      frequency: prev.frequency,
-      frequencyId: prev.frequencyId,
-      pestCount: prev.pestCount,
-      pestValue: '',
-      total: '',
-      time: '',
-      chemicals: '',
-      chemical: '',
-      chemicalId: '',
-      noOfItems: ''
-    }))
-    // Focus back to pest field
-    setTimeout(() => refs.pestInputRef.current?.focus(), 100)
+      // Focus back to pest field
+      setTimeout(() => refs.pestInputRef.current?.focus(), 100)
+    } catch (err) {
+      console.error('Save Pest Error:', err)
+      showToast('error', 'Failed to save pest item')
+    }
   }
 
   const handleEditPestItem = item => {
     setCurrentPestItem({
+      item_id: item.item_id,
       pest: item.pest,
       pestId: item.pestId,
       frequency: item.frequency,
       frequencyId: item.frequencyId,
-      pestCount: item.pestCount,
-      pestValue: item.pestValue,
-      total: item.totalValue,
+      pestCount: item.pestCount || '',
+      pestValue: item.pestValue || '',
+      total: item.totalValue || '',
       time: item.workTime || '0:00',
-      chemical: item.chemical || item.chemicals,
-      chemicals: item.chemicals,
-      chemicalId: item.chemicalId,
-      noOfItems: item.noOfItems
+      chemical: item.chemical || item.chemicals || '',
+      chemicals: item.chemicals || '',
+      chemicalId: item.chemicalId || '',
+      noOfItems: item.noOfItems || ''
     })
     setEditingItemId(item.id)
   }
 
-  const handleDeletePestItem = id => {
-    if (editingItemId === id) setEditingItemId(null)
-    setPestItems(prev => prev.filter(i => i.id !== id))
+  const handleDeletePestItem = async itemId => {
+    if (id) {
+      // Find the item to get its server-side ID if available
+      const itemToDelete = pestItems.find(i => i.id === itemId)
+      if (itemToDelete?.item_id) {
+        try {
+          await deleteProposalPest({ id: itemToDelete.item_id })
+          showToast('delete', 'Pest item deleted successfully')
+          await loadDetails(id)
+        } catch (err) {
+          console.error('Delete Pest Error:', err)
+          showToast('error', 'Failed to delete pest item')
+        }
+        return
+      }
+    }
+
+    // Fallback to local delete
+    if (editingItemId === itemId) setEditingItemId(null)
+    setPestItems(prev => prev.filter(i => i.id !== itemId))
   }
 
   const handleCurrentCallLogChange = (field, value) => {
     setCurrentCallLog(prev => ({ ...prev, [field]: value }))
   }
 
-  const handleSaveCallLog = () => {
-    const newLog = {
-      ...currentCallLog,
-      id: Date.now(),
-      entry_date: new Date().toLocaleDateString('en-GB'),
-      reminder_date: currentCallLog.reminderDate ? currentCallLog.reminderDate.toLocaleDateString('en-GB') : '-',
-      reminder_time: currentCallLog.reminderTime
-        ? currentCallLog.reminderTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        : '-'
+  const handleSaveCallLog = async () => {
+    const decodedProposalId = decodeId(id) || id
+    if (!decodedProposalId) {
+      showToast('error', 'Proposal ID missing')
+      return
     }
-    setCallLogs(prev => [...prev, newLog])
+
+    const payload = {
+      contract_id: String(decodedProposalId),
+      // reminder: currentCallLog.reminder ? 1 : 0, // Potentially wrong based on other views
+      reminder: 'Call Log', // Standardized to what CallLogListPage uses
+      entry_date: formatDateToLocal(new Date()),
+      reminder_date:
+        currentCallLog.reminder && currentCallLog.reminderDate ? formatDateToLocal(currentCallLog.reminderDate) : null,
+      reminder_time:
+        currentCallLog.reminder && currentCallLog.reminderTime
+          ? currentCallLog.reminderTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+          : null,
+      remarks: currentCallLog.remarks || '',
+      // Ensure IDs are sent as strings if they exist to avoid 'int' object has no attribute 'strip' error
+      assign_to: currentCallLog.assignTo?.id
+        ? String(currentCallLog.assignTo.id)
+        : currentCallLog.assignTo
+          ? String(currentCallLog.assignTo)
+          : '',
+      remarks_type: currentCallLog.remarksType || 'All'
+    }
+
+    console.log('🚀 SAVING CALL LOG PAYLOAD:', payload)
+
+    try {
+      let res
+      if (isEditCallLog && currentCallLog.id) {
+        res = await updateCallLog(currentCallLog.id, payload)
+      } else {
+        res = await addCallLog(payload)
+      }
+
+      console.log('✅ CALL LOG API RESPONSE:', res)
+
+      if (res?.status === 'success' || res) {
+        showToast('success', `Call log ${isEditCallLog ? 'updated' : 'added'} successfully`)
+        fetchCallLogs()
+        setCallLogDialogOpen(false)
+        setIsEditCallLog(false)
+        setCurrentCallLog({
+          reminder: true,
+          reminderDate: null,
+          reminderTime: null,
+          assignTo: '',
+          remarks: '',
+          remarksType: 'All'
+        })
+      }
+    } catch (err) {
+      console.error('❌ SAVE CALL LOG ERROR:', err)
+      console.error('❌ ERROR RESPONSE DATA:', err.response?.data)
+      showToast('error', err.response?.data?.message || 'Failed to save call log')
+    }
+  }
+
+  const handleEditCallLog = log => {
+    setIsEditCallLog(true)
     setCurrentCallLog({
-      reminder: true,
-      reminderDate: null,
-      reminderTime: null,
-      assignTo: '',
-      remarks: '',
-      remarksType: 'All'
+      id: log.id,
+      reminder: !!log.reminder,
+      reminderDate: parseSafeDate(log.reminder_date),
+      reminderTime: parseSafeTime(log.reminder_time),
+      assignTo: log.assign_to_name || log.assign_to,
+      remarks: log.remarks || '',
+      remarksType: log.remarks_type || 'All'
     })
+    setCallLogDialogOpen(true)
+  }
+
+  const handleDeleteCallLogClick = log => {
+    setDeleteCallLogDialog({ open: true, row: log })
+  }
+
+  const confirmDeleteCallLog = async () => {
+    const logId = deleteCallLogDialog.row?.id
+    if (!logId) return
+
+    try {
+      await deleteCallLog(logId)
+      showToast('delete', 'Call log deleted successfully')
+      fetchCallLogs()
+    } catch (err) {
+      console.error('Delete Log Error:', err)
+      showToast('error', 'Failed to delete call log')
+    } finally {
+      setDeleteCallLogDialog({ open: false, row: null })
+    }
   }
 
   // 🔹 FETCH INVOICE REMARKS BASED ON PEST ITEMS
@@ -1134,6 +1423,7 @@ export default function ProposalWizard({ id }) {
             dropdowns={dropdowns}
             handleKeyDown={handleKeyDown}
             refs={refs}
+            pestItems={pestItems}
           />
         )
       case 3:
@@ -1151,6 +1441,13 @@ export default function ProposalWizard({ id }) {
             editingItemId={editingItemId}
             handleKeyDown={handleKeyDown}
             refs={refs}
+            // Props for shared state
+            pestSearch={pestSearch}
+            setPestSearch={setPestSearch}
+            pestPagination={pestPagination}
+            setPestPagination={setPestPagination}
+            pestDialogOpen={pestDialogOpen}
+            setPestDialogOpen={setPestDialogOpen}
           />
         )
       case 4:
@@ -1213,17 +1510,30 @@ export default function ProposalWizard({ id }) {
           <Box sx={{ flexGrow: 1, p: 2 }}>{getStepContent(activeStep)}</Box>
 
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4, p: 2 }}>
-            <Button variant='outlined' color='secondary' disabled={activeStep === 0 || isSubmitting} onClick={handlePrev}>
+            <Button
+              variant='outlined'
+              color='secondary'
+              disabled={activeStep === 0 || isSubmitting}
+              onClick={handlePrev}
+            >
               Previous
             </Button>
-            <Button 
-              variant='contained' 
-              color='primary' 
-              onClick={handleNext} 
+            <Button
+              variant='contained'
+              color='primary'
+              onClick={handleNext}
               disabled={isSubmitting}
-              startIcon={isSubmitting && activeStep === steps.length - 1 ? <CircularProgress size={20} color='inherit' /> : null}
+              startIcon={
+                isSubmitting && activeStep === steps.length - 1 ? <CircularProgress size={20} color='inherit' /> : null
+              }
             >
-              {activeStep === steps.length - 1 ? (isSubmitting ? 'Submitting...' : (id ? 'Update Proposal' : 'Submit Proposal')) : 'Next'}
+              {activeStep === steps.length - 1
+                ? isSubmitting
+                  ? 'Submitting...'
+                  : id
+                    ? 'Update Proposal'
+                    : 'Submit Proposal'
+                : 'Next'}
             </Button>
           </Box>
         </CardContent>
@@ -1252,7 +1562,22 @@ export default function ProposalWizard({ id }) {
             <TableSection
               title='CALL LOGS'
               addButton={
-                <Button variant='contained' size='small' onClick={() => setCallLogDialogOpen(true)}>
+                <Button
+                  variant='contained'
+                  size='small'
+                  onClick={() => {
+                    setIsEditCallLog(false)
+                    setCurrentCallLog({
+                      reminder: true,
+                      reminderDate: null,
+                      reminderTime: null,
+                      assignTo: '',
+                      remarks: '',
+                      remarksType: 'All'
+                    })
+                    setCallLogDialogOpen(true)
+                  }}
+                >
                   Add Log
                 </Button>
               }
@@ -1265,29 +1590,53 @@ export default function ProposalWizard({ id }) {
               <table className={styles.table}>
                 <thead>
                   <tr>
-                    <th>#</th>
+                    <th>S.No</th>
+                    <th>Action</th>
                     <th>Reminder</th>
                     <th>Entry Date</th>
                     <th>Reminder Date</th>
+                    <th>Reminder Time</th>
                     <th>Remarks</th>
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedCallLogs.length === 0 ? (
                     <tr>
-                      <td colSpan={5} align='center'>
-                        No call logs found
+                      <td colSpan={6} align='center'>
+                        No logs found
                       </td>
                     </tr>
                   ) : (
                     paginatedCallLogs.map((log, idx) => (
-                      <tr key={idx}>
+                      <tr key={log.id || idx}>
                         <td>{idx + 1 + callLogPagination.pageIndex * callLogPagination.pageSize}</td>
                         <td>
-                          {log.reminder ? <Chip label='Active' color='error' size='small' variant='outlined' /> : 'No'}
+                          <Box sx={{ display: 'flex', gap: 1 }}>
+                            <IconButton size='small' color='primary' onClick={() => handleEditCallLog(log)}>
+                              <i className='tabler-edit' />
+                            </IconButton>
+                            <IconButton size='small' color='error' onClick={() => handleDeleteCallLogClick(log)}>
+                              <i className='tabler-trash' />
+                            </IconButton>
+                          </Box>
+                        </td>
+                        <td>
+                          {log.reminder ? (
+                            <Chip
+                              label='Remind'
+                              variant='outlined'
+                              color='success'
+                              size='small'
+                              icon={<i className='tabler-check' style={{ fontSize: '14px' }} />}
+                              sx={{ borderRadius: '4px', height: '24px', '& .MuiChip-label': { px: 1 } }}
+                            />
+                          ) : (
+                            '-'
+                          )}
                         </td>
                         <td>{log.entry_date || '-'}</td>
                         <td>{log.reminder_date || '-'}</td>
+                        <td>{log.reminder_time || '-'}</td>
                         <td>{log.remarks || '-'}</td>
                       </tr>
                     ))
@@ -1323,38 +1672,80 @@ export default function ProposalWizard({ id }) {
               <table className={styles.table}>
                 <thead>
                   <tr>
-                    <th>ID</th>
-                    <th>Date</th>
+                    <th>S.No</th>
+                    <th>Action</th>
+                    <th>Proposal Date</th>
                     <th>Title</th>
+                    <th>Document</th>
                     <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedProposals.length === 0 ? (
                     <tr>
-                      <td colSpan={4} align='center'>
+                      <td colSpan={6} align='center'>
                         No proposals found
                       </td>
                     </tr>
                   ) : (
                     paginatedProposals.map((prop, idx) => (
-                      <tr
-                        key={prop.id || idx}
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => {
-                          const realId = prop.id
-                          const encodedId = encodeId(realId)
-                          router.push(`/${lang}/admin/proposal-editor?proposal_id=${encodedId}`)
-                        }}
-                      >
-                        <td>{prop.proposal_code || prop.id}</td>
-                        <td>{prop.proposal_date || '-'}</td>
-                        <td>{prop.title || '-'}</td>
+                      <tr key={prop.id || idx}>
+                        <td>{idx + 1 + propPagination.pageIndex * propPagination.pageSize}</td>
+                        <td>
+                          <Box sx={{ display: 'flex', gap: 1 }}>
+                            <IconButton
+                              size='small'
+                              color='primary'
+                              onClick={() => {
+                                const encodedId = encodeId(prop.id)
+                                router.push(`/${lang}/admin/proposal-editor?proposal_id=${encodedId}`)
+                              }}
+                            >
+                              <i className='tabler-edit' />
+                            </IconButton>
+                            <IconButton size='small' color='error' onClick={() => handleDeleteProposalClick(prop)}>
+                              <i className='tabler-trash' />
+                            </IconButton>
+                            <IconButton
+                              size='small'
+                              color='info'
+                              onClick={() => {
+                                if (prop.file_name) {
+                                  let finalUrl = prop.file_name
+                                  if (!finalUrl.startsWith('http')) {
+                                    const apiBase = process.env.NEXT_PUBLIC_API_URL?.replace('/api/', '') || ''
+                                    finalUrl = `${apiBase}${finalUrl.startsWith('/') ? '' : '/'}${finalUrl}`
+                                  }
+                                  if (
+                                    finalUrl.includes('/media/') &&
+                                    !finalUrl.includes('/agreements/') &&
+                                    !finalUrl.includes('/agreement/') &&
+                                    finalUrl.toLowerCase().includes('proposal')
+                                  ) {
+                                    finalUrl = finalUrl.replace('/media/', '/media/agreements/')
+                                  }
+                                  window.open(finalUrl, '_blank')
+                                } else {
+                                  showToast('error', 'File not available on server')
+                                }
+                              }}
+                            >
+                              <i className='tabler-download' />
+                            </IconButton>
+                          </Box>
+                        </td>
+                        <td>{prop.proposal_date || prop.created_on?.split(' ')[0] || '-'}</td>
+                        <td>{prop.name || prop.title || '-'}</td>
+                        <td>{prop.file_name_display || (prop.file_name ? prop.file_name.split('/').pop() : '-')}</td>
                         <td>
                           <Chip
-                            label={prop.status || 'Active'}
+                            label={prop.status === 1 ? 'Approved' : 'Pending'}
                             size='small'
-                            sx={{ bgcolor: '#dff7e9', color: '#28c76f', fontWeight: 600 }}
+                            sx={{
+                              bgcolor: prop.status === 1 ? '#dff7e9' : '#fff2e2',
+                              color: prop.status === 1 ? '#28c76f' : '#ff9f43',
+                              fontWeight: 600
+                            }}
                           />
                         </td>
                       </tr>
@@ -1377,7 +1768,7 @@ export default function ProposalWizard({ id }) {
       >
         <DialogTitle>
           <Typography variant='h5' component='span'>
-            Call Log
+            {isEditCallLog ? 'Edit Call Log' : 'Add Call Log'}
           </Typography>
           <DialogCloseButton onClick={() => setCallLogDialogOpen(false)} disableRipple>
             <i className='tabler-x' />
@@ -1461,6 +1852,256 @@ export default function ProposalWizard({ id }) {
           </Button>
           <Button
             onClick={handleSaveCallLog}
+            variant='contained'
+            sx={{ bgcolor: '#00adef', '&:hover': { bgcolor: '#008dc4' } }}
+          >
+            {isEditCallLog ? 'Update' : 'Save'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Proposal Confirmation Dialog */}
+      <Dialog
+        onClose={() => setDeleteProposalDialog({ open: false, row: null })}
+        open={deleteProposalDialog.open}
+        PaperProps={{
+          sx: {
+            overflow: 'visible',
+            width: 420,
+            borderRadius: 1,
+            textAlign: 'center'
+          }
+        }}
+      >
+        <DialogTitle
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1,
+            color: 'error.main',
+            fontWeight: 700,
+            pb: 1,
+            position: 'relative'
+          }}
+        >
+          <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
+          Confirm Delete
+          <DialogCloseButton
+            onClick={() => setDeleteProposalDialog({ open: false, row: null })}
+            disableRipple
+            sx={{ position: 'absolute', right: 3, top: 2 }}
+          >
+            <i className='tabler-x' />
+          </DialogCloseButton>
+        </DialogTitle>
+
+        <DialogContent sx={{ px: 5, pt: 1 }}>
+          <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
+            Are you sure you want to delete proposal{' '}
+            <strong style={{ color: '#d32f2f' }}>
+              {deleteProposalDialog.row?.name || deleteProposalDialog.row?.title}
+            </strong>
+            ?
+            <br />
+            This action cannot be undone.
+          </Typography>
+        </DialogContent>
+
+        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+          <GlobalButton
+            onClick={() => setDeleteProposalDialog({ open: false, row: null })}
+            color='secondary'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+          >
+            Cancel
+          </GlobalButton>
+
+          <GlobalButton
+            onClick={confirmDeleteSalesProposal}
+            variant='contained'
+            color='error'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+          >
+            Delete
+          </GlobalButton>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Call Log Confirmation Dialog */}
+      <Dialog
+        onClose={() => setDeleteCallLogDialog({ open: false, row: null })}
+        open={deleteCallLogDialog.open}
+        PaperProps={{
+          sx: {
+            overflow: 'visible',
+            width: 420,
+            borderRadius: 1,
+            textAlign: 'center'
+          }
+        }}
+      >
+        <DialogTitle
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1,
+            color: 'error.main',
+            fontWeight: 700,
+            pb: 1,
+            position: 'relative'
+          }}
+        >
+          <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
+          Confirm Delete
+          <DialogCloseButton
+            onClick={() => setDeleteCallLogDialog({ open: false, row: null })}
+            disableRipple
+            sx={{ position: 'absolute', right: 3, top: 2 }}
+          >
+            <i className='tabler-x' />
+          </DialogCloseButton>
+        </DialogTitle>
+
+        <DialogContent sx={{ px: 5, pt: 1 }}>
+          <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
+            Are you sure you want to delete this call log?
+            <br />
+            This action cannot be undone.
+          </Typography>
+        </DialogContent>
+
+        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+          <GlobalButton
+            onClick={() => setDeleteCallLogDialog({ open: false, row: null })}
+            color='secondary'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+          >
+            Cancel
+          </GlobalButton>
+
+          <GlobalButton
+            onClick={confirmDeleteCallLog}
+            variant='contained'
+            color='error'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+          >
+            Delete
+          </GlobalButton>
+        </DialogActions>
+      </Dialog>
+
+      {/* --- ADD/EDIT PEST DIALOG (GLOBAL) --- */}
+      <Dialog
+        open={pestDialogOpen}
+        onClose={() => setPestDialogOpen(false)}
+        maxWidth='md'
+        fullWidth
+        PaperProps={{ sx: { overflow: 'visible' } }}
+      >
+        <DialogTitle>
+          <Typography variant='h5' component='span'>
+            {editingItemId ? 'Edit Pest' : 'Add Pest'}
+          </Typography>
+          <DialogCloseButton onClick={() => setPestDialogOpen(false)} disableRipple>
+            <i className='tabler-x' />
+          </DialogCloseButton>
+        </DialogTitle>
+        <DialogContent sx={{ p: 6 }}>
+          <Grid container spacing={5}>
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete
+                label='Pest'
+                options={dropdowns.pests || []}
+                value={currentPestItem.pestId}
+                onChange={v => handleCurrentPestItemAutocompleteChange('pest', v)}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete
+                label='Billing Frequency'
+                options={dropdowns.frequencies || []}
+                value={currentPestItem.frequencyId}
+                onChange={v => handleCurrentPestItemAutocompleteChange('frequency', v)}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={4}>
+              <CustomTextField
+                fullWidth
+                label='Pest Count'
+                name='pestCount'
+                type='number'
+                value={currentPestItem.pestCount || ''}
+                onChange={handleCurrentPestItemChange}
+                InputProps={{ readOnly: true }}
+                sx={{ '& .MuiInputBase-root': { bgcolor: '#f0f0f0' } }}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <CustomTextField
+                fullWidth
+                label='No of Units'
+                name='noOfItems'
+                type='number'
+                value={currentPestItem.noOfItems}
+                onChange={handleCurrentPestItemChange}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={4}>
+              <CustomTextField
+                fullWidth
+                label='Pest Value'
+                name='pestValue'
+                type='number'
+                value={currentPestItem.pestValue}
+                onChange={handleCurrentPestItemChange}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <CustomTextField
+                fullWidth
+                label='Total'
+                name='total'
+                value={currentPestItem.total || ''}
+                InputProps={{ readOnly: true }}
+                sx={{ '& .MuiInputBase-root': { bgcolor: '#f0f0f0' } }}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete
+                label='Time'
+                options={['0:05', '0:10', '0:15', '0:30', '1:00']}
+                value={currentPestItem.time}
+                onChange={v => handleCurrentPestItemAutocompleteChange('time', v)}
+              />
+            </Grid>
+            <Grid item xs={12} md={8}>
+              <GlobalAutocomplete
+                label='Chemicals'
+                options={dropdowns.chemicals || []}
+                value={currentPestItem.chemicalId}
+                onChange={v => handleCurrentPestItemAutocompleteChange('chemical', v)}
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions sx={{ p: 6, justifyContent: 'flex-end' }}>
+          <Button
+            onClick={() => setPestDialogOpen(false)}
+            variant='tonal'
+            color='secondary'
+            sx={{ bgcolor: '#aaa', color: '#fff', '&:hover': { bgcolor: '#888' } }}
+          >
+            Close
+          </Button>
+          <Button
+            onClick={() => {
+              handleSavePestItem()
+              setPestDialogOpen(false)
+            }}
             variant='contained'
             sx={{ bgcolor: '#00adef', '&:hover': { bgcolor: '#008dc4' } }}
           >

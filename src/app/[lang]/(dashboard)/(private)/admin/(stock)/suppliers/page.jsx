@@ -287,6 +287,7 @@ const SupplierPageContent = () => {
       if (isEdit) {
         payload.id = formData.id
         await updateSupplier(payload)
+        showToast('success', 'Supplier updated successfully')
       } else {
         await addSupplier(payload)
         showToast('success', 'Supplier added successfully')
@@ -458,9 +459,7 @@ const SupplierPageContent = () => {
               </Typography>
 
               <GlobalButton
-                startIcon={
-                    <RefreshIcon />
-                }
+                startIcon={<RefreshIcon />}
                 disabled={loading}
                 onClick={async () => {
                   setLoading(true)

@@ -1,16 +1,17 @@
 'use client'
 
 import { Suspense, useState, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams, useParams } from 'next/navigation'
 import { Box, Grid, Typography, Card, Divider, CircularProgress } from '@mui/material'
 
 // API
-import { getSalesAgreementContent } from '@/api/sales/proposal/agreement/content'
+import { getSalesAgreementContent, updateSalesAgreement, addSalesAgreement } from '@/api/sales/proposal/agreement'
 import { getProposalDetails } from '@/api/sales/proposal'
 
 // Layout & Components
 import ContentLayout from '@/components/layout/ContentLayout'
 import GlobalButton from '@/components/common/GlobalButton'
+import { showToast } from '@/components/common/Toasts'
 import GlobalTextField from '@/components/common/GlobalTextField'
 import CKEditorField from '@/components/common/CKEditorField'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
@@ -18,11 +19,13 @@ import { decodeId } from '@/utils/urlEncoder'
 
 const ProposalEditorContent = () => {
   const router = useRouter()
+  const { lang } = useParams()
   const searchParams = useSearchParams()
   const urlProposalId = searchParams.get('proposal_id')
 
   // ✅ Persist ID even if URL gets cleared
   const [activeProposalId, setActiveProposalId] = useState(null)
+  const [agreementId, setAgreementId] = useState(null)
 
   useEffect(() => {
     if (urlProposalId) {
@@ -48,13 +51,19 @@ const ProposalEditorContent = () => {
           const apiResponse = res?.data || res
           if (apiResponse?.status === 'success' || apiResponse?.data) {
             const data = apiResponse.data || apiResponse
+
+            // ✅ Store agreement ID for updating later
+            if (data.id) setAgreementId(data.id)
+
             if (data.description) {
               console.log('✍️ SETTING DESCRIPTION:', data.description.substring(0, 50) + '...')
               setDescription(data.description)
             }
 
-            // Fallback for title/date if present here
-            if (data.title && !title) setTitle(data.title)
+            if (data.name || data.title) {
+              setTitle(data.name || data.title)
+            }
+
             if (data.proposal_date) {
               const d = new Date(data.proposal_date)
               if (!isNaN(d.getTime())) setProposalDate(d)
@@ -124,7 +133,11 @@ const ProposalEditorContent = () => {
               }
             }}
           >
-            <CKEditorField key={description ? 'loaded' : 'loading'} value={description} onChange={data => setDescription(data)} />
+            <CKEditorField
+              key={description ? 'loaded' : 'loading'}
+              value={description}
+              onChange={data => setDescription(data)}
+            />
           </Box>
         </Grid>
 
@@ -136,8 +149,43 @@ const ProposalEditorContent = () => {
 
           <GlobalButton
             variant='contained'
-            onClick={() => {
-              console.log({ proposalDate, title, description, activeProposalId })
+            onClick={async () => {
+              if (!activeProposalId) {
+                showToast('error', 'No proposal selected!')
+                return
+              }
+
+              try {
+                const payload = {
+                  description: description,
+                  name: title,
+                  proposal_date: proposalDate ? proposalDate.toISOString().split('T')[0] : null,
+                  proposal_id: Number(activeProposalId)
+                }
+
+                let res
+                if (agreementId) {
+                  // Update existing
+                  res = await updateSalesAgreement(agreementId, payload)
+                } else {
+                  // Add new
+                  res = await addSalesAgreement(payload)
+                }
+
+                if (res?.status === 'success' || res) {
+                  showToast('success', 'Sales proposal saved successfully!')
+
+                  // ✅ Redirect back to Update Proposal page
+                  setTimeout(() => {
+                    router.push(`/${lang}/admin/sales-quotation/update/${urlProposalId}`)
+                  }, 1500)
+                } else {
+                  showToast('error', 'Failed to save proposal.')
+                }
+              } catch (error) {
+                console.error('❌ SAVE ERROR:', error)
+                showToast('error', 'Error saving proposal.')
+              }
             }}
           >
             Save

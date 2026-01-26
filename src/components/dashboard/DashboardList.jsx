@@ -29,9 +29,10 @@ const StatusChip = ({ status }) => {
   let color = 'default'
   const normalized = status?.toLowerCase()
 
-  if (['completed', 'closed'].includes(normalized)) color = 'success'
-  else if (['in progress', 'open'].includes(normalized)) color = 'primary'
-  else if (['pending'].includes(normalized)) color = 'warning'
+  if (['completed', 'closed', 'active', 'fixed'].includes(normalized)) color = 'success'
+  else if (['in progress', 'open', 'renewed'].includes(normalized)) color = 'primary'
+  else if (['pending', 'inactive'].includes(normalized)) color = 'warning'
+  else if (['expired', 'terminated'].includes(normalized)) color = 'error'
 
   return <Chip label={status} color={color} size='small' variant='tonal' sx={{ fontWeight: 500 }} />
 }
@@ -214,11 +215,11 @@ export default function DashboardList() {
                     renewals.map((row, index) => (
                       <TableRow key={index} hover>
                         <TableCell>{index + 1}</TableCell>
-                        <TableCell>{row.contract_no}</TableCell>
-                        <TableCell>{row.customer_name}</TableCell>
-                        <TableCell>{row.end_date}</TableCell>
+                        <TableCell>{row.contract_code || row.contract_no}</TableCell>
+                        <TableCell>{row.customer || row.customer_name}</TableCell>
+                        <TableCell>{row.end_date || row.reminder_date || '-'}</TableCell>
                         <TableCell>
-                          <StatusChip status={row.status} />
+                          <StatusChip status={row.contract_status || row.status} />
                         </TableCell>
                       </TableRow>
                     ))
@@ -238,8 +239,9 @@ export default function DashboardList() {
                 <TableHead>
                   <TableRow>
                     <TableCell>S.No</TableCell>
-                    <TableCell>Ticket No</TableCell>
-                    <TableCell>Ticket Date</TableCell>
+                    <TableCell>Customer Name</TableCell>
+                    <TableCell>Service Address</TableCell>
+                    <TableCell>Service Date</TableCell>
                     <TableCell>Status</TableCell>
                   </TableRow>
                 </TableHead>
@@ -247,7 +249,7 @@ export default function DashboardList() {
                 <TableBody>
                   {kivList.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} align='center'>
+                      <TableCell colSpan={5} align='center'>
                         No KIV records
                       </TableCell>
                     </TableRow>
@@ -255,10 +257,11 @@ export default function DashboardList() {
                     kivList.map((row, index) => (
                       <TableRow key={index} hover>
                         <TableCell>{index + 1}</TableCell>
-                        <TableCell>{row.ticket_no}</TableCell>
-                        <TableCell>{row.ticket_date}</TableCell>
+                        <TableCell>{row.customer}</TableCell>
+                        <TableCell>{row.service_address}</TableCell>
+                        <TableCell>{row.service_date}</TableCell>
                         <TableCell>
-                          <StatusChip status={row.status} />
+                          <StatusChip status={row.degree} />
                         </TableCell>
                       </TableRow>
                     ))

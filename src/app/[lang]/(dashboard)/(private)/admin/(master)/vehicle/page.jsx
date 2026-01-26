@@ -28,6 +28,7 @@ import { usePermission } from '@/hooks/usePermission'
 
 import AddIcon from '@mui/icons-material/Add'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
+import RefreshIcon from '@mui/icons-material/Refresh'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import FileDownloadIcon from '@mui/icons-material/FileDownload'
 import PrintIcon from '@mui/icons-material/Print'
@@ -288,7 +289,35 @@ const VehiclePageContent = () => {
     >
       <Card>
         <CardHeader
-          title='Vehicle List'
+          title={
+            <Box display='flex' alignItems='center' gap={2}>
+              <Typography variant='h5' sx={{ fontWeight: 600 }}>
+                Vehicle List
+              </Typography>
+              <GlobalButton
+                startIcon={
+                  <RefreshIcon
+                    sx={{
+                      animation: loading ? 'spin 1s linear infinite' : 'none',
+                      '@keyframes spin': {
+                        '0%': { transform: 'rotate(0deg)' },
+                        '100%': { transform: 'rotate(360deg)' }
+                      }
+                    }}
+                  />
+                }
+                disabled={loading}
+                onClick={async () => {
+                  setLoading(true)
+                  setPagination({ pageIndex: 0, pageSize: 25 })
+                  await fetchVehicles()
+                  setTimeout(() => setLoading(false), 800)
+                }}
+              >
+                {loading ? 'Refreshing...' : 'Refresh'}
+              </GlobalButton>
+            </Box>
+          }
           action={
             <Box display='flex' alignItems='center' gap={2}>
               <GlobalButton
@@ -316,19 +345,34 @@ const VehiclePageContent = () => {
         <Divider />
 
         <Box p={4}>
-          <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-            <FormControl size='small' sx={{ width: 140 }}>
-              <Select
-                value={pagination.pageSize}
-                onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
-              >
-                {[25, 50, 75, 100].map(s => (
-                  <MenuItem key={s} value={s}>
-                    {s} entries
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+          <Box
+            sx={{
+              mb: 3,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 2,
+              flexShrink: 0
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant='body2' color='text.secondary'>
+                Show
+              </Typography>
+              <FormControl size='small' sx={{ width: 140 }}>
+                <Select
+                  value={pagination.pageSize}
+                  onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
+                >
+                  {[25, 50, 75, 100].map(s => (
+                    <MenuItem key={s} value={s}>
+                      {s} entries
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
 
             <DebouncedInput
               value={searchText}
@@ -337,15 +381,9 @@ const VehiclePageContent = () => {
                 setPagination(prev => ({ ...prev, pageIndex: 0 }))
               }}
               placeholder='Search vehicle...'
+              sx={{ width: 360 }}
+              variant='outlined'
               size='small'
-              sx={{ width: 300 }}
-              InputProps={{
-                startAdornment: (
-                  <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', color: 'text.secondary' }}>
-                    <i className='tabler-search' />
-                  </Box>
-                )
-              }}
             />
           </Box>
 
@@ -453,28 +491,68 @@ const VehiclePageContent = () => {
       </Drawer>
 
       {/* DELETE DIALOG */}
-      <Dialog open={deleteDialog.open} onClose={() => !deleteLoading && setDeleteDialog({ open: false, row: null })}>
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <WarningAmberIcon color='warning' />
+      <Dialog
+        onClose={() => !deleteLoading && setDeleteDialog({ open: false, row: null })}
+        aria-labelledby='customized-dialog-title'
+        open={deleteDialog.open}
+        closeAfterTransition={false}
+        PaperProps={{
+          sx: {
+            overflow: 'visible',
+            width: 420,
+            borderRadius: 1,
+            textAlign: 'center'
+          }
+        }}
+      >
+        <DialogTitle
+          id='customized-dialog-title'
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1,
+            color: 'error.main',
+            fontWeight: 700,
+            pb: 1,
+            position: 'relative'
+          }}
+        >
+          <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
           Confirm Delete
+          <DialogCloseButton
+            onClick={() => !deleteLoading && setDeleteDialog({ open: false, row: null })}
+            disableRipple
+          >
+            <i className='tabler-x' />
+          </DialogCloseButton>
         </DialogTitle>
-        <DialogContent>
-          <Typography>
-            Are you sure you want to delete <strong>{deleteDialog.row?.vehicle_name || deleteDialog.row?.name}</strong>?
+        <DialogContent sx={{ px: 5, pt: 1 }}>
+          <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
+            Are you sure you want to delete{' '}
+            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.vehicle_name || deleteDialog.row?.name}</strong>?
+            <br />
             This action cannot be undone.
           </Typography>
         </DialogContent>
-        <DialogActions sx={{ pb: 3, px: 3 }}>
+        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
           <GlobalButton
-            onClick={() => setDeleteDialog({ open: false, row: null })}
             color='secondary'
+            onClick={() => setDeleteDialog({ open: false, row: null })}
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
             disabled={deleteLoading}
           >
             Cancel
           </GlobalButton>
-            <GlobalButton color='error' variant='contained' onClick={confirmDelete} disabled={deleteLoading}>
-              Delete
-            </GlobalButton>
+          <GlobalButton
+            color='error'
+            variant='contained'
+            onClick={confirmDelete}
+            disabled={deleteLoading}
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+          >
+            {deleteLoading ? 'Deleting...' : 'Delete'}
+          </GlobalButton>
         </DialogActions>
       </Dialog>
     </StickyListLayout>

@@ -37,7 +37,7 @@ export const getDashboardRenewal = async () => {
 
     return {
       status: 'success',
-      data: res?.data?.data || []
+      data: res?.data?.results || res?.data?.data || []
     }
   } catch {
     console.error('❌ Dashboard Renewal API Error')
@@ -57,7 +57,7 @@ export const getKviFinder = async () => {
 
     return {
       status: 'success',
-      data: res?.data?.data || []
+      data: res?.data?.results || res?.data?.data || []
     }
   } catch {
     console.error('❌ KVI Finder API Error')

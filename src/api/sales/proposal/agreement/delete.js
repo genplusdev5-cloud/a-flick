@@ -1,5 +1,6 @@
 import api from '@/utils/axiosInstance'
 
 export const deleteSalesAgreement = data => {
-  return api.patch('/sales_agreement-delete/', data)
+  const id = typeof data === 'object' ? data.id : data
+  return api.patch('/sales_agreement-delete/', {}, { params: { id } })
 }

@@ -1,6 +1,8 @@
-import { Grid, Typography, Button, Box } from '@mui/material'
+import { Grid, Typography, Button, Box, Divider } from '@mui/material'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
 import CustomTextField from '@core/components/mui/TextField'
+import { useState } from 'react'
+import UpdateContractValueDialog from './UpdateContractValueDialog'
 
 const Step3ServiceDetails = ({
   formData,
@@ -10,8 +12,25 @@ const Step3ServiceDetails = ({
   handleViewFile,
   dropdowns,
   handleKeyDown,
-  refs
+  refs,
+  pestItems // ✅ Received from parent
 }) => {
+  const [openUpdateDialog, setOpenUpdateDialog] = useState(false)
+
+  // Calculate total from pest items
+  const calculatedTotal = (pestItems || []).reduce((acc, curr) => acc + (Number(curr.totalValue) || 0), 0)
+
+  // Use manual value if set, otherwise calculated
+  // If formData.contractValue is 0 or empty, we might want to default to calculatedTotal?
+  // But if user explicitly sets 0, we should respect it.
+  // Let's assume calculatedTotal is the baseline.
+  const displayValue = formData.contractValue ? formData.contractValue : calculatedTotal
+
+  const handleUpdateValue = val => {
+    handleChange({
+      target: { name: 'contractValue', value: val }
+    })
+  }
   return (
     <Grid container spacing={4}>
       <Grid item xs={12}>
@@ -99,27 +118,32 @@ const Step3ServiceDetails = ({
         />
       </Grid>
 
-      {/* Technician */}
-      <Grid item xs={12} md={6}>
-        <GlobalAutocomplete
-          label='Technician'
-          options={dropdowns?.technicians || []}
-          value={formData.technicianId}
-          onChange={v => handleAutocompleteChange('technician', v, refs.technicianRef)}
-          inputRef={refs.technicianRef}
-        />
+      <Divider />
+
+      {/* Contract Value Display (Bottom) */}
+      <Grid item xs={12} display='flex' justifyContent='flex-start' alignItems='center' sx={{ mt: 38 }}>
+        <Box
+          display='flex'
+          alignItems='center'
+          gap={1}
+          sx={{ cursor: 'pointer', p: 1, borderRadius: 1, '&:hover': { bgcolor: 'action.hover' } }}
+          onClick={() => setOpenUpdateDialog(true)}
+        >
+          <Typography variant='subtitle1' color='textSecondary'>
+            Total Contract Value ($)
+          </Typography>
+          <Typography variant='h6' color='primary.main' sx={{ textDecoration: 'underline' }}>
+            {displayValue}
+          </Typography>
+        </Box>
       </Grid>
 
-      {/* Supervisor */}
-      <Grid item xs={12} md={6}>
-        <GlobalAutocomplete
-          label='Supervisor'
-          options={dropdowns?.supervisors || []}
-          value={formData.supervisorId}
-          onChange={v => handleAutocompleteChange('supervisor', v, refs.supervisorRef)}
-          inputRef={refs.supervisorRef}
-        />
-      </Grid>
+      <UpdateContractValueDialog
+        open={openUpdateDialog}
+        onClose={() => setOpenUpdateDialog(false)}
+        currentValue={displayValue}
+        onSave={handleUpdateValue}
+      />
     </Grid>
   )
 }
