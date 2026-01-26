@@ -57,22 +57,6 @@ const Step1DealType = ({
             >
               Convert to Contract
             </Button>
-
-            {/* Duplicate Button (Update Mode Only) */}
-            {formData.id && (
-              <Button
-                variant='contained'
-                color='secondary'
-                size='small'
-                startIcon={<i className='tabler-copy' />}
-                onClick={() => {
-                  console.log('Duplicate clicked')
-                }}
-                sx={{ textTransform: 'none', fontWeight: 600 }}
-              >
-                Duplicate
-              </Button>
-            )}
           </Box>
         </Box>
         <Divider />

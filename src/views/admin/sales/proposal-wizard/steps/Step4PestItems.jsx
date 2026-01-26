@@ -142,7 +142,9 @@ const Step4PestItems = ({
   pestPagination,
   setPestPagination,
   pestDialogOpen,
-  setPestDialogOpen
+  setPestDialogOpen,
+  handleCurrentPestItemDateChange, // ✅ New prop
+  timeOptions // ✅ New prop
 }) => {
   // --- Filtering Logic (Pests) ---
   const filteredPests = useMemo(() => {
@@ -188,6 +190,31 @@ const Step4PestItems = ({
               {editingItemId ? 'Update Pest Item' : 'Enter Pest Details'}
             </Typography>
             <Grid container spacing={4} alignItems='flex-end'>
+              {/* Row 1: Dates */}
+              <Grid item xs={12} md={4}>
+                <AppReactDatepicker
+                  selected={currentPestItem.startDate}
+                  onChange={date => handleCurrentPestItemDateChange('startDate', date)}
+                  dateFormat='dd/MM/yyyy'
+                  customInput={<CustomTextField fullWidth label='Start Date' placeholder='dd/mm/yyyy' />}
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <AppReactDatepicker
+                  selected={currentPestItem.endDate}
+                  onChange={date => handleCurrentPestItemDateChange('endDate', date)}
+                  dateFormat='dd/MM/yyyy'
+                  customInput={<CustomTextField fullWidth label='End Date' placeholder='dd/mm/yyyy' />}
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <AppReactDatepicker
+                  selected={currentPestItem.reminderDate}
+                  onChange={date => handleCurrentPestItemDateChange('reminderDate', date)}
+                  dateFormat='dd/MM/yyyy'
+                  customInput={<CustomTextField fullWidth label='Reminder Date' placeholder='dd/mm/yyyy' />}
+                />
+              </Grid>
               <Grid item xs={12} md={2}>
                 <GlobalAutocomplete
                   label='Pest'
@@ -241,7 +268,7 @@ const Step4PestItems = ({
               <Grid item xs={12} md={2}>
                 <GlobalAutocomplete
                   label='Time'
-                  options={['0:05', '0:10', '0:15', '0:30', '1:00']}
+                  options={timeOptions}
                   value={currentPestItem.time}
                   onChange={v => handleCurrentPestItemAutocompleteChange('time', v, refs.timeInputRef)}
                   inputRef={refs.timeInputRef}
@@ -270,6 +297,7 @@ const Step4PestItems = ({
                   onKeyDown={e => handleKeyDown(e, refs.currentNoOfItemsRef)}
                 />
               </Grid>
+
               <Grid item xs={12} md={3} display='flex' justifyContent='flex-end'>
                 <Button
                   variant='contained'
@@ -317,7 +345,7 @@ const Step4PestItems = ({
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>#</th>
+                <th>S.No</th>
                 <th>Action</th>
                 <th>Pest</th>
                 <th>Billing Frequency</th>

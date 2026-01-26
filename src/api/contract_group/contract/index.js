@@ -12,3 +12,5 @@ export * from './getDates'
 export * from './schedule'
 export * from './ticket-add'
 export * from './invoiceRemark'
+export * from './duplicate'
+

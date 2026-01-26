@@ -53,10 +53,17 @@ import { showToast } from '@/components/common/Toasts'
 import { IconButton, Chip } from '@mui/material'
 
 // ✅ APIs
-import { getProposalList, getProposalFilters, deleteProposal } from '@/api/sales/proposal'
+import {
+  getProposalList,
+  getProposalFilters,
+  deleteProposal,
+  getProposalDetails,
+  duplicateProposal
+} from '@/api/sales/proposal'
 import { getAllEmployees } from '@/api/employee/getAllEmployees'
 import { getCustomerList } from '@/api/customer_group/customer'
 import { encodeId } from '@/utils/urlEncoder'
+import DuplicateProposalDialog from '@/views/admin/sales/proposal-wizard/steps/DuplicateProposalDialog'
 
 const SalesQuotationPage = () => {
   const router = useRouter()
@@ -96,6 +103,12 @@ const SalesQuotationPage = () => {
     row: null
   })
 
+  const [duplicateDialog, setDuplicateDialog] = useState({
+    open: false,
+    row: null,
+    details: null
+  })
+
   // ---------------- DELETE ----------------
   const confirmDelete = async () => {
     try {
@@ -109,6 +122,72 @@ const SalesQuotationPage = () => {
     } catch (error) {
       console.error('❌ Delete Error:', error)
       showToast('error', 'Failed to delete sales quotation')
+    }
+  }
+
+  // ---------------- DUPLICATE ----------------
+  const handleDuplicateClick = async row => {
+    try {
+      setLoading(true)
+      const id = row.proposal_id || row.id
+      const res = await getProposalDetails(id)
+      const data = res?.status === 'success' || res ? res.data || res : null
+      if (data) {
+        setDuplicateDialog({
+          open: true,
+          row,
+          details: data
+        })
+      }
+    } catch (err) {
+      console.error('❌ Fetch Details Error:', err)
+      showToast('error', 'Failed to fetch proposal details for duplication')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleGenerateDuplicate = async customDates => {
+    if (!duplicateDialog.details) return
+
+    try {
+      setLoading(true)
+      const details = duplicateDialog.details
+
+      const formatDateToLocal = date => {
+        if (!date) return null
+        const d = new Date(date)
+        const year = d.getFullYear()
+        const month = String(d.getMonth() + 1).padStart(2, '0')
+        const day = String(d.getDate()).padStart(2, '0')
+        return `${year}-${month}-${day}`
+      }
+
+      const time = details.preferred_time || '09:00:00'
+
+      const dupPayload = new FormData()
+      dupPayload.append('proposal_id', String(details.id))
+      dupPayload.append('customer_id', String(details.customer_id))
+      dupPayload.append('start_date', formatDateToLocal(customDates?.startDate || details.start_date))
+      dupPayload.append('end_date', formatDateToLocal(customDates?.endDate || details.end_date))
+      dupPayload.append('reminder_date', formatDateToLocal(customDates?.reminderDate || details.reminder_date))
+      dupPayload.append('preferred_time', time)
+
+      const res = await duplicateProposal(dupPayload)
+
+      if (res?.status === 'success' || res?.data?.id) {
+        showToast('success', 'Proposal Duplicated Successfully!')
+        const newId = res?.data?.id || res?.id
+        const encodedNewId = encodeId(newId)
+        router.push(`/${lang}/admin/sales-quotation/update/${encodedNewId}`)
+      } else {
+        showToast('error', res?.message || 'Duplication failed')
+      }
+    } catch (e) {
+      console.error('❌ Duplication Error:', e)
+      showToast('error', e.response?.data?.message || 'Failed to duplicate proposal')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -143,6 +222,9 @@ const SalesQuotationPage = () => {
                 }}
               >
                 <i className='tabler-edit' />
+              </IconButton>
+              <IconButton size='small' color='secondary' onClick={() => handleDuplicateClick(row.original)}>
+                <i className='tabler-copy' />
               </IconButton>
               <IconButton size='small' color='error' onClick={() => setDeleteDialog({ open: true, row: row.original })}>
                 <i className='tabler-trash' />
@@ -781,7 +863,16 @@ const SalesQuotationPage = () => {
               </DialogActions>
             </Dialog>
 
+            <DuplicateProposalDialog
+              open={duplicateDialog.open}
+              handleClose={() => setDuplicateDialog({ open: false, row: null, details: null })}
+              onGenerate={handleGenerateDuplicate}
+              contractType={duplicateDialog.details?.contract_type}
+              frequency={duplicateDialog.details?.billing_frequency}
+            />
+
             {/* ================= PAGINATION ================= */}
+
             <Box sx={{ mt: 'auto', pt: 2 }}>
               <TablePaginationComponent totalCount={rowCount} pagination={pagination} setPagination={setPagination} />
             </Box>

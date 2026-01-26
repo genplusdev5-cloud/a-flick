@@ -49,7 +49,13 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import styles from '@core/styles/table.module.css'
 
 // API
-import { addProposal, updateProposal, getProposalDetails, getProposalList } from '@/api/sales/proposal'
+import {
+  addProposal,
+  updateProposal,
+  getProposalDetails,
+  getProposalList,
+  duplicateProposal
+} from '@/api/sales/proposal'
 import { listSalesAgreement, deleteSalesAgreement } from '@/api/sales/proposal/agreement'
 import { getContractDates, getInvoiceCount, getPestCount, getInvoiceRemark } from '@/api/contract_group/contract'
 import { getAllDropdowns } from '@/api/contract_group/contract/dropdowns'
@@ -58,6 +64,7 @@ import { listCallLogs, addCallLog, updateCallLog, deleteCallLog } from '@/api/co
 import { addProposalPest, updateProposalPest, deleteProposalPest } from '@/api/sales/proposal/pest'
 import { decodeId, encodeId } from '@/utils/urlEncoder'
 import addContractFile from '@/api/contract_group/contract/details/contract_file/add'
+import callLogReminder from '@/api/contract_group/contract/details/call_log/reminder'
 
 // Steps
 import Step1DealType from './steps/Step1DealType'
@@ -119,6 +126,22 @@ const fileToBase64 = file => {
     reader.onerror = error => reject(error)
   })
 }
+
+// 💡 NEW: Generate time options from 0:05 to 23:55 in 5-minute increments
+const generateTimeOptions = () => {
+  const options = []
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 5) {
+      if (h === 0 && m === 0) continue // Start from 0:05
+      const hh = String(h).padStart(1, '0')
+      const mm = String(m).padStart(2, '0')
+      options.push(`${hh}:${mm}`)
+    }
+  }
+  return options
+}
+
+const timeOptions = generateTimeOptions()
 
 export default function ProposalWizard({ id }) {
   const router = useRouter()
@@ -235,6 +258,7 @@ export default function ProposalWizard({ id }) {
   const [isEditCallLog, setIsEditCallLog] = useState(false)
   const [deleteProposalDialog, setDeleteProposalDialog] = useState({ open: false, row: null })
   const [deleteCallLogDialog, setDeleteCallLogDialog] = useState({ open: false, row: null })
+  const [deletePestDialog, setDeletePestDialog] = useState({ open: false, id: null, row: null })
 
   const [currentPestItem, setCurrentPestItem] = useState({
     pest: '',
@@ -248,7 +272,10 @@ export default function ProposalWizard({ id }) {
     chemicals: '',
     chemical: '',
     chemicalId: '',
-    noOfItems: ''
+    noOfItems: '',
+    startDate: null,
+    endDate: null,
+    reminderDate: null
   })
 
   const [pestItems, setPestItems] = useState([])
@@ -653,22 +680,32 @@ export default function ProposalWizard({ id }) {
 
         if (data.pest_items && Array.isArray(data.pest_items)) {
           setPestItems(
-            data.pest_items.map(item => ({
-              id: Date.now().toString(36) + Math.random().toString(36).substring(2),
-              item_id: item.id,
-              pest: item.pest,
-              pestId: item.pest_id,
-              frequency: item.frequency,
-              frequencyId: item.frequency_id,
-              pestCount: item.no_location || '',
-              pestValue: item.pest_value || '',
-              totalValue: item.total_value || '',
-              workTime: convertMinutesToTime(item.work_time),
-              chemical: item.chemical_name || item.chemical || '',
-              chemicals: item.chemical_name || item.chemical || '',
-              chemicalId: item.chemical_id,
-              noOfItems: item.pest_service_count || ''
-            }))
+            data.pest_items.map(item => {
+              const pCount = Number(item.no_location || 0)
+              const pValue = Number(item.pest_value || 0)
+              const pTotal = Number(item.total_value || 0)
+              const pItemsCount = Number(item.pest_service_count || 0)
+
+              return {
+                id: Date.now().toString(36) + Math.random().toString(36).substring(2),
+                item_id: item.id,
+                pest: item.pest,
+                pestId: item.pest_id,
+                frequency: item.frequency,
+                frequencyId: item.frequency_id,
+                pestCount: isNaN(pCount) ? '0' : String(pCount),
+                pestValue: isNaN(pValue) ? '0' : String(pValue),
+                totalValue: isNaN(pTotal) ? '0' : String(pTotal),
+                workTime: convertMinutesToTime(item.work_time),
+                chemical: item.chemical_name || item.chemical || '',
+                chemicals: item.chemical_name || item.chemical || '',
+                chemicalId: item.chemical_id,
+                noOfItems: isNaN(pItemsCount) ? '0' : String(pItemsCount),
+                startDate: parseSafeDate(item.start_date),
+                endDate: parseSafeDate(item.end_date),
+                reminderDate: parseSafeDate(item.reminder_date)
+              }
+            })
           )
         }
       }
@@ -709,6 +746,20 @@ export default function ProposalWizard({ id }) {
     const month = String(d.getMonth() + 1).padStart(2, '0')
     const day = String(d.getDate()).padStart(2, '0')
     return `${day}/${month}/${year}`
+  }
+
+  // 💡 NEW: Helper to parse DD/MM/YYYY to Date object
+  const parseDateString = dateStr => {
+    if (!dateStr) return null
+    if (dateStr instanceof Date) return dateStr
+    // Try IS0 (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss)
+    const isoDate = new Date(dateStr)
+    if (!isNaN(isoDate.getTime()) && dateStr.includes('-')) return isoDate
+
+    // Parse DD/MM/YYYY
+    const [day, month, year] = dateStr.split('/').map(Number)
+    if (!day || !month || !year) return null
+    return new Date(year, month - 1, day)
   }
 
   useEffect(() => {
@@ -804,8 +855,12 @@ export default function ProposalWizard({ id }) {
     // Auto-calculate End Date / Reminder Date
     if (name === 'startDate' && date) {
       try {
+        const d = new Date(date)
+        const year = d.getFullYear()
+        const month = String(d.getMonth() + 1).padStart(2, '0')
+        const day = String(d.getDate()).padStart(2, '0')
         const payload = {
-          start_date: date?.toISOString().split('T')[0],
+          start_date: `${year}-${month}-${day}`,
           contract_type: formData.contractType || '',
           frequency: formData.billingFrequency || ''
         }
@@ -814,8 +869,8 @@ export default function ProposalWizard({ id }) {
           const apiData = res.data.data
           setFormData(prev => ({
             ...prev,
-            endDate: new Date(apiData.end_date),
-            reminderDate: new Date(apiData.reminder_date)
+            endDate: parseDateString(apiData.end_date),
+            reminderDate: parseDateString(apiData.reminder_date)
           }))
         }
       } catch (e) {
@@ -842,6 +897,36 @@ export default function ProposalWizard({ id }) {
     })
   }
 
+  const handleCurrentPestItemDateChange = async (name, date) => {
+    setCurrentPestItem(prev => ({ ...prev, [name]: date }))
+
+    // Auto-calculate End Date / Reminder Date for Pest Item
+    if (name === 'startDate' && date) {
+      try {
+        const d = new Date(date)
+        const year = d.getFullYear()
+        const month = String(d.getMonth() + 1).padStart(2, '0')
+        const day = String(d.getDate()).padStart(2, '0')
+        const payload = {
+          start_date: `${year}-${month}-${day}`, // API expects YYYY-MM-DD
+          contract_type: formData.contractType || '',
+          frequency: currentPestItem.frequency || ''
+        }
+        const res = await getContractDates(payload)
+        if (res?.data?.status === 'success') {
+          const apiData = res.data.data
+          setCurrentPestItem(prev => ({
+            ...prev,
+            endDate: parseDateString(apiData.end_date),
+            reminderDate: parseDateString(apiData.reminder_date)
+          }))
+        }
+      } catch (e) {
+        console.error('Pest Date Calc Error:', e)
+      }
+    }
+  }
+
   // --- Auto-calculate Pest Count ---
 
   const handleCurrentPestItemAutocompleteChange = (name, newValue, ref) => {
@@ -865,7 +950,8 @@ export default function ProposalWizard({ id }) {
     if (name === 'pest') pestId = newId
     if (name === 'frequency') frequencyId = newId
 
-    const { startDate, endDate } = formData
+    const startDate = currentPestItem.startDate || formData.startDate
+    const endDate = currentPestItem.endDate || formData.endDate
 
     // Explicit debug message
     console.log('🐞 Attempting to fetch pest count with:', { pestId, frequencyId, startDate, endDate })
@@ -947,7 +1033,10 @@ export default function ProposalWizard({ id }) {
   }
 
   const handleSavePestItem = async () => {
-    if (!formData.startDate || !formData.endDate || !currentPestItem.pest || !currentPestItem.frequency) {
+    const startDate = currentPestItem.startDate || formData.startDate
+    const endDate = currentPestItem.endDate || formData.endDate
+
+    if (!startDate || !endDate || !currentPestItem.pest || !currentPestItem.frequency) {
       showToast('warning', 'Dates, Pest, and Frequency are required.')
       return
     }
@@ -956,6 +1045,7 @@ export default function ProposalWizard({ id }) {
 
     const itemPayload = {
       proposal_id: id ? decodeId(id) || id : null,
+      contract_id: id ? decodeId(id) || id : null, // Added as requested by API error
       pest_id: Number(currentPestItem.pestId),
       frequency_id: Number(currentPestItem.frequencyId),
       chemical_id: currentPestItem.chemicalId ? Number(currentPestItem.chemicalId) : null,
@@ -969,7 +1059,10 @@ export default function ProposalWizard({ id }) {
       work_time: convertTimeToMinutes(currentPestItem.time || '0:00'),
       remarks: '',
       is_active: 1,
-      status: 1
+      status: 1,
+      start_date: formatDate(startDate) || null,
+      end_date: formatDate(endDate) || null,
+      reminder_date: formatDate(currentPestItem.reminderDate || startDate) || null
     }
 
     try {
@@ -1030,7 +1123,10 @@ export default function ProposalWizard({ id }) {
         chemicals: '',
         chemical: '',
         chemicalId: '',
-        noOfItems: ''
+        noOfItems: '',
+        startDate: null,
+        endDate: null,
+        reminderDate: null
       }))
       setEditingItemId(null)
       setPestDialogOpen(false)
@@ -1057,15 +1153,25 @@ export default function ProposalWizard({ id }) {
       chemical: item.chemical || item.chemicals || '',
       chemicals: item.chemicals || '',
       chemicalId: item.chemicalId || '',
-      noOfItems: item.noOfItems || ''
+      noOfItems: item.noOfItems || '',
+      startDate: parseDateString(item.start_date || item.startDate),
+      endDate: parseDateString(item.end_date || item.endDate),
+      reminderDate: parseDateString(item.reminder_date || item.reminderDate)
     })
     setEditingItemId(item.id)
   }
 
-  const handleDeletePestItem = async itemId => {
+  const handleDeletePestItem = itemId => {
+    const itemToDelete = pestItems.find(i => i.id === itemId)
+    setDeletePestDialog({ open: true, id: itemId, row: itemToDelete })
+  }
+
+  const confirmDeletePestItem = async () => {
+    const { id: itemId, row: itemToDelete } = deletePestDialog
+    if (!itemId) return
+
     if (id) {
       // Find the item to get its server-side ID if available
-      const itemToDelete = pestItems.find(i => i.id === itemId)
       if (itemToDelete?.item_id) {
         try {
           await deleteProposalPest({ id: itemToDelete.item_id })
@@ -1075,13 +1181,15 @@ export default function ProposalWizard({ id }) {
           console.error('Delete Pest Error:', err)
           showToast('error', 'Failed to delete pest item')
         }
-        return
       }
+    } else {
+      // Local delete
+      if (editingItemId === itemId) setEditingItemId(null)
+      setPestItems(prev => prev.filter(i => i.id !== itemId))
+      showToast('delete', 'Pest item removed')
     }
 
-    // Fallback to local delete
-    if (editingItemId === itemId) setEditingItemId(null)
-    setPestItems(prev => prev.filter(i => i.id !== itemId))
+    setDeletePestDialog({ open: false, id: null, row: null })
   }
 
   const handleCurrentCallLogChange = (field, value) => {
@@ -1180,6 +1288,25 @@ export default function ProposalWizard({ id }) {
       showToast('error', 'Failed to delete call log')
     } finally {
       setDeleteCallLogDialog({ open: false, row: null })
+    }
+  }
+
+  const handleToggleReminder = async log => {
+    try {
+      const id = log.id
+      if (!id) return
+
+      const res = await callLogReminder({ id: String(id) })
+
+      if (res?.status === 'success' || res) {
+        const message =
+          log.is_reminder === 1 ? 'Reminder dismissed successfully' : res.message || 'Reminder updated successfully'
+        showToast('success', message)
+        fetchCallLogs()
+      }
+    } catch (err) {
+      console.error('Toggle Reminder Error:', err)
+      showToast('error', 'Failed to update reminder')
     }
   }
 
@@ -1448,6 +1575,8 @@ export default function ProposalWizard({ id }) {
             setPestPagination={setPestPagination}
             pestDialogOpen={pestDialogOpen}
             setPestDialogOpen={setPestDialogOpen}
+            handleCurrentPestItemDateChange={handleCurrentPestItemDateChange}
+            timeOptions={timeOptions}
           />
         )
       case 4:
@@ -1621,21 +1750,61 @@ export default function ProposalWizard({ id }) {
                           </Box>
                         </td>
                         <td>
-                          {log.reminder ? (
+                          {log.is_reminder === 1 ? (
+                            <Chip
+                              label='Dismiss'
+                              variant='outlined'
+                              color='error'
+                              size='small'
+                              clickable
+                              onClick={() => handleToggleReminder(log)}
+                              icon={<i className='tabler-x' style={{ fontSize: '14px' }} />}
+                              sx={{
+                                borderRadius: '4px',
+                                height: '24px',
+                                borderColor: '#ea5455',
+                                color: '#ea5455',
+                                '& .MuiChip-label': { px: 1 },
+                                '&:hover': { bgcolor: 'rgba(234, 84, 85, 0.08)' }
+                              }}
+                            />
+                          ) : (
                             <Chip
                               label='Remind'
                               variant='outlined'
                               color='success'
                               size='small'
+                              clickable
+                              onClick={() => handleToggleReminder(log)}
                               icon={<i className='tabler-check' style={{ fontSize: '14px' }} />}
-                              sx={{ borderRadius: '4px', height: '24px', '& .MuiChip-label': { px: 1 } }}
+                              sx={{
+                                borderRadius: '4px',
+                                height: '24px',
+                                borderColor: '#28c76f',
+                                color: '#28c76f',
+                                '& .MuiChip-label': { px: 1 },
+                                '&:hover': { bgcolor: 'rgba(40, 199, 111, 0.08)' }
+                              }}
                             />
-                          ) : (
-                            '-'
                           )}
                         </td>
-                        <td>{log.entry_date || '-'}</td>
-                        <td>{log.reminder_date || '-'}</td>
+
+                        <td>
+                          {log.entry_date
+                            ? log.entry_date.includes('-')
+                              ? formatDate(new Date(log.entry_date))
+                              : log.entry_date
+                            : log.created_on
+                              ? log.created_on.split(' ')[0]
+                              : '-'}
+                        </td>
+                        <td>
+                          {log.reminder_date
+                            ? log.reminder_date.includes('-')
+                              ? formatDate(new Date(log.reminder_date))
+                              : log.reminder_date
+                            : '-'}
+                        </td>
                         <td>{log.reminder_time || '-'}</td>
                         <td>{log.remarks || '-'}</td>
                       </tr>
@@ -1992,6 +2161,71 @@ export default function ProposalWizard({ id }) {
         </DialogActions>
       </Dialog>
 
+      {/* Delete Pest Confirmation Dialog */}
+      <Dialog
+        onClose={() => setDeletePestDialog({ open: false, id: null, row: null })}
+        open={deletePestDialog.open}
+        PaperProps={{
+          sx: {
+            overflow: 'visible',
+            width: 420,
+            borderRadius: 1,
+            textAlign: 'center'
+          }
+        }}
+      >
+        <DialogTitle
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1,
+            color: 'error.main',
+            fontWeight: 700,
+            pb: 1,
+            position: 'relative'
+          }}
+        >
+          <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
+          Confirm Delete
+          <DialogCloseButton
+            onClick={() => setDeletePestDialog({ open: false, id: null, row: null })}
+            disableRipple
+            sx={{ position: 'absolute', right: 3, top: 2 }}
+          >
+            <i className='tabler-x' />
+          </DialogCloseButton>
+        </DialogTitle>
+
+        <DialogContent sx={{ px: 5, pt: 1 }}>
+          <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
+            Are you sure you want to delete pest{' '}
+            <strong style={{ color: '#d32f2f' }}>{deletePestDialog.row?.pest}</strong>?
+            <br />
+            This action cannot be undone.
+          </Typography>
+        </DialogContent>
+
+        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+          <GlobalButton
+            onClick={() => setDeletePestDialog({ open: false, id: null, row: null })}
+            color='secondary'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
+          >
+            Cancel
+          </GlobalButton>
+
+          <GlobalButton
+            onClick={confirmDeletePestItem}
+            variant='contained'
+            color='error'
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+          >
+            Delete
+          </GlobalButton>
+        </DialogActions>
+      </Dialog>
+
       {/* --- ADD/EDIT PEST DIALOG (GLOBAL) --- */}
       <Dialog
         open={pestDialogOpen}
@@ -2010,6 +2244,31 @@ export default function ProposalWizard({ id }) {
         </DialogTitle>
         <DialogContent sx={{ p: 6 }}>
           <Grid container spacing={5}>
+            {/* Row 1: Dates */}
+            <Grid item xs={12} md={4}>
+              <AppReactDatepicker
+                selected={currentPestItem.startDate}
+                onChange={date => handleCurrentPestItemDateChange('startDate', date)}
+                dateFormat='dd/MM/yyyy'
+                customInput={<CustomTextField fullWidth label='Start Date' placeholder='dd/mm/yyyy' />}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <AppReactDatepicker
+                selected={currentPestItem.endDate}
+                onChange={date => handleCurrentPestItemDateChange('endDate', date)}
+                dateFormat='dd/MM/yyyy'
+                customInput={<CustomTextField fullWidth label='End Date' placeholder='dd/mm/yyyy' />}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <AppReactDatepicker
+                selected={currentPestItem.reminderDate}
+                onChange={date => handleCurrentPestItemDateChange('reminderDate', date)}
+                dateFormat='dd/MM/yyyy'
+                customInput={<CustomTextField fullWidth label='Reminder Date' placeholder='dd/mm/yyyy' />}
+              />
+            </Grid>
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
                 label='Pest'
@@ -2030,6 +2289,17 @@ export default function ProposalWizard({ id }) {
             <Grid item xs={12} md={4}>
               <CustomTextField
                 fullWidth
+                label='No of Units'
+                name='noOfItems'
+                type='number'
+                value={currentPestItem.noOfItems}
+                onChange={handleCurrentPestItemChange}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={4}>
+              <CustomTextField
+                fullWidth
                 label='Pest Count'
                 name='pestCount'
                 type='number'
@@ -2037,16 +2307,6 @@ export default function ProposalWizard({ id }) {
                 onChange={handleCurrentPestItemChange}
                 InputProps={{ readOnly: true }}
                 sx={{ '& .MuiInputBase-root': { bgcolor: '#f0f0f0' } }}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <CustomTextField
-                fullWidth
-                label='No of Units'
-                name='noOfItems'
-                type='number'
-                value={currentPestItem.noOfItems}
-                onChange={handleCurrentPestItemChange}
               />
             </Grid>
 
@@ -2073,7 +2333,7 @@ export default function ProposalWizard({ id }) {
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
                 label='Time'
-                options={['0:05', '0:10', '0:15', '0:30', '1:00']}
+                options={timeOptions}
                 value={currentPestItem.time}
                 onChange={v => handleCurrentPestItemAutocompleteChange('time', v)}
               />

@@ -96,6 +96,7 @@ const Step2CustomerInfo = ({
         <AppReactDatepicker
           selected={formData.poExpiry}
           onChange={date => handleDateChange('poExpiry', date)}
+          dateFormat='dd/MM/yyyy'
           customInput={
             <CustomTextField
               fullWidth
@@ -189,6 +190,7 @@ const Step2CustomerInfo = ({
         <AppReactDatepicker
           selected={formData.startDate}
           onChange={date => handleDateChange('startDate', date)}
+          dateFormat='dd/MM/yyyy'
           customInput={
             <CustomTextField
               fullWidth
@@ -203,6 +205,7 @@ const Step2CustomerInfo = ({
         <AppReactDatepicker
           selected={formData.endDate}
           onChange={date => handleDateChange('endDate', date)}
+          dateFormat='dd/MM/yyyy'
           customInput={
             <CustomTextField
               fullWidth
@@ -217,6 +220,7 @@ const Step2CustomerInfo = ({
         <AppReactDatepicker
           selected={formData.reminderDate}
           onChange={date => handleDateChange('reminderDate', date)}
+          dateFormat='dd/MM/yyyy'
           customInput={
             <CustomTextField
               fullWidth
