@@ -214,6 +214,17 @@ export default function EditCustomerPage() {
 
   const pageTitle = 'Edit Customer'
 
+  // ⭐ Pink Star Styling
+  const requiredFieldSx = {
+    '& .MuiFormLabel-asterisk': {
+      color: '#e91e63 !important',
+      fontWeight: 700
+    },
+    '& .MuiInputLabel-root.Mui-required': {
+      color: 'inherit'
+    }
+  }
+
   const handlePhoneChange = (e, name) => {
     let value = e.target.value.replace(/\D/g, '')
     if (value.length > 10) value = value.slice(0, 10)
@@ -299,6 +310,41 @@ export default function EditCustomerPage() {
   const handleFinalCancel = () => router.push(`/${lang}/admin/customers`)
 
   const handleFinalSave = async () => {
+    // 🔍 Validate all fields
+    const requiredFields = [
+      'origin',
+      'commenceDate',
+      'companyPrefix',
+      'customerName',
+      'abssCustomerName',
+      'cardId',
+      'picName',
+      'picEmail',
+      'picPhone',
+      'billingName',
+      'billingEmail',
+      'billingPhone',
+      'city',
+      'postalCode',
+      'paymentTerms',
+      'salesperson',
+      'loginEmail',
+      'password',
+      'billingAddress'
+    ]
+
+    for (const f of requiredFields) {
+      if (!formData[f]) {
+        showToast('warning', `Please fill ${f.replace(/([A-Z])/g, ' $1').toLowerCase()}`)
+        return
+      }
+    }
+
+    if (picEmailError || billingEmailError || miniEmailError) {
+      showToast('warning', 'Please fix email errors')
+      return
+    }
+
     if (saving) return
     setSaving(true)
     const formatDate = d => (d ? new Date(d).toISOString().split('T')[0] : null)
@@ -414,6 +460,8 @@ export default function EditCustomerPage() {
                   value={originOptions.find(o => o.value === formData.origin) || null}
                   onChange={option => setFormData(prev => ({ ...prev, origin: option?.value || '' }))}
                   options={originOptions}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -423,7 +471,7 @@ export default function EditCustomerPage() {
                   selected={formData.commenceDate}
                   onChange={date => setFormData(prev => ({ ...prev, commenceDate: date }))}
                   dateFormat='dd/MM/yyyy'
-                  customInput={<GlobalTextField fullWidth label='Commence Date' />}
+                  customInput={<GlobalTextField fullWidth label='Commence Date' required sx={requiredFieldSx} />}
                 />
               </Grid>
 
@@ -437,6 +485,8 @@ export default function EditCustomerPage() {
                   value={formData.companyPrefix}
                   onChange={handleChange}
                   onKeyDown={e => handleEnterFocus(e, customerNameRef)}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -450,6 +500,8 @@ export default function EditCustomerPage() {
                   value={formData.customerName}
                   onChange={e => handleTypedChange(e, /^[a-zA-Z\s]*$/, 'customerName')}
                   onKeyDown={e => handleEnterFocus(e, abssCustomerNameRef)}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -463,6 +515,8 @@ export default function EditCustomerPage() {
                   value={formData.abssCustomerName}
                   onChange={e => handleTypedChange(e, /^[a-zA-Z\s]*$/, 'abssCustomerName')}
                   onKeyDown={e => handleEnterFocus(e, cardIdRef)}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -476,6 +530,8 @@ export default function EditCustomerPage() {
                   value={formData.cardId}
                   onChange={handleChange}
                   onKeyDown={e => handleEnterFocus(e, picNameRef)}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -489,6 +545,8 @@ export default function EditCustomerPage() {
                   value={formData.picName}
                   onChange={e => handleTypedChange(e, /^[a-zA-Z\s]*$/, 'picName')}
                   onKeyDown={e => handleEnterFocus(e, picEmailRef)}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -508,6 +566,8 @@ export default function EditCustomerPage() {
                   error={picEmailError}
                   helperText={picEmailError ? 'Invalid email' : ''}
                   onKeyDown={e => handleEnterFocus(e, picPhoneRef)}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -521,6 +581,8 @@ export default function EditCustomerPage() {
                   value={formData.picPhone}
                   onChange={e => handlePhoneChange(e, 'picPhone')}
                   onKeyDown={e => handleEnterFocus(e, billingNameRef)}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -534,6 +596,8 @@ export default function EditCustomerPage() {
                   value={formData.billingName}
                   onChange={e => handleTypedChange(e, /^[a-zA-Z\s]*$/, 'billingName')}
                   onKeyDown={e => handleEnterFocus(e, billingEmailRef)}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -553,6 +617,8 @@ export default function EditCustomerPage() {
                   error={billingEmailError}
                   helperText={billingEmailError ? 'Invalid email' : ''}
                   onKeyDown={e => handleEnterFocus(e, billingPhoneRef)}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -566,6 +632,8 @@ export default function EditCustomerPage() {
                   value={formData.billingPhone}
                   onChange={e => handlePhoneChange(e, 'billingPhone')}
                   onKeyDown={e => handleEnterFocus(e, cityRef)}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -579,6 +647,8 @@ export default function EditCustomerPage() {
                   value={formData.city}
                   onChange={e => handleTypedChange(e, /^[a-zA-Z\s]*$/, 'city')}
                   onKeyDown={e => handleEnterFocus(e, postalCodeRef)}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -592,6 +662,8 @@ export default function EditCustomerPage() {
                   value={formData.postalCode}
                   onChange={handleChange}
                   onKeyDown={e => handleEnterFocus(e, paymentTermsRef)}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -612,6 +684,8 @@ export default function EditCustomerPage() {
                     { value: 'Yearly', label: 'Yearly' }
                   ]}
                   onChange={opt => setFormData(prev => ({ ...prev, paymentTerms: opt?.value || '' }))}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -627,6 +701,8 @@ export default function EditCustomerPage() {
                     setFormData(prev => ({ ...prev, salesperson: opt?.value || '' }))
                     loginEmailRef.current?.querySelector('input')?.focus()
                   }}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -640,6 +716,8 @@ export default function EditCustomerPage() {
                   value={formData.loginEmail}
                   onChange={handleChange}
                   onKeyDown={e => handleEnterFocus(e, passwordRef)}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -654,6 +732,8 @@ export default function EditCustomerPage() {
                   value={formData.password}
                   onChange={handleChange}
                   onKeyDown={e => handleEnterFocus(e, billingAddressRef)}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -668,6 +748,8 @@ export default function EditCustomerPage() {
                   onChange={handleChange}
                   rows={3}
                   onKeyDown={e => handleEnterFocus(e, remarks1Ref)}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -682,6 +764,8 @@ export default function EditCustomerPage() {
                   onChange={handleChange}
                   rows={3}
                   onKeyDown={e => handleEnterFocus(e, remarks2Ref)}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -695,6 +779,8 @@ export default function EditCustomerPage() {
                   value={formData.remarks2}
                   onChange={handleChange}
                   rows={3}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
             </Grid>
@@ -710,14 +796,12 @@ export default function EditCustomerPage() {
               <Card sx={{ p: 2, boxShadow: 'none' }} elevation={0}>
                 <GlobalTextField
                   fullWidth
-                  label={
-                    <span>
-                      Name <span style={{ color: 'red' }}>*</span>
-                    </span>
-                  }
+                  label='Name'
                   name='miniName'
                   value={contactForm.miniName}
                   onChange={e => setContactForm(prev => ({ ...prev, miniName: e.target.value }))}
+                  required
+                  sx={requiredFieldSx}
                 />
                 <Box mt={3} />
                 <GlobalTextField
@@ -732,6 +816,8 @@ export default function EditCustomerPage() {
                   }}
                   error={miniEmailError}
                   helperText={miniEmailError ? 'Invalid email' : ''}
+                  required
+                  sx={requiredFieldSx}
                 />
                 <Box mt={3} />
                 <GlobalTextField
@@ -745,6 +831,8 @@ export default function EditCustomerPage() {
                     if (v.length > 5) v = v.slice(0, 5) + ' ' + v.slice(5)
                     setContactForm(prev => ({ ...prev, miniPhone: v }))
                   }}
+                  required
+                  sx={requiredFieldSx}
                 />
 
                 <Box mt={3} display='flex' gap={2}>
@@ -758,7 +846,7 @@ export default function EditCustomerPage() {
                     fullWidth
                     color={editingContact ? 'success' : 'primary'}
                     onClick={handleAddOrUpdateContact}
-                    disabled={contactForm.miniEmail && miniEmailError}
+                    disabled={(contactForm.miniEmail && miniEmailError) || !contactForm.miniName || !contactForm.miniEmail || !contactForm.miniPhone}
                   >
                     {editingContact ? 'Update Member' : 'Add Member'}
                   </GlobalButton>

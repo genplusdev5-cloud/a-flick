@@ -105,9 +105,11 @@ const GlobalAutocomplete = ({
           {...params}
           ref={inputRef}
           label={label}
-          placeholder={placeholder || label}
+          placeholder={placeholder || (typeof label === 'string' ? label : '')}
           error={error}
           helperText={helperText}
+          required={props.required}
+          sx={props.sx}
         />
       )}
       {...props}

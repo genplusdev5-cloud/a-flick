@@ -33,6 +33,33 @@ const Step1DealType = ({
   // Merge parent dropdowns with locally added customers
   const customerOptions = [...(dropdowns?.customers || []), ...addedCustomers]
 
+  const requiredFieldSx = {
+    '& .MuiFormLabel-asterisk': {
+      color: '#e91e63 !important',
+      fontWeight: 700
+    },
+    '& .MuiInputLabel-root.Mui-required': {
+      color: 'inherit'
+    }
+  }
+
+  const renderLabel = (label, showAddIcon = false) => (
+    <Box component='span' sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      {label}
+      {showAddIcon && !formData.id && (
+        <i
+          className='tabler-user-plus'
+          style={{ cursor: 'pointer', fontSize: '1.2rem', color: '#7367f0' }}
+          onClick={e => {
+            e.stopPropagation()
+            e.preventDefault()
+            setOpenCustomerDialog(true)
+          }}
+        />
+      )}
+    </Box>
+  )
+
   return (
     <Grid container spacing={4}>
       <Grid item xs={12}>
@@ -70,33 +97,22 @@ const Step1DealType = ({
           value={formData.companyId}
           onChange={v => handleAutocompleteChange('company', v, refs.companyRef)}
           inputRef={refs.companyRef}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
 
       {/* Customer (Moved from Step 2) */}
       <Grid item xs={12} md={3}>
         <GlobalAutocomplete
-          label={
-            <Box component='span' sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              Customer *
-              {!formData.id && (
-                <i
-                  className='tabler-user-plus'
-                  style={{ cursor: 'pointer', fontSize: '1.2rem', color: '#7367f0' }} // Primary color
-                  onClick={e => {
-                    e.stopPropagation()
-                    e.preventDefault()
-                    setOpenCustomerDialog(true)
-                  }}
-                />
-              )}
-            </Box>
-          }
+          label={renderLabel('Customer', true)}
           placeholder='Customer'
           options={customerOptions}
           value={formData.customerId}
           onChange={v => handleAutocompleteChange('customer', v, refs.customerRef)}
           inputRef={refs.customerRef}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
 
@@ -108,6 +124,8 @@ const Step1DealType = ({
           value={formData.contractType}
           onChange={v => handleAutocompleteChange('contractType', v, refs.contractTypeRef)}
           inputRef={refs.contractTypeRef}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
 
@@ -140,6 +158,8 @@ const Step1DealType = ({
           onChange={handleChange}
           inputRef={refs.billingNameRef}
           onKeyDown={e => handleKeyDown(e, refs.billingNameRef)}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
       <Grid item xs={12} md={4}>
@@ -151,6 +171,8 @@ const Step1DealType = ({
           onChange={handleChange}
           inputRef={refs.billingAddressRef}
           onKeyDown={e => handleKeyDown(e, refs.billingAddressRef)}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
       <Grid item xs={12} md={4}>
@@ -162,6 +184,8 @@ const Step1DealType = ({
           onChange={handleChange}
           inputRef={refs.billingPostalCodeRef}
           onKeyDown={e => handleKeyDown(e, refs.billingPostalCodeRef)}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
 
@@ -175,6 +199,8 @@ const Step1DealType = ({
           onChange={handleChange}
           inputRef={refs.customerCodeRef}
           onKeyDown={e => handleKeyDown(e, refs.customerCodeRef)}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
       <Grid item xs={12} md={4}>
@@ -186,6 +212,8 @@ const Step1DealType = ({
           onChange={handleChange}
           inputRef={refs.groupCodeRef}
           onKeyDown={e => handleKeyDown(e, refs.groupCodeRef)}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
       <Grid item xs={12} md={4}>
@@ -197,6 +225,8 @@ const Step1DealType = ({
           onChange={handleChange}
           inputRef={refs.accCodeRef}
           onKeyDown={e => handleKeyDown(e, refs.accCodeRef)}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
 
@@ -214,6 +244,8 @@ const Step1DealType = ({
           onChange={handleChange}
           inputRef={refs.picContactNameRef}
           onKeyDown={e => handleKeyDown(e, refs.picContactNameRef)}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
       <Grid item xs={12} md={4}>
@@ -225,6 +257,8 @@ const Step1DealType = ({
           onChange={handleChange}
           inputRef={refs.picEmailRef}
           onKeyDown={e => handleKeyDown(e, refs.picEmailRef)}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
       <Grid item xs={12} md={4}>
@@ -236,6 +270,8 @@ const Step1DealType = ({
           onChange={handleChange}
           inputRef={refs.picPhoneRef}
           onKeyDown={e => handleKeyDown(e, refs.picPhoneRef)}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
 
@@ -253,6 +289,8 @@ const Step1DealType = ({
           onChange={handleChange}
           inputRef={refs.billingContactNameRef}
           onKeyDown={e => handleKeyDown(e, refs.billingContactNameRef)}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
       <Grid item xs={12} md={4}>
@@ -264,6 +302,8 @@ const Step1DealType = ({
           onChange={handleChange}
           inputRef={refs.billingEmailRef}
           onKeyDown={e => handleKeyDown(e, refs.billingEmailRef)}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
       <Grid item xs={12} md={4}>
@@ -275,6 +315,8 @@ const Step1DealType = ({
           onChange={handleChange}
           inputRef={refs.billingPhoneRef}
           onKeyDown={e => handleKeyDown(e, refs.billingPhoneRef)}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
 

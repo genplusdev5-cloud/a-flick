@@ -18,6 +18,16 @@ const Step3BillingDetails = ({
 }) => {
   const handleChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }))
 
+  const requiredFieldSx = {
+    '& .MuiFormLabel-asterisk': {
+      color: '#e91e63 !important',
+      fontWeight: 700
+    },
+    '& .MuiInputLabel-root.Mui-required': {
+      color: 'inherit'
+    }
+  }
+
   return (
     <Grid container spacing={4}>
       <Grid item xs={12}>
@@ -34,6 +44,8 @@ const Step3BillingDetails = ({
           value={formData.billingFrequencyId}
           onChange={(v) => handleAutocompleteChange('billingFrequency', v, refs.billingFrequencyInputRef)}
           inputRef={refs.billingFrequencyInputRef}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
 
@@ -45,6 +57,8 @@ const Step3BillingDetails = ({
           name='invoiceCount'
           value={formData.invoiceCount}
           InputProps={{ readOnly: true }}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
 
@@ -57,14 +71,14 @@ const Step3BillingDetails = ({
           options={formData.invoiceRemarksOptions || []}
           value={Array.isArray(formData.invoiceRemarks) ? formData.invoiceRemarks : []}
           onChange={v => setFormData(prev => ({ ...prev, invoiceRemarks: v }))}
-          renderInput={params => <CustomTextField {...params} label='Invoice Remarks' />}
+          renderInput={params => <CustomTextField {...params} label='Invoice Remarks' required sx={requiredFieldSx} />}
         />
       </Grid>
 
        {/* Upload Floor Plan */}
       <Grid item xs={12} md={6}>
         <Typography variant='subtitle2' sx={{ mb: 1 }}>
-          Upload Floor Plan
+          Upload Floor Plan <span style={{ color: '#e91e63', fontWeight: 700 }}>*</span>
         </Typography>
 
         <Box display='flex' gap={2} alignItems='center'>
@@ -76,7 +90,6 @@ const Step3BillingDetails = ({
           {formData.uploadedFileName ? (
             <Box display='flex' alignItems='center' gap={1}>
               <Typography variant='body2'>{formData.uploadedFileName}</Typography>
-               {/* View button omitted for simplicity unless user asks for preview logic explicitly again */}
             </Box>
           ) : (
             <Typography variant='body2' color='textSecondary'>
@@ -96,6 +109,8 @@ const Step3BillingDetails = ({
           onChange={handleChange}
           inputRef={refs.reportBlockRef} // Ensure Ref
           onKeyDown={e => handleKeyDown(e, refs.reportBlockRef)}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
 
@@ -107,6 +122,8 @@ const Step3BillingDetails = ({
           value={formData.technicianId}
           onChange={v => handleAutocompleteChange('technician', v, refs.technicianInputRef)}
           inputRef={refs.technicianInputRef}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
 
@@ -118,6 +135,8 @@ const Step3BillingDetails = ({
           value={formData.supervisorId}
           onChange={v => handleAutocompleteChange('supervisor', v, refs.supervisorInputRef)}
           inputRef={refs.supervisorInputRef}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
 

@@ -154,10 +154,20 @@ const Step4PestItems = ({
     return pestItems.filter(i => Object.values(i).some(v => String(v).toLowerCase().includes(lower)))
   }, [pestItems, pestSearch])
 
-  const paginatedPests = useMemo(() => {
+  const PaginatedPests = useMemo(() => {
     const start = pestPagination.pageIndex * pestPagination.pageSize
     return filteredPests.slice(start, start + pestPagination.pageSize)
   }, [filteredPests, pestPagination])
+
+  const requiredFieldSx = {
+    '& .MuiFormLabel-asterisk': {
+      color: '#e91e63 !important',
+      fontWeight: 700
+    },
+    '& .MuiInputLabel-root.Mui-required': {
+      color: 'inherit'
+    }
+  }
 
   // Helpers
   const onSavePest = () => {
@@ -196,7 +206,15 @@ const Step4PestItems = ({
                   selected={currentPestItem.startDate}
                   onChange={date => handleCurrentPestItemDateChange('startDate', date)}
                   dateFormat='dd/MM/yyyy'
-                  customInput={<CustomTextField fullWidth label='Start Date' placeholder='dd/mm/yyyy' />}
+                  customInput={
+                    <CustomTextField
+                      fullWidth
+                      label='Start Date'
+                      placeholder='dd/mm/yyyy'
+                      required
+                      sx={requiredFieldSx}
+                    />
+                  }
                 />
               </Grid>
               <Grid item xs={12} md={4}>
@@ -204,7 +222,15 @@ const Step4PestItems = ({
                   selected={currentPestItem.endDate}
                   onChange={date => handleCurrentPestItemDateChange('endDate', date)}
                   dateFormat='dd/MM/yyyy'
-                  customInput={<CustomTextField fullWidth label='End Date' placeholder='dd/mm/yyyy' />}
+                  customInput={
+                    <CustomTextField
+                      fullWidth
+                      label='End Date'
+                      placeholder='dd/mm/yyyy'
+                      required
+                      sx={requiredFieldSx}
+                    />
+                  }
                 />
               </Grid>
               <Grid item xs={12} md={4}>
@@ -212,25 +238,37 @@ const Step4PestItems = ({
                   selected={currentPestItem.reminderDate}
                   onChange={date => handleCurrentPestItemDateChange('reminderDate', date)}
                   dateFormat='dd/MM/yyyy'
-                  customInput={<CustomTextField fullWidth label='Reminder Date' placeholder='dd/mm/yyyy' />}
+                  customInput={
+                    <CustomTextField
+                      fullWidth
+                      label='Reminder Date'
+                      placeholder='dd/mm/yyyy'
+                      required
+                      sx={requiredFieldSx}
+                    />
+                  }
                 />
               </Grid>
               <Grid item xs={12} md={2}>
                 <GlobalAutocomplete
                   label='Pest'
                   options={dropdowns.pests || []}
-                  value={currentPestItem.pestId} // ✅ ID
+                  value={currentPestItem.pestId}
                   onChange={v => handleCurrentPestItemAutocompleteChange('pest', v, refs.pestInputRef)}
                   inputRef={refs.pestInputRef}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
               <Grid item xs={12} md={2}>
                 <GlobalAutocomplete
                   label='Billing Frequency'
                   options={dropdowns.frequencies || []}
-                  value={currentPestItem.frequencyId} // ✅ ID
+                  value={currentPestItem.frequencyId}
                   onChange={v => handleCurrentPestItemAutocompleteChange('frequency', v, refs.frequencyInputRef)}
                   inputRef={refs.frequencyInputRef}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
               <Grid item xs={12} md={2}>
@@ -240,7 +278,8 @@ const Step4PestItems = ({
                   name='pestCount'
                   value={currentPestItem.pestCount || ''}
                   InputProps={{ readOnly: true }}
-                  sx={{ '& .MuiInputBase-root': { bgcolor: '#f0f0f0' } }}
+                  sx={{ '& .MuiInputBase-root': { bgcolor: '#f0f0f0' }, ...requiredFieldSx }}
+                  required
                 />
               </Grid>
               <Grid item xs={12} md={2}>
@@ -253,6 +292,8 @@ const Step4PestItems = ({
                   onChange={handleCurrentPestItemChange}
                   inputRef={refs.currentPestValueRef}
                   onKeyDown={e => handleKeyDown(e, refs.currentPestValueRef)}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
               <Grid item xs={12} md={2}>
@@ -262,7 +303,8 @@ const Step4PestItems = ({
                   name='total'
                   value={currentPestItem.total || ''}
                   InputProps={{ readOnly: true }}
-                  sx={{ '& .MuiInputBase-root': { bgcolor: '#f0f0f0' } }}
+                  sx={{ '& .MuiInputBase-root': { bgcolor: '#f0f0f0' }, ...requiredFieldSx }}
+                  required
                 />
               </Grid>
               <Grid item xs={12} md={2}>
@@ -272,6 +314,8 @@ const Step4PestItems = ({
                   value={currentPestItem.time}
                   onChange={v => handleCurrentPestItemAutocompleteChange('time', v, refs.timeInputRef)}
                   inputRef={refs.timeInputRef}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -280,9 +324,11 @@ const Step4PestItems = ({
                 <GlobalAutocomplete
                   label='Chemicals'
                   options={dropdowns.chemicals || []}
-                  value={currentPestItem.chemicalId} // ✅ FIX
+                  value={currentPestItem.chemicalId}
                   onChange={v => handleCurrentPestItemAutocompleteChange('chemical', v, refs.currentChemicalsRef)}
                   inputRef={refs.currentChemicalsRef}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
               <Grid item xs={12} md={3}>
@@ -295,6 +341,8 @@ const Step4PestItems = ({
                   onChange={handleCurrentPestItemChange}
                   inputRef={refs.currentNoOfItemsRef}
                   onKeyDown={e => handleKeyDown(e, refs.currentNoOfItemsRef)}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -319,7 +367,7 @@ const Step4PestItems = ({
           </Box>
         </Grid>
       )}
-
+...
       {/* PEST TABLE (Full Width) */}
       <Grid item xs={12}>
         <TableSection

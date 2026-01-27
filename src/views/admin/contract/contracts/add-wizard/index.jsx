@@ -401,11 +401,91 @@ export default function AddContractWizard() {
   const handleNext = () => {
     // Validation Logic per step
     if (activeStep === 0) {
-      if (!formData.customer || !formData.contractType) {
-        showToast('error', 'Please fill in required fields')
+      if (
+        !formData.companyId ||
+        !formData.customerId ||
+        !formData.contractType ||
+        !formData.name ||
+        !formData.billingName ||
+        !formData.billingAddress ||
+        !formData.billingPostalCode ||
+        !formData.customerCode ||
+        !formData.groupCode ||
+        !formData.accCode ||
+        !formData.picContactName ||
+        !formData.picEmail ||
+        !formData.picPhone ||
+        !formData.billingContactName ||
+        !formData.billingEmail ||
+        !formData.billingPhone
+      ) {
+        showToast('warning', 'Please fill all mandatory fields in Contract Basics')
         return
       }
     }
+
+    if (activeStep === 1) {
+      if (
+        !formData.serviceAddress ||
+        !formData.postalCode ||
+        !formData.coveredLocation ||
+        !formData.poNumber ||
+        !formData.poExpiry ||
+        !formData.preferredTime ||
+        !formData.reportEmail ||
+        !formData.contactPerson ||
+        !formData.sitePhone ||
+        !formData.mobile ||
+        !formData.callTypeId ||
+        !formData.startDate ||
+        !formData.endDate ||
+        !formData.reminderDate ||
+        !formData.industryId ||
+        !formData.paymentTerm ||
+        !formData.salesPersonId ||
+        !formData.latitude ||
+        !formData.longitude
+      ) {
+        showToast('warning', 'Please fill all details & schedule fields')
+        return
+      }
+    }
+
+    if (activeStep === 2) {
+      if (
+        !formData.billingFrequencyId ||
+        !formData.invoiceCount ||
+        !formData.invoiceRemarks.length ||
+        !formData.file ||
+        !formData.reportBlock ||
+        !formData.technicianId ||
+        !formData.supervisorId
+      ) {
+        showToast('warning', 'Please fill all billing & staff fields (including floor plan)')
+        return
+      }
+    }
+
+    if (activeStep === 3) {
+      if (!pestItems.length) {
+        showToast('warning', 'Please add at least one pest item')
+        return
+      }
+    }
+
+    if (activeStep === 4) {
+      if (
+        !formData.billingRemarks ||
+        !formData.technicianRemarks ||
+        !formData.appointmentRemarks ||
+        !formData.agreement1 ||
+        !formData.agreement2
+      ) {
+        showToast('warning', 'Please fill all remarks and agreements')
+        return
+      }
+    }
+
     if (activeStep < steps.length - 1) {
       setActiveStep(prev => prev + 1)
     } else {
@@ -529,8 +609,16 @@ export default function AddContractWizard() {
 
   const handleAddPestItem = () => {
     // Validate
-    if (!currentPestItem.pest) {
-      showToast('error', 'Select a pest')
+    if (
+      !currentPestItem.pestId ||
+      !currentPestItem.frequencyId ||
+      !currentPestItem.pestCount ||
+      !currentPestItem.pestValue ||
+      !currentPestItem.time ||
+      !currentPestItem.chemicalId ||
+      !currentPestItem.noOfItems
+    ) {
+      showToast('warning', 'Please fill all mandatory pest details')
       return
     }
 

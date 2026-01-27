@@ -158,6 +158,17 @@ export default function AddCustomerPage() {
 
   const pageTitle = isEditMode ? 'Edit Customer' : 'Add Customer'
 
+  // ⭐ Pink Star Styling
+  const requiredFieldSx = {
+    '& .MuiFormLabel-asterisk': {
+      color: '#e91e63 !important',
+      fontWeight: 700
+    },
+    '& .MuiInputLabel-root.Mui-required': {
+      color: 'inherit'
+    }
+  }
+
   // Handlers
   const handlePhoneChange = (e, name) => {
     let value = e.target.value.replace(/\D/g, '')
@@ -178,10 +189,11 @@ export default function AddCustomerPage() {
     }
   }
 
-  const handleEnterFocus = (e, nextRef) => {
+  const handleEnterFocus = (e, nextId) => {
     if (e.key === 'Enter') {
       e.preventDefault()
-      nextRef.current?.focus()
+      const nextEl = document.getElementsByName(nextId)[0] || document.getElementById(nextId)
+      nextEl?.focus()
     }
   }
 
@@ -237,6 +249,41 @@ export default function AddCustomerPage() {
   const handleFinalCancel = () => router.push(`/${lang}/admin/customers`)
 
   const handleFinalSave = async () => {
+    // 🔍 Validate all fields
+    const requiredFields = [
+      'origin',
+      'commenceDate',
+      'companyPrefix',
+      'customerName',
+      'abssCustomerName',
+      'cardId',
+      'picName',
+      'picEmail',
+      'picPhone',
+      'billingName',
+      'billingEmail',
+      'billingPhone',
+      'city',
+      'postalCode',
+      'paymentTerms',
+      'salesperson',
+      'loginEmail',
+      'password',
+      'billingAddress'
+    ]
+
+    for (const f of requiredFields) {
+      if (!formData[f]) {
+        showToast('warning', `Please fill ${f.replace(/([A-Z])/g, ' $1').toLowerCase()}`)
+        return
+      }
+    }
+
+    if (picEmailError || billingEmailError || loginEmailError) {
+      showToast('warning', 'Please fix email errors')
+      return
+    }
+
     if (isSaving) return
     setIsSaving(true)
     const formatDate = d => d.toISOString().split('T')[0]
@@ -337,6 +384,8 @@ export default function AddCustomerPage() {
                       origin: newValue?.value ?? ''
                     }))
                   }
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -346,7 +395,7 @@ export default function AddCustomerPage() {
                   selected={formData.commenceDate}
                   onChange={date => setFormData(prev => ({ ...prev, commenceDate: date }))}
                   dateFormat='dd/MM/yyyy'
-                  customInput={<GlobalTextField fullWidth label='Commence Date' />}
+                  customInput={<GlobalTextField fullWidth label='Commence Date' required sx={requiredFieldSx} />}
                 />
               </Grid>
 
@@ -360,6 +409,8 @@ export default function AddCustomerPage() {
                   value={formData.companyPrefix}
                   onChange={handleChange}
                   onKeyDown={e => handleEnterFocus(e, 'customerName')}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -373,6 +424,8 @@ export default function AddCustomerPage() {
                   value={formData.customerName}
                   onChange={e => handleTypedChange(e, /^[a-zA-Z\s]*$/, 'customerName')}
                   onKeyDown={e => handleEnterFocus(e, 'abssCustomerName')}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -386,6 +439,8 @@ export default function AddCustomerPage() {
                   value={formData.abssCustomerName}
                   onChange={e => handleTypedChange(e, /^[a-zA-Z\s]*$/, 'abssCustomerName')}
                   onKeyDown={e => handleEnterFocus(e, 'cardId')}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -399,6 +454,8 @@ export default function AddCustomerPage() {
                   value={formData.cardId}
                   onChange={handleChange}
                   onKeyDown={e => handleEnterFocus(e, 'picName')}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -412,6 +469,8 @@ export default function AddCustomerPage() {
                   value={formData.picName}
                   onChange={e => handleTypedChange(e, /^[a-zA-Z\s]*$/, 'picName')}
                   onKeyDown={e => handleEnterFocus(e, 'picEmail')}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -431,6 +490,8 @@ export default function AddCustomerPage() {
                   error={picEmailError}
                   helperText={picEmailError ? 'Invalid email' : ''}
                   onKeyDown={e => handleEnterFocus(e, 'picPhone')}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -444,6 +505,8 @@ export default function AddCustomerPage() {
                   value={formData.picPhone}
                   onChange={e => handlePhoneChange(e, 'picPhone')}
                   onKeyDown={e => handleEnterFocus(e, 'billingName')}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -457,6 +520,8 @@ export default function AddCustomerPage() {
                   value={formData.billingName}
                   onChange={e => handleTypedChange(e, /^[a-zA-Z\s]*$/, 'billingName')}
                   onKeyDown={e => handleEnterFocus(e, 'billingEmail')}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -476,6 +541,8 @@ export default function AddCustomerPage() {
                   error={billingEmailError}
                   helperText={billingEmailError ? 'Invalid email' : ''}
                   onKeyDown={e => handleEnterFocus(e, 'billingPhone')}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -489,6 +556,8 @@ export default function AddCustomerPage() {
                   value={formData.billingPhone}
                   onChange={e => handlePhoneChange(e, 'billingPhone')}
                   onKeyDown={e => handleEnterFocus(e, 'city')}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -502,6 +571,8 @@ export default function AddCustomerPage() {
                   value={formData.city}
                   onChange={e => handleTypedChange(e, /^[a-zA-Z\s]*$/, 'city')}
                   onKeyDown={e => handleEnterFocus(e, 'postalCode')}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -515,6 +586,8 @@ export default function AddCustomerPage() {
                   value={formData.postalCode}
                   onChange={handleChange}
                   onKeyDown={e => handleEnterFocus(e, 'paymentTerms')}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -534,6 +607,8 @@ export default function AddCustomerPage() {
                     { value: 'Yearly', label: 'Yearly' }
                   ]}
                   onChange={option => setFormData(prev => ({ ...prev, paymentTerms: option?.value || '' }))}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -545,6 +620,8 @@ export default function AddCustomerPage() {
                   value={dropdowns.employees.find(e => e.value === formData.salesperson) || null}
                   options={dropdowns.employees}
                   onChange={option => setFormData(prev => ({ ...prev, salesperson: option?.value || '' }))}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -564,6 +641,8 @@ export default function AddCustomerPage() {
                   error={!!loginEmailError}
                   helperText={loginEmailError}
                   onKeyDown={e => handleEnterFocus(e, 'password')}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -578,6 +657,8 @@ export default function AddCustomerPage() {
                   value={formData.password}
                   onChange={handleChange}
                   onKeyDown={e => handleEnterFocus(e, 'billingAddress')}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -592,6 +673,8 @@ export default function AddCustomerPage() {
                   onChange={handleChange}
                   rows={2}
                   onKeyDown={e => handleEnterFocus(e, 'remarks1')}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -606,6 +689,8 @@ export default function AddCustomerPage() {
                   onChange={handleChange}
                   rows={2}
                   onKeyDown={e => handleEnterFocus(e, 'remarks2')}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -619,6 +704,8 @@ export default function AddCustomerPage() {
                   value={formData.remarks2}
                   onChange={handleChange}
                   rows={2}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
             </Grid>
@@ -635,14 +722,12 @@ export default function AddCustomerPage() {
                 {/* Contact Form */}
                 <CustomTextFieldWrapper
                   fullWidth
-                  label={
-                    <span>
-                      Name <span style={{ color: 'red' }}>*</span>
-                    </span>
-                  }
+                  label='Name'
                   name='miniName'
                   value={contactForm.miniName}
                   onChange={e => setContactForm(prev => ({ ...prev, miniName: e.target.value }))}
+                  required
+                  sx={requiredFieldSx}
                 />
                 <Box mt={3} />
                 <CustomTextFieldWrapper
@@ -657,6 +742,8 @@ export default function AddCustomerPage() {
                   }}
                   error={miniEmailError}
                   helperText={miniEmailError ? 'Invalid email' : ''}
+                  required
+                  sx={requiredFieldSx}
                 />
                 <Box mt={3} />
                 <CustomTextFieldWrapper
@@ -670,6 +757,8 @@ export default function AddCustomerPage() {
                     if (v.length > 5) v = v.slice(0, 5) + ' ' + v.slice(5)
                     setContactForm(prev => ({ ...prev, miniPhone: v }))
                   }}
+                  required
+                  sx={requiredFieldSx}
                 />
 
                 <Box mt={3} display='flex' gap={2}>
@@ -683,7 +772,7 @@ export default function AddCustomerPage() {
                     fullWidth
                     color={editingContact ? 'success' : 'primary'}
                     onClick={handleAddOrUpdateContact}
-                    disabled={contactForm.miniEmail && miniEmailError}
+                    disabled={(contactForm.miniEmail && miniEmailError) || !contactForm.miniName || !contactForm.miniEmail || !contactForm.miniPhone}
                   >
                     {editingContact ? 'Update Member' : 'Add Member'}
                   </GlobalButton>

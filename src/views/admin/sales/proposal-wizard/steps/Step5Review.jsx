@@ -1,7 +1,17 @@
-import { Grid, Typography, Button } from '@mui/material'
+import { Grid, Typography } from '@mui/material'
 import CustomTextField from '@core/components/mui/TextField'
 
 const Step5Review = ({ formData, handleChange }) => {
+  const requiredFieldSx = {
+    '& .MuiFormLabel-asterisk': {
+      color: '#e91e63 !important',
+      fontWeight: 700
+    },
+    '& .MuiInputLabel-root.Mui-required': {
+      color: 'inherit'
+    }
+  }
+
   return (
     <Grid container spacing={4}>
       <Grid item xs={12}>
@@ -17,6 +27,8 @@ const Step5Review = ({ formData, handleChange }) => {
           name='billingRemarks'
           value={formData.billingRemarks}
           onChange={handleChange}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
 
@@ -29,6 +41,8 @@ const Step5Review = ({ formData, handleChange }) => {
           name='technicianRemarks'
           value={formData.technicianRemarks}
           onChange={handleChange}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
 
@@ -41,6 +55,8 @@ const Step5Review = ({ formData, handleChange }) => {
           name='appointmentRemarks'
           value={formData.appointmentRemarks}
           onChange={handleChange}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
 
@@ -53,6 +69,8 @@ const Step5Review = ({ formData, handleChange }) => {
           name='agreement1'
           value={formData.agreement1}
           onChange={handleChange}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
 
@@ -65,6 +83,8 @@ const Step5Review = ({ formData, handleChange }) => {
           name='agreement2'
           value={formData.agreement2}
           onChange={handleChange}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
     </Grid>

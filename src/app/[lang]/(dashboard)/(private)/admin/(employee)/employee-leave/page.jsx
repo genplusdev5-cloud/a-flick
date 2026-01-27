@@ -148,6 +148,17 @@ const EmployeeLeavePageContent = () => {
     description: ''
   })
 
+  // ⭐ Pink Star Styling
+  const requiredFieldSx = {
+    '& .MuiFormLabel-asterisk': {
+      color: '#e91e63 !important',
+      fontWeight: 700
+    },
+    '& .MuiInputLabel-root.Mui-required': {
+      color: 'inherit'
+    }
+  }
+
   const employeeRef = useRef(null)
   const supervisorRef = useRef(null)
   const leaveTypeRef = useRef(null)
@@ -227,8 +238,17 @@ const EmployeeLeavePageContent = () => {
   const handleSubmit = async e => {
     e.preventDefault()
 
-    if (!formData.employee_id || !formData.leaveType) {
-      showToast('warning', 'Employee and Leave Type are required')
+    // 🔍 Validate all mandatory fields
+    if (
+      !formData.employee_id ||
+      !formData.leaveType ||
+      !formData.leave_date ||
+      !formData.start_time ||
+      !formData.to_date ||
+      !formData.end_time ||
+      !formData.description
+    ) {
+      showToast('warning', 'Please fill all mandatory fields')
       return
     }
 
@@ -847,6 +867,7 @@ const EmployeeLeavePageContent = () => {
                   label='Employee'
                   fullWidth
                   required
+                  sx={requiredFieldSx}
                   value={
                     employeeList
                       .map(emp => ({
@@ -876,6 +897,7 @@ const EmployeeLeavePageContent = () => {
                   label='Leave Type'
                   fullWidth
                   required
+                  sx={requiredFieldSx}
                   value={
                     (leaveTypeList || [])
                       .map(type => ({
@@ -907,7 +929,7 @@ const EmployeeLeavePageContent = () => {
                       selected={formData.leave_date ? new Date(formData.leave_date) : new Date()}
                       onChange={date => handleFieldChange('leave_date', date)}
                       dateFormat='dd/MM/yyyy'
-                      customInput={<GlobalTextField fullWidth label='Date' />}
+                      customInput={<GlobalTextField fullWidth label='Date' required sx={requiredFieldSx} />}
                     />
                   </Grid>
 
@@ -936,7 +958,7 @@ const EmployeeLeavePageContent = () => {
                         }))
                       }}
                       dateFormat='h:mm aa'
-                      customInput={<GlobalTextField fullWidth label='Time' />}
+                      customInput={<GlobalTextField fullWidth label='Time' required sx={requiredFieldSx} />}
                     />
                   </Grid>
                 </Grid>
@@ -952,7 +974,7 @@ const EmployeeLeavePageContent = () => {
                       selected={formData.to_date ? new Date(formData.to_date) : new Date()}
                       onChange={date => handleFieldChange('to_date', date)}
                       dateFormat='dd/MM/yyyy'
-                      customInput={<GlobalTextField fullWidth label='Date' />}
+                      customInput={<GlobalTextField fullWidth label='Date' required sx={requiredFieldSx} />}
                     />
                   </Grid>
 
@@ -981,7 +1003,7 @@ const EmployeeLeavePageContent = () => {
                         }))
                       }}
                       dateFormat='h:mm aa'
-                      customInput={<GlobalTextField fullWidth label='Time' />}
+                      customInput={<GlobalTextField fullWidth label='Time' required sx={requiredFieldSx} />}
                     />
                   </Grid>
                 </Grid>
@@ -995,6 +1017,8 @@ const EmployeeLeavePageContent = () => {
                   rows={3}
                   value={formData.description ?? ''} // ✅ controlled
                   onChange={e => handleFieldChange('description', e.target.value)}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -1007,6 +1031,8 @@ const EmployeeLeavePageContent = () => {
                     label='Status'
                     value={formData.status}
                     onChange={e => handleFieldChange('status', e.target.value)}
+                    required
+                    sx={requiredFieldSx}
                   >
                     <MenuItem value='Pending'>Pending</MenuItem>
                     <MenuItem value='Approved'>Approved</MenuItem>

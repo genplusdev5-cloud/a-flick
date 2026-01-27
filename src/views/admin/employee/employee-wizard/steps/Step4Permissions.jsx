@@ -60,7 +60,9 @@ const Step4Permissions = ({ form, setField }) => {
         </Grid>
         
         <Grid item xs={12}>
-             <Typography variant='subtitle2' sx={{ mb: 2 }}>Signature Upload</Typography>
+          <Typography variant='subtitle2' sx={{ mb: 2 }}>
+            Signature Upload <span style={{ color: '#e91e63', fontWeight: 700 }}>*</span>
+          </Typography>
              
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Button variant='outlined' component='label' sx={{ height: 56 }}>

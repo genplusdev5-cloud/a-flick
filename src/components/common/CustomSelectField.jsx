@@ -39,6 +39,7 @@ const CustomSelectField = ({
             label={label}
             placeholder={placeholder}
             InputLabelProps={{ shrink: true }}
+            required={props.required}
           />
         )}
         sx={{

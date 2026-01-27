@@ -15,6 +15,16 @@ const Step2CustomerInfo = ({
   handleKeyDown,
   refs
 }) => {
+  const requiredFieldSx = {
+    '& .MuiFormLabel-asterisk': {
+      color: '#e91e63 !important',
+      fontWeight: 700
+    },
+    '& .MuiInputLabel-root.Mui-required': {
+      color: 'inherit'
+    }
+  }
+
   return (
     <Grid container spacing={4}>
       <Grid item xs={12}>
@@ -49,6 +59,8 @@ const Step2CustomerInfo = ({
           onChange={handleChange}
           inputRef={refs.serviceAddressRef}
           onKeyDown={e => handleKeyDown(e, refs.serviceAddressRef)}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
 
@@ -61,6 +73,8 @@ const Step2CustomerInfo = ({
           onChange={handleChange}
           inputRef={refs.postalCodeRef}
           onKeyDown={e => handleKeyDown(e, refs.postalCodeRef)}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
       <Grid item xs={12} md={3}>
@@ -72,6 +86,8 @@ const Step2CustomerInfo = ({
           onChange={handleChange}
           inputRef={refs.coveredLocationRef}
           onKeyDown={e => handleKeyDown(e, refs.coveredLocationRef)}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
 
@@ -89,6 +105,8 @@ const Step2CustomerInfo = ({
           onChange={handleChange}
           inputRef={refs.poNumberRef}
           onKeyDown={e => handleKeyDown(e, refs.poNumberRef)}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
 
@@ -103,6 +121,8 @@ const Step2CustomerInfo = ({
               label='PO Expiry Date'
               inputRef={refs.poExpiryRef}
               onKeyDown={e => handleKeyDown(e, refs.poExpiryRef)}
+              required
+              sx={requiredFieldSx}
             />
           }
         />
@@ -122,6 +142,8 @@ const Step2CustomerInfo = ({
               label='Preferred Time'
               inputRef={refs.preferredTimeRef}
               onKeyDown={e => handleKeyDown(e, refs.preferredTimeRef)}
+              required
+              sx={requiredFieldSx}
             />
           }
         />
@@ -137,6 +159,8 @@ const Step2CustomerInfo = ({
           onChange={handleChange}
           inputRef={refs.reportEmailRef}
           onKeyDown={e => handleKeyDown(e, refs.reportEmailRef)}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
 
@@ -149,6 +173,8 @@ const Step2CustomerInfo = ({
           onChange={handleChange}
           inputRef={refs.contactPersonRef}
           onKeyDown={e => handleKeyDown(e, refs.contactPersonRef)}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
 
@@ -161,6 +187,8 @@ const Step2CustomerInfo = ({
           onChange={handleChange}
           inputRef={refs.sitePhoneRef}
           onKeyDown={e => handleKeyDown(e, refs.sitePhoneRef)}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
 
@@ -173,6 +201,8 @@ const Step2CustomerInfo = ({
           onChange={handleChange}
           inputRef={refs.mobileRef}
           onKeyDown={e => handleKeyDown(e, refs.mobileRef)}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
 
@@ -183,6 +213,8 @@ const Step2CustomerInfo = ({
           value={formData.callTypeId}
           onChange={v => handleAutocompleteChange('callType', v, refs.callTypeRef)}
           inputRef={refs.callTypeRef}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
 
@@ -194,9 +226,11 @@ const Step2CustomerInfo = ({
           customInput={
             <CustomTextField
               fullWidth
-              label='Start Date *'
+              label='Start Date'
               inputRef={refs.startDateRef}
               onKeyDown={e => handleKeyDown(e, refs.startDateRef)}
+              required
+              sx={requiredFieldSx}
             />
           }
         />
@@ -209,9 +243,11 @@ const Step2CustomerInfo = ({
           customInput={
             <CustomTextField
               fullWidth
-              label='End Date *'
+              label='End Date'
               inputRef={refs.endDateRef}
               onKeyDown={e => handleKeyDown(e, refs.endDateRef)}
+              required
+              sx={requiredFieldSx}
             />
           }
         />
@@ -227,6 +263,8 @@ const Step2CustomerInfo = ({
               label='Reminder Date'
               inputRef={refs.reminderDateRef}
               onKeyDown={e => handleKeyDown(e, refs.reminderDateRef)}
+              required
+              sx={requiredFieldSx}
             />
           }
         />
@@ -239,6 +277,8 @@ const Step2CustomerInfo = ({
           value={formData.industryId}
           onChange={v => handleAutocompleteChange('industry', v, refs.industryRef)}
           inputRef={refs.industryRef}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
 
@@ -249,6 +289,8 @@ const Step2CustomerInfo = ({
           value={formData.paymentTerm}
           onChange={v => handleAutocompleteChange('paymentTerm', v, refs.paymentTermRef)}
           inputRef={refs.paymentTermRef}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
 
@@ -259,6 +301,8 @@ const Step2CustomerInfo = ({
           value={formData.salesPersonId}
           onChange={v => handleAutocompleteChange('salesPerson', v, refs.salesPersonRef)}
           inputRef={refs.salesPersonRef}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
 
@@ -272,6 +316,8 @@ const Step2CustomerInfo = ({
           onChange={handleChange}
           inputRef={refs.latitudeRef}
           onKeyDown={e => handleKeyDown(e, refs.latitudeRef)}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
       <Grid item xs={12} md={4}>
@@ -283,6 +329,8 @@ const Step2CustomerInfo = ({
           onChange={handleChange}
           inputRef={refs.longitudeRef}
           onKeyDown={e => handleKeyDown(e, refs.longitudeRef)}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
     </Grid>

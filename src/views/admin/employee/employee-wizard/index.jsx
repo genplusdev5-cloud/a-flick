@@ -211,19 +211,58 @@ export default function EmployeeWizard({ mode = 'add', id = null }) {
   }, [mode, id])
 
 
-  const validateStep = (step) => {
-      if (step === 0) {
-          if(!form.name || !form.email) {
-              showToast('warning', 'Name and Email are required')
-              return false
-          }
-          if(mode === 'add' && !form.password) {
-               showToast('warning', 'Password is required')
-               return false
-          }
-           if (emailError) return false
+  const validateStep = step => {
+    if (step === 0) {
+      if (!form.name || !form.nickname || !form.email || !form.phone || !form.dob || !form.nationality || !form.fingerPrintId) {
+        showToast('warning', 'Please fill all personal information fields')
+        return false
       }
-      return true
+      if (mode === 'add' && !form.password) {
+        showToast('warning', 'Password is required')
+        return false
+      }
+      if (emailError) return false
+    }
+
+    if (step === 1) {
+      if (
+        !form.employeeRole ||
+        !form.employeeCode ||
+        !form.department ||
+        !form.designation ||
+        !form.userRole ||
+        !form.scheduler ||
+        !form.supervisor ||
+        !form.joinDate
+      ) {
+        showToast('warning', 'Please fill all professional details')
+        return false
+      }
+    }
+
+    if (step === 2) {
+      if (
+        !form.targetDay ||
+        !form.targetNight ||
+        !form.targetSaturday ||
+        !form.vehicleNumber ||
+        !form.color ||
+        !form.lunchTime ||
+        !form.description
+      ) {
+        showToast('warning', 'Please fill all operations & logistics fields')
+        return false
+      }
+    }
+
+    if (step === 3) {
+      if (!form.signature && !form.existingSignature) {
+        showToast('warning', 'Please upload a signature')
+        return false
+      }
+    }
+
+    return true
   }
 
   const handleNext = () => {

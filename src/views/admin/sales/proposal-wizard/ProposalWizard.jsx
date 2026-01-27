@@ -798,22 +798,91 @@ export default function ProposalWizard({ id }) {
 
   const validateStep = step => {
     if (step === 0) {
-      if (!formData.name) {
-        showToast('error', 'Contract Name is required!')
-        return false
-      }
-      if (!formData.customerId) {
-        showToast('error', 'Customer is required!')
+      if (
+        !formData.companyId ||
+        !formData.customerId ||
+        !formData.contractType ||
+        !formData.name ||
+        !formData.billingName ||
+        !formData.billingAddress ||
+        !formData.billingPostalCode ||
+        !formData.customerCode ||
+        !formData.groupCode ||
+        !formData.accCode ||
+        !formData.picContactName ||
+        !formData.picEmail ||
+        !formData.picPhone ||
+        !formData.billingContactName ||
+        !formData.billingEmail ||
+        !formData.billingPhone
+      ) {
+        showToast('warning', 'Please fill all mandatory fields in Sales Type')
         return false
       }
     }
 
     if (step === 1) {
-      if (!formData.startDate || !formData.endDate) {
-        showToast('warning', 'Please enter Start Date and End Date!')
+      if (
+        !formData.serviceAddress ||
+        !formData.postalCode ||
+        !formData.coveredLocation ||
+        !formData.poNumber ||
+        !formData.poExpiry ||
+        !formData.preferredTime ||
+        !formData.reportEmail ||
+        !formData.contactPerson ||
+        !formData.sitePhone ||
+        !formData.mobile ||
+        !formData.callTypeId ||
+        !formData.startDate ||
+        !formData.endDate ||
+        !formData.reminderDate ||
+        !formData.industryId ||
+        !formData.paymentTerm ||
+        !formData.salesPersonId ||
+        !formData.latitude ||
+        !formData.longitude
+      ) {
+        showToast('warning', 'Please fill all mandatory fields in Customer Info')
         return false
       }
     }
+
+    if (step === 2) {
+      if (
+        !formData.billingFrequencyId ||
+        !formData.invoiceCount ||
+        !formData.invoiceRemarks.length ||
+        !formData.file ||
+        !formData.reportBlock ||
+        !formData.technicianId ||
+        !formData.supervisorId
+      ) {
+        showToast('warning', 'Please fill all mandatory billing fields (including floor plan)')
+        return false
+      }
+    }
+
+    if (step === 3) {
+      if (!pestItems.length) {
+        showToast('warning', 'Please add at least one pest item')
+        return false
+      }
+    }
+
+    if (step === 4) {
+      if (
+        !formData.billingRemarks ||
+        !formData.technicianRemarks ||
+        !formData.appointmentRemarks ||
+        !formData.agreement1 ||
+        !formData.agreement2
+      ) {
+        showToast('warning', 'Please fill all remarks and agreements')
+        return false
+      }
+    }
+
     return true
   }
 

@@ -123,6 +123,16 @@ const Step4PestItems = ({
   editingItemId,
   handleKeyDown
 }) => {
+  const requiredFieldSx = {
+    '& .MuiFormLabel-asterisk': {
+      color: '#e91e63 !important',
+      fontWeight: 700
+    },
+    '& .MuiInputLabel-root.Mui-required': {
+      color: 'inherit'
+    }
+  }
+
   // Mock internal states for table to look real
   const [pestSearch, setPestSearch] = useState('')
   const [pestPagination, setPestPagination] = useState({ pageIndex: 0, pageSize: 5 })
@@ -167,6 +177,8 @@ const Step4PestItems = ({
                   value={currentPestItem.pestId}
                   onChange={v => handleCurrentPestItemAutocompleteChange('pest', v, refs.pestInputRef)}
                   inputRef={refs.pestInputRef}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
               <Grid item xs={12} md={2}>
@@ -176,6 +188,8 @@ const Step4PestItems = ({
                   value={currentPestItem.frequencyId}
                   onChange={v => handleCurrentPestItemAutocompleteChange('frequency', v, refs.frequencyInputRef)}
                   inputRef={refs.frequencyInputRef}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
               <Grid item xs={12} md={2}>
@@ -185,8 +199,9 @@ const Step4PestItems = ({
                   name='pestCount'
                   value={currentPestItem.pestCount}
                   onChange={handleCurrentPestItemChange} // Proposal used readOnly + auto calc, but we allow edit if needed or stick to auto
-                  sx={{ '& .MuiInputBase-root': { bgcolor: '#f8f9fa' } }}
+                  sx={{ '& .MuiInputBase-root': { bgcolor: '#f8f9fa' }, ...requiredFieldSx }}
                   inputRef={refs.currentPestCountRef}
+                  required
                 />
               </Grid>
               <Grid item xs={12} md={2}>
@@ -199,6 +214,8 @@ const Step4PestItems = ({
                   onChange={handleCurrentPestItemChange}
                   inputRef={refs.currentPestValueRef}
                   onKeyDown={e => handleKeyDown(e, refs.currentPestValueRef)}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
               <Grid item xs={12} md={2}>
@@ -208,7 +225,8 @@ const Step4PestItems = ({
                   name='total'
                   value={currentPestItem.total}
                   InputProps={{ readOnly: true }}
-                  sx={{ '& .MuiInputBase-root': { bgcolor: '#f8f9fa' } }}
+                  sx={{ '& .MuiInputBase-root': { bgcolor: '#f8f9fa' }, ...requiredFieldSx }}
+                  required
                 />
               </Grid>
               <Grid item xs={12} md={2}>
@@ -218,6 +236,8 @@ const Step4PestItems = ({
                   value={currentPestItem.time}
                   onChange={v => handleCurrentPestItemAutocompleteChange('time', v, refs.timeInputRef)}
                   inputRef={refs.timeInputRef}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
 
@@ -229,6 +249,8 @@ const Step4PestItems = ({
                   value={currentPestItem.chemicalId}
                   onChange={v => handleCurrentPestItemAutocompleteChange('chemicals', v, refs.currentChemicalsRef)}
                   inputRef={refs.currentChemicalsRef}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
               <Grid item xs={12} md={3}>
@@ -241,6 +263,8 @@ const Step4PestItems = ({
                   onChange={handleCurrentPestItemChange}
                   inputRef={refs.currentNoOfItemsRef}
                   onKeyDown={e => handleKeyDown(e, refs.currentNoOfItemsRef)}
+                  required
+                  sx={requiredFieldSx}
                 />
               </Grid>
               <Grid item xs={12} md={3} display='flex' justifyContent='flex-end'>

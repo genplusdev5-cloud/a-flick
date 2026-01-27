@@ -17,6 +17,22 @@ const Step3ServiceDetails = ({
 }) => {
   const [openUpdateDialog, setOpenUpdateDialog] = useState(false)
 
+  const requiredFieldSx = {
+    '& .MuiFormLabel-asterisk': {
+      color: '#e91e63 !important',
+      fontWeight: 700
+    },
+    '& .MuiInputLabel-root.Mui-required': {
+      color: 'inherit'
+    }
+  }
+
+  const renderLabel = (label) => (
+    <>
+      {label} <span style={{ color: '#e91e63', fontWeight: 700 }}>*</span>
+    </>
+  )
+
   // Calculate total from pest items
   const calculatedTotal = (pestItems || []).reduce((acc, curr) => acc + (Number(curr.totalValue) || 0), 0)
 
@@ -47,6 +63,8 @@ const Step3ServiceDetails = ({
           value={formData.billingFrequencyId}
           onChange={v => handleAutocompleteChange('billingFrequency', v, refs.billingFrequencyRef)}
           inputRef={refs.billingFrequencyRef}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
 
@@ -58,6 +76,8 @@ const Step3ServiceDetails = ({
           name='invoiceCount'
           value={formData.invoiceCount}
           InputProps={{ readOnly: true }}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
 
@@ -74,14 +94,14 @@ const Step3ServiceDetails = ({
               target: { name: 'invoiceRemarks', value: v }
             })
           }
-          renderInput={params => <CustomTextField {...params} label='Invoice Remarks' />}
+          renderInput={params => <CustomTextField {...params} label='Invoice Remarks' required sx={requiredFieldSx} />}
         />
       </Grid>
 
       {/* Upload Floor Plan */}
       <Grid item xs={12} md={6}>
         <Typography variant='subtitle2' sx={{ mb: 1 }}>
-          Upload Floor Plan
+          Upload Floor Plan <span style={{ color: '#e91e63', fontWeight: 700 }}>*</span>
         </Typography>
 
         <Box display='flex' gap={2} alignItems='center'>
@@ -115,6 +135,34 @@ const Step3ServiceDetails = ({
           onChange={handleChange}
           inputRef={refs.reportBlockRef}
           onKeyDown={e => handleKeyDown(e, refs.reportBlockRef)}
+          required
+          sx={requiredFieldSx}
+        />
+      </Grid>
+
+      {/* Technician */}
+      <Grid item xs={12} md={6}>
+        <GlobalAutocomplete
+          label='Technician'
+          options={dropdowns.technicians || []}
+          value={formData.technicianId}
+          onChange={v => handleAutocompleteChange('technician', v, refs.technicianRef)}
+          inputRef={refs.technicianRef}
+          required
+          sx={requiredFieldSx}
+        />
+      </Grid>
+
+      {/* Supervisor */}
+      <Grid item xs={12} md={6}>
+        <GlobalAutocomplete
+          label='Supervisor'
+          options={dropdowns.supervisors || []}
+          value={formData.supervisorId}
+          onChange={v => handleAutocompleteChange('supervisor', v, refs.supervisorRef)}
+          inputRef={refs.supervisorRef}
+          required
+          sx={requiredFieldSx}
         />
       </Grid>
 
