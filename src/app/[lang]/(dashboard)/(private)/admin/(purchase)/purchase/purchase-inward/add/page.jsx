@@ -617,12 +617,12 @@ const AddPurchaseInwardPage = () => {
               />
             </Grid>
 
-            <Grid item xs={12} md={3}>
+            <Grid item xs={12} md={2}>
               <GlobalTextField label='Total Qty' type='number' value={total_quantity} disabled />
             </Grid>
 
             {/* Row 3: Rate & FOC */}
-            <Grid item xs={12} md={3}>
+            <Grid item xs={12} md={2}>
               <Box display='flex' flexDirection='column'>
                 <FormControlLabel
                   control={<Checkbox checked={isFoc} onChange={e => handleFocChange(e.target.checked)} size='small' />}
@@ -638,7 +638,7 @@ const AddPurchaseInwardPage = () => {
               </Box>
             </Grid>
 
-            <Grid item xs={12} md={3}>
+            <Grid item xs={12} md={2}>
               <GlobalTextField
                 label='Amount'
                 value={amount}

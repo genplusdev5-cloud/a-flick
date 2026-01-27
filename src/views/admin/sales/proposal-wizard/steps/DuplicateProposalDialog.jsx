@@ -1,5 +1,5 @@
 // React Imports
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 // MUI Imports
 import Button from '@mui/material/Button'
@@ -14,14 +14,34 @@ import Grid from '@mui/material/Grid'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import CustomTextField from '@core/components/mui/TextField'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
+import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
 import { getContractDates } from '@/api/contract_group/contract/getDates'
 
-const DuplicateProposalDialog = ({ open, handleClose, onGenerate, contractType, frequency }) => {
+const DuplicateProposalDialog = ({
+  open,
+  handleClose,
+  onGenerate,
+  contractType,
+  frequency,
+  customers = [],
+  defaultCustomerId
+}) => {
   // States
   const [startDate, setStartDate] = useState(null)
   const [endDate, setEndDate] = useState(null)
   const [reminderDate, setReminderDate] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [selectedCustomerId, setSelectedCustomerId] = useState(null)
+
+  // Initialize selected customer when dialog opens
+  useEffect(() => {
+    if (open) {
+      setSelectedCustomerId(defaultCustomerId || null)
+      setStartDate(null)
+      setEndDate(null)
+      setReminderDate(null)
+    }
+  }, [open, defaultCustomerId])
 
   // Helper to parse date strings (handles DD/MM/YYYY and YYYY-MM-DD)
   const parseDateString = dateStr => {
@@ -70,7 +90,7 @@ const DuplicateProposalDialog = ({ open, handleClose, onGenerate, contractType, 
   }
 
   const handleGenerate = () => {
-    onGenerate({ startDate, endDate, reminderDate })
+    onGenerate({ startDate, endDate, reminderDate, customerId: selectedCustomerId })
     handleClose()
   }
 
@@ -93,8 +113,22 @@ const DuplicateProposalDialog = ({ open, handleClose, onGenerate, contractType, 
         </DialogCloseButton>
       </DialogTitle>
       <DialogContent>
-        <Typography sx={{ mb: 6 }}>Please enter the new dates for the duplicated proposal.</Typography>
+        <Typography sx={{ mb: 6 }}>
+          Please enter the new dates and select a customer for the duplicated proposal.
+        </Typography>
         <Grid container spacing={6}>
+          {/* Customer Selection */}
+          <Grid item xs={12}>
+            <GlobalAutocomplete
+              label='Customer'
+              placeholder='Select Customer'
+              options={customers}
+              value={customers.find(c => c.value === selectedCustomerId) || null}
+              onChange={val => setSelectedCustomerId(val ? val.value : null)}
+              getOptionLabel={option => (option ? option.label : '')}
+            />
+          </Grid>
+
           <Grid item xs={12} sm={6}>
             <AppReactDatepicker
               selected={startDate}

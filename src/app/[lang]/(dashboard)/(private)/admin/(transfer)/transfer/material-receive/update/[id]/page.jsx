@@ -44,10 +44,16 @@ const EditMaterialRequestReceivedPage = () => {
   const type = searchParams.get('type') || 'tm'
 
   const decodedId = useMemo(() => {
+    if (!id) return null
     try {
-      return Number(atob(id))
-    } catch {
-      return Number(id)
+      const urlDecoded = decodeURIComponent(id)
+      return atob(urlDecoded.replace(/-/g, '+').replace(/_/g, '/'))
+    } catch (e) {
+      try {
+        return atob(String(id).replace(/-/g, '+').replace(/_/g, '/'))
+      } catch {
+        return id
+      }
     }
   }, [id])
 
@@ -62,6 +68,8 @@ const EditMaterialRequestReceivedPage = () => {
   const [saveLoading, setSaveLoading] = useState(false)
 
   // Header fields
+  const [origin, setOrigin] = useState(null)
+  const [originOptions, setOriginOptions] = useState([])
   const [fromVehicle, setFromVehicle] = useState(null)
   const [toVehicle, setToVehicle] = useState(null)
   const [materialIssue, setMaterialIssue] = useState(null)
@@ -83,48 +91,84 @@ const EditMaterialRequestReceivedPage = () => {
   // 🔥 FETCH DETAILS
   useEffect(() => {
     const fetchData = async () => {
+      setInitLoading(true)
       try {
-        setInitLoading(true)
-
-        const [purchaseRes, materialRes, detailsRes, issueRes] = await Promise.all([
-          getPurchaseFilters(),
-          getMaterialRequestDropdowns(),
-          getMaterialReceiveDetails(decodedId, type),
-          getMaterialIssueList({ page_size: 100 })
+        // Step 1: Fetch Dropdowns (Parallel)
+        const [purchaseRes, materialRes, issueRes] = await Promise.all([
+          getPurchaseFilters().catch(e => {
+            console.error('Origin error', e)
+            return null
+          }),
+          getMaterialRequestDropdowns().catch(e => {
+            console.error('Material drop error', e)
+            return null
+          }),
+          getMaterialIssueList({ page_size: 100 }).catch(e => {
+            console.error('Issue list error', e)
+            return null
+          })
         ])
 
+        // --- DROPDOWNS ---
         const materialData = materialRes?.data?.data || materialRes?.data || materialRes || {}
+        const filterData = purchaseRes?.data || purchaseRes || {}
+        const purchaseData = filterData?.data || filterData || {}
 
-        // Materials
-        const techs =
-          materialData?.employee?.name?.map(e => ({
-            label: e.name,
-            value: e.id,
-            id: e.id
-          })) || []
-
+        // 1. Employees
+        const employeeRaw = materialData?.employee?.name || materialData?.employee || []
+        const techs = employeeRaw.map(e => ({
+          label: e.name || e.label || '',
+          value: e.id || e.value,
+          id: e.id || e.value
+        }))
         setEmployeeOptions(techs)
 
+        // 2. Chemicals
+        let chemRaw = []
+        if (Array.isArray(purchaseData?.chemicals)) {
+          chemRaw = purchaseData.chemicals
+        } else if (Array.isArray(purchaseData?.chemicals?.name)) {
+          chemRaw = purchaseData.chemicals.name
+        } else if (Array.isArray(materialData?.chemicals?.name)) {
+          chemRaw = materialData.chemicals.name
+        } else if (Array.isArray(materialData?.chemical?.name)) {
+          chemRaw = materialData.chemical.name
+        }
+
         setChemicalOptions(
-          (materialData?.chemicals?.name || materialData?.chemicals || []).map(c => ({
-            label: c.label || c.name || '',
-            value: c.value || c.id,
-            id: c.value || c.id,
+          chemRaw.map(c => ({
+            label: c.name || c.label || '',
+            value: c.id || c.value,
+            id: c.id || c.value,
             uom: c.uom || c.unit || c.uom_id
           }))
         )
 
+        // 3. UOM
+        const uomRaw = materialData?.uom?.name || materialData?.uom || []
         setUomOptions(
-          materialData?.uom?.name?.map(u => ({
-            label: u.name,
-            value: u.id,
-            id: u.id
-          })) || []
+          uomRaw.map(u => ({
+            label: u.name || u.label || '',
+            value: u.id || u.value,
+            id: u.id || u.value
+          }))
         )
 
-        const issues = (issueRes?.data?.results || issueRes?.results || []).map(i => {
+        // 4. Origins
+        const originRaw = purchaseData?.company?.name || purchaseData?.company || []
+        const origins = originRaw.map(i => ({
+          label: i.name || i.label || '',
+          value: i.id || i.value,
+          id: i.id || i.value
+        }))
+        setOriginOptions(origins)
+
+        // 5. Issues
+        const issueData = issueRes?.data?.results || issueRes?.results || []
+        const issues = issueData.map(i => {
           const trNo = i.num_series || i.issue_number || `Issue #${i.id}`
-          const trDate = i.receive_date || i.issue_date ? format(parseISO(i.receive_date || i.issue_date), 'dd/MM/yyyy') : ''
+          const trDate =
+            i.receive_date || i.issue_date ? format(parseISO(i.receive_date || i.issue_date), 'dd/MM/yyyy') : ''
           const tech = i.technician_name || i.technician || ''
           return {
             label: `${trNo}${trDate ? ` (${trDate})` : ''}${tech ? ` - ${tech}` : ''}`,
@@ -135,31 +179,61 @@ const EditMaterialRequestReceivedPage = () => {
         })
         setIssueOptions(issues)
 
-        // Details
-        const detailJson = detailsRes?.data || detailsRes || {}
-        const details = detailJson?.data || detailJson
+        // Step 2: Fetch Details (Sequential or Parallel with fallback)
+        if (decodedId && decodedId !== 'NaN') {
+          try {
+            const detailsRes = await getMaterialReceiveDetails(decodedId, type)
+            const detailJson = detailsRes?.data || detailsRes || {}
+            const details = detailJson?.data || detailJson
 
-        setReceiveDate(details.receive_date ? parseISO(details.receive_date) : details.issue_date ? parseISO(details.issue_date) : null)
-        setRemarks(details.remarks || '')
+            if (details) {
+              setReceiveDate(
+                details.receive_date
+                  ? parseISO(details.receive_date)
+                  : details.issue_date
+                    ? parseISO(details.issue_date)
+                    : null
+              )
+              setRemarks(details.remarks || '')
 
-        setFromVehicle(techs.find(t => t.id === details.from_vehicle_id) || (details.from_vehicle ? { label: details.from_vehicle, id: details.from_vehicle_id } : null))
-        setToVehicle(techs.find(t => t.id === details.to_vehicle_id) || (details.to_vehicle ? { label: details.to_vehicle, id: details.to_vehicle_id } : null))
+              setOrigin(origins.find(o => String(o.id) === String(details.origin_id || details.company_id)) || null)
+              setFromVehicle(
+                techs.find(t => String(t.id) === String(details.from_vehicle_id)) ||
+                  (details.from_vehicle && details.from_vehicle !== '-'
+                    ? { label: details.from_vehicle, id: details.from_vehicle_id }
+                    : null)
+              )
+              setToVehicle(
+                techs.find(t => String(t.id) === String(details.to_vehicle_id)) ||
+                  (details.to_vehicle && details.to_vehicle !== '-'
+                    ? { label: details.to_vehicle, id: details.to_vehicle_id }
+                    : null)
+              )
 
-        setMaterialIssue(issues.find(i => i.id === details.issue_id) || (details.issue_id ? { label: `Issue #${details.issue_id}`, id: details.issue_id } : null))
+              setMaterialIssue(
+                issues.find(i => String(i.id) === String(details.issue_id)) ||
+                  (details.issue_id ? { label: `Issue #${details.issue_id}`, id: details.issue_id } : null)
+              )
 
-        setItems(
-          (details.items || details.transfer_items || details.transfer_in_items || []).map(item => ({
-            id: item.id,
-            chemical: item.item_name || item.chemical_name || item.chemical?.name || '',
-            chemicalId: item.item_id || item.chemical_id || item.chemical?.id,
-            uom: item.uom_name || item.uom?.name || item.uom_details?.name || item.uom,
-            uomId: item.uom_id || item.uom?.id || item.uom_details?.id,
-            quantity: item.quantity || item.transfer_quantity
-          }))
-        )
+              setItems(
+                (details.items || details.transfer_items || details.transfer_in_items || []).map(item => ({
+                  id: item.id,
+                  chemical: item.item_name || item.chemical_name || item.chemical?.name || '',
+                  chemicalId: item.item_id || item.chemical_id || item.chemical?.id,
+                  uom: item.uom_name || item.uom?.name || item.uom_details?.name || item.uom,
+                  uomId: item.uom_id || item.uom?.id || item.uom_details?.id,
+                  quantity: item.quantity || item.transfer_quantity
+                }))
+              )
+            }
+          } catch (detErr) {
+            console.error('Details load failed', detErr)
+            // showToast('error', 'Failed to load record details') // Optional: don't annoy user if only details fail
+          }
+        }
       } catch (err) {
-        console.error(err)
-        showToast('error', 'Failed to load details')
+        console.error('Init failed', err)
+        showToast('error', 'Failed to load metadata')
       } finally {
         setInitLoading(false)
       }
@@ -171,14 +245,16 @@ const EditMaterialRequestReceivedPage = () => {
   const handleIssueChange = val => {
     setMaterialIssue(val)
     if (val && val.items) {
-      setItems(val.items.map(i => ({
-        id: Date.now() + Math.random(),
-        chemical: i.item_name || i.chemical_name || '',
-        chemicalId: i.item_id || i.chemical_id,
-        uom: i.uom || i.uom_name || '',
-        uomId: i.uom_id,
-        quantity: i.transfer_quantity || i.quantity || ''
-      })))
+      setItems(
+        val.items.map(i => ({
+          id: Date.now() + Math.random(),
+          chemical: i.item_name || i.chemical_name || '',
+          chemicalId: i.item_id || i.chemical_id,
+          uom: i.uom || i.uom_name || '',
+          uomId: i.uom_id,
+          quantity: i.transfer_quantity || i.quantity || ''
+        }))
+      )
     }
   }
 
@@ -261,26 +337,36 @@ const EditMaterialRequestReceivedPage = () => {
 
       const payload = {
         id: decodedId,
-        from_vehicle: fromVehicle.label,
-        from_vehicle_id: fromVehicle.id,
-        to_vehicle: toVehicle.label,
-        to_vehicle_id: toVehicle.id,
+        origin_id: origin?.id || null,
+        company_id: origin?.id || null,
+        from_vehicle: fromVehicle?.label || '-',
+        from_vehicle_id: fromVehicle?.id || null,
+        to_vehicle: toVehicle?.label || '-',
+        to_vehicle_id: toVehicle?.id || null,
         issue_id: materialIssue?.id || null,
-        employee_id: fromVehicle.id,
+        employee_id: fromVehicle?.id || null,
+        from_employee_id: fromVehicle?.id || null,
+        to_employee_id: toVehicle?.id || null,
         receive_date: format(receiveDate, 'yyyy-MM-dd'),
+        receive_status: 'Pending',
         remarks,
         is_active: 1,
         status: 1,
-        items: JSON.stringify(items.map(i => ({
-          id: typeof i.id === 'number' && i.id < 1000000000000 ? i.id : null,
-          item_id: i.chemicalId,
-          item_name: i.chemical,
-          uom_id: i.uomId,
-          uom: i.uom,
-          quantity: Number(i.quantity),
-          is_active: 1,
-          status: 1
-        })))
+        items: items.map(i => {
+          const itemObj = {
+            item_id: i.chemicalId,
+            item_name: i.chemical,
+            uom_id: i.uomId,
+            uom: i.uom,
+            quantity: Number(i.quantity),
+            is_active: 1,
+            status: 1
+          }
+          if (i.id && !String(i.id).startsWith('temp') && String(i.id).length < 12) {
+            itemObj.id = i.id
+          }
+          return itemObj
+        })
       }
 
       await updateMaterialReceive(decodedId, payload)
@@ -313,13 +399,25 @@ const EditMaterialRequestReceivedPage = () => {
         <Box px={4} py={3} position='relative'>
           {initLoading && (
             <Box
-              sx={{ position: 'absolute', inset: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1, bgcolor: 'rgba(255,255,255,0.7)' }}
+              sx={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                zIndex: 1,
+                bgcolor: 'rgba(255,255,255,0.7)'
+              }}
             >
               <CircularProgress />
             </Box>
           )}
 
           <Grid container spacing={3}>
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete label='Origin' options={originOptions} value={origin} onChange={setOrigin} />
+            </Grid>
+
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
                 label='From Vehicle'
@@ -373,7 +471,12 @@ const EditMaterialRequestReceivedPage = () => {
         <Box px={4} py={3}>
           <Grid container spacing={2} alignItems='flex-end'>
             <Grid item xs={12} md={4}>
-              <GlobalAutocomplete label='Chemical' options={chemicalOptions} value={chemical} onChange={handleChemicalChange} />
+              <GlobalAutocomplete
+                label='Chemical'
+                options={chemicalOptions}
+                value={chemical}
+                onChange={handleChemicalChange}
+              />
             </Grid>
             <Grid item xs={12} md={3}>
               <GlobalTextField
@@ -432,12 +535,16 @@ const EditMaterialRequestReceivedPage = () => {
                       <td>{i.uom}</td>
                       <td align='right'>{i.quantity}</td>
                       <td align='center'>
-                        <IconButton size='small' color='primary' onClick={() => {
-                          setEditId(i.id)
-                          setChemical({ label: i.chemical, id: i.chemicalId })
-                          setUom({ label: i.uom, id: i.uomId })
-                          setQuantity(i.quantity)
-                        }}>
+                        <IconButton
+                          size='small'
+                          color='primary'
+                          onClick={() => {
+                            setEditId(i.id)
+                            setChemical({ label: i.chemical, id: i.chemicalId })
+                            setUom({ label: i.uom, id: i.uomId })
+                            setQuantity(i.quantity)
+                          }}
+                        >
                           <EditIcon fontSize='small' />
                         </IconButton>
                         <IconButton size='small' color='error' onClick={() => handleRemoveItem(i.id)}>

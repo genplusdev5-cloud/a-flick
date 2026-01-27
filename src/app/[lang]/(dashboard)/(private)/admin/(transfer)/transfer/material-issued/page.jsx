@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 
 import {
@@ -67,6 +67,7 @@ import styles from '@core/styles/table.module.css'
 
 const MaterialRequestIssuedPage = () => {
   const router = useRouter()
+  const { lang } = useParams()
   const columnHelper = createColumnHelper()
 
   const [originOptions, setOriginOptions] = useState([])
@@ -160,8 +161,16 @@ const MaterialRequestIssuedPage = () => {
         return {
           sno: pagination.pageIndex * pagination.pageSize + index + 1,
           id: item.id,
-          fromVehicle: item.from_vehicle || '-',
-          toVehicle: item.to_vehicle || '-',
+          fromVehicle:
+            technicianOptions.find(t => t.value === item.from_vehicle_id)?.label ||
+            item.from_vehicle ||
+            (item.from_vehicle === '-' ? '-' : item.from_vehicle) ||
+            '-',
+          toVehicle:
+            technicianOptions.find(t => t.value === item.to_vehicle_id)?.label ||
+            item.to_vehicle ||
+            (item.to_vehicle === '-' ? '-' : item.to_vehicle) ||
+            '-',
           issueNo: item.num_series || item.issue_number || '-',
           issueDate: item.issue_date ? format(new Date(item.issue_date), 'dd/MM/yyyy') : '-',
           requestNo: item.request_no || item.request_details?.num_series || item.request_details?.request_no || '-',
@@ -205,7 +214,9 @@ const MaterialRequestIssuedPage = () => {
     selectedTechnician,
     searchText,
     uiDateFilter,
-    uiDateRange
+    uiDateRange,
+    technicianOptions,
+    originOptions
   ])
 
   /* ───────── DELETE ───────── */
@@ -246,7 +257,9 @@ const MaterialRequestIssuedPage = () => {
                 size='small'
                 color='primary'
                 onClick={() =>
-                  router.push(`/admin/transfer/material-issued/update/${btoa(String(row.id))}?type=${row.recordType}`)
+                  router.push(
+                    `/${lang}/admin/transfer/material-issued/update/${btoa(String(row.id))}?type=${row.recordType}`
+                  )
                 }
               >
                 <i className='tabler-edit' />
@@ -314,7 +327,10 @@ const MaterialRequestIssuedPage = () => {
         <CardHeader
           title='Material Issued'
           action={
-            <GlobalButton startIcon={<AddIcon />} onClick={() => router.push('/admin/transfer/material-issued/add')}>
+            <GlobalButton
+              startIcon={<AddIcon />}
+              onClick={() => router.push(`/${lang}/admin/transfer/material-issued/add`)}
+            >
               Add Material Issued
             </GlobalButton>
           }

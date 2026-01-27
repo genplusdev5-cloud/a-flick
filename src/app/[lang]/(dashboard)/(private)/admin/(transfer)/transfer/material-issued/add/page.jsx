@@ -44,13 +44,15 @@ const AddMaterialRequestIssuedPage = () => {
 
   /* ───── STATES ───── */
   const [employeeOptions, setEmployeeOptions] = useState([])
+  const [originOptions, setOriginOptions] = useState([])
   const [chemicalOptions, setChemicalOptions] = useState([])
   const [uomOptions, setUomOptions] = useState([])
 
   const [requestNo, setRequestNo] = useState('')
   const [issueDate, setIssueDate] = useState(new Date())
-  const [fromEmployee, setFromEmployee] = useState(null)
-  const [toEmployee, setToEmployee] = useState(null)
+  const [origin, setOrigin] = useState(null)
+  const [fromVehicle, setFromVehicle] = useState(null)
+  const [toVehicle, setToVehicle] = useState(null)
   const [remarks, setRemarks] = useState('')
 
   const [chemical, setChemical] = useState(null)
@@ -70,10 +72,7 @@ const AddMaterialRequestIssuedPage = () => {
       try {
         setInitLoading(true)
 
-        const [purchaseRes, materialRes] = await Promise.all([
-          getPurchaseFilters(),
-          getMaterialRequestDropdowns()
-        ])
+        const [purchaseRes, materialRes] = await Promise.all([getPurchaseFilters(), getMaterialRequestDropdowns()])
 
         const purchaseData = purchaseRes?.data?.data || purchaseRes?.data || {}
         const materialData = materialRes?.data?.data || materialRes?.data || materialRes || {}
@@ -104,6 +103,15 @@ const AddMaterialRequestIssuedPage = () => {
         }))
         setChemicalOptions(chemicals)
 
+        // Origin
+        const origins = (purchaseData?.company?.name || []).map(i => ({
+          label: i.name,
+          value: i.id,
+          id: i.id
+        }))
+        setOriginOptions(origins)
+        if (origins.length > 0) setOrigin(origins[0])
+
         // UOM
         const uomRaw = materialData?.uom?.name || materialData?.uom || []
         const uoms = uomRaw.map(u => ({
@@ -112,7 +120,6 @@ const AddMaterialRequestIssuedPage = () => {
           id: u.id
         }))
         setUomOptions(uoms)
-
       } catch (e) {
         showToast('error', 'Failed to load dropdowns')
       } finally {
@@ -198,7 +205,7 @@ const AddMaterialRequestIssuedPage = () => {
 
   /* ───── SAVE ───── */
   const handleSave = async () => {
-    if (!requestNo || !fromEmployee || !toEmployee || !issueDate || !items.length) {
+    if (!fromVehicle || !toVehicle || !issueDate || !items.length) {
       showToast('warning', 'Fill all required fields')
       return
     }
@@ -208,14 +215,28 @@ const AddMaterialRequestIssuedPage = () => {
 
       const payload = {
         request_no: requestNo,
-        from_employee_id: fromEmployee.id,
-        to_employee_id: toEmployee.id,
+        origin_id: origin?.id || null,
+        company_id: origin?.id || null,
+        from_employee_id: fromVehicle?.id || null,
+        to_employee_id: toVehicle?.id || null,
+        employee_id: fromVehicle?.id || null,
+        from_vehicle: fromVehicle?.label || '-',
+        from_vehicle_id: fromVehicle?.id || null,
+        to_vehicle: toVehicle?.label || '-',
+        to_vehicle_id: toVehicle?.id || null,
         issue_date: format(issueDate, 'yyyy-MM-dd'),
+        issue_status: 'Pending',
         remarks,
+        is_active: 1,
+        status: 1,
         items: items.map(i => ({
           item_id: i.chemicalId,
+          item_name: i.chemical,
           uom_id: i.uomId,
-          quantity: Number(i.quantity)
+          uom: i.uom,
+          quantity: Number(i.quantity),
+          is_active: 1,
+          status: 1
         }))
       }
 
@@ -263,8 +284,6 @@ const AddMaterialRequestIssuedPage = () => {
           )}
 
           <Grid container spacing={3}>
-
-
             <Grid item md={4} xs={12}>
               <AppReactDatepicker
                 selected={issueDate}
@@ -275,28 +294,24 @@ const AddMaterialRequestIssuedPage = () => {
 
             <Grid item md={4} xs={12}>
               <GlobalAutocomplete
-                label='From Employee'
+                label='From Vehicle'
                 options={employeeOptions}
-                value={fromEmployee}
-                onChange={setFromEmployee}
+                value={fromVehicle}
+                onChange={setFromVehicle}
               />
             </Grid>
 
             <Grid item md={4} xs={12}>
               <GlobalAutocomplete
-                label='To Employee'
+                label='To Vehicle'
                 options={employeeOptions}
-                value={toEmployee}
-                onChange={setToEmployee}
+                value={toVehicle}
+                onChange={setToVehicle}
               />
             </Grid>
 
-               <Grid item md={4} xs={12}>
-              <GlobalTextField
-                label='Request No'
-                value={requestNo}
-                onChange={e => setRequestNo(e.target.value)}
-              />
+            <Grid item md={4} xs={12}>
+              <GlobalTextField label='Request No' value={requestNo} onChange={e => setRequestNo(e.target.value)} />
             </Grid>
 
             <Grid item xs={12} md={4}>
@@ -338,7 +353,12 @@ const AddMaterialRequestIssuedPage = () => {
             </Grid>
 
             <Grid item md={3} xs={12}>
-              <GlobalTextField label='Quantity' type='number' value={quantity} onChange={e => setQuantity(e.target.value)} />
+              <GlobalTextField
+                label='Quantity'
+                type='number'
+                value={quantity}
+                onChange={e => setQuantity(e.target.value)}
+              />
             </Grid>
 
             <Grid item md={2} xs={12}>
@@ -404,10 +424,7 @@ const AddMaterialRequestIssuedPage = () => {
 
         {/* ACTIONS */}
         <Box px={4} py={3} display='flex' justifyContent='flex-end' gap={2}>
-          <GlobalButton
-            color='secondary'
-            onClick={() => router.push(`/${lang}/admin/transfer/material-issued`)}
-          >
+          <GlobalButton color='secondary' onClick={() => router.push(`/${lang}/admin/transfer/material-issued`)}>
             Close
           </GlobalButton>
 
@@ -419,7 +436,6 @@ const AddMaterialRequestIssuedPage = () => {
     </StickyListLayout>
   )
 }
-
 
 export default function AddMaterialRequestIssuedWrapper() {
   return (

@@ -282,7 +282,7 @@ const VerticalMenu = ({ scrollMenu }) => {
           </PermissionItem>
 
           <PermissionItem module='Material Request Issued'>
-            <MenuItem href={`/${locale}/admin/transfer/material-issued`}>Material Issued</MenuItem>
+            <MenuItem href={`/${locale}/admin/transfer/material-issued`}>Material Issue</MenuItem>
           </PermissionItem>
         </PermissionSubMenu>
 

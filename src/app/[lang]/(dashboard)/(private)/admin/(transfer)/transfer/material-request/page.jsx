@@ -28,6 +28,8 @@ import {
 import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 import StickyListLayout from '@/components/common/StickyListLayout'
 import PermissionGuard from '@/components/auth/PermissionGuard'
+import GlobalButton from '@/components/common/GlobalButton'
+import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
 import AddIcon from '@mui/icons-material/Add'
@@ -97,8 +99,12 @@ const MaterialRequestPageContent = () => {
     try {
       const res = await getMaterialRequestDropdowns()
       const data = res?.data || res
-      const uniqueNames = [...new Set((data?.employee?.name || []).map(e => e.name))]
-      setEmployeeOptions(uniqueNames)
+      const technicians = (data?.employee?.name || []).map(e => ({
+        label: e.name,
+        value: e.id,
+        id: e.id
+      }))
+      setEmployeeOptions(technicians)
     } catch (err) {
       console.error('Dropdown load failed:', err)
     }
@@ -109,16 +115,19 @@ const MaterialRequestPageContent = () => {
   }, [])
 
   const confirmDelete = async () => {
+    if (!deleteDialog.row) return
     try {
       setLoading(true)
-      const row = deleteDialog.row
-      if (!row) return
-      await deleteTmMaterialRequest(row.id)
-      showToast('delete', `Request ${row.requestNo || `REQ-${row.id}`} deleted`)
-      await loadData()
+      const res = await deleteTmMaterialRequest(deleteDialog.row.id)
+      if (res.status === 'success') {
+        showToast('delete', `Request ${deleteDialog.row.requestNo || `REQ-${deleteDialog.row.id}`} deleted`)
+        await loadData()
+      } else {
+        showToast('error', res.message || 'Failed to delete request')
+      }
     } catch (err) {
-      console.error(err)
-      showToast('error', 'Failed to delete request')
+      console.error('❌ DELETE ERROR:', err.response?.data || err.message)
+      showToast('error', err.response?.data?.message || 'Delete failed')
     } finally {
       setLoading(false)
       setDeleteDialog({ open: false, row: null })
@@ -128,11 +137,11 @@ const MaterialRequestPageContent = () => {
   const loadData = async (showToastMsg = false) => {
     setLoading(true)
     try {
-      const response = await getTmMaterialRequestList({ 
+      const response = await getTmMaterialRequestList({
         page,
-        page_size: PAGE_SIZE 
+        page_size: PAGE_SIZE
       })
-      
+
       const apiData = response?.data?.data || response?.data || response
       setTotalCount(apiData?.count || 0)
       const results = apiData?.results || []
@@ -141,9 +150,17 @@ const MaterialRequestPageContent = () => {
         id: r.id,
         requestNo: r.request_no || `REQ-${r.id}`,
         requestDate: r.request_date,
-        fromVehicle: r.from_vehicle || '',
-        toVehicle: r.to_vehicle || '',
-        approvedStatus: r.is_approved === 1 ? 'Yes' : 'N/A',
+        fromVehicle:
+          employeeOptions.find(e => String(e.id) === String(r.from_vehicle_id))?.label ||
+          r.from_vehicle ||
+          (r.from_vehicle === '-' ? '-' : r.from_vehicle) ||
+          '-',
+        toVehicle:
+          employeeOptions.find(e => String(e.id) === String(r.to_vehicle_id))?.label ||
+          r.to_vehicle ||
+          (r.to_vehicle === '-' ? '-' : r.to_vehicle) ||
+          '-',
+        approvedStatus: r.is_approved === 1 || r.is_approved === true ? 'Yes' : r.is_approved === 0 ? 'No' : 'N/A',
         issuedStatus: r.is_issued === 1 ? 'Yes' : 'N/A',
         completedStatus: r.is_completed === 1 ? 'Yes' : 'No',
         remarks: r.remarks || '',
@@ -159,8 +176,9 @@ const MaterialRequestPageContent = () => {
             new Date(row.requestDate) >= appliedFilters.startDate &&
             new Date(row.requestDate) <= appliedFilters.endDate
         const matchesStatus = !appliedFilters.requestStatus || row.status === appliedFilters.requestStatus
-        const matchesVehicle = !appliedFilters.vehicle || 
-          row.fromVehicle === appliedFilters.vehicle || 
+        const matchesVehicle =
+          !appliedFilters.vehicle ||
+          row.fromVehicle === appliedFilters.vehicle ||
           row.toVehicle === appliedFilters.vehicle
         return matchesSearch && matchesDate && matchesStatus && matchesVehicle
       })
@@ -173,6 +191,7 @@ const MaterialRequestPageContent = () => {
       setRows(withSno)
       if (showToastMsg) showToast('info', 'Material requests refreshed')
     } catch (err) {
+      console.error('API Error Response:', err.response?.data)
       console.error(err)
       showToast('error', 'Failed to load requests')
     } finally {
@@ -182,7 +201,7 @@ const MaterialRequestPageContent = () => {
 
   useEffect(() => {
     loadData(false)
-  }, [page, appliedFilters])
+  }, [page, appliedFilters, employeeOptions])
 
   const getStatusColor = status => {
     switch (status) {
@@ -348,7 +367,7 @@ const MaterialRequestPageContent = () => {
             }
             action={
               <Box display='flex' alignItems='center' gap={2}>
-                <Button
+                <GlobalButton
                   variant='contained'
                   color='primary'
                   startIcon={<AddIcon />}
@@ -356,7 +375,7 @@ const MaterialRequestPageContent = () => {
                   sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
                 >
                   Add Request
-                </Button>
+                </GlobalButton>
               </Box>
             }
             sx={{
@@ -407,7 +426,7 @@ const MaterialRequestPageContent = () => {
                 )}
               />
               <CustomAutocomplete
-                options={employeeOptions}
+                options={employeeOptions.map(e => e.label)}
                 value={uiVehicle || null}
                 onChange={(e, val) => setUiVehicle(val || '')}
                 renderInput={params => (
@@ -420,37 +439,37 @@ const MaterialRequestPageContent = () => {
                   />
                 )}
               />
-              <Button
-                  variant='contained'
-                  color='primary'
-                  startIcon={
-                    <RefreshIcon
-                      sx={{
-                        animation: loading ? 'spin 1s linear infinite' : 'none',
-                        '@keyframes spin': {
-                          '0%': { transform: 'rotate(0deg)' },
-                          '100%': { transform: 'rotate(360deg)' }
-                        }
-                      }}
-                    />
-                  }
-                  disabled={loading}
-                  onClick={() => {
-                    setPage(1)
-                    setAppliedFilters({
-                      enableDateFilter: uiEnableDateFilter,
-                      startDate: uiStartDate,
-                      endDate: uiEndDate,
-                      requestStatus: uiRequestStatus,
-                      vehicle: uiVehicle,
-                      searchText: uiSearchText
-                    })
-                    loadData(true)
-                  }}
-                  sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
-                >
-                  {loading ? 'Refreshing...' : 'Refresh'}
-                </Button>
+              <GlobalButton
+                variant='contained'
+                color='primary'
+                startIcon={
+                  <RefreshIcon
+                    sx={{
+                      animation: loading ? 'spin 1s linear infinite' : 'none',
+                      '@keyframes spin': {
+                        '0%': { transform: 'rotate(0deg)' },
+                        '100%': { transform: 'rotate(360deg)' }
+                      }
+                    }}
+                  />
+                }
+                disabled={loading}
+                onClick={() => {
+                  setPage(1)
+                  setAppliedFilters({
+                    enableDateFilter: uiEnableDateFilter,
+                    startDate: uiStartDate,
+                    endDate: uiEndDate,
+                    requestStatus: uiRequestStatus,
+                    vehicle: uiVehicle,
+                    searchText: uiSearchText
+                  })
+                  loadData(true)
+                }}
+                sx={{ textTransform: 'none', fontWeight: 500, px: 2.5, height: 36 }}
+              >
+                {loading ? 'Refreshing...' : 'Refresh'}
+              </GlobalButton>
             </Box>
 
             <Divider sx={{ mb: 3 }} />
@@ -479,7 +498,7 @@ const MaterialRequestPageContent = () => {
                 </FormControl>
                 <Box sx={{ display: 'flex', gap: 1.5 }}>
                   {['Copy', 'CSV', 'Excel', 'PDF', 'Print'].map(label => (
-                    <Button
+                    <GlobalButton
                       key={label}
                       variant='contained'
                       sx={{
@@ -502,7 +521,7 @@ const MaterialRequestPageContent = () => {
                       }}
                     >
                       {label}
-                    </Button>
+                    </GlobalButton>
                   ))}
                 </Box>
               </Box>
@@ -526,11 +545,7 @@ const MaterialRequestPageContent = () => {
 
             <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
               <StickyTableWrapper rowCount={rows.length}>
-                <table
-                  className={styles.table}
-                  style={{ width: '100%', tableLayout: 'auto' }}
-                >
-
+                <table className={styles.table} style={{ width: '100%', tableLayout: 'auto' }}>
                   <thead>
                     {table.getHeaderGroups().map(hg => (
                       <tr key={hg.id}>
@@ -572,7 +587,10 @@ const MaterialRequestPageContent = () => {
                       table.getRowModel().rows.map(row => (
                         <tr key={row.id}>
                           {row.getVisibleCells().map(cell => (
-                            <td key={cell.id} style={{ width: cell.column.id === 'actions' ? cell.column.getSize() : 'auto' }}>
+                            <td
+                              key={cell.id}
+                              style={{ width: cell.column.id === 'actions' ? cell.column.getSize() : 'auto' }}
+                            >
                               {flexRender(cell.column.columnDef.cell, cell.getContext())}
                             </td>
                           ))}
@@ -583,6 +601,8 @@ const MaterialRequestPageContent = () => {
                 </table>
               </StickyTableWrapper>
             </Box>
+
+            <Divider />
 
             <Box sx={{ mt: 'auto', flexShrink: 0, pt: 4 }}>
               <Box
@@ -616,56 +636,67 @@ const MaterialRequestPageContent = () => {
       {/* Delete Confirmation Dialog */}
       <Dialog
         onClose={() => setDeleteDialog({ open: false, row: null })}
-        aria-labelledby='delete-request-dialog'
+        aria-labelledby='customized-dialog-title'
         open={deleteDialog.open}
         closeAfterTransition={false}
-        PaperProps={{ sx: { overflow: 'visible', width: 420, borderRadius: 1, textAlign: 'center' } }}
+        PaperProps={{
+          sx: {
+            overflow: 'visible',
+            width: 420,
+            borderRadius: 1,
+            textAlign: 'center'
+          }
+        }}
       >
-        <DialogTitle sx={{ pt: 12 }}>
-          <Box
-            sx={{
-              position: 'absolute',
-              top: -40,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              bgcolor: 'error.main',
-              color: 'white',
-              width: 80,
-              height: 80,
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: '4px solid white',
-              boxShadow: 3
-            }}
-          >
-            <WarningAmberIcon sx={{ fontSize: 40 }} />
-          </Box>
-          <Typography variant='h5' sx={{ fontWeight: 600 }}>
-            Confirm Deletion
-          </Typography>
+        {/* 🔴 Title with Warning Icon */}
+        <DialogTitle
+          id='customized-dialog-title'
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1,
+            color: 'error.main',
+            fontWeight: 700,
+            pb: 1,
+            position: 'relative'
+          }}
+        >
+          <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
+          Confirm Delete
+          <DialogCloseButton onClick={() => setDeleteDialog({ open: false, row: null })} disableRipple>
+            <i className='tabler-x' />
+          </DialogCloseButton>
         </DialogTitle>
-        <DialogContent sx={{ px: 8, pb: 4 }}>
-          <Typography>Are you sure you want to delete this material request? This action cannot be undone.</Typography>
+
+        {/* Centered text */}
+        <DialogContent sx={{ px: 5, pt: 1 }}>
+          <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
+            Are you sure you want to delete material request{' '}
+            <strong style={{ color: '#d32f2f' }}>{deleteDialog.row?.requestNo || 'this request'}</strong>?
+            <br />
+            This action cannot be undone.
+          </Typography>
         </DialogContent>
-        <DialogActions sx={{ justifyContent: 'center', gap: 3, pb: 10 }}>
-          <Button
-            onClick={() => setDeleteDialog({ open: false, row: null })}
-            variant='tonal'
+
+        {/* Centered buttons */}
+        <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
+          <GlobalButton
             color='secondary'
+            onClick={() => setDeleteDialog({ open: false, row: null })}
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
           >
             Cancel
-          </Button>
-          <Button
+          </GlobalButton>
+          <GlobalButton
             onClick={confirmDelete}
             variant='contained'
             color='error'
-            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}
+            disabled={loading}
+            sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
           >
-            Delete
-          </Button>
+            {loading ? 'Deleting...' : 'Delete'}
+          </GlobalButton>
         </DialogActions>
       </Dialog>
     </>

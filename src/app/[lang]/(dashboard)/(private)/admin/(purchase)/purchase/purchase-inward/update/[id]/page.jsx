@@ -311,6 +311,18 @@ const EditPurchaseInwardPage = () => {
     }
   }
 
+  // Auto-calculate Quantity
+  const quantity = useMemo(() => {
+    const q = Number(in_quantity)
+    const c = Number(conversion)
+    return q && c ? q * c : 0
+  }, [in_quantity, conversion])
+
+  const total_quantity = useMemo(() => {
+    const a = Number(additional) || 0
+    return quantity + a
+  }, [quantity, additional])
+
   // Auto-calculate Amount
   useEffect(() => {
     const q = Number(quantity) || 0
@@ -362,17 +374,6 @@ const EditPurchaseInwardPage = () => {
     setPrevRate(row.prevRate || row.rate)
     setIsFoc(row.isFoc)
   }
-
-  const quantity = useMemo(() => {
-    const q = Number(in_quantity)
-    const c = Number(conversion)
-    return q && c ? q * c : 0
-  }, [in_quantity, conversion])
-
-  const total_quantity = useMemo(() => {
-    const a = Number(additional) || 0
-    return quantity + a
-  }, [quantity, additional])
 
   const handleAddItem = () => {
     if (!chemical || !uom || !in_quantity || !conversion) {
@@ -551,9 +552,9 @@ const EditPurchaseInwardPage = () => {
             {/* spacer to keep 3-column grid */}
             <Grid item xs={12} md={4} />
 
-            {/* 🔹 ROW 2 – Supplier + PO + Vehicle */}
+            {/* 🔹 ROW 2 – Suppliers + PO + Vehicle */}
             <Grid item xs={12} md={4}>
-              <GlobalAutocomplete label='Supplier' options={supplierOptions} value={supplier} onChange={setSupplier} />
+              <GlobalAutocomplete label='Suppliers' options={supplierOptions} value={supplier} onChange={setSupplier} />
             </Grid>
 
             <Grid item xs={12} md={4}>
@@ -595,7 +596,7 @@ const EditPurchaseInwardPage = () => {
             {/* Row 1 */}
             <Grid item xs={12} md={3}>
               <GlobalAutocomplete
-                label='Chemical'
+                label='Chemicals'
                 options={chemicalOptions}
                 value={chemical}
                 onChange={handleChemicalChange}
@@ -646,12 +647,12 @@ const EditPurchaseInwardPage = () => {
               />
             </Grid>
 
-            <Grid item xs={12} md={3}>
+            <Grid item xs={12} md={2}>
               <GlobalTextField label='Total Qty' type='number' value={total_quantity} disabled />
             </Grid>
 
             {/* Row 3: Rate & FOC */}
-            <Grid item xs={12} md={3}>
+            <Grid item xs={12} md={2}>
               <Box display='flex' flexDirection='column'>
                 <FormControlLabel
                   control={<Checkbox checked={isFoc} onChange={e => handleFocChange(e.target.checked)} size='small' />}
@@ -667,7 +668,7 @@ const EditPurchaseInwardPage = () => {
               </Box>
             </Grid>
 
-            <Grid item xs={12} md={3}>
+            <Grid item xs={12} md={2}>
               <GlobalTextField
                 label='Amount'
                 value={amount}
@@ -715,7 +716,7 @@ const EditPurchaseInwardPage = () => {
                     IN QTY
                   </th>
                   <th align='left' style={{ width: '10%', textAlign: 'left' }}>
-                    CONV.
+                    CONVERSION
                   </th>
                   <th align='left' style={{ width: '10%', textAlign: 'left' }}>
                     QTY

@@ -52,6 +52,8 @@ const AddMaterialReceivePage = () => {
   const [saveLoading, setSaveLoading] = useState(false)
 
   // Header fields
+  const [origin, setOrigin] = useState(null)
+  const [originOptions, setOriginOptions] = useState([])
   const [fromVehicle, setFromVehicle] = useState(null)
   const [toVehicle, setToVehicle] = useState(null)
   const [materialIssue, setMaterialIssue] = useState(null)
@@ -104,12 +106,21 @@ const AddMaterialReceivePage = () => {
           })) || []
         )
 
+        const origins = (purchaseData?.company?.name || []).map(i => ({
+          label: i.name,
+          value: i.id,
+          id: i.id
+        }))
+        setOriginOptions(origins)
+        if (origins.length > 0) setOrigin(origins[0])
+
         const issueRes = await getMaterialIssueList({ page_size: 100 })
         const issueData = issueRes?.data?.results || issueRes?.results || []
         setIssueOptions(
           issueData.map(i => {
             const trNo = i.num_series || i.issue_number || `Issue #${i.id}`
-            const trDate = i.receive_date || i.issue_date ? format(parseISO(i.receive_date || i.issue_date), 'dd/MM/yyyy') : ''
+            const trDate =
+              i.receive_date || i.issue_date ? format(parseISO(i.receive_date || i.issue_date), 'dd/MM/yyyy') : ''
             const tech = i.technician_name || i.technician || ''
             return {
               label: `${trNo}${trDate ? ` (${trDate})` : ''}${tech ? ` - ${tech}` : ''}`,
@@ -236,27 +247,30 @@ const AddMaterialReceivePage = () => {
       setSaveLoading(true)
 
       const payload = {
-        from_vehicle: fromVehicle.label,
-        from_vehicle_id: fromVehicle.id,
-        to_vehicle: toVehicle.label,
-        to_vehicle_id: toVehicle.id,
+        origin_id: origin?.id || null,
+        company_id: origin?.id || null,
+        from_vehicle: fromVehicle?.label || '-',
+        from_vehicle_id: fromVehicle?.id || null,
+        to_vehicle: toVehicle?.label || '-',
+        to_vehicle_id: toVehicle?.id || null,
         issue_id: materialIssue?.id || null,
-        employee_id: fromVehicle.id, // Primary vehicle
+        employee_id: fromVehicle?.id || null,
+        from_employee_id: fromVehicle?.id || null,
+        to_employee_id: toVehicle?.id || null,
         receive_date: format(receiveDate, 'yyyy-MM-dd'),
+        receive_status: 'Pending',
         remarks,
         is_active: 1,
         status: 1,
-        items: JSON.stringify(
-          items.map(i => ({
-            item_id: i.chemicalId,
-            item_name: i.chemical,
-            uom_id: i.uomId,
-            uom: i.uom,
-            quantity: Number(i.quantity),
-            is_active: 1,
-            status: 1
-          }))
-        )
+        items: items.map(i => ({
+          item_id: i.chemicalId,
+          item_name: i.chemical,
+          uom_id: i.uomId,
+          uom: i.uom,
+          quantity: Number(i.quantity),
+          is_active: 1,
+          status: 1
+        }))
       }
 
       await addMaterialReceive(payload)
@@ -310,6 +324,9 @@ const AddMaterialReceivePage = () => {
                 onChange={setReceiveDate}
                 customInput={<DateInput label='Receive Date' />}
               />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete label='Origin' options={originOptions} value={origin} onChange={setOrigin} />
             </Grid>
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete

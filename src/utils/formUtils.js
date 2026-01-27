@@ -25,13 +25,18 @@ export const objectToFormData = (obj, form, namespace) => {
       if (value instanceof File) {
         fd.append(formKey, value)
       }
-      // If value is Array -> append each item
+      // If value is Array -> append each item (handle nested objects in arrays)
       else if (Array.isArray(value)) {
         value.forEach((element, index) => {
+          const nestedKey = `${formKey}[${index}]`
           if (element instanceof File) {
-             fd.append(`${formKey}[${index}]`, element) // or just formKey depending on backend
-          } else {
-             fd.append(`${formKey}[${index}]`, element)
+            fd.append(nestedKey, element)
+          } else if (typeof element === 'object' && element !== null && !(element instanceof Date)) {
+            objectToFormData(element, fd, nestedKey)
+          } else if (element instanceof Date) {
+            fd.append(nestedKey, element.toISOString())
+          } else if (element !== null && element !== undefined) {
+            fd.append(nestedKey, element)
           }
         })
       }

@@ -147,7 +147,7 @@ const SalesQuotationPage = () => {
     }
   }
 
-  const handleGenerateDuplicate = async customDates => {
+  const handleGenerateDuplicate = async ({ startDate, endDate, reminderDate, customerId }) => {
     if (!duplicateDialog.details) return
 
     try {
@@ -167,10 +167,10 @@ const SalesQuotationPage = () => {
 
       const dupPayload = new FormData()
       dupPayload.append('proposal_id', String(details.id))
-      dupPayload.append('customer_id', String(details.customer_id))
-      dupPayload.append('start_date', formatDateToLocal(customDates?.startDate || details.start_date))
-      dupPayload.append('end_date', formatDateToLocal(customDates?.endDate || details.end_date))
-      dupPayload.append('reminder_date', formatDateToLocal(customDates?.reminderDate || details.reminder_date))
+      dupPayload.append('customer_id', String(customerId || details.customer_id))
+      dupPayload.append('start_date', formatDateToLocal(startDate || details.start_date))
+      dupPayload.append('end_date', formatDateToLocal(endDate || details.end_date))
+      dupPayload.append('reminder_date', formatDateToLocal(reminderDate || details.reminder_date))
       dupPayload.append('preferred_time', time)
 
       const res = await duplicateProposal(dupPayload)
@@ -273,8 +273,11 @@ const SalesQuotationPage = () => {
       columnHelper.accessor(
         row =>
           row.postal_code ||
+          row.postal_address ||
+          row.billing_postal_address ||
           row.zip_code ||
           row.customer?.postal_code ||
+          row.customer?.postal_address ||
           row.customer?.zip_code ||
           row.customer_postal_code ||
           '-',
@@ -866,9 +869,11 @@ const SalesQuotationPage = () => {
             <DuplicateProposalDialog
               open={duplicateDialog.open}
               handleClose={() => setDuplicateDialog({ open: false, row: null, details: null })}
-              onGenerate={handleGenerateDuplicate}
+              onGenerate={val => handleGenerateDuplicate(val)}
               contractType={duplicateDialog.details?.contract_type}
               frequency={duplicateDialog.details?.billing_frequency}
+              customers={filterOptions.customers}
+              defaultCustomerId={duplicateDialog.details?.customer_id}
             />
 
             {/* ================= PAGINATION ================= */}

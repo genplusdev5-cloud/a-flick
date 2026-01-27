@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState, useEffect, useMemo, forwardRef } from 'react'
 import Link from 'next/link'
@@ -40,15 +40,15 @@ const EditMaterialRequestPage = () => {
   const router = useRouter()
   const params = useParams()
   const { lang, id } = params
-  
+
   const decodedId = useMemo(() => {
     if (!id) return null
     try {
       const urlDecoded = decodeURIComponent(id)
-      return atob(urlDecoded)
+      return atob(urlDecoded.replace(/-/g, '+').replace(/_/g, '/'))
     } catch (e) {
       try {
-        return atob(id)
+        return atob(String(id).replace(/-/g, '+').replace(/_/g, '/'))
       } catch {
         return id
       }
@@ -101,30 +101,35 @@ const EditMaterialRequestPage = () => {
 
   useEffect(() => {
     const fetchData = async () => {
+      setInitLoading(true)
       try {
-        setInitLoading(true)
-
-        const [dropdownRes, detailsRes, filterRes] = await Promise.all([
-          getMaterialRequestDropdowns(),
-          getMaterialRequestById(decodedId),
-          getPurchaseFilters()
+        // Step 1: Fetch Metadata (Parallel)
+        const [dropdownRes, filterRes] = await Promise.all([
+          getMaterialRequestDropdowns().catch(e => {
+            console.error('Material drop error', e)
+            return null
+          }),
+          getPurchaseFilters().catch(e => {
+            console.error('Origin error', e)
+            return null
+          })
         ])
 
         // --- DROPDOWNS ---
-        const materialData = dropdownRes?.data || dropdownRes || {}
+        const materialData = dropdownRes?.data?.data || dropdownRes?.data || dropdownRes || {}
         const filterData = filterRes?.data || filterRes || {}
         const purchaseData = filterData?.data || filterData || {}
 
         // 1. Origins
-        const origins =
-          purchaseData?.company?.name?.map(item => ({
-            label: item.name,
-            value: item.name,
-            id: item.id
-          })) || []
+        const originRaw = purchaseData?.company?.name || purchaseData?.company || []
+        const origins = originRaw.map(item => ({
+          label: item.name || item.label || '',
+          value: item.id || item.value,
+          id: item.id || item.value
+        }))
         setOriginOptions(origins)
 
-        // 2. Chemicals (PRIORITY: Specialized Purchase API)
+        // 2. Chemicals
         let chemRaw = []
         if (Array.isArray(purchaseData?.chemicals)) {
           chemRaw = purchaseData.chemicals
@@ -132,12 +137,14 @@ const EditMaterialRequestPage = () => {
           chemRaw = purchaseData.chemicals.name
         } else if (Array.isArray(materialData?.chemicals?.name)) {
           chemRaw = materialData.chemicals.name
+        } else if (Array.isArray(materialData?.chemical?.name)) {
+          chemRaw = materialData.chemical.name
         }
 
         const chemicals = chemRaw.map(c => ({
-          label: c.name,
-          value: c.name,
-          id: c.id,
+          label: c.name || c.label || '',
+          value: c.id || c.value,
+          id: c.id || c.value,
           uom: c.uom || c.uom_name || c.unit
         }))
         setChemicalOptions(chemicals)
@@ -145,62 +152,81 @@ const EditMaterialRequestPage = () => {
         // 3. UOM
         const uomRaw = materialData?.uom?.name || materialData?.uom || []
         const uoms = uomRaw.map(u => ({
-          label: u.name,
-          value: u.name,
-          id: u.id
+          label: u.name || u.label || '',
+          value: u.id || u.value,
+          id: u.id || u.value
         }))
         setUomOptions(uoms)
 
         // 4. Employees
-        const employees =
-          (materialData?.employee?.name || []).map(item => ({
-            label: item.name,
-            value: item.id,
-            id: item.id
-          })) || []
+        const employeeRaw = materialData?.employee?.name || materialData?.employee || []
+        const employees = employeeRaw.map(item => ({
+          label: item.name || item.label || '',
+          value: item.id || item.value,
+          id: item.id || item.value
+        }))
         setEmployeeOptions(employees)
 
         // 5. Suppliers
-        const suppliers =
-          (materialData?.supplier?.name || []).map(item => ({
-            label: item.name,
-            value: item.id,
-            id: item.id
-          })) || []
+        const supplierRaw = materialData?.supplier?.name || materialData?.supplier || []
+        const suppliers = supplierRaw.map(item => ({
+          label: item.name || item.label || '',
+          value: item.id || item.value,
+          id: item.id || item.value
+        }))
         setSupplierOptions(suppliers)
 
-        // --- DETAILS ---
-        const data = detailsRes?.data ?? detailsRes ?? {}
+        // Step 2: Fetch Details (Sequential or Parallel with fallback)
+        if (decodedId && decodedId !== 'NaN') {
+          try {
+            const detailsRes = await getMaterialRequestById(decodedId)
+            const data = detailsRes?.data ?? detailsRes ?? {}
 
-        if (data.request_date) setRequestDate(new Date(data.request_date))
+            if (data) {
+              if (data.request_date) setRequestDate(new Date(data.request_date))
 
-        setOrigin(origins.find(o => o.id == data.origin_id) || null)
-        setFromVehicle(employees.find(e => e.label === data.from_vehicle) || (data.from_vehicle ? { label: data.from_vehicle, id: data.from_vehicle } : null))
-        setToVehicle(employees.find(e => e.label === data.to_vehicle) || (data.to_vehicle ? { label: data.to_vehicle, id: data.to_vehicle } : null))
-        setRemarks(data.remarks || '')
+              setOrigin(origins.find(o => String(o.id) === String(data.origin_id)) || null)
+              setFromVehicle(
+                employees.find(e => String(e.id) === String(data.from_vehicle_id)) ||
+                  (data.from_vehicle && data.from_vehicle !== '-'
+                    ? { label: data.from_vehicle, id: data.from_vehicle_id }
+                    : null)
+              )
+              setToVehicle(
+                employees.find(e => String(e.id) === String(data.to_vehicle_id)) ||
+                  (data.to_vehicle && data.to_vehicle !== '-'
+                    ? { label: data.to_vehicle, id: data.to_vehicle_id }
+                    : null)
+              )
+              setRemarks(data.remarks || '')
 
-        // --- ITEMS ---
-        const itemsList = data.items || []
+              // --- ITEMS ---
+              const itemsList = data.items || []
 
-        const mappedItems = itemsList.map(item => {
-          const chemId = item.item_id || item.item?.id || item.chemical_id
-          const uomId = item.uom_id || item.uom?.id
+              const mappedItems = itemsList.map(item => {
+                const chemId = item.item_id || item.item?.id || item.chemical_id
+                const uomId = item.uom_id || item.uom?.id
 
-          return {
-            id: item.id,
-            chemical: item.item_name || item.chemical_name || item.item?.name || '',
-            chemicalId: chemId,
-            uom: item.uom_name || item.uom || item.uom_details?.name || '',
-            uomId: uomId,
-            quantity: item.quantity,
-            remarks: item.remarks || ''
+                return {
+                  id: item.id,
+                  chemical: item.item_name || item.chemical_name || item.item?.name || '',
+                  chemicalId: chemId,
+                  uom: item.uom_name || item.uom || item.uom_details?.name || '',
+                  uomId: uomId,
+                  quantity: item.quantity,
+                  remarks: item.remarks || ''
+                }
+              })
+
+              setItems(mappedItems)
+            }
+          } catch (detErr) {
+            console.error('Details failed', detErr)
           }
-        })
-
-        setItems(mappedItems)
+        }
       } catch (err) {
-        console.error('Failed to fetch material request details', err)
-        showToast('error', 'Failed to load material request data')
+        console.error('Failed to fetch metadata', err)
+        showToast('error', 'Failed to load metadata')
       } finally {
         setInitLoading(false)
       }
@@ -215,11 +241,11 @@ const EditMaterialRequestPage = () => {
     setChemical(val)
     if (val && val.uom) {
       const uomStr = typeof val.uom === 'object' ? val.uom.label || val.uom.name : val.uom
-      const foundUom = uomOptions.find(u => u.label.toLowerCase() === uomStr.toLowerCase())
+      const foundUom = uomOptions.find(u => u.label.toLowerCase() === uomStr.toLowerCase() || u.id == val.uom_id)
       if (foundUom) {
         setUom(foundUom)
       } else {
-        setUom({ label: uomStr, value: uomStr, id: null })
+        setUom({ label: uomStr, value: uomStr, id: val.uom_id || null })
       }
     } else {
       setUom(null)
@@ -246,9 +272,9 @@ const EditMaterialRequestPage = () => {
             ? {
                 ...item,
                 chemical: chemical.label,
-                chemicalId: chemical.id,
+                chemicalId: chemical.id || chemical.value,
                 uom: uom.label,
-                uomId: uom.id,
+                uomId: uom.id || uom.value,
                 quantity
               }
             : item
@@ -261,9 +287,9 @@ const EditMaterialRequestPage = () => {
         {
           id: `temp-${Date.now()}`,
           chemical: chemical.label,
-          chemicalId: chemical.id,
+          chemicalId: chemical.id || chemical.value,
           uom: uom.label,
-          uomId: uom.id,
+          uomId: uom.id || uom.value,
           quantity
         }
       ])
@@ -300,27 +326,36 @@ const EditMaterialRequestPage = () => {
       const payload = {
         id: Number(decodedId),
         request_date: format(requestDate, 'yyyy-MM-dd'),
-        company_id: origin?.id || null,
-        origin_id: origin?.id || null,
-        employee_id: currentUser?.id || fromVehicle?.id || null,
-        from_vehicle: fromVehicle?.label || null,
-        from_vehicle_id: fromVehicle?.id || null,
-        to_vehicle: toVehicle?.label || null,
-        to_vehicle_id: toVehicle?.id || null,
-        supervisor_id: null,
         remarks: remarks,
+        employee_id: Number(fromVehicle?.id || currentUser?.id) || null, // Priority to selected vehicle/employee
+        from_vehicle: fromVehicle?.label || '-',
+        from_vehicle_id: Number(fromVehicle?.id) || null,
+        to_vehicle: toVehicle?.label || '-',
+        to_vehicle_id: Number(toVehicle?.id) || null,
         is_active: 1,
         status: 1,
-        items: JSON.stringify(items.map(item => ({
-          id: String(item.id).startsWith('temp') ? null : item.id,
-          item_id: item.chemicalId,
-          item_name: item.chemical,
-          uom: item.uom,
-          uom_id: item.uomId,
-          quantity: Number(item.quantity),
-          is_active: 1,
-          status: 1
-        })))
+        items: JSON.stringify(
+          items.map(item => {
+            const itemObj = {
+              id: item.id && !String(item.id).startsWith('temp') ? Number(item.id) : null,
+              mr_id: Number(decodedId),
+              item_id: Number(item.chemicalId) || null,
+              item_name: item.chemical,
+              uom: item.uom,
+              uom_id: Number(item.uomId) || null,
+              quantity: Number(item.quantity),
+              is_active: 1,
+              status: 1
+            }
+            return itemObj
+          })
+        )
+      }
+
+      // Only include origin if selected to avoid backend attribute errors
+      if (origin?.id) {
+        payload.origin_id = Number(origin.id) || null
+        payload.company_id = Number(origin.id) || null
       }
 
       await updateMaterialRequest(payload)
@@ -393,14 +428,9 @@ const EditMaterialRequestPage = () => {
               />
             </Grid>
 
-            {/* <Grid item xs={12} md={4}>
-              <GlobalAutocomplete
-                label='Origin'
-                options={originOptions}
-                value={origin}
-                onChange={setOrigin}
-              />
-            </Grid> */}
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete label='Origin' options={originOptions} value={origin} onChange={setOrigin} />
+            </Grid>
 
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
@@ -438,7 +468,12 @@ const EditMaterialRequestPage = () => {
         <Box px={4} py={3}>
           <Grid container spacing={2} alignItems='flex-end'>
             <Grid item xs={12} md={3}>
-              <GlobalAutocomplete label='Chemical' options={chemicalOptions} value={chemical} onChange={handleChemicalChange} />
+              <GlobalAutocomplete
+                label='Chemical'
+                options={chemicalOptions}
+                value={chemical}
+                onChange={handleChemicalChange}
+              />
             </Grid>
 
             <Grid item xs={12} md={2}>
@@ -498,13 +533,13 @@ const EditMaterialRequestPage = () => {
                       <td align='center'>
                         <div style={{ display: 'flex', justifyContent: 'center', gap: '4px' }}>
                           <IconButton
-                              size='small'
-                              color='primary'
-                              onClick={() => handleEditItem(row)}
-                              sx={{ padding: '4px' }}
-                            >
-                              <EditIcon fontSize='small' sx={{ fontSize: '1.25rem' }} />
-                            </IconButton>
+                            size='small'
+                            color='primary'
+                            onClick={() => handleEditItem(row)}
+                            sx={{ padding: '4px' }}
+                          >
+                            <EditIcon fontSize='small' sx={{ fontSize: '1.25rem' }} />
+                          </IconButton>
 
                           <IconButton
                             size='small'

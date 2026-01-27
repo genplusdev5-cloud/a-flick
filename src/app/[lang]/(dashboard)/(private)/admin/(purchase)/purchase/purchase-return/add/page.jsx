@@ -132,6 +132,15 @@ const AddPurchaseReturnPage = () => {
           }
         }
 
+        const chemicals = chemRaw.map(c => ({
+          label: c.name,
+          value: c.name,
+          id: c.id,
+          uom: c.store_uom || c.uom || c.uom_name || c.unit,
+          rate: c.unit_rate || c.rate || c.price || 0,
+          isFoc: c.is_foc || Number(c.unit_rate || c.rate || 0) === 0
+        }))
+
         const uoms =
           materialData?.uom?.name?.map(u => ({
             label: u.name,

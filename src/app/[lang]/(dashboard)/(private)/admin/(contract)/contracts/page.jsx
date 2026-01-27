@@ -32,7 +32,12 @@ import PresetDateRangePicker from '@/components/common/PresetDateRangePicker'
 import { getCompanyList } from '@/api/master/company'
 import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 
-import { getContractList, deleteContract, getContractDetails, duplicateContract } from '@/api/contract_group/contract'
+import {
+  getContractList,
+  deleteContractApi,
+  getContractDetails,
+  duplicateContract
+} from '@/api/contract_group/contract'
 import api from '@/utils/axiosInstance'
 import { encodeId, decodeId } from '@/utils/urlEncoder'
 import DuplicateProposalDialog from '@/views/admin/sales/proposal-wizard/steps/DuplicateProposalDialog'
@@ -475,7 +480,7 @@ const ContractsPageContent = () => {
 
   const confirmDelete = async () => {
     if (deleteDialog.row) {
-      await deleteContractApi(deleteDialog.row.id)
+      await deleteContractApi(deleteDialog.row.uuid)
 
       showToast('delete', `Contract ${deleteDialog.row.contractCode} deleted`)
       loadData()
@@ -519,7 +524,7 @@ const ContractsPageContent = () => {
         return `${year}-${month}-${day}`
       }
 
-      // Payload matching Postman for contracts
+      // Payload matching API requirement for contracts (expects contract_id to be the UUID)
       const dupPayload = new FormData()
       dupPayload.append('contract_id', String(details.id))
       dupPayload.append('customer_id', String(details.customer_id))
@@ -532,9 +537,8 @@ const ContractsPageContent = () => {
 
       if (res?.status === 'success' || res?.data?.id) {
         showToast('success', 'Contract Duplicated Successfully!')
-        const newId = res?.data?.uuid || res?.uuid || res?.data?.id || res?.id
-        const encodedNewId = encodeId(newId)
-        router.push(`/${lang}/admin/contracts/edit/${encodedNewId}`)
+        setDuplicateDialog({ open: false, row: null, details: null })
+        loadData()
       } else {
         showToast('error', res?.message || 'Duplication failed')
       }

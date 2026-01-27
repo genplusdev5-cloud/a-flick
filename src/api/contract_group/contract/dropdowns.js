@@ -2,10 +2,11 @@
 import api from '@/utils/axiosInstance'
 import { getCompanyList } from '@/api/master/company/getCompanyList'
 import { getCustomerNamesForList } from '@/api/contract_group/contract/listDropdowns'
+import { getCustomerOrigin } from '@/api/customer_group/customer/origin'
 
 export const getAllDropdowns = async () => {
   try {
-    const [contractRes, companiesRes, customersRes] = await Promise.all([
+    const [contractRes, companiesRes, customersRes, originsRes] = await Promise.all([
       api.get('/contract/').catch(err => {
         console.error('Contract API failed', err)
         return null
@@ -16,6 +17,10 @@ export const getAllDropdowns = async () => {
       }),
       getCustomerNamesForList().catch(err => {
         console.error('Customer List API failed', err)
+        return []
+      }),
+      getCustomerOrigin().catch(err => {
+        console.error('Origin List API failed', err)
         return []
       })
     ])
@@ -69,10 +74,12 @@ export const getAllDropdowns = async () => {
 
     const companies = unwrap(companiesRes, raw.company)
     const customers = unwrap(customersRes, raw.customer)
+    const origins = unwrap(originsRes, raw.origin)
 
     return {
       companies,
       customers,
+      origins,
       callTypes: unwrap(null, raw.calltype),
       billingFreq: unwrap(null, raw.billing_frequency),
       serviceFreq: unwrap(null, raw.service_frequency),

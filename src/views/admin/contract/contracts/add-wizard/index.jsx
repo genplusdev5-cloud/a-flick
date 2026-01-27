@@ -767,12 +767,7 @@ export default function AddContractWizard() {
     <Card className='flex flex-col md:flex-row'>
       <CardContent className='max-md:border-be md:border-ie md:min-is-[300px]'>
         <StepperWrapper>
-          <Stepper
-            activeStep={activeStep}
-            orientation='vertical'
-            connector={<></>}
-            className='flex flex-col gap-4 min-is-[220px]'
-          >
+          <Stepper activeStep={activeStep} orientation='vertical' className='flex flex-col gap-4 min-is-[220px]'>
             {steps.map((label, index) => {
               return (
                 <StyledStep key={index} completed={index < activeStep}>

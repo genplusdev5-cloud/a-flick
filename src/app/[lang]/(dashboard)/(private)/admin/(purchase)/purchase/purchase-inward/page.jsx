@@ -323,19 +323,19 @@ const PurchaseInwardPage = () => {
   const columns = useMemo(
     () => [
       columnHelper.accessor('sno', {
-        header: 'S.No',
-        cell: info => info.row.index + 1
+        header: () => <div className='text-center'>S.No</div>,
+        cell: info => <div className='text-center'>{info.row.index + 1}</div>
       }),
 
       columnHelper.display({
         id: 'action',
-        header: 'Action',
+        header: () => <div className='text-center'>Action</div>,
         enableSorting: false,
         cell: info => {
           const rowData = info.row.original
 
           return (
-            <Box sx={{ display: 'flex', gap: 1 }}>
+            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
               {/* VIEW (optional – same icon style) */}
               {/* <IconButton size='small' color='primary' onClick={() => console.log('VIEW', rowData.id)}>
                 <i className='tabler-eye' />
@@ -380,14 +380,23 @@ const PurchaseInwardPage = () => {
 
       columnHelper.accessor('origin', { header: 'Origin' }),
       columnHelper.accessor('inwardNo', { header: 'Inward No.' }),
-      columnHelper.accessor('inwardDate', { header: 'Inward Date' }),
+      columnHelper.accessor('inwardDate', {
+        header: () => <div className='text-right'>Inward Date</div>,
+        cell: info => <div className='text-right'>{info.getValue()}</div>
+      }),
       columnHelper.accessor('supplierName', { header: 'Supplier Name' }),
-      columnHelper.accessor('noOfItems', { header: 'No. of Items' }),
+      columnHelper.accessor('noOfItems', {
+        header: () => <div className='text-right'>No. of Items</div>,
+        cell: info => <div className='text-right'>{info.getValue()}</div>
+      }),
       columnHelper.accessor('poNo', { header: 'PO No.' }),
       columnHelper.accessor('poDate', {
-        header: 'PO Date',
-        cell: info =>
-          info.getValue() && info.getValue() !== '-' ? format(new Date(info.getValue()), 'dd/MM/yyyy') : '-'
+        header: () => <div className='text-right'>PO Date</div>,
+        cell: info => (
+          <div className='text-right'>
+            {info.getValue() && info.getValue() !== '-' ? format(new Date(info.getValue()), 'dd/MM/yyyy') : '-'}
+          </div>
+        )
       }),
 
       columnHelper.accessor('status', {
@@ -457,7 +466,7 @@ const PurchaseInwardPage = () => {
                 variant='contained'
                 startIcon={<AddIcon />}
                 sx={{ height: 36 }}
-                onClick={() => router.push('/admin/purchase/purchase-inward/add')}
+                onClick={() => router.push(`/${lang}/admin/purchase/purchase-inward/add`)}
               >
                 Add Purchase Inward
               </GlobalButton>

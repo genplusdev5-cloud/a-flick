@@ -35,21 +35,22 @@ const Step1DealType = ({
 
   const requiredFieldSx = {
     '& .MuiFormLabel-asterisk': {
-      color: '#e91e63 !important',
-      fontWeight: 700
-    },
-    '& .MuiInputLabel-root.Mui-required': {
-      color: 'inherit'
+      display: 'none'
     }
   }
 
-  const renderLabel = (label, showAddIcon = false) => (
-    <Box component='span' sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+  const renderLabel = (label, required = false, showAddIcon = false) => (
+    <Box component='span' sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
       {label}
+      {required && (
+        <Typography component='span' sx={{ color: '#e91e63', fontWeight: 700, fontSize: '0.75rem', mt: -0.5 }}>
+          *
+        </Typography>
+      )}
       {showAddIcon && !formData.id && (
         <i
           className='tabler-user-plus'
-          style={{ cursor: 'pointer', fontSize: '1.2rem', color: '#7367f0' }}
+          style={{ cursor: 'pointer', fontSize: '1.2rem', color: '#7367f0', marginLeft: '4px' }}
           onClick={e => {
             e.stopPropagation()
             e.preventDefault()
@@ -92,20 +93,18 @@ const Step1DealType = ({
       {/* Origin */}
       <Grid item xs={12} md={3}>
         <GlobalAutocomplete
-          label='Origin'
-          options={dropdowns?.companies || []}
-          value={formData.companyId}
-          onChange={v => handleAutocompleteChange('company', v, refs.companyRef)}
-          inputRef={refs.companyRef}
-          required
-          sx={requiredFieldSx}
+          label={renderLabel('Origin')}
+          options={dropdowns?.origins || []}
+          value={formData.originId}
+          onChange={v => handleAutocompleteChange('origin', v, refs.originRef)}
+          inputRef={refs.originRef}
         />
       </Grid>
 
       {/* Customer (Moved from Step 2) */}
       <Grid item xs={12} md={3}>
         <GlobalAutocomplete
-          label={renderLabel('Customer', true)}
+          label={renderLabel('Customer', true, true)}
           placeholder='Customer'
           options={customerOptions}
           value={formData.customerId}
@@ -119,7 +118,7 @@ const Step1DealType = ({
       {/* Contract Type */}
       <Grid item xs={12} md={3}>
         <GlobalAutocomplete
-          label='Contract Type'
+          label={renderLabel('Contract Type', true)}
           options={['Continuous Contract', 'Limited Contract', 'Continuous Job', 'Job', 'Warranty']}
           value={formData.contractType}
           onChange={v => handleAutocompleteChange('contractType', v, refs.contractTypeRef)}
@@ -132,15 +131,15 @@ const Step1DealType = ({
       <Grid item xs={12} md={3}>
         <CustomTextField
           fullWidth
-          label='Contract Name '
+          label={renderLabel('Business Name', true)}
           name='name'
-          placeholder='Contract Name'
-          value={formData.name}
+          placeholder='Business Name'
+          value={formData.name || ''}
           onChange={handleChange}
-          ref={refs.nameRef}
+          inputRef={refs.nameRef}
           onKeyDown={e => handleKeyDown(e, refs.nameRef)}
           required
-          sx={{ '& .MuiInputBase-root': { bgcolor: '#fffde7' } }}
+          sx={{ ...requiredFieldSx, '& .MuiInputBase-root': { bgcolor: '#fffde7' } }}
         />
       </Grid>
 
@@ -152,9 +151,9 @@ const Step1DealType = ({
       <Grid item xs={12} md={4}>
         <CustomTextField
           fullWidth
-          label='Billing Name'
+          label={renderLabel('Billing Name', true)}
           name='billingName'
-          value={formData.billingName}
+          value={formData.billingName || ''}
           onChange={handleChange}
           inputRef={refs.billingNameRef}
           onKeyDown={e => handleKeyDown(e, refs.billingNameRef)}
@@ -162,25 +161,24 @@ const Step1DealType = ({
           sx={requiredFieldSx}
         />
       </Grid>
-      <Grid item xs={12} md={4}>
+      <Grid item xs={12} md={8}>
         <CustomTextField
           fullWidth
-          label='Billing Address'
+          label={renderLabel('Billing Address')}
           name='billingAddress'
-          value={formData.billingAddress}
+          value={formData.billingAddress || ''}
           onChange={handleChange}
           inputRef={refs.billingAddressRef}
           onKeyDown={e => handleKeyDown(e, refs.billingAddressRef)}
-          required
-          sx={requiredFieldSx}
         />
       </Grid>
-      <Grid item xs={12} md={4}>
+
+      <Grid item xs={12} md={3}>
         <CustomTextField
           fullWidth
-          label='Billing Postal Code'
+          label={renderLabel('Billing Postal Code', true)}
           name='billingPostalCode'
-          value={formData.billingPostalCode}
+          value={formData.billingPostalCode || ''}
           onChange={handleChange}
           inputRef={refs.billingPostalCodeRef}
           onKeyDown={e => handleKeyDown(e, refs.billingPostalCodeRef)}
@@ -189,134 +187,113 @@ const Step1DealType = ({
         />
       </Grid>
 
-      {/* --- ROW 4: Codes --- */}
-      <Grid item xs={12} md={4}>
+      <Grid item xs={12} md={3}>
         <CustomTextField
           fullWidth
-          label='Cust. Code'
+          label={renderLabel('Cust. Code')}
           name='customerCode'
-          value={formData.customerCode}
+          value={formData.customerCode || ''}
           onChange={handleChange}
           inputRef={refs.customerCodeRef}
           onKeyDown={e => handleKeyDown(e, refs.customerCodeRef)}
-          required
-          sx={requiredFieldSx}
         />
       </Grid>
-      <Grid item xs={12} md={4}>
+      <Grid item xs={12} md={3}>
         <CustomTextField
           fullWidth
-          label='Group Code'
+          label={renderLabel('Group Code')}
           name='groupCode'
-          value={formData.groupCode}
+          value={formData.groupCode || ''}
           onChange={handleChange}
           inputRef={refs.groupCodeRef}
           onKeyDown={e => handleKeyDown(e, refs.groupCodeRef)}
-          required
-          sx={requiredFieldSx}
         />
       </Grid>
-      <Grid item xs={12} md={4}>
+      <Grid item xs={12} md={3}>
         <CustomTextField
           fullWidth
-          label='Acc. Code'
+          label={renderLabel('Acc. Code')}
           name='accCode'
-          value={formData.accCode}
+          value={formData.accCode || ''}
           onChange={handleChange}
           inputRef={refs.accCodeRef}
           onKeyDown={e => handleKeyDown(e, refs.accCodeRef)}
-          required
-          sx={requiredFieldSx}
         />
       </Grid>
 
-      {/* --- ROW 5: PIC Contact --- */}
+      {/* PIC Info */}
       <Grid item xs={12}>
         <Divider sx={{ my: 1 }}> PIC Contact Details </Divider>
       </Grid>
-
       <Grid item xs={12} md={4}>
         <CustomTextField
           fullWidth
-          label='PIC Contact Name'
+          label={renderLabel('PIC Contact Name')}
           name='picContactName'
-          value={formData.picContactName}
+          value={formData.picContactName || ''}
           onChange={handleChange}
           inputRef={refs.picContactNameRef}
           onKeyDown={e => handleKeyDown(e, refs.picContactNameRef)}
-          required
-          sx={requiredFieldSx}
         />
       </Grid>
       <Grid item xs={12} md={4}>
         <CustomTextField
           fullWidth
-          label='PIC Email'
+          label={renderLabel('PIC Email')}
           name='picEmail'
-          value={formData.picEmail}
+          value={formData.picEmail || ''}
           onChange={handleChange}
           inputRef={refs.picEmailRef}
           onKeyDown={e => handleKeyDown(e, refs.picEmailRef)}
-          required
-          sx={requiredFieldSx}
         />
       </Grid>
       <Grid item xs={12} md={4}>
         <CustomTextField
           fullWidth
-          label='PIC Phone'
+          label={renderLabel('PIC Phone')}
           name='picPhone'
-          value={formData.picPhone}
+          value={formData.picPhone || ''}
           onChange={handleChange}
           inputRef={refs.picPhoneRef}
           onKeyDown={e => handleKeyDown(e, refs.picPhoneRef)}
-          required
-          sx={requiredFieldSx}
         />
       </Grid>
 
-      {/* --- ROW 6: Billing Contact --- */}
+      {/* Billing Info */}
       <Grid item xs={12}>
         <Divider sx={{ my: 1 }}> Billing Contact Details </Divider>
       </Grid>
-
       <Grid item xs={12} md={4}>
         <CustomTextField
           fullWidth
-          label='Billing Contact Name'
+          label={renderLabel('Billing Contact Name')}
           name='billingContactName'
-          value={formData.billingContactName}
+          value={formData.billingContactName || ''}
           onChange={handleChange}
           inputRef={refs.billingContactNameRef}
           onKeyDown={e => handleKeyDown(e, refs.billingContactNameRef)}
-          required
-          sx={requiredFieldSx}
         />
       </Grid>
       <Grid item xs={12} md={4}>
         <CustomTextField
           fullWidth
-          label='Billing Email'
+          label={renderLabel('Billing Email')}
           name='billingEmail'
-          value={formData.billingEmail}
+          value={formData.billingEmail || ''}
           onChange={handleChange}
           inputRef={refs.billingEmailRef}
           onKeyDown={e => handleKeyDown(e, refs.billingEmailRef)}
-          required
-          sx={requiredFieldSx}
         />
       </Grid>
       <Grid item xs={12} md={4}>
         <CustomTextField
           fullWidth
-          label='Billing Phone'
+          label={renderLabel('Billing Phone')}
           name='billingPhone'
-          value={formData.billingPhone}
+          value={formData.billingPhone || ''}
           onChange={handleChange}
           inputRef={refs.billingPhoneRef}
           onKeyDown={e => handleKeyDown(e, refs.billingPhoneRef)}
-          required
-          sx={requiredFieldSx}
         />
       </Grid>
 

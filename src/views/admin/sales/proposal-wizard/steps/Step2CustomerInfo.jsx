@@ -1,4 +1,4 @@
-import { Grid, Typography, FormControlLabel, Checkbox, Divider } from '@mui/material'
+import { Grid, Typography, FormControlLabel, Checkbox, Divider, Box } from '@mui/material'
 import GlobalAutocomplete from '@/components/common/GlobalAutocomplete'
 import CustomTextField from '@core/components/mui/TextField'
 import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
@@ -17,13 +17,20 @@ const Step2CustomerInfo = ({
 }) => {
   const requiredFieldSx = {
     '& .MuiFormLabel-asterisk': {
-      color: '#e91e63 !important',
-      fontWeight: 700
-    },
-    '& .MuiInputLabel-root.Mui-required': {
-      color: 'inherit'
+      display: 'none'
     }
   }
+
+  const renderLabel = (label, required = false) => (
+    <Box component='span' sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+      {label}
+      {required && (
+        <Typography component='span' sx={{ color: '#e91e63', fontWeight: 700, fontSize: '0.75rem', mt: -0.5 }}>
+          *
+        </Typography>
+      )}
+    </Box>
+  )
 
   return (
     <Grid container spacing={4}>
@@ -53,9 +60,9 @@ const Step2CustomerInfo = ({
       <Grid item xs={12} md={6}>
         <CustomTextField
           fullWidth
-          label='Service Address'
+          label={renderLabel('Service Address', true)}
           name='serviceAddress'
-          value={formData.serviceAddress}
+          value={formData.serviceAddress || ''}
           onChange={handleChange}
           inputRef={refs.serviceAddressRef}
           onKeyDown={e => handleKeyDown(e, refs.serviceAddressRef)}
@@ -67,9 +74,9 @@ const Step2CustomerInfo = ({
       <Grid item xs={12} md={3}>
         <CustomTextField
           fullWidth
-          label='Postal Code'
+          label={renderLabel('Postal Code', true)}
           name='postalCode'
-          value={formData.postalCode}
+          value={formData.postalCode || ''}
           onChange={handleChange}
           inputRef={refs.postalCodeRef}
           onKeyDown={e => handleKeyDown(e, refs.postalCodeRef)}
@@ -80,14 +87,12 @@ const Step2CustomerInfo = ({
       <Grid item xs={12} md={3}>
         <CustomTextField
           fullWidth
-          label='Covered Location'
+          label={renderLabel('Covered Location')}
           name='coveredLocation'
-          value={formData.coveredLocation}
+          value={formData.coveredLocation || ''}
           onChange={handleChange}
           inputRef={refs.coveredLocationRef}
           onKeyDown={e => handleKeyDown(e, refs.coveredLocationRef)}
-          required
-          sx={requiredFieldSx}
         />
       </Grid>
 
@@ -99,14 +104,12 @@ const Step2CustomerInfo = ({
       <Grid item xs={12} md={4}>
         <CustomTextField
           fullWidth
-          label='PO Number'
+          label={renderLabel('PO Number')}
           name='poNumber'
-          value={formData.poNumber}
+          value={formData.poNumber || ''}
           onChange={handleChange}
           inputRef={refs.poNumberRef}
           onKeyDown={e => handleKeyDown(e, refs.poNumberRef)}
-          required
-          sx={requiredFieldSx}
         />
       </Grid>
 
@@ -118,11 +121,9 @@ const Step2CustomerInfo = ({
           customInput={
             <CustomTextField
               fullWidth
-              label='PO Expiry Date'
+              label={renderLabel('PO Expiry Date')}
               inputRef={refs.poExpiryRef}
               onKeyDown={e => handleKeyDown(e, refs.poExpiryRef)}
-              required
-              sx={requiredFieldSx}
             />
           }
         />
@@ -139,11 +140,9 @@ const Step2CustomerInfo = ({
           customInput={
             <CustomTextField
               fullWidth
-              label='Preferred Time'
+              label={renderLabel('Preferred Time')}
               inputRef={refs.preferredTimeRef}
               onKeyDown={e => handleKeyDown(e, refs.preferredTimeRef)}
-              required
-              sx={requiredFieldSx}
             />
           }
         />
@@ -153,68 +152,58 @@ const Step2CustomerInfo = ({
       <Grid item xs={12} md={6}>
         <CustomTextField
           fullWidth
-          label='Service Report Email'
+          label={renderLabel('Service Report Email')}
           name='reportEmail'
-          value={formData.reportEmail}
+          value={formData.reportEmail || ''}
           onChange={handleChange}
           inputRef={refs.reportEmailRef}
           onKeyDown={e => handleKeyDown(e, refs.reportEmailRef)}
-          required
-          sx={requiredFieldSx}
         />
       </Grid>
 
       <Grid item xs={12} md={6}>
         <CustomTextField
           fullWidth
-          label='Site Contact Person Name'
+          label={renderLabel('Site Contact Person Name')}
           name='contactPerson'
-          value={formData.contactPerson}
+          value={formData.contactPerson || ''}
           onChange={handleChange}
           inputRef={refs.contactPersonRef}
           onKeyDown={e => handleKeyDown(e, refs.contactPersonRef)}
-          required
-          sx={requiredFieldSx}
         />
       </Grid>
 
       <Grid item xs={12} md={3}>
         <CustomTextField
           fullWidth
-          label='Site Incharge Phone Number'
+          label={renderLabel('Site Incharge Phone Number')}
           name='sitePhone'
-          value={formData.sitePhone}
+          value={formData.sitePhone || ''}
           onChange={handleChange}
           inputRef={refs.sitePhoneRef}
           onKeyDown={e => handleKeyDown(e, refs.sitePhoneRef)}
-          required
-          sx={requiredFieldSx}
         />
       </Grid>
 
       <Grid item xs={12} md={3}>
         <CustomTextField
           fullWidth
-          label='Mobile'
+          label={renderLabel('Mobile')}
           name='mobile'
-          value={formData.mobile}
+          value={formData.mobile || ''}
           onChange={handleChange}
           inputRef={refs.mobileRef}
           onKeyDown={e => handleKeyDown(e, refs.mobileRef)}
-          required
-          sx={requiredFieldSx}
         />
       </Grid>
 
       <Grid item xs={12} md={3}>
         <GlobalAutocomplete
-          label='Call Type'
+          label={renderLabel('Call Type')}
           options={dropdowns?.callTypes || []}
           value={formData.callTypeId}
           onChange={v => handleAutocompleteChange('callType', v, refs.callTypeRef)}
           inputRef={refs.callTypeRef}
-          required
-          sx={requiredFieldSx}
         />
       </Grid>
 
@@ -226,7 +215,7 @@ const Step2CustomerInfo = ({
           customInput={
             <CustomTextField
               fullWidth
-              label='Start Date'
+              label={renderLabel('Start Date', true)}
               inputRef={refs.startDateRef}
               onKeyDown={e => handleKeyDown(e, refs.startDateRef)}
               required
@@ -243,7 +232,7 @@ const Step2CustomerInfo = ({
           customInput={
             <CustomTextField
               fullWidth
-              label='End Date'
+              label={renderLabel('End Date', true)}
               inputRef={refs.endDateRef}
               onKeyDown={e => handleKeyDown(e, refs.endDateRef)}
               required
@@ -260,7 +249,7 @@ const Step2CustomerInfo = ({
           customInput={
             <CustomTextField
               fullWidth
-              label='Reminder Date'
+              label={renderLabel('Reminder Date', true)}
               inputRef={refs.reminderDateRef}
               onKeyDown={e => handleKeyDown(e, refs.reminderDateRef)}
               required
@@ -272,7 +261,7 @@ const Step2CustomerInfo = ({
 
       <Grid item xs={12} md={4}>
         <GlobalAutocomplete
-          label='Industry'
+          label={renderLabel('Industry', true)}
           options={dropdowns?.industries || []}
           value={formData.industryId}
           onChange={v => handleAutocompleteChange('industry', v, refs.industryRef)}
@@ -284,19 +273,17 @@ const Step2CustomerInfo = ({
 
       <Grid item xs={12} md={4}>
         <GlobalAutocomplete
-          label='Payment Term'
+          label={renderLabel('Payment Term')}
           options={['0 days', '30 days']}
           value={formData.paymentTerm}
           onChange={v => handleAutocompleteChange('paymentTerm', v, refs.paymentTermRef)}
           inputRef={refs.paymentTermRef}
-          required
-          sx={requiredFieldSx}
         />
       </Grid>
 
       <Grid item xs={12} md={4}>
         <GlobalAutocomplete
-          label='Sales Person'
+          label={renderLabel('Sales Person', true)}
           options={dropdowns?.salesPersons || []}
           value={formData.salesPersonId}
           onChange={v => handleAutocompleteChange('salesPerson', v, refs.salesPersonRef)}
@@ -310,27 +297,23 @@ const Step2CustomerInfo = ({
       <Grid item xs={12} md={4}>
         <CustomTextField
           fullWidth
-          label='Latitude'
+          label={renderLabel('Latitude')}
           name='latitude'
-          value={formData.latitude}
+          value={formData.latitude || ''}
           onChange={handleChange}
           inputRef={refs.latitudeRef}
           onKeyDown={e => handleKeyDown(e, refs.latitudeRef)}
-          required
-          sx={requiredFieldSx}
         />
       </Grid>
       <Grid item xs={12} md={4}>
         <CustomTextField
           fullWidth
-          label='Longitude'
+          label={renderLabel('Longitude')}
           name='longitude'
-          value={formData.longitude}
+          value={formData.longitude || ''}
           onChange={handleChange}
           inputRef={refs.longitudeRef}
           onKeyDown={e => handleKeyDown(e, refs.longitudeRef)}
-          required
-          sx={requiredFieldSx}
         />
       </Grid>
     </Grid>

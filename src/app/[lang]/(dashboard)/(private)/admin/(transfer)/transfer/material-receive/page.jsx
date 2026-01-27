@@ -174,17 +174,25 @@ const MaterialRequestReceivedPage = () => {
       setTotalCount(data?.count || 0)
 
       const mapped = (data?.results || []).map((item, index) => {
+        const fromV =
+          employeeOptions.find(e => String(e.id) === String(item.from_vehicle_id))?.label || item.from_vehicle
+        const toV = employeeOptions.find(e => String(e.id) === String(item.to_vehicle_id))?.label || item.to_vehicle
+
+        let displayStatus = item.receive_status || 'Pending'
+        if (item.status === 1 && !item.receive_status) displayStatus = 'Pending'
+        if (item.status === 2) displayStatus = 'Completed'
+
         return {
           sno: pagination.pageIndex * pagination.pageSize + (index + 1),
           id: item.id,
-          fromVehicle: item.from_vehicle || '-',
-          toVehicle: item.to_vehicle || '-',
+          fromVehicle: fromV && fromV !== '-' ? fromV : '-',
+          toVehicle: toV && toV !== '-' ? toV : '-',
           issueNo: item.issue_number || item.num_series_issue || (item.issue_id ? `Issue #${item.issue_id}` : '-'),
           transferInNo: item.num_series || item.receive_number || '-',
           transferInDate: item.receive_date ? format(new Date(item.receive_date), 'dd/MM/yyyy') : '-',
           rawDate: item.receive_date,
           remarks: item.remarks || '-',
-          status: item.receive_status || item.status || 'Pending',
+          status: displayStatus,
           recordType: item.record_type || 'tm'
         }
       })
@@ -220,7 +228,8 @@ const MaterialRequestReceivedPage = () => {
     selectedToVehicle,
     selectedIssue,
     uiDateFilter,
-    uiDateRange
+    uiDateRange,
+    employeeOptions
   ])
 
   /* ───────── COLUMNS ───────── */
@@ -240,7 +249,9 @@ const MaterialRequestReceivedPage = () => {
                 size='small'
                 color='primary'
                 onClick={() =>
-                  router.push(`/${lang}/admin/transfer/material-receive/update/${btoa(String(r.id))}?type=${r.recordType}`)
+                  router.push(
+                    `/${lang}/admin/transfer/material-receive/update/${btoa(String(r.id))}?type=${r.recordType}`
+                  )
                 }
               >
                 <i className='tabler-edit' />

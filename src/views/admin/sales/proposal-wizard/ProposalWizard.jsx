@@ -98,6 +98,23 @@ const formatDate = date => {
   return `${day}/${month}/${year}`
 }
 
+const requiredFieldSx = {
+  '& .MuiFormLabel-asterisk': {
+    display: 'none'
+  }
+}
+
+const renderLabel = (label, required = false) => (
+  <Box component='span' sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+    {label}
+    {required && (
+      <Typography component='span' sx={{ color: '#e91e63', fontWeight: 700, fontSize: '0.75rem', mt: -0.5 }}>
+        *
+      </Typography>
+    )}
+  </Box>
+)
+
 // 💡 NEW: Helper to format date locally (YYYY-MM-DD) for MUI pickers if needed
 const formatDateToLocal = date => {
   if (!date) return ''
@@ -159,12 +176,12 @@ export default function ProposalWizard({ id }) {
   // ----------------------------------------------------------------------
   const [formData, setFormData] = useState({
     // Step 1
-    company: '',
-    companyId: '', // ✅ Add companyId
-    salesMode: '', // Keeping for safe removal or backward compat if needed
+    originId: '',
+    origin: '',
+    salesMode: '',
     contractType: '',
     proposalStatus: 'Draft',
-    name: '', // Renamed from contractName
+    name: '',
     contractCode: '',
     // Additional Step 1 Fields
     customer: '',
@@ -183,6 +200,7 @@ export default function ProposalWizard({ id }) {
     billingContactName: '',
     billingEmail: '',
     billingPhone: '',
+    invoiceRemarks: [], // Default to array for multi-select
 
     // Step 2
     // customer: '', // Moved to Step 1
@@ -220,7 +238,7 @@ export default function ProposalWizard({ id }) {
     invoiceRemarksOptions: [], // Suggested remarks from API
     riskAssessment: '',
     copyCustomerAddress: false,
-    reportBlock: '', // New
+    reportBlock: '',
     contractValue: '',
     billingFrequency: '',
     // Files
@@ -233,12 +251,7 @@ export default function ProposalWizard({ id }) {
     technicianRemarks: '',
     appointmentRemarks: '',
     agreement1: '',
-    agreement2: '',
-
-    // Hidden / Calculations
-    invoiceRemarks: [],
-    latitude: '',
-    longitude: ''
+    agreement2: ''
   })
 
   // Table Data State
@@ -291,7 +304,7 @@ export default function ProposalWizard({ id }) {
 
   const [dropdowns, setDropdowns] = useState({
     customers: [],
-    companies: [], // ✅ Add companies dropdown
+    origins: [],
     callTypes: [],
     industries: [],
     technicians: [],
@@ -325,7 +338,7 @@ export default function ProposalWizard({ id }) {
     fileUploadButtonRef: useRef(null),
 
     // Step 1
-    companyRef: useRef(null),
+    originRef: useRef(null),
     customerRef: useRef(null),
     contractTypeRef: useRef(null),
     billingNameRef: useRef(null),
@@ -372,7 +385,7 @@ export default function ProposalWizard({ id }) {
   const focusableElementRefs = useMemo(
     () => [
       // Step 0
-      refs.companyRef,
+      refs.originRef,
       refs.customerRef,
       refs.contractTypeRef,
       refs.nameRef,
@@ -600,9 +613,10 @@ export default function ProposalWizard({ id }) {
 
       setDropdowns({
         ...data,
+        origins: data.origins || data.companies, // Fallback to companies if origins is empty
         billingFrequencies: data.billingFreq,
         serviceFrequencies: data.serviceFreq,
-        frequencies: data.billingFreq, // Updated to use Billing Frequency as per user request
+        frequencies: data.billingFreq,
         salesPersons: data.salesPeople
       })
 
@@ -612,7 +626,7 @@ export default function ProposalWizard({ id }) {
           c => c.label?.toLowerCase().includes('a-flick') || c.name?.toLowerCase().includes('a-flick')
         )
         if (aflick) {
-          setFormData(prev => ({ ...prev, company: aflick.label || aflick.name, companyId: aflick.id || aflick.value }))
+          setFormData(prev => ({ ...prev, origin: aflick.label || aflick.name, originId: aflick.id || aflick.value }))
         }
       }
     } catch (err) {
@@ -631,7 +645,8 @@ export default function ProposalWizard({ id }) {
         setFormData(prev => ({
           ...prev,
           id: data.id,
-          companyId: data.company_id,
+          originId: data.company_id,
+          origin: data.company || '',
           salesMode: data.sales_mode?.replace(/_/g, ' ')?.replace(/\b\w/g, l => l.toUpperCase()) || '',
           customerId: data.customer_id,
           customer: data.customer,
@@ -639,7 +654,7 @@ export default function ProposalWizard({ id }) {
           contractType: data.contract_type?.replace(/_/g, ' ')?.replace(/\b\w/g, l => l.toUpperCase()) || '',
           contractCode: data.contract_code || '',
           serviceAddress: data.service_address || '',
-          postalCode: data.postal_code || '',
+          postalCode: data.postal_code || data.postal_address || '',
           coveredLocation: data.covered_location || '',
           poNumber: data.po_number || '',
           poExpiry: parseSafeDate(data.po_expiry_date),
@@ -668,6 +683,18 @@ export default function ProposalWizard({ id }) {
           billingFrequency: data.billing_frequency || '',
           invoiceCount: data.invoice_count || '',
           invoiceRemarks: data.invoice_remarks ? data.invoice_remarks.split(',').map(s => s.trim()) : [],
+          billingName: data.billing_name || '',
+          billingAddress: data.billing_address || '',
+          billingPostalCode: data.billing_postal_address || '',
+          customerCode: data.cust_code || '',
+          groupCode: data.grouping_code || '',
+          accCode: data.acc_code || '',
+          picContactName: data.pic_contact_name || '',
+          picEmail: data.pic_email || '',
+          picPhone: data.pic_phone || '',
+          billingContactName: data.billing_contact_name || '',
+          billingEmail: data.billing_email || '',
+          billingPhone: data.billing_phone || '',
           latitude: data.latitude || '',
           longitude: data.longitude || '',
           billingRemarks: data.billing_remarks || '',
@@ -720,6 +747,13 @@ export default function ProposalWizard({ id }) {
   // ----------------------------------------------------------------------
   const parseSafeDate = dStr => {
     if (!dStr || dStr === '0000-00-00' || dStr === '00-00-0000') return null
+
+    // Handle DD/MM/YYYY or DD-MM-YYYY
+    if (/^\d{1,2}[/-]\d{1,2}[/-]\d{4}$/.test(dStr)) {
+      const [d, m, y] = dStr.split(/[/-]/)
+      return new Date(`${y}-${m}-${d}`)
+    }
+
     const d = new Date(dStr)
     return isNaN(d.getTime()) ? null : d
   }
@@ -772,8 +806,8 @@ export default function ProposalWizard({ id }) {
       try {
         const payload = {
           billing_frequency_id: Number(formData.billingFrequencyId),
-          start_date: formatDate(formData.startDate),
-          end_date: formatDate(formData.endDate)
+          start_date: formatDateToLocal(formData.startDate),
+          end_date: formatDateToLocal(formData.endDate)
         }
 
         const res = await getInvoiceCount(payload)
@@ -798,24 +832,15 @@ export default function ProposalWizard({ id }) {
 
   const validateStep = step => {
     if (step === 0) {
-      if (
-        !formData.companyId ||
-        !formData.customerId ||
-        !formData.contractType ||
-        !formData.name ||
-        !formData.billingName ||
-        !formData.billingAddress ||
-        !formData.billingPostalCode ||
-        !formData.customerCode ||
-        !formData.groupCode ||
-        !formData.accCode ||
-        !formData.picContactName ||
-        !formData.picEmail ||
-        !formData.picPhone ||
-        !formData.billingContactName ||
-        !formData.billingEmail ||
-        !formData.billingPhone
-      ) {
+      const isMissing = [
+        formData.customerId,
+        formData.contractType,
+        formData.name,
+        formData.billingName,
+        formData.billingPostalCode
+      ].some(val => !val || (typeof val === 'string' && val.trim() === ''))
+
+      if (isMissing) {
         showToast('warning', 'Please fill all mandatory fields in Sales Type')
         return false
       }
@@ -825,23 +850,11 @@ export default function ProposalWizard({ id }) {
       if (
         !formData.serviceAddress ||
         !formData.postalCode ||
-        !formData.coveredLocation ||
-        !formData.poNumber ||
-        !formData.poExpiry ||
-        !formData.preferredTime ||
-        !formData.reportEmail ||
-        !formData.contactPerson ||
-        !formData.sitePhone ||
-        !formData.mobile ||
-        !formData.callTypeId ||
         !formData.startDate ||
         !formData.endDate ||
         !formData.reminderDate ||
         !formData.industryId ||
-        !formData.paymentTerm ||
-        !formData.salesPersonId ||
-        !formData.latitude ||
-        !formData.longitude
+        !formData.salesPersonId
       ) {
         showToast('warning', 'Please fill all mandatory fields in Customer Info')
         return false
@@ -849,16 +862,8 @@ export default function ProposalWizard({ id }) {
     }
 
     if (step === 2) {
-      if (
-        !formData.billingFrequencyId ||
-        !formData.invoiceCount ||
-        !formData.invoiceRemarks.length ||
-        !formData.file ||
-        !formData.reportBlock ||
-        !formData.technicianId ||
-        !formData.supervisorId
-      ) {
-        showToast('warning', 'Please fill all mandatory billing fields (including floor plan)')
+      if (!formData.billingFrequencyId) {
+        showToast('warning', 'Please select Billing Frequency')
         return false
       }
     }
@@ -870,18 +875,7 @@ export default function ProposalWizard({ id }) {
       }
     }
 
-    if (step === 4) {
-      if (
-        !formData.billingRemarks ||
-        !formData.technicianRemarks ||
-        !formData.appointmentRemarks ||
-        !formData.agreement1 ||
-        !formData.agreement2
-      ) {
-        showToast('warning', 'Please fill all remarks and agreements')
-        return false
-      }
-    }
+    // Step 4 Remarks - No mandatory fields requested by user
 
     return true
   }
@@ -1125,13 +1119,13 @@ export default function ProposalWizard({ id }) {
       pest_value: String(currentPestItem.pestValue || '0'),
       pest_service_count: String(currentPestItem.noOfItems || '0'),
       total_value: totalValueSum,
-      work_time: convertTimeToMinutes(currentPestItem.time || '0:00'),
+      work_time: convertTimeToMinutes(currentPestItem.workTime || '0:00'),
       remarks: '',
       is_active: 1,
       status: 1,
-      start_date: formatDate(startDate) || null,
-      end_date: formatDate(endDate) || null,
-      reminder_date: formatDate(currentPestItem.reminderDate || startDate) || null
+      start_date: formatDateToLocal(startDate) || null,
+      end_date: formatDateToLocal(endDate) || null,
+      reminder_date: formatDateToLocal(currentPestItem.reminderDate || startDate) || null
     }
 
     try {
@@ -1160,7 +1154,7 @@ export default function ProposalWizard({ id }) {
                     ...currentPestItem,
                     id: editingItemId,
                     totalValue: totalValueSum,
-                    workTime: currentPestItem.time || '0:00'
+                    workTime: currentPestItem.workTime || '0:00'
                   }
                 : item
             )
@@ -1467,9 +1461,9 @@ export default function ProposalWizard({ id }) {
     const totalValueSum = pestItems.reduce((acc, curr) => acc + (Number(curr.totalValue) || 0), 0)
 
     const payload = {
-      id: id ? decodeId(id) || id : null, // Add numeric ID to root
+      id: id ? decodeId(id) || id : null,
       name: formData.name || '',
-      company_id: String(formData.companyId || ''),
+      company_id: String(formData.originId || ''),
       customer_id: Number(formData.customerId),
       sales_mode: formData.salesMode?.toLowerCase().replace(/\s+/g, '_') || null,
       contract_code: formData.contractCode || null,
@@ -1479,8 +1473,8 @@ export default function ProposalWizard({ id }) {
       postal_code: formData.postalCode || null,
       covered_location: formData.coveredLocation || null,
       po_number: formData.poNumber || null,
-      po_expiry_date: formatDate(formData.poExpiry) || null,
-      proposal_date: formatDate(new Date()),
+      po_expiry_date: formatDateToLocal(formData.poExpiry) || null,
+      proposal_date: formatDateToLocal(new Date()),
       preferred_time: formData.preferredTime ? formData.preferredTime.toTimeString().slice(0, 8) : '09:00:00',
       report_email: formData.reportEmail || null,
       contact_person_name: formData.contactPerson || null,
@@ -1488,9 +1482,9 @@ export default function ProposalWizard({ id }) {
       mobile: formData.mobile || null,
       call_type_id: formData.callTypeId ? Number(formData.callTypeId) : null,
       grouping_code: formData.groupCode || null,
-      start_date: formatDate(formData.startDate) || null,
-      end_date: formatDate(formData.endDate) || null,
-      reminder_date: formatDate(formData.reminderDate) || null,
+      start_date: formatDateToLocal(formData.startDate) || null,
+      end_date: formatDateToLocal(formData.endDate) || null,
+      reminder_date: formatDateToLocal(formData.reminderDate) || null,
       industry_id: formData.industryId ? Number(formData.industryId) : null,
       contract_value: Number(totalValueSum),
       technician_id: formData.technicianId ? Number(formData.technicianId) : null,
@@ -1529,6 +1523,7 @@ export default function ProposalWizard({ id }) {
       floor_plan_file: formData.file ? await fileToBase64(formData.file) : null,
 
       pest_items: pestItems.map(i => ({
+        id: i.item_id || null,
         customer_id: Number(formData.customerId),
         pest_id: Number(i.pestId),
         frequency_id: Number(i.frequencyId),
@@ -1541,6 +1536,9 @@ export default function ProposalWizard({ id }) {
         pest_service_count: Number(i.noOfItems),
         total_value: Number(i.totalValue),
         work_time: convertTimeToMinutes(i.workTime),
+        start_date: formatDateToLocal(i.startDate || formData.startDate),
+        end_date: formatDateToLocal(i.endDate || formData.endDate),
+        reminder_date: formatDateToLocal(i.reminderDate || i.startDate || formData.startDate),
         remarks: '',
         is_active: 1,
         status: 1
@@ -1646,6 +1644,8 @@ export default function ProposalWizard({ id }) {
             setPestDialogOpen={setPestDialogOpen}
             handleCurrentPestItemDateChange={handleCurrentPestItemDateChange}
             timeOptions={timeOptions}
+            paginatedPests={paginatedPests}
+            filteredPests={filteredPests}
           />
         )
       case 4:
@@ -1708,14 +1708,35 @@ export default function ProposalWizard({ id }) {
           <Box sx={{ flexGrow: 1, p: 2 }}>{getStepContent(activeStep)}</Box>
 
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4, p: 2 }}>
-            <Button
-              variant='outlined'
-              color='secondary'
-              disabled={activeStep === 0 || isSubmitting}
-              onClick={handlePrev}
-            >
-              Previous
-            </Button>
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <Button
+                variant='outlined'
+                color='secondary'
+                disabled={activeStep === 0 || isSubmitting}
+                onClick={handlePrev}
+              >
+                Previous
+              </Button>
+
+              {id && activeStep < steps.length - 1 && (
+                <Button
+                  variant='contained'
+                  color='success'
+                  onClick={() => {
+                    if (validateStep(activeStep)) {
+                      handleSubmit()
+                    }
+                  }}
+                  disabled={isSubmitting}
+                  startIcon={
+                    isSubmitting ? <CircularProgress size={20} color='inherit' /> : <i className='tabler-check' />
+                  }
+                >
+                  {isSubmitting ? 'Updating...' : 'Update Proposal'}
+                </Button>
+              )}
+            </Box>
+
             <Button
               variant='contained'
               color='primary'
@@ -2319,7 +2340,15 @@ export default function ProposalWizard({ id }) {
                 selected={currentPestItem.startDate}
                 onChange={date => handleCurrentPestItemDateChange('startDate', date)}
                 dateFormat='dd/MM/yyyy'
-                customInput={<CustomTextField fullWidth label='Start Date' placeholder='dd/mm/yyyy' />}
+                customInput={
+                  <CustomTextField
+                    fullWidth
+                    label={renderLabel('Start Date', true)}
+                    placeholder='dd/mm/yyyy'
+                    required
+                    sx={requiredFieldSx}
+                  />
+                }
               />
             </Grid>
             <Grid item xs={12} md={4}>
@@ -2327,7 +2356,15 @@ export default function ProposalWizard({ id }) {
                 selected={currentPestItem.endDate}
                 onChange={date => handleCurrentPestItemDateChange('endDate', date)}
                 dateFormat='dd/MM/yyyy'
-                customInput={<CustomTextField fullWidth label='End Date' placeholder='dd/mm/yyyy' />}
+                customInput={
+                  <CustomTextField
+                    fullWidth
+                    label={renderLabel('End Date', true)}
+                    placeholder='dd/mm/yyyy'
+                    required
+                    sx={requiredFieldSx}
+                  />
+                }
               />
             </Grid>
             <Grid item xs={12} md={4}>
@@ -2335,34 +2372,35 @@ export default function ProposalWizard({ id }) {
                 selected={currentPestItem.reminderDate}
                 onChange={date => handleCurrentPestItemDateChange('reminderDate', date)}
                 dateFormat='dd/MM/yyyy'
-                customInput={<CustomTextField fullWidth label='Reminder Date' placeholder='dd/mm/yyyy' />}
+                customInput={
+                  <CustomTextField
+                    fullWidth
+                    label={renderLabel('Reminder Date', true)}
+                    placeholder='dd/mm/yyyy'
+                    required
+                    sx={requiredFieldSx}
+                  />
+                }
               />
             </Grid>
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
-                label='Pest'
+                label={renderLabel('Pest', true)}
                 options={dropdowns.pests || []}
                 value={currentPestItem.pestId}
                 onChange={v => handleCurrentPestItemAutocompleteChange('pest', v)}
+                required
+                sx={requiredFieldSx}
               />
             </Grid>
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
-                label='Billing Frequency'
+                label={renderLabel('Billing Frequency', true)}
                 options={dropdowns.frequencies || []}
                 value={currentPestItem.frequencyId}
                 onChange={v => handleCurrentPestItemAutocompleteChange('frequency', v)}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <CustomTextField
-                fullWidth
-                label='No of Units'
-                name='noOfItems'
-                type='number'
-                value={currentPestItem.noOfItems}
-                onChange={handleCurrentPestItemChange}
+                required
+                sx={requiredFieldSx}
               />
             </Grid>
 
@@ -2382,37 +2420,55 @@ export default function ProposalWizard({ id }) {
             <Grid item xs={12} md={4}>
               <CustomTextField
                 fullWidth
-                label='Pest Value'
+                label={renderLabel('Pest Value', true)}
                 name='pestValue'
                 type='number'
                 value={currentPestItem.pestValue}
                 onChange={handleCurrentPestItemChange}
+                required
+                sx={requiredFieldSx}
               />
             </Grid>
             <Grid item xs={12} md={4}>
               <CustomTextField
                 fullWidth
                 label='Total'
-                name='total'
-                value={currentPestItem.total || ''}
+                name='totalValue'
+                value={currentPestItem.totalValue || ''}
                 InputProps={{ readOnly: true }}
                 sx={{ '& .MuiInputBase-root': { bgcolor: '#f0f0f0' } }}
               />
             </Grid>
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
-                label='Time'
+                label={renderLabel('Time', true)}
                 options={timeOptions}
                 value={currentPestItem.time}
                 onChange={v => handleCurrentPestItemAutocompleteChange('time', v)}
+                required
+                sx={requiredFieldSx}
               />
             </Grid>
-            <Grid item xs={12} md={8}>
+            <Grid item xs={12} md={9}>
               <GlobalAutocomplete
-                label='Chemicals'
+                label={renderLabel('Chemicals', true)}
                 options={dropdowns.chemicals || []}
                 value={currentPestItem.chemicalId}
                 onChange={v => handleCurrentPestItemAutocompleteChange('chemical', v)}
+                required
+                sx={requiredFieldSx}
+              />
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <CustomTextField
+                fullWidth
+                label={renderLabel('No of Units', true)}
+                name='noOfItems'
+                type='number'
+                value={currentPestItem.noOfItems}
+                onChange={handleCurrentPestItemChange}
+                required
+                sx={requiredFieldSx}
               />
             </Grid>
           </Grid>

@@ -56,7 +56,6 @@ export const TableSection = ({
     sx={{
       border: '1px solid #ddd',
       borderRadius: 1,
-      overflow: 'hidden',
       p: 2,
       bgcolor: 'background.paper'
     }}
@@ -143,31 +142,42 @@ const Step4PestItems = ({
   setPestPagination,
   pestDialogOpen,
   setPestDialogOpen,
-  handleCurrentPestItemDateChange, // ✅ New prop
-  timeOptions // ✅ New prop
+  handleCurrentPestItemDateChange,
+  timeOptions,
+  paginatedPests: propPaginatedPests,
+  filteredPests: propFilteredPests
 }) => {
   // --- Filtering Logic (Pests) ---
   const filteredPests = useMemo(() => {
+    if (propFilteredPests) return propFilteredPests
     if (!Array.isArray(pestItems)) return []
     if (!pestSearch) return pestItems
     const lower = pestSearch.toLowerCase()
     return pestItems.filter(i => Object.values(i).some(v => String(v).toLowerCase().includes(lower)))
-  }, [pestItems, pestSearch])
+  }, [pestItems, pestSearch, propFilteredPests])
 
-  const PaginatedPests = useMemo(() => {
+  const paginatedPests = useMemo(() => {
+    if (propPaginatedPests) return propPaginatedPests
     const start = pestPagination.pageIndex * pestPagination.pageSize
     return filteredPests.slice(start, start + pestPagination.pageSize)
-  }, [filteredPests, pestPagination])
+  }, [filteredPests, pestPagination, propPaginatedPests])
 
   const requiredFieldSx = {
     '& .MuiFormLabel-asterisk': {
-      color: '#e91e63 !important',
-      fontWeight: 700
-    },
-    '& .MuiInputLabel-root.Mui-required': {
-      color: 'inherit'
+      display: 'none'
     }
   }
+
+  const renderLabel = (label, required = false) => (
+    <Box component='span' sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+      {label}
+      {required && (
+        <Typography component='span' sx={{ color: '#e91e63', fontWeight: 700, fontSize: '0.75rem', mt: -0.5 }}>
+          *
+        </Typography>
+      )}
+    </Box>
+  )
 
   // Helpers
   const onSavePest = () => {
@@ -179,14 +189,21 @@ const Step4PestItems = ({
     <Grid container spacing={2}>
       <Grid item xs={12} display='flex' justifyContent='space-between' alignItems='center'>
         <Typography variant='h6'>Add Pests & History</Typography>
+        <Box display='flex' alignItems='center' gap={1}>
+          <Typography variant='subtitle1' color='textSecondary'>
+            Total Contract Value ($)
+          </Typography>
+          <Typography variant='h6' color='primary.main'>
+            {pestItems.reduce((acc, curr) => acc + Number(curr.totalValue || 0), 0)}
+          </Typography>
+        </Box>
       </Grid>
-
       {/* --- INLINE ADD FORM (ONLY FOR ADD MODE) --- */}
       {!id && (
         <Grid item xs={12}>
           <Box
             sx={{
-              p: 4,
+              p: 3,
               bgcolor: '#fff',
               borderRadius: 1,
               border: '1px solid #e0e0e0',
@@ -199,7 +216,7 @@ const Step4PestItems = ({
             >
               {editingItemId ? 'Update Pest Item' : 'Enter Pest Details'}
             </Typography>
-            <Grid container spacing={4} alignItems='flex-end'>
+            <Grid container spacing={2} alignItems='flex-end'>
               {/* Row 1: Dates */}
               <Grid item xs={12} md={4}>
                 <AppReactDatepicker
@@ -209,7 +226,7 @@ const Step4PestItems = ({
                   customInput={
                     <CustomTextField
                       fullWidth
-                      label='Start Date'
+                      label={renderLabel('Start Date', true)}
                       placeholder='dd/mm/yyyy'
                       required
                       sx={requiredFieldSx}
@@ -225,7 +242,7 @@ const Step4PestItems = ({
                   customInput={
                     <CustomTextField
                       fullWidth
-                      label='End Date'
+                      label={renderLabel('End Date', true)}
                       placeholder='dd/mm/yyyy'
                       required
                       sx={requiredFieldSx}
@@ -241,7 +258,7 @@ const Step4PestItems = ({
                   customInput={
                     <CustomTextField
                       fullWidth
-                      label='Reminder Date'
+                      label={renderLabel('Reminder Date', true)}
                       placeholder='dd/mm/yyyy'
                       required
                       sx={requiredFieldSx}
@@ -249,9 +266,9 @@ const Step4PestItems = ({
                   }
                 />
               </Grid>
-              <Grid item xs={12} md={2}>
+              <Grid item xs={12} md={4}>
                 <GlobalAutocomplete
-                  label='Pest'
+                  label={renderLabel('Pest', true)}
                   options={dropdowns.pests || []}
                   value={currentPestItem.pestId}
                   onChange={v => handleCurrentPestItemAutocompleteChange('pest', v, refs.pestInputRef)}
@@ -260,9 +277,9 @@ const Step4PestItems = ({
                   sx={requiredFieldSx}
                 />
               </Grid>
-              <Grid item xs={12} md={2}>
+              <Grid item xs={12} md={4}>
                 <GlobalAutocomplete
-                  label='Billing Frequency'
+                  label={renderLabel('Billing Frequency', true)}
                   options={dropdowns.frequencies || []}
                   value={currentPestItem.frequencyId}
                   onChange={v => handleCurrentPestItemAutocompleteChange('frequency', v, refs.frequencyInputRef)}
@@ -271,7 +288,7 @@ const Step4PestItems = ({
                   sx={requiredFieldSx}
                 />
               </Grid>
-              <Grid item xs={12} md={2}>
+              <Grid item xs={12} md={4}>
                 <CustomTextField
                   fullWidth
                   label='Pest Count'
@@ -282,10 +299,10 @@ const Step4PestItems = ({
                   required
                 />
               </Grid>
-              <Grid item xs={12} md={2}>
+              <Grid item xs={12} md={4}>
                 <CustomTextField
                   fullWidth
-                  label='Pest Value'
+                  label={renderLabel('Pest Value', true)}
                   name='pestValue'
                   type='number'
                   value={currentPestItem.pestValue || ''}
@@ -296,33 +313,33 @@ const Step4PestItems = ({
                   sx={requiredFieldSx}
                 />
               </Grid>
-              <Grid item xs={12} md={2}>
+              <Grid item xs={12} md={4}>
                 <CustomTextField
                   fullWidth
                   label='Total'
-                  name='total'
-                  value={currentPestItem.total || ''}
+                  name='totalValue'
+                  value={currentPestItem.totalValue || ''}
                   InputProps={{ readOnly: true }}
                   sx={{ '& .MuiInputBase-root': { bgcolor: '#f0f0f0' }, ...requiredFieldSx }}
                   required
                 />
               </Grid>
-              <Grid item xs={12} md={2}>
+              <Grid item xs={12} md={4}>
                 <GlobalAutocomplete
-                  label='Time'
+                  label={renderLabel('Work Time', true)}
                   options={timeOptions}
-                  value={currentPestItem.time}
-                  onChange={v => handleCurrentPestItemAutocompleteChange('time', v, refs.timeInputRef)}
+                  value={currentPestItem.workTime}
+                  onChange={v => handleCurrentPestItemAutocompleteChange('workTime', v, refs.timeInputRef)}
                   inputRef={refs.timeInputRef}
                   required
                   sx={requiredFieldSx}
                 />
               </Grid>
 
-              {/* Row 2 */}
+              {/* Row 4 */}
               <Grid item xs={12} md={6}>
                 <GlobalAutocomplete
-                  label='Chemicals'
+                  label={renderLabel('Chemicals', true)}
                   options={dropdowns.chemicals || []}
                   value={currentPestItem.chemicalId}
                   onChange={v => handleCurrentPestItemAutocompleteChange('chemical', v, refs.currentChemicalsRef)}
@@ -334,7 +351,7 @@ const Step4PestItems = ({
               <Grid item xs={12} md={3}>
                 <CustomTextField
                   fullWidth
-                  label='No of Items'
+                  label={renderLabel('No of Items', true)}
                   name='noOfItems'
                   type='number'
                   value={currentPestItem.noOfItems}
@@ -367,7 +384,7 @@ const Step4PestItems = ({
           </Box>
         </Grid>
       )}
-...
+
       {/* PEST TABLE (Full Width) */}
       <Grid item xs={12}>
         <TableSection
@@ -390,7 +407,7 @@ const Step4PestItems = ({
           setPagination={setPestPagination}
           filteredCount={filteredPests.length}
         >
-          <table className={styles.table}>
+          <table className={styles.table} style={{ minWidth: 1200 }}>
             <thead>
               <tr>
                 <th>S.No</th>
@@ -402,12 +419,15 @@ const Step4PestItems = ({
                 <th>Work Time</th>
                 <th>Chemicals</th>
                 <th>No Of Items</th>
+                <th>Start Date</th>
+                <th>End Date</th>
+                <th>Reminder Date</th>
               </tr>
             </thead>
             <tbody>
               {paginatedPests.length === 0 ? (
                 <tr>
-                  <td colSpan={9} align='center'>
+                  <td colSpan={12} align='center'>
                     No pest items added
                   </td>
                 </tr>
@@ -449,6 +469,27 @@ const Step4PestItems = ({
                       />
                     </td>
                     <td>{item.noOfItems}</td>
+                    <td>
+                      {item.startDate
+                        ? item.startDate instanceof Date
+                          ? item.startDate.toLocaleDateString('en-GB')
+                          : item.startDate
+                        : '-'}
+                    </td>
+                    <td>
+                      {item.endDate
+                        ? item.endDate instanceof Date
+                          ? item.endDate.toLocaleDateString('en-GB')
+                          : item.endDate
+                        : '-'}
+                    </td>
+                    <td>
+                      {item.reminderDate
+                        ? item.reminderDate instanceof Date
+                          ? item.reminderDate.toLocaleDateString('en-GB')
+                          : item.reminderDate
+                        : '-'}
+                    </td>
                   </tr>
                 ))
               )}

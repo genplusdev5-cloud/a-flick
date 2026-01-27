@@ -568,7 +568,7 @@ const PurchaseOrderPage = () => {
                 variant='contained'
                 startIcon={<AddIcon />}
                 sx={{ height: 36 }}
-                onClick={() => router.push(`/admin/purchase/purchase-order/add`)}
+                onClick={() => router.push(`/${lang}/admin/purchase/purchase-order/add`)}
               >
                 Add Purchase Order
               </GlobalButton>

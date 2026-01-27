@@ -199,9 +199,9 @@ export default function AddMaterialRequestPage() {
             ? {
                 ...item,
                 chemical: chemical.label,
-                chemicalId: chemical.id,
+                chemicalId: chemical.id || chemical.value,
                 uom: uom.label,
-                uomId: uom.id,
+                uomId: uom.id || uom.value,
                 quantity
               }
             : item
@@ -214,9 +214,9 @@ export default function AddMaterialRequestPage() {
         {
           id: Date.now(),
           chemical: chemical.label,
-          chemicalId: chemical.id,
+          chemicalId: chemical.id || chemical.value,
           uom: uom.label,
-          uomId: uom.id,
+          uomId: uom.id || uom.value,
           quantity
         }
       ])
@@ -254,26 +254,29 @@ export default function AddMaterialRequestPage() {
       const payload = {
         request_date: format(requestDate, 'yyyy-MM-dd'),
         remarks: remarks,
-        company_id: origin?.id || null,
-        origin_id: origin?.id || null,
-        employee_id: currentUser?.id || fromVehicle?.id || null,
-        from_vehicle: fromVehicle?.label || null,
-        from_vehicle_id: fromVehicle?.id || null,
-        to_vehicle: toVehicle?.label || null,
-        to_vehicle_id: toVehicle?.id || null,
-        supervisor_id: null,
+        employee_id: Number(fromVehicle?.id || currentUser?.id) || null,
+        from_vehicle: fromVehicle?.label || '-',
+        from_vehicle_id: Number(fromVehicle?.id) || null,
+        to_vehicle: toVehicle?.label || '-',
+        to_vehicle_id: Number(toVehicle?.id) || null,
         request_status: 'Pending',
         is_active: 1,
         status: 1,
-        items: JSON.stringify(items.map(i => ({
-          item_id: i.chemicalId,
+        items: items.map(i => ({
+          item_id: Number(i.chemicalId) || null,
           item_name: i.chemical,
           uom: i.uom,
-          uom_id: i.uomId,
+          uom_id: Number(i.uomId) || null,
           quantity: Number(i.quantity),
           is_active: 1,
           status: 1
-        })))
+        }))
+      }
+
+      // Only include origin if it has a value
+      if (origin?.id) {
+        payload.origin_id = Number(origin.id) || null
+        payload.company_id = Number(origin.id) || null
       }
 
       await addMaterialRequest(payload)
