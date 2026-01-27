@@ -797,10 +797,10 @@ export default function AddContractWizard() {
         </StepperWrapper>
       </CardContent>
 
-      <CardContent className='flex-1 p-6'>
-        {getStepContent(activeStep)}
+      <CardContent className='flex-1 pbs-6 flex flex-col' sx={{ minHeight: 0, minWidth: 0 }}>
+        <Box sx={{ flexGrow: 1, p: 2, overflow: 'auto', minHeight: 0 }}>{getStepContent(activeStep)}</Box>
 
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4, p: 2 }}>
           <Button
             disabled={activeStep === 0}
             onClick={handlePrev}

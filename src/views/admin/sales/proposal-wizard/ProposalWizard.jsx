@@ -644,17 +644,17 @@ export default function ProposalWizard({ id }) {
       if (data) {
         setFormData(prev => ({
           ...prev,
-          id: data.id,
+          id: data.id || data.proposal_id,
           originId: data.company_id,
-          origin: data.company || '',
-          salesMode: data.sales_mode?.replace(/_/g, ' ')?.replace(/\b\w/g, l => l.toUpperCase()) || '',
+          origin: data.company || data.company_name || '',
+          salesMode: (data.sales_mode || data.proposal_sales_mode)?.replace(/_/g, ' ')?.replace(/\b\w/g, l => l.toUpperCase()) || '',
           customerId: data.customer_id,
-          customer: data.customer,
-          name: data.name || '',
-          contractType: data.contract_type?.replace(/_/g, ' ')?.replace(/\b\w/g, l => l.toUpperCase()) || '',
-          contractCode: data.contract_code || '',
-          serviceAddress: data.service_address || '',
-          postalCode: data.postal_code || data.postal_address || '',
+          customer: data.customer || data.customer_name || data.name || '',
+          name: data.name || data.business_name || '',
+          contractType: (data.contract_type || data.proposal_contract_type)?.replace(/_/g, ' ')?.replace(/\b\w/g, l => l.toUpperCase()) || '',
+          contractCode: data.contract_code || data.proposal_code || '',
+          serviceAddress: data.service_address || data.address || '',
+          postalCode: data.postal_code || data.postal_address || data.zip_code || '',
           coveredLocation: data.covered_location || '',
           poNumber: data.po_number || '',
           poExpiry: parseSafeDate(data.po_expiry_date),
@@ -1658,9 +1658,9 @@ export default function ProposalWizard({ id }) {
   if (loading) return <Box p={4}>Loading...</Box>
 
   return (
-    <Box>
-      <Card className='flex flex-col md:flex-row'>
-        <CardContent className='max-md:border-be md:border-ie md:min-is-[300px]'>
+    <Box sx={{ minHeight: 0 }}>
+      <Card className='flex flex-col md:flex-row' sx={{ minHeight: 0 }}>
+        <CardContent className='max-md:border-be md:border-ie md:min-is-[300px]' sx={{ overflowY: 'auto' }}>
           <Typography variant='h5' className='m-4 mb-6 font-bold'>
             {id ? 'Update Proposal' : 'Add Proposal'} <span style={{ fontSize: '12px', color: '#999' }}>`</span>
           </Typography>
@@ -1704,8 +1704,8 @@ export default function ProposalWizard({ id }) {
           </StepperWrapper>
         </CardContent>
 
-        <CardContent className='flex-1 pbs-6 flex flex-col'>
-          <Box sx={{ flexGrow: 1, p: 2 }}>{getStepContent(activeStep)}</Box>
+        <CardContent className='flex-1 pbs-6 flex flex-col' sx={{ minHeight: 0, minWidth: 0 }}>
+          <Box sx={{ flexGrow: 1, p: 2, overflow: 'auto', minHeight: 0 }}>{getStepContent(activeStep)}</Box>
 
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4, p: 2 }}>
             <Box sx={{ display: 'flex', gap: 2 }}>
@@ -1956,8 +1956,10 @@ export default function ProposalWizard({ id }) {
                               size='small'
                               color='primary'
                               onClick={() => {
+                                const realPropId = decodeId(id) || id
                                 const encodedId = encodeId(prop.id)
-                                router.push(`/${lang}/admin/proposal-editor?proposal_id=${encodedId}`)
+                                const encodedPropId = encodeId(realPropId)
+                                router.push(`/${lang}/admin/proposal-editor?id=${encodedId}&proposal_id=${encodedPropId}`)
                               }}
                             >
                               <i className='tabler-edit' />
@@ -2333,7 +2335,7 @@ export default function ProposalWizard({ id }) {
           </DialogCloseButton>
         </DialogTitle>
         <DialogContent sx={{ p: 6 }}>
-          <Grid container spacing={5}>
+          <Grid container spacing={3}>
             {/* Row 1: Dates */}
             <Grid item xs={12} md={4}>
               <AppReactDatepicker
@@ -2383,6 +2385,8 @@ export default function ProposalWizard({ id }) {
                 }
               />
             </Grid>
+
+            {/* Row 2: Pest & Frequency & Count */}
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
                 label={renderLabel('Pest', true)}
@@ -2403,7 +2407,6 @@ export default function ProposalWizard({ id }) {
                 sx={requiredFieldSx}
               />
             </Grid>
-
             <Grid item xs={12} md={4}>
               <CustomTextField
                 fullWidth
@@ -2417,6 +2420,7 @@ export default function ProposalWizard({ id }) {
               />
             </Grid>
 
+            {/* Row 3: Value & Total & Time */}
             <Grid item xs={12} md={4}>
               <CustomTextField
                 fullWidth
@@ -2441,7 +2445,7 @@ export default function ProposalWizard({ id }) {
             </Grid>
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
-                label={renderLabel('Time', true)}
+                label={renderLabel('Work Time', true)}
                 options={timeOptions}
                 value={currentPestItem.time}
                 onChange={v => handleCurrentPestItemAutocompleteChange('time', v)}
@@ -2449,7 +2453,9 @@ export default function ProposalWizard({ id }) {
                 sx={requiredFieldSx}
               />
             </Grid>
-            <Grid item xs={12} md={9}>
+
+            {/* Row 4: Chemicals & No of Items */}
+            <Grid item xs={12} md={4}>
               <GlobalAutocomplete
                 label={renderLabel('Chemicals', true)}
                 options={dropdowns.chemicals || []}
@@ -2459,10 +2465,10 @@ export default function ProposalWizard({ id }) {
                 sx={requiredFieldSx}
               />
             </Grid>
-            <Grid item xs={12} md={3}>
+            <Grid item xs={12} md={4}>
               <CustomTextField
                 fullWidth
-                label={renderLabel('No of Units', true)}
+                label={renderLabel('No of Items', true)}
                 name='noOfItems'
                 type='number'
                 value={currentPestItem.noOfItems}

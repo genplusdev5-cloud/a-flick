@@ -114,7 +114,7 @@ export const TableSection = ({
       </Box>
     </Box>
 
-    <Box sx={{ maxHeight: 400, overflowX: 'auto', borderTop: '1px solid #eee' }}>{children}</Box>
+    <Box sx={{ maxHeight: 400, overflow: 'auto', borderTop: '1px solid #eee' }}>{children}</Box>
 
     <Box sx={{ mt: 2 }}>
       <TablePaginationComponent totalCount={filteredCount} pagination={pagination} setPagination={setPagination} />
@@ -186,7 +186,7 @@ const Step4PestItems = ({
   }
 
   return (
-    <Grid container spacing={2}>
+    <Grid container spacing={2} sx={{ width: '100%', m: 0 }}>
       <Grid item xs={12} display='flex' justifyContent='space-between' alignItems='center'>
         <Typography variant='h6'>Add Pests & History</Typography>
         <Box display='flex' alignItems='center' gap={1}>
@@ -216,7 +216,7 @@ const Step4PestItems = ({
             >
               {editingItemId ? 'Update Pest Item' : 'Enter Pest Details'}
             </Typography>
-            <Grid container spacing={2} alignItems='flex-end'>
+            <Grid container spacing={3} alignItems='flex-end'>
               {/* Row 1: Dates */}
               <Grid item xs={12} md={4}>
                 <AppReactDatepicker
@@ -266,6 +266,8 @@ const Step4PestItems = ({
                   }
                 />
               </Grid>
+
+              {/* Row 2: Pest & Frequency & Count */}
               <Grid item xs={12} md={4}>
                 <GlobalAutocomplete
                   label={renderLabel('Pest', true)}
@@ -299,6 +301,8 @@ const Step4PestItems = ({
                   required
                 />
               </Grid>
+
+              {/* Row 3: Value & Total & Time */}
               <Grid item xs={12} md={4}>
                 <CustomTextField
                   fullWidth
@@ -336,8 +340,8 @@ const Step4PestItems = ({
                 />
               </Grid>
 
-              {/* Row 4 */}
-              <Grid item xs={12} md={6}>
+              {/* Row 4: Chemicals, Items, Button */}
+              <Grid item xs={12} md={4}>
                 <GlobalAutocomplete
                   label={renderLabel('Chemicals', true)}
                   options={dropdowns.chemicals || []}
@@ -348,7 +352,7 @@ const Step4PestItems = ({
                   sx={requiredFieldSx}
                 />
               </Grid>
-              <Grid item xs={12} md={3}>
+              <Grid item xs={12} md={4}>
                 <CustomTextField
                   fullWidth
                   label={renderLabel('No of Items', true)}
@@ -362,8 +366,7 @@ const Step4PestItems = ({
                   sx={requiredFieldSx}
                 />
               </Grid>
-
-              <Grid item xs={12} md={3} display='flex' justifyContent='flex-end'>
+              <Grid item xs={12} md={4} display='flex' justifyContent='flex-end'>
                 <Button
                   variant='contained'
                   onClick={handleSavePestItem}

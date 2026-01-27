@@ -5,7 +5,12 @@ import { useRouter, useSearchParams, useParams } from 'next/navigation'
 import { Box, Grid, Typography, Card, Divider, CircularProgress } from '@mui/material'
 
 // API
-import { getSalesAgreementContent, updateSalesAgreement, addSalesAgreement } from '@/api/sales/proposal/agreement'
+import {
+  getSalesAgreementContent,
+  updateSalesAgreement,
+  addSalesAgreement,
+  salesAgreementDetails
+} from '@/api/sales/proposal/agreement'
 import { getProposalDetails } from '@/api/sales/proposal'
 
 // Layout & Components
@@ -21,75 +26,98 @@ const ProposalEditorContent = () => {
   const router = useRouter()
   const { lang } = useParams()
   const searchParams = useSearchParams()
+  const urlAgreementId = searchParams.get('id')
   const urlProposalId = searchParams.get('proposal_id')
 
-  // ✅ Persist ID even if URL gets cleared
+  // ✅ Persist IDs even if URL gets cleared
+  const [activeAgreementId, setActiveAgreementId] = useState(null)
   const [activeProposalId, setActiveProposalId] = useState(null)
   const [agreementId, setAgreementId] = useState(null)
 
   useEffect(() => {
+    if (urlAgreementId) {
+      const decoded = decodeId(urlAgreementId) || urlAgreementId
+      setActiveAgreementId(decoded)
+    }
     if (urlProposalId) {
-      console.log('✅ URL HAS ID:', urlProposalId)
       const decoded = decodeId(urlProposalId) || urlProposalId
       setActiveProposalId(decoded)
     }
-  }, [urlProposalId])
+  }, [urlAgreementId, urlProposalId])
 
   const [proposalDate, setProposalDate] = useState(new Date())
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
 
   useEffect(() => {
-    if (activeProposalId) {
-      console.log('🔍 FETCHING DATA FOR PROPOSAL:', activeProposalId)
-
-      // 1. Fetch Agreement Content (Description)
-      getSalesAgreementContent(activeProposalId)
-        .then(res => {
-          console.log('✅ AGREEMENT API RESPONSE:', res)
-          // Handle { status: 'success', data: { description: '...' } }
+    const fetchData = async () => {
+      // 1. Fetch Agreement Content
+      if (activeAgreementId) {
+        console.log('🔍 FETCHING AGREEMENT BY ID:', activeAgreementId)
+        try {
+          const res = await salesAgreementDetails(activeAgreementId)
           const apiResponse = res?.data || res
-          if (apiResponse?.status === 'success' || apiResponse?.data) {
+          if (apiResponse?.status === 'success' || apiResponse?.id || apiResponse?.data) {
             const data = apiResponse.data || apiResponse
-
-            // ✅ Store agreement ID for updating later
-            if (data.id) setAgreementId(data.id)
-
-            if (data.description) {
-              console.log('✍️ SETTING DESCRIPTION:', data.description.substring(0, 50) + '...')
-              setDescription(data.description)
-            }
-
-            if (data.name || data.title) {
-              setTitle(data.name || data.title)
-            }
-
+            setAgreementId(data.id)
+            if (data.description) setDescription(data.description)
+            if (data.name || data.title) setTitle(data.name || data.title)
             if (data.proposal_date) {
               const d = new Date(data.proposal_date)
               if (!isNaN(d.getTime())) setProposalDate(d)
             }
-          }
-        })
-        .catch(err => console.error('❌ AGREEMENT FETCH ERROR:', err))
-
-      // 2. Fetch Proposal Details (Title, Date, Customer etc)
-      getProposalDetails(activeProposalId)
-        .then(res => {
-          console.log('✅ PROPOSAL DETAILS RESPONSE:', res)
-          // details.js already does res.data, so res IS the data object { status: 'success', data: {...} }
-          const apiResponse = res
-          if (apiResponse?.status === 'success' || apiResponse?.data) {
-            const data = apiResponse.data || apiResponse
-            if (data.name || data.title) setTitle(data.name || data.title || '')
-            if (data.proposal_date || data.start_date) {
-              const d = new Date(data.proposal_date || data.start_date)
-              if (!isNaN(d.getTime())) setProposalDate(d)
+            // Use proposal_id from agreement if not already set
+            if (!activeProposalId && data.proposal_id) {
+              fetchProposalDetails(data.proposal_id)
             }
           }
-        })
-        .catch(err => console.error('❌ PROPOSAL DETAILS ERROR:', err))
+        } catch (err) {
+          console.error('❌ AGREEMENT FETCH ERROR:', err)
+        }
+      } else if (activeProposalId) {
+        console.log('🔍 FETCHING AGREEMENT BY PROPOSAL ID:', activeProposalId)
+        try {
+          const res = await getSalesAgreementContent(activeProposalId)
+          const apiResponse = res?.data || res
+          if (apiResponse?.status === 'success' || apiResponse?.id || apiResponse?.data) {
+            const data = apiResponse.data || apiResponse
+            setAgreementId(data.id)
+            if (data.description) setDescription(data.description)
+            if (data.name || data.title) setTitle(data.name || data.title)
+          }
+        } catch (err) {
+          console.warn('⚠️ No existing agreement for this proposal yet.')
+        }
+      }
+
+      // 2. Fetch Proposal Details (Main Metadata)
+      if (activeProposalId) {
+        fetchProposalDetails(activeProposalId)
+      }
     }
-  }, [activeProposalId]) // ✅ Depend on persistent ID
+
+    const fetchProposalDetails = async propId => {
+      console.log('🔍 FETCHING PROPOSAL DETAILS:', propId)
+      try {
+        const res = await getProposalDetails(String(propId))
+        const apiResponse = res?.data || res
+        if (apiResponse?.status === 'success' || apiResponse?.id || apiResponse?.data) {
+          const data = apiResponse.data || apiResponse
+          if (!title && (data.name || data.title)) setTitle(data.name || data.title || '')
+          if (data.proposal_date || data.start_date) {
+            const d = new Date(data.proposal_date || data.start_date)
+            if (!isNaN(d.getTime())) setProposalDate(d)
+          }
+        }
+      } catch (err) {
+        console.error('❌ PROPOSAL DETAILS ERROR:', err)
+      }
+    }
+
+    if (activeAgreementId || activeProposalId) {
+      fetchData()
+    }
+  }, [activeAgreementId, activeProposalId])
 
   return (
     <Card sx={{ p: 5, boxShadow: 'none' }} elevation={0}>

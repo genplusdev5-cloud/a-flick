@@ -169,8 +169,8 @@ const Step4PestItems = ({
             >
               {editingItemId ? 'Update Pest Item' : 'Enter Pest Details'}
             </Typography>
-            <Grid container spacing={4} alignItems='flex-end'>
-              <Grid item xs={12} md={2}>
+            <Grid container spacing={3} alignItems='flex-end' sx={{ width: '100%', m: 0 }}>
+              <Grid item xs={12} md={4}>
                 <GlobalAutocomplete
                   label='Pest'
                   options={dropdowns.pests || []}
@@ -181,10 +181,10 @@ const Step4PestItems = ({
                   sx={requiredFieldSx}
                 />
               </Grid>
-              <Grid item xs={12} md={2}>
+              <Grid item xs={12} md={4}>
                 <GlobalAutocomplete
-                  label='Billing Frequency' // Label mismatch in Proposal (Billing vs Service) but keeping Proposal label
-                  options={dropdowns.billingFrequencies || []} // Using billing frequencies as requested/observed
+                  label='Billing Frequency'
+                  options={dropdowns.billingFrequencies || []}
                   value={currentPestItem.frequencyId}
                   onChange={v => handleCurrentPestItemAutocompleteChange('frequency', v, refs.frequencyInputRef)}
                   inputRef={refs.frequencyInputRef}
@@ -192,19 +192,19 @@ const Step4PestItems = ({
                   sx={requiredFieldSx}
                 />
               </Grid>
-              <Grid item xs={12} md={2}>
+              <Grid item xs={12} md={4}>
                 <CustomTextField
                   fullWidth
                   label='Pest Count'
                   name='pestCount'
                   value={currentPestItem.pestCount}
-                  onChange={handleCurrentPestItemChange} // Proposal used readOnly + auto calc, but we allow edit if needed or stick to auto
+                  onChange={handleCurrentPestItemChange}
                   sx={{ '& .MuiInputBase-root': { bgcolor: '#f8f9fa' }, ...requiredFieldSx }}
                   inputRef={refs.currentPestCountRef}
                   required
                 />
               </Grid>
-              <Grid item xs={12} md={2}>
+              <Grid item xs={12} md={4}>
                 <CustomTextField
                   fullWidth
                   label='Pest Value'
@@ -218,7 +218,7 @@ const Step4PestItems = ({
                   sx={requiredFieldSx}
                 />
               </Grid>
-              <Grid item xs={12} md={2}>
+              <Grid item xs={12} md={4}>
                 <CustomTextField
                   fullWidth
                   label='Total'
@@ -229,7 +229,7 @@ const Step4PestItems = ({
                   required
                 />
               </Grid>
-              <Grid item xs={12} md={2}>
+              <Grid item xs={12} md={4}>
                 <GlobalAutocomplete
                   label='Time'
                   options={['0:05', '0:10', '0:15', '0:30', '1:00']}
@@ -241,8 +241,8 @@ const Step4PestItems = ({
                 />
               </Grid>
 
-              {/* Row 2 */}
-              <Grid item xs={12} md={6}>
+              {/* Row 3 */}
+              <Grid item xs={12} md={4}>
                 <GlobalAutocomplete
                   label='Chemicals'
                   options={dropdowns.chemicals || []}
@@ -253,7 +253,7 @@ const Step4PestItems = ({
                   sx={requiredFieldSx}
                 />
               </Grid>
-              <Grid item xs={12} md={3}>
+              <Grid item xs={12} md={4}>
                 <CustomTextField
                   fullWidth
                   label='No of Items'
@@ -267,7 +267,7 @@ const Step4PestItems = ({
                   sx={requiredFieldSx}
                 />
               </Grid>
-              <Grid item xs={12} md={3} display='flex' justifyContent='flex-end'>
+              <Grid item xs={12} md={4} display='flex' justifyContent='flex-end'>
                 <Button
                   variant='contained'
                   onClick={handleAddPestItem}

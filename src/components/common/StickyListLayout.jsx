@@ -19,7 +19,7 @@ const StickyListLayout = ({ header, children, footer }) => {
         flexDirection: 'column',
         height: '100%',
         maxHeight: '100%',
-        overflow: 'hidden'
+        overflow: 'visible'
       }}
     >
       <Box sx={{ flexShrink: 0, mb: 1 }}>{header}</Box>
@@ -27,7 +27,6 @@ const StickyListLayout = ({ header, children, footer }) => {
         sx={{
           flexGrow: 1,
           minHeight: 0,
-          overflow: 'hidden', // Let the table wrapper handle scrolling
           display: 'flex',
           flexDirection: 'column'
         }}
