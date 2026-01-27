@@ -38,6 +38,7 @@ import { getPurchaseReturnDetails, updatePurchaseReturn } from '@/api/purchase/p
 import { getChemicalsList } from '@/api/master/chemicals/list'
 
 import { getMaterialRequestDropdowns } from '@/api/transfer/materialRequest/dropdown'
+import { getVehicleDropdown } from '@/api/purchase/vehicle/dropdown'
 import { showToast } from '@/components/common/Toasts'
 
 const EditPurchaseReturnPage = () => {
@@ -109,10 +110,11 @@ const EditPurchaseReturnPage = () => {
       try {
         setInitLoading(true)
 
-        const [purchaseRes, materialRes, detailsRes] = await Promise.all([
+        const [purchaseRes, materialRes, detailsRes, vehicleRes] = await Promise.all([
           getPurchaseFilters(),
           getMaterialRequestDropdowns(),
-          getPurchaseReturnDetails({ id: decodedId, type })
+          getPurchaseReturnDetails({ id: decodedId, type }),
+          getVehicleDropdown()
         ])
 
         // Dropdowns
@@ -171,10 +173,10 @@ const EditPurchaseReturnPage = () => {
         )
 
         const vehicles =
-          materialData?.employee?.name?.map(e => ({
-            label: e.name,
-            value: e.id,
-            id: e.id
+          vehicleRes?.vehicle?.map(v => ({
+            label: v.vehicle_name || v.name,
+            value: v.id,
+            id: v.id
           })) || []
 
         setVehicleOptions(vehicles)

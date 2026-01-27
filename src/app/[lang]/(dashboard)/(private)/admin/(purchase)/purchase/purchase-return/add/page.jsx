@@ -39,6 +39,7 @@ import PermissionGuard from '@/components/auth/PermissionGuard'
 import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 import styles from '@core/styles/table.module.css'
 import { getMaterialRequestDropdowns } from '@/api/transfer/materialRequest/dropdown'
+import { getVehicleDropdown } from '@/api/purchase/vehicle/dropdown'
 import { showToast } from '@/components/common/Toasts'
 
 import { format } from 'date-fns'
@@ -98,7 +99,11 @@ const AddPurchaseReturnPage = () => {
       try {
         setInitLoading(true)
 
-        const [purchaseRes, materialRes] = await Promise.all([getPurchaseFilters(), getMaterialRequestDropdowns()])
+        const [purchaseRes, materialRes, vehicleRes] = await Promise.all([
+          getPurchaseFilters(),
+          getMaterialRequestDropdowns(),
+          getVehicleDropdown()
+        ])
 
         const purchaseData = purchaseRes?.data?.data || {}
 
@@ -154,10 +159,10 @@ const AddPurchaseReturnPage = () => {
         setUomOptions(uoms)
 
         const vehicles =
-          materialData?.employee?.name?.map(e => ({
-            label: e.name,
-            value: e.id,
-            id: e.id
+          vehicleRes?.vehicle?.map(v => ({
+            label: v.vehicle_name || v.name,
+            value: v.id,
+            id: v.id
           })) || []
 
         setVehicleOptions(vehicles)

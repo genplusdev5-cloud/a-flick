@@ -39,6 +39,7 @@ import PermissionGuard from '@/components/auth/PermissionGuard'
 import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 import styles from '@core/styles/table.module.css'
 import { getMaterialRequestDropdowns } from '@/api/transfer/materialRequest/dropdown'
+import { getVehicleDropdown } from '@/api/purchase/vehicle/dropdown'
 import { showToast } from '@/components/common/Toasts'
 
 import { format } from 'date-fns'
@@ -92,7 +93,11 @@ const AddPurchaseInwardPage = () => {
       try {
         setInitLoading(true)
 
-        const [purchaseRes, materialRes] = await Promise.all([getPurchaseFilters(), getMaterialRequestDropdowns()])
+        const [purchaseRes, materialRes, vehicleRes] = await Promise.all([
+          getPurchaseFilters(),
+          getMaterialRequestDropdowns(),
+          getVehicleDropdown()
+        ])
 
         const purchaseData = purchaseRes?.data?.data || {}
 
@@ -137,8 +142,6 @@ const AddPurchaseInwardPage = () => {
           label: c.name,
           value: c.name,
           id: c.id,
-          value: c.name,
-          id: c.id,
           uom: c.store_uom || c.uom || c.uom_name || c.unit,
           rate: c.unit_rate || c.rate || c.price || 0,
           isFoc: c.is_foc || Number(c.unit_rate || c.rate || 0) === 0
@@ -152,10 +155,10 @@ const AddPurchaseInwardPage = () => {
           })) || []
 
         const vehicles =
-          materialData?.employee?.name?.map(e => ({
-            label: e.name,
-            value: e.id,
-            id: e.id
+          vehicleRes?.vehicle?.map(v => ({
+            label: v.vehicle_name || v.name,
+            value: v.id,
+            id: v.id
           })) || []
 
         setOriginOptions(origins)
