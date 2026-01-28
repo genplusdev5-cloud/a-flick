@@ -219,6 +219,7 @@ const StockSummaryPageContent = () => {
         id: r.item_id || i,
         chemicalName: r.item_name || '-',
         uom: r.uom || '-',
+        openingDate: r.opening_date ? format(new Date(r.opening_date), 'dd/MM/yyyy') : '-',
         openingStock: r.opening_stock ?? 0,
         purchaseIn: r.purchase_in ?? 0,
         purchaseReturn: r.purchase_return ?? 0,
@@ -404,6 +405,7 @@ const StockSummaryPageContent = () => {
       columnHelper.accessor('sno', { header: 'S.No', size: 60 }),
       columnHelper.accessor('chemicalName', { header: 'Chemical Name', size: 200 }),
       columnHelper.accessor('uom', { header: 'UOM', size: 100 }),
+      columnHelper.accessor('openingDate', { header: 'Opening Date', size: 130 }),
       columnHelper.accessor('openingStock', { header: 'Opening Stock', size: 130 }),
       columnHelper.accessor('purchaseIn', { header: 'Purchase In', size: 130 }),
       columnHelper.accessor('purchaseReturn', { header: 'Purchase Return', size: 150 }),
@@ -654,6 +656,7 @@ const StockSummaryPageContent = () => {
                   <col style={{ width: 60 }} />
                   <col style={{ width: 200 }} />
                   <col style={{ width: 100 }} />
+                  <col style={{ width: 130 }} />
                   <col style={{ width: 130 }} />
                   <col style={{ width: 130 }} />
                   <col style={{ width: 150 }} />

@@ -475,15 +475,12 @@ const Step4PestItems = ({
                 <th>Work Time</th>
                 <th>Chemicals</th>
                 <th>No Of Items</th>
-                <th>Start Date</th>
-                <th>End Date</th>
-                <th>Reminder Date</th>
               </tr>
             </thead>
             <tbody>
               {paginatedPests.length === 0 ? (
                 <tr>
-                  <td colSpan={12} align='center'>
+                  <td colSpan={9} align='center'>
                     No pest items added
                   </td>
                 </tr>
@@ -541,27 +538,6 @@ const Step4PestItems = ({
                       </Box>
                     </td>
                     <td>{item.noOfItems}</td>
-                    <td>
-                      {item.startDate
-                        ? item.startDate instanceof Date
-                          ? item.startDate.toLocaleDateString('en-GB')
-                          : item.startDate
-                        : '-'}
-                    </td>
-                    <td>
-                      {item.endDate
-                        ? item.endDate instanceof Date
-                          ? item.endDate.toLocaleDateString('en-GB')
-                          : item.endDate
-                        : '-'}
-                    </td>
-                    <td>
-                      {item.reminderDate
-                        ? item.reminderDate instanceof Date
-                          ? item.reminderDate.toLocaleDateString('en-GB')
-                          : item.reminderDate
-                        : '-'}
-                    </td>
                   </tr>
                 ))
               )}

@@ -18,7 +18,6 @@ import {
   TableCell,
   TableBody,
   Breadcrumbs,
-  CircularProgress,
   FormControlLabel,
   Checkbox
 } from '@mui/material'
@@ -28,7 +27,11 @@ import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
 import { getPurchaseFilters, addPurchaseInward } from '@/api/purchase/purchase_inward'
 import { getChemicalsList } from '@/api/master/chemicals/list'
-import { getPurchaseOrderList, getPurchaseOrderDetails } from '@/api/purchase/purchase_order'
+import {
+  getPurchaseOrderList,
+  getPurchaseOrderDetails,
+  getPurchaseFilters as getPoFilters
+} from '@/api/purchase/purchase_order'
 
 import StickyListLayout from '@/components/common/StickyListLayout'
 import GlobalButton from '@/components/common/GlobalButton'
@@ -221,14 +224,27 @@ const AddPurchaseInwardPage = () => {
     const fetchPOs = async () => {
       if (supplier?.id) {
         try {
-          const res = await getPurchaseFilters({ supplier_id: supplier.id })
-          const purchaseData = res?.data?.data || res?.data || {}
+          const params = {
+            supplier_id: supplier.id,
+            is_filter: 1
+          }
 
-          // Use robust mapping based on observed backend structures
-          const rawPOs = purchaseData?.purchase_order?.name || purchaseData?.po_number?.po_number || []
+          const res = await getPoFilters(params)
+
+          // Robust mapping to handle various backend response structures
+          const data = res?.data?.data || res?.data || res || {}
+
+          let rawPOs = []
+          if (Array.isArray(data.po_number)) {
+            rawPOs = data.po_number
+          } else if (data.po_number && Array.isArray(data.po_number.label)) {
+            rawPOs = data.po_number.label
+          } else if (Array.isArray(data.label)) {
+            rawPOs = data.label
+          }
 
           const pos = rawPOs.map(item => ({
-            label: item.name || item.po_number || item.num_series || 'Unknown',
+            label: item.po_number || item.label || item.name || 'Unknown',
             value: item.id,
             id: item.id
           }))
@@ -243,11 +259,10 @@ const AddPurchaseInwardPage = () => {
         setPurchaseOrder(null)
       }
     }
-
     if (!initLoading) {
       fetchPOs()
     }
-  }, [supplier, initLoading])
+  }, [supplier, origin, initLoading])
 
   // ✅ NEW – Fetch PO Items when PO is selected
   useEffect(() => {
@@ -486,25 +501,6 @@ const AddPurchaseInwardPage = () => {
 
         {/* HEADER FORM */}
         <Box px={4} py={3} position='relative'>
-          {initLoading && (
-            <Box
-              sx={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                bgcolor: 'rgba(255,255,255,0.7)',
-                zIndex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <CircularProgress size={40} />
-            </Box>
-          )}
-
           <Grid container spacing={3}>
             {/* 🔹 ROW 1 – Date + Origin */}
             <Grid item xs={12} md={4}>

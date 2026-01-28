@@ -39,6 +39,7 @@ import StatusChip from '@/components/common/StatusChip'
 import { getTmMaterialRequestList } from '@/api/transfer/materialRequest/list'
 import { deleteTmMaterialRequest } from '@/api/transfer/materialRequest/delete'
 import { getMaterialRequestDropdowns } from '@/api/transfer/materialRequest/dropdown'
+import { getVehicleDropdown } from '@/api/purchase/vehicle/dropdown'
 
 import CustomTextField from '@core/components/mui/TextField'
 import CustomAutocomplete from '@core/components/mui/Autocomplete'
@@ -93,18 +94,27 @@ const MaterialRequestPageContent = () => {
 
   const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null })
   const [sorting, setSorting] = useState([])
-  const [employeeOptions, setEmployeeOptions] = useState([])
+  const [vehicleOptions, setVehicleOptions] = useState([])
+  const [technicianOptions, setTechnicianOptions] = useState([])
 
   const fetchOptions = async () => {
     try {
-      const res = await getMaterialRequestDropdowns()
-      const data = res?.data || res
-      const technicians = (data?.employee?.name || []).map(e => ({
+      const [dropdownRes, vehicleRes] = await Promise.all([getMaterialRequestDropdowns(), getVehicleDropdown()])
+
+      const dropdownData = dropdownRes?.data || dropdownRes
+      const technicians = (dropdownData?.employee?.name || []).map(e => ({
         label: e.name,
         value: e.id,
         id: e.id
       }))
-      setEmployeeOptions(technicians)
+      setTechnicianOptions(technicians)
+
+      const vehicles = (vehicleRes?.vehicle || []).map(v => ({
+        label: v.vehicle_name || v.name,
+        value: v.id,
+        id: v.id
+      }))
+      setVehicleOptions(vehicles)
     } catch (err) {
       console.error('Dropdown load failed:', err)
     }
@@ -151,15 +161,8 @@ const MaterialRequestPageContent = () => {
         requestNo: r.request_no || `REQ-${r.id}`,
         requestDate: r.request_date,
         fromVehicle:
-          employeeOptions.find(e => String(e.id) === String(r.from_vehicle_id))?.label ||
-          r.from_vehicle ||
-          (r.from_vehicle === '-' ? '-' : r.from_vehicle) ||
-          '-',
-        toVehicle:
-          employeeOptions.find(e => String(e.id) === String(r.to_vehicle_id))?.label ||
-          r.to_vehicle ||
-          (r.to_vehicle === '-' ? '-' : r.to_vehicle) ||
-          '-',
+          vehicleOptions.find(v => String(v.id) === String(r.from_vehicle_id))?.label || r.from_vehicle || '-',
+        toVehicle: vehicleOptions.find(v => String(v.id) === String(r.to_vehicle_id))?.label || r.to_vehicle || '-',
         approvedStatus: r.is_approved === 1 || r.is_approved === true ? 'Yes' : r.is_approved === 0 ? 'No' : 'N/A',
         issuedStatus: r.is_issued === 1 ? 'Yes' : 'N/A',
         completedStatus: r.is_completed === 1 ? 'Yes' : 'No',
@@ -201,7 +204,7 @@ const MaterialRequestPageContent = () => {
 
   useEffect(() => {
     loadData(false)
-  }, [page, appliedFilters, employeeOptions])
+  }, [page, appliedFilters, vehicleOptions])
 
   const getStatusColor = status => {
     switch (status) {
@@ -426,7 +429,7 @@ const MaterialRequestPageContent = () => {
                 )}
               />
               <CustomAutocomplete
-                options={employeeOptions.map(e => e.label)}
+                options={vehicleOptions.map(e => e.label)}
                 value={uiVehicle || null}
                 onChange={(e, val) => setUiVehicle(val || '')}
                 renderInput={params => (

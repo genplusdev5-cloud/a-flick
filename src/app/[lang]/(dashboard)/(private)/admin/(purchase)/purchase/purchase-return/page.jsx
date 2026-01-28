@@ -100,15 +100,13 @@ const PurchaseReturnPage = () => {
   // UI STATES (Local to dropdowns)
   const [filterOrigin, setFilterOrigin] = useState(null)
   const [filterSupplier, setFilterSupplier] = useState(null)
-  const [filterStatus, setFilterStatus] = useState(null)
-  const [filterPiNo, setFilterPiNo] = useState(null)
-  const [piNoOptions, setPiNoOptions] = useState([])
+  const [filterPO, setFilterPO] = useState(null)
+  const [poOptions, setPoOptions] = useState([])
 
   // APPLIED STATES (Used for API calls)
   const [appliedOrigin, setAppliedOrigin] = useState(null)
   const [appliedSupplier, setAppliedSupplier] = useState(null)
-  const [appliedStatus, setAppliedStatus] = useState(null)
-  const [appliedPiNo, setAppliedPiNo] = useState(null)
+  const [appliedPO, setAppliedPO] = useState(null)
   const [appliedDateFilter, setAppliedDateFilter] = useState(false)
   const [appliedDateRange, setAppliedDateRange] = useState([null, null])
 
@@ -207,40 +205,39 @@ const PurchaseReturnPage = () => {
   }, [])
 
   useEffect(() => {
-    const fetchPiOptions = async () => {
+    const fetchPoOptions = async () => {
       if (!filterSupplier) {
-        setPiNoOptions([])
-        setFilterPiNo(null)
+        setPoOptions([])
+        setFilterPO(null)
         return
       }
       try {
-        const { getPurchaseInwardList } = await import('@/api/purchase/purchase_inward')
-        const res = await getPurchaseInwardList({
+        const { getPurchaseOrderList } = await import('@/api/purchase/purchase_order')
+        const res = await getPurchaseOrderList({
           company: filterOrigin?.id,
           supplier_id: filterSupplier.id,
           page_size: 1000
         })
         const items = res?.data?.results || res?.results || []
-        setPiNoOptions(
+        setPoOptions(
           items.map(item => ({
-            label: item.pi_number || item.inward_number || item.num_series,
+            label: item.po_number || item.num_series,
             value: item.id,
             id: item.id
           }))
         )
       } catch (err) {
-        console.error('PI options fetch failed', err)
+        console.error('PO options fetch failed', err)
       }
     }
-    fetchPiOptions()
+    fetchPoOptions()
   }, [filterSupplier, filterOrigin])
 
   // ✅ FETCH FUNCTION
   const fetchPurchaseReturnList = async (
     origin = appliedOrigin,
     supplier = appliedSupplier,
-    statusVal = appliedStatus,
-    piNo = appliedPiNo,
+    poVal = appliedPO,
     dateFilter = appliedDateFilter,
     dateRange = appliedDateRange,
     search = appliedSearchQuery,
@@ -253,9 +250,11 @@ const PurchaseReturnPage = () => {
         page: pageIdx + 1,
         page_size: pagination.pageSize,
         company: origin?.id || undefined,
+        company_id: origin?.id || undefined, // Fallback
         supplier_id: supplier?.id || undefined,
-        status: statusVal?.label || undefined,
-        pi_id: piNo?.id || undefined,
+        po_id: poVal?.id || undefined,
+        purchase_order_id: poVal?.id || undefined, // Fallback
+        type: 'tm', // Added based on other return APIs
         search: search.trim()
       }
 
@@ -269,7 +268,9 @@ const PurchaseReturnPage = () => {
         }
       }
 
+      console.log('Fetching Purchase Return List with params:', params)
       const res = await getPurchaseReturnList(params)
+      console.log('Purchase Return Response:', res)
 
       setTotalCount(res?.data?.count || 0)
 
@@ -303,7 +304,11 @@ const PurchaseReturnPage = () => {
 
       setRows(mappedRows)
     } catch (err) {
-      console.error('Purchase inward list error', err)
+      console.error('Purchase return list error', err)
+      if (err.response) {
+        console.error('Backend Error Data:', err.response.data)
+        console.error('Backend Error Status:', err.response.status)
+      }
     } finally {
       setLoading(false)
     }
@@ -316,8 +321,7 @@ const PurchaseReturnPage = () => {
     pagination.pageSize,
     appliedOrigin,
     appliedSupplier,
-    appliedStatus,
-    appliedPiNo,
+    appliedPO,
     appliedDateFilter,
     appliedDateRange,
     appliedSearchQuery
@@ -377,22 +381,8 @@ const PurchaseReturnPage = () => {
       columnHelper.accessor('origin', { header: 'Origin' }),
       columnHelper.accessor('returnNo', { header: 'Return No.' }),
       columnHelper.accessor('returnDate', { header: 'Return Date' }),
-      columnHelper.accessor('inwardNo', { header: 'Inward No.' }),
-      columnHelper.accessor('inwardDate', { header: 'Inward Date' }),
       columnHelper.accessor('supplierName', { header: 'Supplier Name' }),
-      columnHelper.accessor('noOfItems', { header: 'No. of Items' }),
-
-      columnHelper.accessor('status', {
-        header: 'Status',
-        cell: info => (
-          <Chip
-            label={info.getValue()}
-            color={info.getValue() === 'Completed' ? 'success' : 'warning'}
-            size='small'
-            sx={{ fontWeight: 600, color: '#fff' }}
-          />
-        )
-      })
+      columnHelper.accessor('noOfItems', { header: 'No. of Items' })
     ],
     []
   )
@@ -502,17 +492,6 @@ const PurchaseReturnPage = () => {
             />
           </Box>
 
-          {/* Status */}
-          <Box sx={{ width: 220 }}>
-            <GlobalAutocomplete
-              label='Status'
-              placeholder='Select Status'
-              options={statusOptions}
-              value={filterStatus}
-              onChange={val => setFilterStatus(val)}
-            />
-          </Box>
-
           {/* Supplier */}
           <Box sx={{ width: 220 }}>
             <GlobalAutocomplete
@@ -524,14 +503,14 @@ const PurchaseReturnPage = () => {
             />
           </Box>
 
-          {/* PI No Filter */}
+          {/* PO No Filter */}
           <Box sx={{ width: 220 }}>
             <GlobalAutocomplete
-              label='PI No.'
-              placeholder='Select PI No.'
-              options={piNoOptions}
-              value={filterPiNo}
-              onChange={val => setFilterPiNo(val)}
+              label='PO No.'
+              placeholder='Select PO No.'
+              options={poOptions}
+              value={filterPO}
+              onChange={val => setFilterPO(val)}
               disabled={!filterSupplier}
             />
           </Box>
@@ -545,22 +524,12 @@ const PurchaseReturnPage = () => {
             onClick={() => {
               setAppliedOrigin(filterOrigin)
               setAppliedSupplier(filterSupplier)
-              setAppliedStatus(filterStatus)
-              setAppliedPiNo(filterPiNo)
+              setAppliedPO(filterPO)
               setAppliedDateFilter(uiDateFilter)
               setAppliedDateRange(uiDateRange)
               setAppliedSearchQuery(searchQuery)
               setPagination({ pageIndex: 0, pageSize: pagination.pageSize })
-              fetchPurchaseReturnList(
-                filterOrigin,
-                filterSupplier,
-                filterStatus,
-                filterPiNo,
-                uiDateFilter,
-                uiDateRange,
-                searchQuery,
-                0
-              )
+              fetchPurchaseReturnList(filterOrigin, filterSupplier, filterPO, uiDateFilter, uiDateRange, searchQuery, 0)
             }}
           >
             Refresh

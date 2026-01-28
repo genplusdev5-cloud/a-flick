@@ -441,7 +441,7 @@ const VehiclePageContent = () => {
           <form onSubmit={handleSubmit}>
             <CustomTextField
               fullWidth
-              label='Vehicle Name'
+              label=' Name'
               placeholder='Enter vehicle name'
               value={formData.vehicle_name}
               inputRef={nameRef}

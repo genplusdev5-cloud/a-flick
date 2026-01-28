@@ -4,17 +4,7 @@ import { useState, useMemo, useEffect, forwardRef } from 'react'
 import Link from 'next/link'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 
-import {
-  Box,
-  Card,
-  CardHeader,
-  Typography,
-  Grid,
-  Divider,
-  IconButton,
-  Breadcrumbs,
-  CircularProgress
-} from '@mui/material'
+import { Box, Card, CardHeader, Typography, Grid, Divider, IconButton, Breadcrumbs } from '@mui/material'
 
 import StickyListLayout from '@/components/common/StickyListLayout'
 import StickyTableWrapper from '@/components/common/StickyTableWrapper'
@@ -36,6 +26,7 @@ import styles from '@core/styles/table.module.css'
 import { getPurchaseFilters } from '@/api/purchase/purchase_inward'
 import { getMaterialRequestDropdowns } from '@/api/transfer/materialRequest/dropdown'
 import { getMaterialIssueDetails, updateMaterialIssue } from '@/api/transfer/material_issue'
+import { getVehicleDropdown } from '@/api/purchase/vehicle/dropdown'
 
 import { showToast } from '@/components/common/Toasts'
 
@@ -46,10 +37,16 @@ const EditMaterialRequestIssuedPage = () => {
   const type = searchParams.get('type') || 'tm'
 
   const decodedId = useMemo(() => {
+    if (!id) return null
     try {
-      return Number(atob(id))
-    } catch {
-      return Number(id)
+      const urlDecoded = decodeURIComponent(id)
+      return atob(urlDecoded.replace(/-/g, '+').replace(/_/g, '/'))
+    } catch (e) {
+      try {
+        return atob(String(id).replace(/-/g, '+').replace(/_/g, '/'))
+      } catch {
+        return id
+      }
     }
   }, [id])
 
@@ -58,6 +55,7 @@ const EditMaterialRequestIssuedPage = () => {
   const [originOptions, setOriginOptions] = useState([])
   const [chemicalOptions, setChemicalOptions] = useState([])
   const [uomOptions, setUomOptions] = useState([])
+  const [vehicleOptions, setVehicleOptions] = useState([])
 
   const [requestNo, setRequestNo] = useState('')
   const [origin, setOrigin] = useState(null)
@@ -87,10 +85,11 @@ const EditMaterialRequestIssuedPage = () => {
       try {
         setInitLoading(true)
 
-        const [purchaseRes, materialRes, detailsRes] = await Promise.all([
+        const [purchaseRes, materialRes, detailsRes, vehicleRes] = await Promise.all([
           getPurchaseFilters(),
           getMaterialRequestDropdowns(),
-          getMaterialIssueDetails(decodedId, type)
+          getMaterialIssueDetails(decodedId, type),
+          getVehicleDropdown()
         ])
 
         /* DROPDOWNS */
@@ -105,7 +104,7 @@ const EditMaterialRequestIssuedPage = () => {
         }))
         setEmployeeOptions(employees)
 
-        // Chemicals
+        // Chemicals (Robust fetching)
         let chemRaw = []
         if (Array.isArray(purchaseData?.chemicals)) {
           chemRaw = purchaseData.chemicals
@@ -113,13 +112,15 @@ const EditMaterialRequestIssuedPage = () => {
           chemRaw = purchaseData.chemicals.name
         } else if (Array.isArray(materialData?.chemicals?.name)) {
           chemRaw = materialData.chemicals.name
+        } else if (Array.isArray(materialData?.chemical?.name)) {
+          chemRaw = materialData.chemical.name
         }
 
         const chemicals = chemRaw.map(c => ({
-          label: c.name,
-          value: c.id,
-          id: c.id,
-          uom: c.uom || c.uom_name || c.unit
+          label: c.name || c.label || '',
+          value: c.id || c.value,
+          id: c.id || c.value,
+          uom: c.uom || c.uom_name || c.unit || c.uom_id
         }))
         setChemicalOptions(chemicals)
 
@@ -140,18 +141,36 @@ const EditMaterialRequestIssuedPage = () => {
         }))
         setUomOptions(uoms)
 
+        // Vehicles
+        const vehicles = (vehicleRes?.vehicle || []).map(v => ({
+          label: v.vehicle_name || v.name,
+          value: v.id,
+          id: v.id
+        }))
+        setVehicleOptions(vehicles)
+
         /* DETAILS */
         const detailJson = detailsRes?.data || detailsRes || {}
         const d = detailJson?.data || detailJson
 
         if (d && Object.keys(d).length > 0) {
-          setOrigin(origins.find(o => String(o.id) === String(d.company_id || d.origin_id)) || origins[0] || null)
-          setRequestNo(d.request_no || '')
-          setIssueDate(d.issue_date ? parseISO(d.issue_date) : null)
+          setOrigin(origins.find(o => String(o.id) === String(d.company_id || d.origin_id)) || null)
+          setRequestNo(d.request_no || d.request_details?.num_series || d.request_details?.request_no || '')
+          setIssueDate(d.issue_date ? parseISO(d.issue_date) : d.receive_date ? parseISO(d.receive_date) : null)
           setRemarks(d.remarks || '')
 
-          setFromVehicle(employees.find(e => String(e.id) === String(d.from_employee_id || d.from_vehicle_id)) || null)
-          setToVehicle(employees.find(e => String(e.id) === String(d.to_employee_id || d.to_vehicle_id)) || null)
+          setFromVehicle(
+            vehicles.find(v => String(v.id) === String(d.from_employee_id || d.from_vehicle_id)) ||
+              (d.from_vehicle && d.from_vehicle !== '-'
+                ? { label: d.from_vehicle, id: d.from_vehicle_id || d.from_employee_id }
+                : null)
+          )
+          setToVehicle(
+            vehicles.find(v => String(v.id) === String(d.to_employee_id || d.to_vehicle_id)) ||
+              (d.to_vehicle && d.to_vehicle !== '-'
+                ? { label: d.to_vehicle, id: d.to_vehicle_id || d.to_employee_id }
+                : null)
+          )
 
           setItems(
             (d.items || d.transfer_items || d.transfer_in_items || []).map(item => ({
@@ -177,12 +196,21 @@ const EditMaterialRequestIssuedPage = () => {
   const handleChemicalChange = val => {
     setChemical(val)
     if (val && val.uom) {
-      const uomStr = typeof val.uom === 'object' ? val.uom.label || val.uom.name : val.uom
-      const foundUom = uomOptions.find(u => u.label.toLowerCase() === uomStr.toLowerCase())
+      const uomVal = typeof val.uom === 'object' ? val.uom.label || val.uom.name : val.uom
+
+      const foundUom = uomOptions.find(
+        u =>
+          String(u.id) === String(uomVal) ||
+          String(u.label).toLowerCase() === String(uomVal).toLowerCase() ||
+          String(u.value).toLowerCase() === String(uomVal).toLowerCase()
+      )
+
       if (foundUom) {
         setUom(foundUom)
+      } else if (typeof uomVal === 'string') {
+        setUom({ label: uomVal, value: uomVal, id: null })
       } else {
-        setUom({ label: uomStr, value: uomStr, id: null })
+        setUom(null)
       }
     } else {
       setUom(null)
@@ -244,7 +272,7 @@ const EditMaterialRequestIssuedPage = () => {
 
   /* ───── UPDATE ───── */
   const handleUpdate = async () => {
-    if (!requestNo || !fromEmployee || !toEmployee || !issueDate || !items.length) {
+    if (!requestNo || !fromVehicle || !toVehicle || !issueDate || !items.length) {
       showToast('warning', 'Fill all required fields')
       return
     }
@@ -268,16 +296,25 @@ const EditMaterialRequestIssuedPage = () => {
         remarks,
         is_active: 1,
         status: 1,
-        items: items.map(i => ({
-          id: typeof i.id === 'number' && i.id < 1000000000000 ? i.id : null,
-          item_id: i.chemicalId,
-          item_name: i.chemical,
-          uom_id: i.uomId,
-          uom: i.uom,
-          quantity: Number(i.quantity),
-          is_active: 1,
-          status: 1
-        }))
+        items: JSON.stringify(
+          items.map(i => {
+            const itemObj = {
+              item_id: i.chemicalId,
+              item_name: i.chemical,
+              uom_id: i.uomId,
+              uom: i.uom,
+              quantity: Number(i.quantity),
+              is_active: 1,
+              status: 1
+            }
+
+            if (i.id && !String(i.id).startsWith('temp') && String(i.id).length < 12) {
+              itemObj.id = Number(i.id)
+            }
+
+            return itemObj
+          })
+        )
       }
 
       await updateMaterialIssue(decodedId, payload)
@@ -306,23 +343,7 @@ const EditMaterialRequestIssuedPage = () => {
         <Divider />
 
         {/* HEADER */}
-        <Box px={4} py={3} position='relative'>
-          {initLoading && (
-            <Box
-              sx={{
-                position: 'absolute',
-                inset: 0,
-                bgcolor: 'rgba(255,255,255,0.7)',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                zIndex: 1
-              }}
-            >
-              <CircularProgress />
-            </Box>
-          )}
-
+        <Box px={4} py={3}>
           <Grid container spacing={3}>
             <Grid item md={4} xs={12}>
               <AppReactDatepicker
@@ -335,7 +356,7 @@ const EditMaterialRequestIssuedPage = () => {
             <Grid item md={4} xs={12}>
               <GlobalAutocomplete
                 label='From Vehicle'
-                options={employeeOptions}
+                options={vehicleOptions}
                 value={fromVehicle}
                 onChange={setFromVehicle}
               />
@@ -344,7 +365,7 @@ const EditMaterialRequestIssuedPage = () => {
             <Grid item md={4} xs={12}>
               <GlobalAutocomplete
                 label='To Vehicle'
-                options={employeeOptions}
+                options={vehicleOptions}
                 value={toVehicle}
                 onChange={setToVehicle}
               />

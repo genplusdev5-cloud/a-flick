@@ -56,7 +56,12 @@ import {
   getProposalList,
   duplicateProposal
 } from '@/api/sales/proposal'
-import { listSalesAgreement, deleteSalesAgreement } from '@/api/sales/proposal/agreement'
+import {
+  listSalesAgreement,
+  deleteSalesAgreement,
+  getSalesAgreementContent,
+  updateSalesAgreementStatus
+} from '@/api/sales/proposal/agreement'
 import { getContractDates, getInvoiceCount, getPestCount, getInvoiceRemark } from '@/api/contract_group/contract'
 import { getAllDropdowns } from '@/api/contract_group/contract/dropdowns'
 import { getCustomerDetails } from '@/api/customer_group/customer'
@@ -528,7 +533,6 @@ export default function ProposalWizard({ id }) {
       console.log('🔍 FETCHING PROPOSALS FOR:', decodedProposalId)
       listSalesAgreement({ proposal_id: Number(decodedProposalId) })
         .then(res => {
-          // ✅ Highly robust mapping to handle multiple API response formats
           const apiResponse = res?.data || res
           const apiData =
             apiResponse?.data?.results ||
@@ -604,6 +608,38 @@ export default function ProposalWizard({ id }) {
       showToast('error', 'Failed to delete proposal agreement')
     } finally {
       setDeleteProposalDialog({ open: false, row: null })
+    }
+  }
+
+  const handleUpdateProposalStatus = async (row, status) => {
+    try {
+      if (!row.id) return
+
+      // payload key must be 'quotation_status' and value 'approved'/'rejected'
+      const payload = {
+        quotation_status: status === 1 ? 'approved' : 'rejected'
+      }
+
+      const res = await updateSalesAgreementStatus(row.id, payload)
+      if (res?.status === 'success' || res?.message === 'success' || res?.data) {
+        showToast('success', `Proposal ${status === 1 ? 'Approved' : 'Rejected'} Successfully`)
+
+        // Refresh list
+        const decodedProposalId = decodeId(id) || id
+        const listRes = await listSalesAgreement({ proposal_id: Number(decodedProposalId) })
+        const apiResponse = listRes?.data || listRes
+        const apiData =
+          apiResponse?.data?.results ||
+          apiResponse?.results ||
+          (Array.isArray(apiResponse?.data) ? apiResponse.data : Array.isArray(apiResponse) ? apiResponse : [])
+
+        if (Array.isArray(apiData)) setProposals(apiData)
+      } else {
+        showToast('error', res?.message || 'Failed to update status')
+      }
+    } catch (err) {
+      console.error('Update Status Error:', err)
+      showToast('error', 'Failed to update status')
     }
   }
 
@@ -910,6 +946,7 @@ export default function ProposalWizard({ id }) {
         if (remarksArray.length > 0) {
           setFormData(prev => ({
             ...prev,
+            invoiceRemarksOptions: remarksArray,
             invoiceRemarks: remarksArray
           }))
           // showToast('info', 'Invoice remarks updated based on pest items')
@@ -1522,9 +1559,8 @@ export default function ProposalWizard({ id }) {
   // 🔹 FETCH INVOICE REMARKS BASED ON PEST ITEMS
   const fetchInvoiceRemarks = async items => {
     // If specific conditions met, fetch remarks.
-    // Assuming backend logic.
     if (items.length === 0) {
-      setFormData(prev => ({ ...prev, invoiceRemarks: [] }))
+      setFormData(prev => ({ ...prev, invoiceRemarks: [], invoiceRemarksOptions: [] }))
       return
     }
 
@@ -1538,11 +1574,27 @@ export default function ProposalWizard({ id }) {
 
       const res = await getInvoiceRemark(payload)
 
-      if (res?.status === 'success' && Array.isArray(res?.data)) {
-        setFormData(prev => ({
-          ...prev,
-          invoiceRemarksOptions: res.data // Use as options
-        }))
+      if (res?.status === 'success' || res?.message === 'success' || res?.data) {
+        // Handle potential array or comma-separated string response
+        const remarksData = res.data?.invoice_remark || res.data || res.invoice_remark || res
+        let remarksArray = []
+
+        if (Array.isArray(remarksData)) {
+          remarksArray = remarksData.map(r => String(r || '').trim())
+        } else if (typeof remarksData === 'string') {
+          remarksArray = remarksData
+            .split(',')
+            .map(r => r.trim())
+            .filter(Boolean)
+        }
+
+        if (remarksArray.length > 0) {
+          setFormData(prev => ({
+            ...prev,
+            invoiceRemarksOptions: remarksArray,
+            invoiceRemarks: remarksArray // ✅ This makes them appear in the field
+          }))
+        }
       }
     } catch (err) {
       console.error('❌ Invoice Remark API failed', err)
@@ -2091,7 +2143,6 @@ export default function ProposalWizard({ id }) {
                     <th>Action</th>
                     <th>Proposal Date</th>
                     <th>Title</th>
-                    <th>Document</th>
                     <th>Status</th>
                   </tr>
                 </thead>
@@ -2155,17 +2206,58 @@ export default function ProposalWizard({ id }) {
                         </td>
                         <td>{prop.proposal_date || prop.created_on?.split(' ')[0] || '-'}</td>
                         <td>{prop.name || prop.title || '-'}</td>
-                        <td>{prop.file_name_display || (prop.file_name ? prop.file_name.split('/').pop() : '-')}</td>
                         <td>
-                          <Chip
-                            label={prop.status === 1 ? 'Approved' : 'Pending'}
-                            size='small'
-                            sx={{
-                              bgcolor: prop.status === 1 ? '#dff7e9' : '#fff2e2',
-                              color: prop.status === 1 ? '#28c76f' : '#ff9f43',
-                              fontWeight: 600
-                            }}
-                          />
+                          <Box sx={{ display: 'flex', gap: 1 }}>
+                            {/* Show Approve button if NOT approved (or allows re-approval? User said 'reject icon show panna vena' if approved)
+                                actually user said: "approve click pannathu rejecter icon show panna vena" -> If approved, don't show reject.
+                                "same reject pannita approve icon show aaga kudathu" -> If rejected, don't show approve.
+                            */}
+                            {prop.quotation_status !== 'rejected' && (
+                              <IconButton
+                                size='small'
+                                sx={{
+                                  color: '#28c76f',
+                                  bgcolor:
+                                    prop.quotation_status === 'approved'
+                                      ? 'rgba(40, 199, 111, 0.4)'
+                                      : 'rgba(40, 199, 111, 0.16)',
+                                  '&:hover': { bgcolor: 'rgba(40, 199, 111, 0.24)' },
+                                  opacity: prop.quotation_status === 'approved' ? 1 : 0.7
+                                }}
+                                onClick={() => {
+                                  if (prop.quotation_status !== 'approved') {
+                                    handleUpdateProposalStatus(prop, 1)
+                                  }
+                                }}
+                                disabled={prop.quotation_status === 'approved'}
+                              >
+                                <i className='tabler-check' />
+                              </IconButton>
+                            )}
+
+                            {prop.quotation_status !== 'approved' && (
+                              <IconButton
+                                size='small'
+                                sx={{
+                                  color: '#ea5455',
+                                  bgcolor:
+                                    prop.quotation_status === 'rejected'
+                                      ? 'rgba(234, 84, 85, 0.4)'
+                                      : 'rgba(234, 84, 85, 0.16)',
+                                  '&:hover': { bgcolor: 'rgba(234, 84, 85, 0.24)' },
+                                  opacity: prop.quotation_status === 'rejected' ? 1 : 0.7
+                                }}
+                                onClick={() => {
+                                  if (prop.quotation_status !== 'rejected') {
+                                    handleUpdateProposalStatus(prop, 2)
+                                  }
+                                }}
+                                disabled={prop.quotation_status === 'rejected'}
+                              >
+                                <i className='tabler-x' />
+                              </IconButton>
+                            )}
+                          </Box>
                         </td>
                       </tr>
                     ))

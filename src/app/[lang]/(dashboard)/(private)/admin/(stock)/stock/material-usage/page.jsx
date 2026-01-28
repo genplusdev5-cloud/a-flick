@@ -36,6 +36,7 @@ import { getAllEmployees } from '@/api/employee/getAllEmployees'
 import { getCustomerList } from '@/api/customer_group/customer/list'
 import { getSupplierList } from '@/api/stock/supplier/list'
 import { getChemicalsList } from '@/api/master/chemicals/list'
+import getMaterialUsage from '@/api/transfer/materialRequest/usage'
 
 import {
   useReactTable,
@@ -63,25 +64,6 @@ const DebouncedInput = ({ value: initialValue, onChange, debounce = 500, ...prop
   return <CustomTextField {...props} value={value} onChange={e => setValue(e.target.value)} />
 }
 
-const DUMMY_ROWS = [
-  {
-    id: 1,
-    date: '2026-01-06',
-    material: 'Samsung Galaxy A15',
-    usedQty: 1,
-    reference: 'Service Request',
-    remarks: 'Installation'
-  },
-  {
-    id: 2,
-    date: '2026-01-05',
-    material: 'iPhone 14',
-    usedQty: 1,
-    reference: 'Transfer Out',
-    remarks: 'Branch Transfer'
-  }
-]
-
 const MaterialUsagePageContent = () => {
   const [pageSize, setPageSize] = useState(25)
   const [rows, setRows] = useState([])
@@ -100,7 +82,12 @@ const MaterialUsagePageContent = () => {
     enableDateFilter: false,
     startDate: new Date(),
     endDate: new Date(),
-    searchText: ''
+    searchText: '',
+    originId: undefined,
+    technicianId: undefined,
+    customerId: undefined,
+    supplierId: undefined,
+    itemId: undefined
   })
 
   // -- FILTER OPTIONS --
@@ -142,28 +129,51 @@ const MaterialUsagePageContent = () => {
   const loadData = async (showToastMsg = false) => {
     setLoading(true)
     try {
-      // In a real app, this would be an API call
-      // const params = { page, page_size: pageSize, search: appliedFilters.searchText, ... }
-      // const res = await getMaterialUsage(params)
+      const {
+        enableDateFilter,
+        startDate,
+        endDate,
+        searchText,
+        originId,
+        technicianId,
+        customerId,
+        supplierId,
+        itemId
+      } = appliedFilters
 
-      // Using dummy data for now
-      let filtered = [...DUMMY_ROWS]
-
-      if (appliedFilters.searchText) {
-        filtered = filtered.filter(
-          r =>
-            r.material.toLowerCase().includes(appliedFilters.searchText.toLowerCase()) ||
-            r.reference.toLowerCase().includes(appliedFilters.searchText.toLowerCase())
-        )
+      const params = {
+        page,
+        page_size: pageSize,
+        search: searchText || undefined,
+        company_id: originId || undefined,
+        technician_id: technicianId || undefined,
+        customer_id: customerId || undefined,
+        supplier_id: supplierId || undefined,
+        item_id: itemId || undefined
       }
 
-      const mapped = filtered.map((r, i) => ({
-        ...r,
-        sno: (page - 1) * pageSize + i + 1
+      if (enableDateFilter && startDate && endDate) {
+        params.from_date = format(startDate, 'yyyy-MM-dd')
+        params.to_date = format(endDate, 'yyyy-MM-dd')
+      }
+
+      const res = await getMaterialUsage(params)
+      const resData = res?.data?.data || res?.data || res
+      const items = resData?.results || []
+
+      setTotalCount(resData?.count || 0)
+
+      const mapped = items.map((r, i) => ({
+        id: r.item_id || i,
+        sno: (page - 1) * pageSize + i + 1,
+        technician: r.technician_name || '-',
+        customer: r.customer_name || '-',
+        item: r.item_name || '-',
+        uom: r.uom_name || '-',
+        totalUsed: r.total_used ?? 0
       }))
 
       setRows(mapped)
-      setTotalCount(filtered.length)
       if (showToastMsg) showToast('info', 'Material usage refreshed')
     } catch (err) {
       console.error(err)
@@ -183,24 +193,35 @@ const MaterialUsagePageContent = () => {
         getChemicalsList()
       ])
 
-      const companies = originRes?.data?.data?.company?.name || []
+      // 1. Origin
+      const origins = originRes?.data?.data?.company?.name || originRes?.data?.results || []
       setOriginOptions(
-        companies.map(c => ({
-          label: c.name,
-          value: c.name,
-          id: c.id
+        origins.map(c => ({
+          label: c.name || c.label || c.company_name || String(c),
+          value: c.id || c.value || c.name || c,
+          id: c.id || c.value
         }))
       )
 
-      setEmployeeOptions(empRes.map(e => ({ id: e.id, label: e.name })))
-      if (custRes?.status === 'success') {
-        setCustomerOptions(custRes.data.results.map(c => ({ id: c.id, label: c.customer_name })))
-      }
-      const suppData = suppRes?.data?.data?.results || suppRes?.data?.results || []
-      setSupplierOptions(suppData.map(s => ({ id: s.id, label: s.supplier_name })))
-      if (chemRes?.success) {
-        setChemicalOptions((chemRes.data.results || []).map(c => ({ id: c.id, label: c.name })))
-      }
+      // 2. Employee
+      setEmployeeOptions((empRes || []).map(e => ({ id: e.id, label: e.name || e.employee_name || e.label })))
+
+      // 3. Customer
+      const customers = custRes?.data?.results || custRes?.results || []
+      setCustomerOptions(
+        customers.map(c => ({
+          id: c.id || c.customer_id,
+          label: c.customer_name || c.name || c.label
+        }))
+      )
+
+      // 4. Supplier
+      const suppData = suppRes?.data?.data?.results || suppRes?.data?.results || suppRes?.results || []
+      setSupplierOptions(suppData.map(s => ({ id: s.id, label: s.supplier_name || s.name || s.label })))
+
+      // 5. Chemical
+      const chemData = chemRes?.data?.results || chemRes?.results || chemRes || []
+      setChemicalOptions(chemData.map(c => ({ id: c.id, label: c.name || c.label })))
     } catch (err) {
       console.error('Failed to fetch filter options:', err)
     }
@@ -212,7 +233,7 @@ const MaterialUsagePageContent = () => {
 
   useEffect(() => {
     loadData(false)
-  }, [page, appliedFilters, selectedOrigin, selectedEmployee, selectedCustomer, selectedSupplier, selectedChemical, pageSize])
+  }, [page, appliedFilters, pageSize])
 
   const exportCSV = () => {
     const headers = columns.map(c => c.header).filter(h => typeof h === 'string')
@@ -331,15 +352,11 @@ const MaterialUsagePageContent = () => {
   const columns = useMemo(
     () => [
       columnHelper.accessor('sno', { header: 'S.No', size: 60 }),
-      columnHelper.accessor('date', { header: 'Date', size: 120 }),
-      columnHelper.accessor('material', { header: 'Material / Item', size: 250 }),
-      columnHelper.accessor('usedQty', { header: 'Used Qty', size: 100 }),
-      columnHelper.accessor('reference', {
-        header: 'Reference',
-        size: 150,
-        cell: i => <Chip label={i.getValue()} size='small' color='info' variant='tonal' />
-      }),
-      columnHelper.accessor('remarks', { header: 'Remarks', size: 250 })
+      columnHelper.accessor('technician', { header: 'Technician Name', size: 200 }),
+      columnHelper.accessor('customer', { header: 'Customer Name', size: 200 }),
+      columnHelper.accessor('item', { header: 'Item Name', size: 250 }),
+      columnHelper.accessor('uom', { header: 'UOM', size: 100 }),
+      columnHelper.accessor('totalUsed', { header: 'Total Used', size: 120 })
     ],
     []
   )
@@ -384,7 +401,12 @@ const MaterialUsagePageContent = () => {
                     enableDateFilter: uiEnableDateFilter,
                     startDate: uiStartDate,
                     endDate: uiEndDate,
-                    searchText: uiSearchText
+                    searchText: uiSearchText,
+                    originId: selectedOrigin?.id,
+                    technicianId: selectedEmployee?.id,
+                    customerId: selectedCustomer?.id,
+                    supplierId: selectedSupplier?.id,
+                    itemId: selectedChemical?.id
                   })
                   showToast('info', 'Refreshing data...')
                 }}
@@ -573,7 +595,16 @@ const MaterialUsagePageContent = () => {
             />
           </Box>
 
-          <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          <Box
+            sx={{
+              position: 'relative',
+              flexGrow: 1,
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              borderBottom: '1px solid var(--border-color)'
+            }}
+          >
             <StickyTableWrapper rowCount={rows.length}>
               <table className={styles.table} style={{ width: 'max-content', minWidth: '100%', tableLayout: 'fixed' }}>
                 <thead>

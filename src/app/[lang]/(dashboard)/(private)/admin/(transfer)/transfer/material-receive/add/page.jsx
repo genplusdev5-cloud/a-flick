@@ -3,17 +3,7 @@
 import { useState, useMemo, useEffect, forwardRef } from 'react'
 import Link from 'next/link'
 import { useRouter, useParams } from 'next/navigation'
-import {
-  Box,
-  Card,
-  CardHeader,
-  Typography,
-  Grid,
-  Divider,
-  IconButton,
-  Breadcrumbs,
-  CircularProgress
-} from '@mui/material'
+import { Box, Card, CardHeader, Typography, Grid, Divider, IconButton, Breadcrumbs } from '@mui/material'
 
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
@@ -31,6 +21,7 @@ import { getPurchaseFilters } from '@/api/purchase/purchase_order'
 import { getMaterialRequestDropdowns } from '@/api/transfer/materialRequest/dropdown'
 import { addMaterialReceive } from '@/api/transfer/material_receive'
 import { getMaterialIssueList } from '@/api/transfer/material_issue'
+import { getVehicleDropdown } from '@/api/purchase/vehicle/dropdown'
 import { showToast } from '@/components/common/Toasts'
 
 import { format, parseISO } from 'date-fns'
@@ -46,6 +37,7 @@ const AddMaterialReceivePage = () => {
   const [chemicalOptions, setChemicalOptions] = useState([])
   const [uomOptions, setUomOptions] = useState([])
   const [issueOptions, setIssueOptions] = useState([])
+  const [vehicleOptions, setVehicleOptions] = useState([])
 
   // Loading
   const [initLoading, setInitLoading] = useState(false)
@@ -74,11 +66,15 @@ const AddMaterialReceivePage = () => {
       try {
         setInitLoading(true)
 
-        const [purchaseRes, materialRes] = await Promise.all([getPurchaseFilters(), getMaterialRequestDropdowns()])
-
-        const purchaseData = purchaseRes?.data?.data || purchaseRes?.data || {}
+        const [purchaseRes, materialRes, vehicleRes] = await Promise.all([
+          getPurchaseFilters(),
+          getMaterialRequestDropdowns(),
+          getVehicleDropdown()
+        ])
 
         const materialData = materialRes?.data?.data || materialRes?.data || materialRes || {}
+        const filterData = purchaseRes?.data || purchaseRes || {}
+        const purchaseData = filterData?.data || filterData || {}
 
         const techs =
           materialData?.employee?.name?.map(e => ({
@@ -89,12 +85,24 @@ const AddMaterialReceivePage = () => {
 
         setEmployeeOptions(techs)
 
+        // Chemicals (Robust fetching from multiple sources)
+        let chemRaw = []
+        if (Array.isArray(purchaseData?.chemicals)) {
+          chemRaw = purchaseData.chemicals
+        } else if (Array.isArray(purchaseData?.chemicals?.name)) {
+          chemRaw = purchaseData.chemicals.name
+        } else if (Array.isArray(materialData?.chemicals?.name)) {
+          chemRaw = materialData.chemicals.name
+        } else if (Array.isArray(materialData?.chemical?.name)) {
+          chemRaw = materialData.chemical.name
+        }
+
         setChemicalOptions(
-          (materialData?.chemicals?.name || materialData?.chemicals || []).map(c => ({
-            label: c.label || c.name || '',
-            value: c.value || c.id,
-            id: c.value || c.id,
-            uom: c.uom || c.unit || c.uom_id
+          chemRaw.map(c => ({
+            label: c.name || c.label || '',
+            value: c.id || c.value,
+            id: c.id || c.value,
+            uom: c.uom_name || c.uom || c.unit || c.uom_id
           }))
         )
 
@@ -113,6 +121,14 @@ const AddMaterialReceivePage = () => {
         }))
         setOriginOptions(origins)
         if (origins.length > 0) setOrigin(origins[0])
+
+        // Vehicles
+        const vehicles = (vehicleRes?.vehicle || []).map(v => ({
+          label: v.vehicle_name || v.name,
+          value: v.id,
+          id: v.id
+        }))
+        setVehicleOptions(vehicles)
 
         const issueRes = await getMaterialIssueList({ page_size: 100 })
         const issueData = issueRes?.data?.results || issueRes?.results || []
@@ -151,10 +167,14 @@ const AddMaterialReceivePage = () => {
   const handleChemicalChange = val => {
     setChemical(val)
     if (val && val.uom) {
-      const uomVal = val.uom
+      const uomVal = typeof val.uom === 'object' ? val.uom.label || val.uom.name : val.uom
+
       // Try to find in uomOptions by ID or Label
       const foundUom = uomOptions.find(
-        u => String(u.id) === String(uomVal) || String(u.label).toLowerCase() === String(uomVal).toLowerCase()
+        u =>
+          String(u.id) === String(uomVal) ||
+          String(u.label).toLowerCase() === String(uomVal).toLowerCase() ||
+          String(u.value).toLowerCase() === String(uomVal).toLowerCase()
       )
 
       if (foundUom) {
@@ -262,15 +282,17 @@ const AddMaterialReceivePage = () => {
         remarks,
         is_active: 1,
         status: 1,
-        items: items.map(i => ({
-          item_id: i.chemicalId,
-          item_name: i.chemical,
-          uom_id: i.uomId,
-          uom: i.uom,
-          quantity: Number(i.quantity),
-          is_active: 1,
-          status: 1
-        }))
+        items: JSON.stringify(
+          items.map(i => ({
+            item_id: i.chemicalId,
+            item_name: i.chemical,
+            uom_id: i.uomId,
+            uom: i.uom,
+            quantity: Number(i.quantity),
+            is_active: 1,
+            status: 1
+          }))
+        )
       }
 
       await addMaterialReceive(payload)
@@ -300,23 +322,7 @@ const AddMaterialReceivePage = () => {
         <Divider />
 
         {/* HEADER */}
-        <Box px={4} py={3} position='relative'>
-          {initLoading && (
-            <Box
-              sx={{
-                position: 'absolute',
-                inset: 0,
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                zIndex: 1,
-                bgcolor: 'rgba(255,255,255,0.7)'
-              }}
-            >
-              <CircularProgress />
-            </Box>
-          )}
-
+        <Box px={4} py={3}>
           <Grid container spacing={3}>
             <Grid item xs={12} md={4}>
               <AppReactDatepicker
@@ -331,7 +337,7 @@ const AddMaterialReceivePage = () => {
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
                 label='From Vehicle'
-                options={employeeOptions}
+                options={vehicleOptions}
                 value={fromVehicle}
                 onChange={setFromVehicle}
               />
@@ -340,7 +346,7 @@ const AddMaterialReceivePage = () => {
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
                 label='To Vehicle'
-                options={employeeOptions}
+                options={vehicleOptions}
                 value={toVehicle}
                 onChange={setToVehicle}
               />

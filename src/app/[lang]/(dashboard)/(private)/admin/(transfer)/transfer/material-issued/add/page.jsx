@@ -4,17 +4,7 @@ import { useState, useMemo, useEffect, forwardRef } from 'react'
 import Link from 'next/link'
 import { useRouter, useParams } from 'next/navigation'
 
-import {
-  Box,
-  Card,
-  CardHeader,
-  Typography,
-  Grid,
-  Divider,
-  IconButton,
-  Breadcrumbs,
-  CircularProgress
-} from '@mui/material'
+import { Box, Card, CardHeader, Typography, Grid, Divider, IconButton, Breadcrumbs } from '@mui/material'
 
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
@@ -30,6 +20,7 @@ import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 import { getPurchaseFilters } from '@/api/purchase/purchase_inward'
 import { getMaterialRequestDropdowns } from '@/api/transfer/materialRequest/dropdown'
 import { addMaterialIssue } from '@/api/transfer/material_issue'
+import { getVehicleDropdown } from '@/api/purchase/vehicle/dropdown'
 
 import { showToast } from '@/components/common/Toasts'
 import styles from '@core/styles/table.module.css'
@@ -47,6 +38,7 @@ const AddMaterialRequestIssuedPage = () => {
   const [originOptions, setOriginOptions] = useState([])
   const [chemicalOptions, setChemicalOptions] = useState([])
   const [uomOptions, setUomOptions] = useState([])
+  const [vehicleOptions, setVehicleOptions] = useState([])
 
   const [requestNo, setRequestNo] = useState('')
   const [issueDate, setIssueDate] = useState(new Date())
@@ -72,7 +64,11 @@ const AddMaterialRequestIssuedPage = () => {
       try {
         setInitLoading(true)
 
-        const [purchaseRes, materialRes] = await Promise.all([getPurchaseFilters(), getMaterialRequestDropdowns()])
+        const [purchaseRes, materialRes, vehicleRes] = await Promise.all([
+          getPurchaseFilters(),
+          getMaterialRequestDropdowns(),
+          getVehicleDropdown()
+        ])
 
         const purchaseData = purchaseRes?.data?.data || purchaseRes?.data || {}
         const materialData = materialRes?.data?.data || materialRes?.data || materialRes || {}
@@ -85,7 +81,7 @@ const AddMaterialRequestIssuedPage = () => {
         }))
         setEmployeeOptions(employees)
 
-        // Chemicals
+        // Chemicals (Robust fetching)
         let chemRaw = []
         if (Array.isArray(purchaseData?.chemicals)) {
           chemRaw = purchaseData.chemicals
@@ -93,13 +89,15 @@ const AddMaterialRequestIssuedPage = () => {
           chemRaw = purchaseData.chemicals.name
         } else if (Array.isArray(materialData?.chemicals?.name)) {
           chemRaw = materialData.chemicals.name
+        } else if (Array.isArray(materialData?.chemical?.name)) {
+          chemRaw = materialData.chemical.name
         }
 
         const chemicals = chemRaw.map(c => ({
-          label: c.name,
-          value: c.id,
-          id: c.id,
-          uom: c.uom || c.uom_name || c.unit
+          label: c.name || c.label || '',
+          value: c.id || c.value,
+          id: c.id || c.value,
+          uom: c.uom || c.uom_name || c.unit || c.uom_id
         }))
         setChemicalOptions(chemicals)
 
@@ -120,6 +118,14 @@ const AddMaterialRequestIssuedPage = () => {
           id: u.id
         }))
         setUomOptions(uoms)
+
+        // Vehicles
+        const vehicles = (vehicleRes?.vehicle || []).map(v => ({
+          label: v.vehicle_name || v.name,
+          value: v.id,
+          id: v.id
+        }))
+        setVehicleOptions(vehicles)
       } catch (e) {
         showToast('error', 'Failed to load dropdowns')
       } finally {
@@ -133,12 +139,21 @@ const AddMaterialRequestIssuedPage = () => {
   const handleChemicalChange = val => {
     setChemical(val)
     if (val && val.uom) {
-      const uomStr = typeof val.uom === 'object' ? val.uom.label || val.uom.name : val.uom
-      const foundUom = uomOptions.find(u => u.label.toLowerCase() === uomStr.toLowerCase())
+      const uomVal = typeof val.uom === 'object' ? val.uom.label || val.uom.name : val.uom
+
+      const foundUom = uomOptions.find(
+        u =>
+          String(u.id) === String(uomVal) ||
+          String(u.label).toLowerCase() === String(uomVal).toLowerCase() ||
+          String(u.value).toLowerCase() === String(uomVal).toLowerCase()
+      )
+
       if (foundUom) {
         setUom(foundUom)
+      } else if (typeof uomVal === 'string') {
+        setUom({ label: uomVal, value: uomVal, id: null })
       } else {
-        setUom({ label: uomStr, value: uomStr, id: null })
+        setUom(null)
       }
     } else {
       setUom(null)
@@ -266,23 +281,7 @@ const AddMaterialRequestIssuedPage = () => {
         <Divider />
 
         {/* HEADER FORM */}
-        <Box px={4} py={3} position='relative'>
-          {initLoading && (
-            <Box
-              sx={{
-                position: 'absolute',
-                inset: 0,
-                bgcolor: 'rgba(255,255,255,0.7)',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                zIndex: 1
-              }}
-            >
-              <CircularProgress />
-            </Box>
-          )}
-
+        <Box px={4} py={3}>
           <Grid container spacing={3}>
             <Grid item md={4} xs={12}>
               <AppReactDatepicker
@@ -295,7 +294,7 @@ const AddMaterialRequestIssuedPage = () => {
             <Grid item md={4} xs={12}>
               <GlobalAutocomplete
                 label='From Vehicle'
-                options={employeeOptions}
+                options={vehicleOptions}
                 value={fromVehicle}
                 onChange={setFromVehicle}
               />
@@ -304,7 +303,7 @@ const AddMaterialRequestIssuedPage = () => {
             <Grid item md={4} xs={12}>
               <GlobalAutocomplete
                 label='To Vehicle'
-                options={employeeOptions}
+                options={vehicleOptions}
                 value={toVehicle}
                 onChange={setToVehicle}
               />

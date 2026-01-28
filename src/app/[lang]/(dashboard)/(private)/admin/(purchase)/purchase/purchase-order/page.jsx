@@ -395,7 +395,7 @@ const PurchaseOrderPage = () => {
 
       const params = {
         page: pageIdx + 1,
-        page_size: dateFilter || status || origin || supplier || poNo ? 500 : pagination.pageSize,
+        page_size: pagination.pageSize,
         company: origin?.id,
         company_id: origin?.id, // Fallback
         supplier_id: supplier?.id,
@@ -445,53 +445,8 @@ const PurchaseOrderPage = () => {
         recordType: item.record_type || 'tm' // Capture type
       }))
 
-      // 🔥 FRONTEND FILTER FALLBACK
-      let finalRows = mappedRows
-
-      // 1. Date Filter
-      if (dateFilter && dateRange[0] && dateRange[1]) {
-        const startDate = startOfDay(new Date(dateRange[0]))
-        const endDate = endOfDay(new Date(dateRange[1]))
-
-        finalRows = finalRows.filter(row => {
-          if (!row.rawDate) return false
-          let dateObj
-          if (row.rawDate.includes('/')) {
-            const [day, month, year] = row.rawDate.split('/')
-            dateObj = new Date(year, month - 1, day)
-          } else {
-            dateObj = new Date(row.rawDate)
-          }
-          if (isNaN(dateObj.getTime())) return false
-          return isWithinInterval(dateObj, { start: startDate, end: endDate })
-        })
-      }
-
-      // 2. Status Filter
-      if (status?.label) {
-        finalRows = finalRows.filter(row => row.status?.toLowerCase() === status.label.toLowerCase())
-      }
-
-      // 3. Origin Filter
-      if (origin?.id || origin?.name) {
-        finalRows = finalRows.filter(
-          row =>
-            row.origin?.toLowerCase().includes(origin.name?.toLowerCase() || '') ||
-            String(row.origin_id) === String(origin.id)
-        )
-      }
-
-      // 4. Supplier Filter
-      if (supplier?.id || supplier?.name) {
-        finalRows = finalRows.filter(
-          row =>
-            row.supplierName?.toLowerCase().includes(supplier.name?.toLowerCase() || '') ||
-            String(row.supplier_id) === String(supplier.id)
-        )
-      }
-
-      setRows(finalRows)
-      setTotalCount(dateFilter || status || origin || supplier || poNo ? finalRows.length : res?.count || 0)
+      setRows(mappedRows)
+      setTotalCount(res?.count || 0)
     } catch (err) {
       console.error(err)
     } finally {
@@ -511,16 +466,16 @@ const PurchaseOrderPage = () => {
     setPagination({ pageIndex: 0, pageSize: pagination.pageSize })
 
     // Force fetch with current UI values to override useEffect's state check
-    fetchPurchaseOrders(
-      filterOrigin,
-      filterSupplier,
-      filterStatus,
-      filterPoNo,
-      uiDateFilter,
-      uiDateRange,
-      searchQuery,
-      0
-    )
+    // fetchPurchaseOrders(
+    //   filterOrigin,
+    //   filterSupplier,
+    //   filterStatus,
+    //   filterPoNo,
+    //   uiDateFilter,
+    //   uiDateRange,
+    //   searchQuery,
+    //   0
+    // )
   }
 
   return (

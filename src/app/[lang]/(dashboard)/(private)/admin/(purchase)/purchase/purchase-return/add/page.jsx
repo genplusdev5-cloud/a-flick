@@ -18,7 +18,6 @@ import {
   TableCell,
   TableBody,
   Breadcrumbs,
-  CircularProgress,
   FormControlLabel,
   Checkbox
 } from '@mui/material'
@@ -26,7 +25,8 @@ import {
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
-import { getPurchaseFilters, getPurchaseInwardList, getPurchaseInwardDetails } from '@/api/purchase/purchase_inward'
+import { getPurchaseInwardList, getPurchaseInwardDetails } from '@/api/purchase/purchase_inward'
+import { getPurchaseFilters } from '@/api/purchase/purchase_order/filter'
 import { addPurchaseReturn } from '@/api/purchase/purchase_return'
 import { getChemicalsList } from '@/api/master/chemicals/list'
 
@@ -224,6 +224,13 @@ const AddPurchaseReturnPage = () => {
     setTotalQuantity(qty + add)
   }, [in_quantity, conversion, additional])
 
+  // ✅ AMOUNT CALCULATION
+  useEffect(() => {
+    const qty = Number(quantity) || 0
+    const r = Number(rate) || 0
+    setAmount((qty * r).toFixed(2))
+  }, [quantity, rate])
+
   // ✅ FETCH INWARD ITEMS WHEN PI IS SELECTED
   useEffect(() => {
     const fetchInwardItems = async () => {
@@ -260,9 +267,9 @@ const AddPurchaseReturnPage = () => {
           }))
 
           setItems(mappedItems)
-          showToast('success', 'Items populated from Purchase Inward')
+          // showToast('success', 'Items populated from Purchase Inward')
         } else {
-          showToast('warning', 'No items found in this Purchase Inward')
+          // showToast('warning', 'No items found in this Purchase Inward')
         }
       } catch (err) {
         console.error('Failed to fetch Inward details', err)
@@ -285,6 +292,16 @@ const AddPurchaseReturnPage = () => {
     setRate(row.rate || '0')
     setPrevRate(row.prevRate || row.rate)
     setIsFoc(row.isFoc)
+  }
+
+  const handleFocChange = checked => {
+    setIsFoc(checked)
+    if (checked) {
+      setPrevRate(rate)
+      setRate('0')
+    } else {
+      setRate(prevRate || '0')
+    }
   }
 
   const PoDateInput = forwardRef(function PoDateInput(props, ref) {
@@ -427,25 +444,6 @@ const AddPurchaseReturnPage = () => {
 
         {/* HEADER FORM */}
         <Box px={4} py={3} position='relative'>
-          {initLoading && (
-            <Box
-              sx={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                bgcolor: 'rgba(255,255,255,0.7)',
-                zIndex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <CircularProgress size={40} />
-            </Box>
-          )}
-
           <Grid container spacing={3}>
             {/* 🔹 ROW 1 – Return Date + Origin */}
             <Grid item xs={12} md={4}>
@@ -506,18 +504,43 @@ const AddPurchaseReturnPage = () => {
 
         <Divider />
 
-        {/* ITEM ENTRY */}
         <Box px={4} py={3}>
-          <Grid container spacing={3}>
+          <Grid container spacing={3} alignItems='flex-end'>
+            {/* First Row: Chemical + UOM + Quantity */}
             <Grid item xs={12} md={4}>
-              <GlobalAutocomplete label='Chemicals' options={chemicalOptions} value={chemical} onChange={setChemical} />
+              <GlobalAutocomplete
+                label='Chemicals'
+                options={chemicalOptions}
+                value={chemical}
+                onChange={val => {
+                  setChemical(val)
+                  if (val) {
+                    const matchingUom = uomOptions.find(u => u.label === val.uom || u.value === val.uom)
+                    if (matchingUom) {
+                      setUom(matchingUom)
+                    } else if (val.uom) {
+                      setUom({ label: val.uom, value: val.uom, id: val.uom_id })
+                    }
+                  } else {
+                    setUom(null)
+                  }
+                }}
+              />
             </Grid>
 
-            <Grid item xs={12} md={3}>
-              <GlobalAutocomplete label='Store UOM' options={uomOptions} value={uom} onChange={setUom} />
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete
+                label='Store UOM'
+                options={uomOptions}
+                value={uom}
+                onChange={setUom}
+                readOnly
+                disabled
+                sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#f5f5f5' } }}
+              />
             </Grid>
 
-            <Grid item xs={12} md={3}>
+            <Grid item xs={12} md={4}>
               <GlobalTextField
                 label='Quantity'
                 type='number'
@@ -526,13 +549,13 @@ const AddPurchaseReturnPage = () => {
               />
             </Grid>
 
-            {/* Row 2: Rate & FOC */}
-            <Grid item xs={12} md={3}>
+            {/* Second Row: Rate & FOC + Amount + Add Button */}
+            <Grid item xs={12} md={4}>
               <Box display='flex' flexDirection='column'>
                 <FormControlLabel
                   control={<Checkbox checked={isFoc} onChange={e => handleFocChange(e.target.checked)} size='small' />}
                   label='Rate [ FOC ]'
-                  sx={{ mb: -1, '& .MuiTypography-root': { fontSize: '0.75rem' } }}
+                  sx={{ mb: -0.5, '& .MuiTypography-root': { fontSize: '0.75rem' } }}
                 />
                 <GlobalTextField
                   placeholder='0.00'
@@ -543,7 +566,7 @@ const AddPurchaseReturnPage = () => {
               </Box>
             </Grid>
 
-            <Grid item xs={12} md={3}>
+            <Grid item xs={12} md={4}>
               <GlobalTextField
                 label='Amount'
                 value={amount}
@@ -553,13 +576,14 @@ const AddPurchaseReturnPage = () => {
               />
             </Grid>
 
-            <Grid item xs={12} md={2}>
+            <Grid item xs={12} md={4}>
               <GlobalButton
                 fullWidth
                 variant='contained'
                 color={editId ? 'info' : 'primary'}
                 startIcon={editId ? <EditIcon /> : <AddIcon />}
                 onClick={handleAddItem}
+                sx={{ height: 40 }}
               >
                 {editId ? 'Update' : 'Add'}
               </GlobalButton>

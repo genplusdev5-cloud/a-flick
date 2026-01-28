@@ -113,9 +113,6 @@ const DuplicateProposalDialog = ({
         </DialogCloseButton>
       </DialogTitle>
       <DialogContent>
-        <Typography sx={{ mb: 6 }}>
-          Please enter the new dates and select a customer for the duplicated proposal.
-        </Typography>
         <Grid container spacing={6}>
           {/* Customer Selection */}
           <Grid item xs={12}>

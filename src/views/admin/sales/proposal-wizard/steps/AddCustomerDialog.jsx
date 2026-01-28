@@ -1,13 +1,24 @@
 import React, { useState } from 'react'
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Grid, CircularProgress } from '@mui/material'
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Grid,
+  CircularProgress,
+  Typography
+} from '@mui/material'
 import CustomTextField from '@core/components/mui/TextField'
 import { addCustomer } from '@/api/customer_group/customer/add'
 import { showToast } from '@/components/common/Toasts'
+import DialogCloseButton from '@components/dialogs/DialogCloseButton'
 
 const AddCustomerDialog = ({ open, onClose, onCustomerAdded }) => {
   const initialData = {
     name: '',
     serviceAddress: '',
+    billingAddress: '',
     postalCode: '',
     email: '',
     contactPerson: '',
@@ -34,6 +45,7 @@ const AddCustomerDialog = ({ open, onClose, onCustomerAdded }) => {
       const payload = {
         name: formData.name,
         service_address: formData.serviceAddress,
+        billing_address: formData.billingAddress,
         postal_code: formData.postalCode,
         email: formData.email,
         contact_person: formData.contactPerson,
@@ -45,20 +57,13 @@ const AddCustomerDialog = ({ open, onClose, onCustomerAdded }) => {
       const response = await addCustomer(payload)
 
       if (response && (response.success || response.status)) {
-        // Adjust based on actual API response structure
         showToast('success', 'Customer added successfully')
-        // Pass the new customer object back; ensure it matches the dropdown structure
-        // Assuming response.data or response contains the new customer, or we reconstruct it
         const newCustomer = response.data ||
           response.customer || {
-            value: response.id || payload.name, // Fallback if ID not returned immediately, though API should return it
+            value: response.id || payload.name,
             label: payload.name,
             ...payload
           }
-
-        // If the API returns the full object appropriately, use it.
-        // For now, based on typical patterns, we might need to handle what the API returns.
-        // Let's assume the API returns the created object or ID.
 
         onCustomerAdded(newCustomer)
         setFormData(initialData)
@@ -75,8 +80,15 @@ const AddCustomerDialog = ({ open, onClose, onCustomerAdded }) => {
   }
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth='md' fullWidth>
-      <DialogTitle>Add New Customer</DialogTitle>
+    <Dialog open={open} onClose={onClose} maxWidth='md' fullWidth PaperProps={{ sx: { overflow: 'visible' } }}>
+      <DialogTitle id='customized-dialog-title'>
+        <Typography variant='h5' component='span'>
+          Add New Customer
+        </Typography>
+        <DialogCloseButton onClick={onClose} disableRipple>
+          <i className='tabler-x' />
+        </DialogCloseButton>
+      </DialogTitle>
       <DialogContent>
         <Grid container spacing={4} sx={{ mt: 0 }}>
           <Grid item xs={12} md={6}>
@@ -97,12 +109,21 @@ const AddCustomerDialog = ({ open, onClose, onCustomerAdded }) => {
               onChange={handleChange}
             />
           </Grid>
-          <Grid item xs={12}>
+          <Grid item xs={12} md={6}>
             <CustomTextField
               fullWidth
               label='Service Address'
               name='serviceAddress'
               value={formData.serviceAddress}
+              onChange={handleChange}
+            />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <CustomTextField
+              fullWidth
+              label='Billing Address'
+              name='billingAddress'
+              value={formData.billingAddress}
               onChange={handleChange}
             />
           </Grid>
@@ -138,12 +159,12 @@ const AddCustomerDialog = ({ open, onClose, onCustomerAdded }) => {
           </Grid>
         </Grid>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose} color='secondary' disabled={loading}>
-          Cancel
+      <DialogActions sx={{ p: '1rem 1.5rem 1.5rem !important' }}>
+        <Button onClick={onClose} variant='tonal' color='secondary' disabled={loading}>
+          Close
         </Button>
         <Button onClick={handleSubmit} variant='contained' disabled={loading}>
-          {loading ? <CircularProgress size={24} /> : 'Save'}
+          {loading ? <CircularProgress size={24} color='inherit' /> : 'Save'}
         </Button>
       </DialogActions>
     </Dialog>

@@ -3,17 +3,7 @@
 import { useState, useMemo, useEffect, forwardRef } from 'react'
 import Link from 'next/link'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
-import {
-  Box,
-  Card,
-  CardHeader,
-  Typography,
-  Grid,
-  Divider,
-  IconButton,
-  Breadcrumbs,
-  CircularProgress
-} from '@mui/material'
+import { Box, Card, CardHeader, Typography, Grid, Divider, IconButton, Breadcrumbs } from '@mui/material'
 
 import StickyListLayout from '@/components/common/StickyListLayout'
 import StickyTableWrapper from '@/components/common/StickyTableWrapper'
@@ -35,6 +25,7 @@ import { getPurchaseFilters } from '@/api/purchase/purchase_order'
 import { getMaterialRequestDropdowns } from '@/api/transfer/materialRequest/dropdown'
 import { getMaterialReceiveDetails, updateMaterialReceive } from '@/api/transfer/material_receive'
 import { getMaterialIssueList } from '@/api/transfer/material_issue'
+import { getVehicleDropdown } from '@/api/purchase/vehicle/dropdown'
 import { showToast } from '@/components/common/Toasts'
 
 const EditMaterialRequestReceivedPage = () => {
@@ -62,6 +53,7 @@ const EditMaterialRequestReceivedPage = () => {
   const [chemicalOptions, setChemicalOptions] = useState([])
   const [uomOptions, setUomOptions] = useState([])
   const [issueOptions, setIssueOptions] = useState([])
+  const [vehicleOptions, setVehicleOptions] = useState([])
 
   // Loading
   const [initLoading, setInitLoading] = useState(false)
@@ -94,7 +86,7 @@ const EditMaterialRequestReceivedPage = () => {
       setInitLoading(true)
       try {
         // Step 1: Fetch Dropdowns (Parallel)
-        const [purchaseRes, materialRes, issueRes] = await Promise.all([
+        const [purchaseRes, materialRes, issueRes, vehicleRes] = await Promise.all([
           getPurchaseFilters().catch(e => {
             console.error('Origin error', e)
             return null
@@ -105,6 +97,10 @@ const EditMaterialRequestReceivedPage = () => {
           }),
           getMaterialIssueList({ page_size: 100 }).catch(e => {
             console.error('Issue list error', e)
+            return null
+          }),
+          getVehicleDropdown().catch(e => {
+            console.error('Vehicle drop error', e)
             return null
           })
         ])
@@ -140,7 +136,7 @@ const EditMaterialRequestReceivedPage = () => {
             label: c.name || c.label || '',
             value: c.id || c.value,
             id: c.id || c.value,
-            uom: c.uom || c.unit || c.uom_id
+            uom: c.uom_name || c.uom || c.unit || c.uom_id
           }))
         )
 
@@ -179,6 +175,15 @@ const EditMaterialRequestReceivedPage = () => {
         })
         setIssueOptions(issues)
 
+        // Vehicles
+        const vehicleRaw = vehicleRes?.vehicle || []
+        const vehicles = vehicleRaw.map(v => ({
+          label: v.vehicle_name || v.name,
+          value: v.id,
+          id: v.id
+        }))
+        setVehicleOptions(vehicles)
+
         // Step 2: Fetch Details (Sequential or Parallel with fallback)
         if (decodedId && decodedId !== 'NaN') {
           try {
@@ -198,13 +203,13 @@ const EditMaterialRequestReceivedPage = () => {
 
               setOrigin(origins.find(o => String(o.id) === String(details.origin_id || details.company_id)) || null)
               setFromVehicle(
-                techs.find(t => String(t.id) === String(details.from_vehicle_id)) ||
+                vehicles.find(v => String(v.id) === String(details.from_vehicle_id)) ||
                   (details.from_vehicle && details.from_vehicle !== '-'
                     ? { label: details.from_vehicle, id: details.from_vehicle_id }
                     : null)
               )
               setToVehicle(
-                techs.find(t => String(t.id) === String(details.to_vehicle_id)) ||
+                vehicles.find(v => String(v.id) === String(details.to_vehicle_id)) ||
                   (details.to_vehicle && details.to_vehicle !== '-'
                     ? { label: details.to_vehicle, id: details.to_vehicle_id }
                     : null)
@@ -261,10 +266,14 @@ const EditMaterialRequestReceivedPage = () => {
   const handleChemicalChange = val => {
     setChemical(val)
     if (val && val.uom) {
-      const uomVal = val.uom
+      const uomVal = typeof val.uom === 'object' ? val.uom.label || val.uom.name : val.uom
+
       // Try to find in uomOptions by ID or Label
       const foundUom = uomOptions.find(
-        u => String(u.id) === String(uomVal) || String(u.label).toLowerCase() === String(uomVal).toLowerCase()
+        u =>
+          String(u.id) === String(uomVal) ||
+          String(u.label).toLowerCase() === String(uomVal).toLowerCase() ||
+          String(u.value).toLowerCase() === String(uomVal).toLowerCase()
       )
 
       if (foundUom) {
@@ -352,21 +361,25 @@ const EditMaterialRequestReceivedPage = () => {
         remarks,
         is_active: 1,
         status: 1,
-        items: items.map(i => {
-          const itemObj = {
-            item_id: i.chemicalId,
-            item_name: i.chemical,
-            uom_id: i.uomId,
-            uom: i.uom,
-            quantity: Number(i.quantity),
-            is_active: 1,
-            status: 1
-          }
-          if (i.id && !String(i.id).startsWith('temp') && String(i.id).length < 12) {
-            itemObj.id = i.id
-          }
-          return itemObj
-        })
+        items: JSON.stringify(
+          items.map(i => {
+            const itemObj = {
+              item_id: i.chemicalId,
+              item_name: i.chemical,
+              uom_id: i.uomId,
+              uom: i.uom,
+              quantity: Number(i.quantity),
+              is_active: 1,
+              status: 1
+            }
+
+            if (i.id && !String(i.id).startsWith('temp') && String(i.id).length < 12) {
+              itemObj.id = Number(i.id)
+            }
+
+            return itemObj
+          })
+        )
       }
 
       await updateMaterialReceive(decodedId, payload)
@@ -396,23 +409,7 @@ const EditMaterialRequestReceivedPage = () => {
         <Divider />
 
         {/* HEADER */}
-        <Box px={4} py={3} position='relative'>
-          {initLoading && (
-            <Box
-              sx={{
-                position: 'absolute',
-                inset: 0,
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                zIndex: 1,
-                bgcolor: 'rgba(255,255,255,0.7)'
-              }}
-            >
-              <CircularProgress />
-            </Box>
-          )}
-
+        <Box px={4} py={3}>
           <Grid container spacing={3}>
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete label='Origin' options={originOptions} value={origin} onChange={setOrigin} />
@@ -421,7 +418,7 @@ const EditMaterialRequestReceivedPage = () => {
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
                 label='From Vehicle'
-                options={employeeOptions}
+                options={vehicleOptions}
                 value={fromVehicle}
                 onChange={setFromVehicle}
               />
@@ -438,7 +435,7 @@ const EditMaterialRequestReceivedPage = () => {
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
                 label='To Vehicle'
-                options={employeeOptions}
+                options={vehicleOptions}
                 value={toVehicle}
                 onChange={setToVehicle}
               />
@@ -572,13 +569,8 @@ const EditMaterialRequestReceivedPage = () => {
           <GlobalButton color='secondary' onClick={() => router.push(`/${lang}/admin/transfer/material-receive`)}>
             Cancel
           </GlobalButton>
-          <GlobalButton
-            variant='contained'
-            onClick={handleUpdate}
-            disabled={saveLoading}
-            startIcon={saveLoading ? <CircularProgress size={20} color='inherit' /> : null}
-          >
-            {saveLoading ? 'Updating...' : 'Update'}
+          <GlobalButton variant='contained' onClick={handleUpdate} disabled={saveLoading}>
+            {saveLoading ? 'Updating...' : 'Update Request'}
           </GlobalButton>
         </Box>
       </Card>

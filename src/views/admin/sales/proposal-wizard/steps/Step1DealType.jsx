@@ -67,24 +67,21 @@ const Step1DealType = ({
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
           <Typography variant='h6'>Contract Information</Typography>
           <Box sx={{ display: 'flex', gap: 2 }}>
-            <Button
-              variant='contained'
-              color='success'
-              size='small'
-              startIcon={<i className='tabler-file-export' />}
-              onClick={() => {
-                if (formData.id) {
+            {formData.id && (
+              <Button
+                variant='contained'
+                color='success'
+                size='small'
+                startIcon={<i className='tabler-file-export' />}
+                onClick={() => {
                   const encodedId = encodeId(formData.id)
                   router.push(`/${lang}/admin/contracts/add?from_proposal=${encodedId}`)
-                } else {
-                  // Fallback or alert if no ID (should rely on isSubmitting or disabled state if new)
-                  console.warn('No proposal ID found to convert')
-                }
-              }}
-              sx={{ textTransform: 'none', fontWeight: 600 }}
-            >
-              Convert to Contract
-            </Button>
+                }}
+                sx={{ textTransform: 'none', fontWeight: 600 }}
+              >
+                Convert to Contract
+              </Button>
+            )}
           </Box>
         </Box>
         <Divider />

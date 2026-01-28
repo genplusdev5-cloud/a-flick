@@ -3,17 +3,7 @@
 import { useState, useEffect, useMemo, forwardRef } from 'react'
 import Link from 'next/link'
 import { useRouter, useParams } from 'next/navigation'
-import {
-  Box,
-  Card,
-  CardHeader,
-  Typography,
-  Grid,
-  Divider,
-  IconButton,
-  Breadcrumbs,
-  CircularProgress
-} from '@mui/material'
+import { Box, Card, CardHeader, Typography, Grid, Divider, IconButton, Breadcrumbs } from '@mui/material'
 
 import StickyListLayout from '@/components/common/StickyListLayout'
 import StickyTableWrapper from '@/components/common/StickyTableWrapper'
@@ -33,6 +23,7 @@ import EditIcon from '@mui/icons-material/Edit'
 import { getPurchaseFilters } from '@/api/purchase/purchase_order/filter'
 import { getMaterialRequestById, updateMaterialRequest } from '@/api/transfer/materialRequest/edit'
 import { getMaterialRequestDropdowns } from '@/api/transfer/materialRequest/dropdown'
+import { getVehicleDropdown } from '@/api/purchase/vehicle/dropdown'
 import { showToast } from '@/components/common/Toasts'
 import styles from '@core/styles/table.module.css'
 
@@ -61,6 +52,7 @@ const EditMaterialRequestPage = () => {
   const [chemicalOptions, setChemicalOptions] = useState([])
   const [uomOptions, setUomOptions] = useState([])
   const [supplierOptions, setSupplierOptions] = useState([])
+  const [vehicleOptions, setVehicleOptions] = useState([])
 
   // Loading states
   const [initLoading, setInitLoading] = useState(false)
@@ -104,15 +96,10 @@ const EditMaterialRequestPage = () => {
       setInitLoading(true)
       try {
         // Step 1: Fetch Metadata (Parallel)
-        const [dropdownRes, filterRes] = await Promise.all([
-          getMaterialRequestDropdowns().catch(e => {
-            console.error('Material drop error', e)
-            return null
-          }),
-          getPurchaseFilters().catch(e => {
-            console.error('Origin error', e)
-            return null
-          })
+        const [dropdownRes, filterRes, vehicleRes] = await Promise.all([
+          getMaterialRequestDropdowns(),
+          getPurchaseFilters(),
+          getVehicleDropdown()
         ])
 
         // --- DROPDOWNS ---
@@ -176,6 +163,15 @@ const EditMaterialRequestPage = () => {
         }))
         setSupplierOptions(suppliers)
 
+        // 6. Vehicles
+        const vehicleRaw = vehicleRes?.vehicle || []
+        const vehicles = vehicleRaw.map(v => ({
+          label: v.vehicle_name || v.name,
+          value: v.id,
+          id: v.id
+        }))
+        setVehicleOptions(vehicles)
+
         // Step 2: Fetch Details (Sequential or Parallel with fallback)
         if (decodedId && decodedId !== 'NaN') {
           try {
@@ -187,13 +183,13 @@ const EditMaterialRequestPage = () => {
 
               setOrigin(origins.find(o => String(o.id) === String(data.origin_id)) || null)
               setFromVehicle(
-                employees.find(e => String(e.id) === String(data.from_vehicle_id)) ||
+                vehicles.find(v => String(v.id) === String(data.from_vehicle_id)) ||
                   (data.from_vehicle && data.from_vehicle !== '-'
                     ? { label: data.from_vehicle, id: data.from_vehicle_id }
                     : null)
               )
               setToVehicle(
-                employees.find(e => String(e.id) === String(data.to_vehicle_id)) ||
+                vehicles.find(v => String(v.id) === String(data.to_vehicle_id)) ||
                   (data.to_vehicle && data.to_vehicle !== '-'
                     ? { label: data.to_vehicle, id: data.to_vehicle_id }
                     : null)
@@ -331,14 +327,12 @@ const EditMaterialRequestPage = () => {
         from_vehicle: fromVehicle?.label || '-',
         from_vehicle_id: Number(fromVehicle?.id) || null,
         to_vehicle: toVehicle?.label || '-',
-        to_vehicle_id: Number(toVehicle?.id) || null,
+        request_status: 'Pending',
         is_active: 1,
         status: 1,
         items: JSON.stringify(
           items.map(item => {
             const itemObj = {
-              id: item.id && !String(item.id).startsWith('temp') ? Number(item.id) : null,
-              mr_id: Number(decodedId),
               item_id: Number(item.chemicalId) || null,
               item_name: item.chemical,
               uom: item.uom,
@@ -347,6 +341,11 @@ const EditMaterialRequestPage = () => {
               is_active: 1,
               status: 1
             }
+
+            if (item.id && !String(item.id).startsWith('temp')) {
+              itemObj.id = Number(item.id)
+            }
+
             return itemObj
           })
         )
@@ -396,26 +395,7 @@ const EditMaterialRequestPage = () => {
         <Divider />
 
         {/* HEADER FORM */}
-        <Box px={4} py={3} position='relative'>
-          {initLoading && (
-            <Box
-              sx={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                bgcolor: 'rgba(255,255,255,0.7)',
-                zIndex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <CircularProgress size={40} />
-            </Box>
-          )}
-
+        <Box px={4} py={3}>
           <Grid container spacing={3}>
             <Grid item xs={12} md={4}>
               <AppReactDatepicker
@@ -435,7 +415,7 @@ const EditMaterialRequestPage = () => {
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
                 label='From Vehicle'
-                options={employeeOptions}
+                options={vehicleOptions}
                 value={fromVehicle}
                 onChange={setFromVehicle}
               />
@@ -444,7 +424,7 @@ const EditMaterialRequestPage = () => {
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
                 label='To Vehicle'
-                options={employeeOptions}
+                options={vehicleOptions}
                 value={toVehicle}
                 onChange={setToVehicle}
               />

@@ -1,19 +1,9 @@
-"use client"
+'use client'
 
 import { useState, useEffect, useMemo, forwardRef } from 'react'
 import Link from 'next/link'
 import { useRouter, useParams } from 'next/navigation'
-import {
-  Box,
-  Card,
-  CardHeader,
-  Typography,
-  Grid,
-  Divider,
-  IconButton,
-  Breadcrumbs,
-  CircularProgress
-} from '@mui/material'
+import { Box, Card, CardHeader, Typography, Grid, Divider, IconButton, Breadcrumbs } from '@mui/material'
 
 import StickyListLayout from '@/components/common/StickyListLayout'
 import StickyTableWrapper from '@/components/common/StickyTableWrapper'
@@ -33,6 +23,7 @@ import EditIcon from '@mui/icons-material/Edit'
 import { getPurchaseFilters } from '@/api/purchase/purchase_order/filter'
 import { getMaterialRequestById, updateMaterialRequest } from '@/api/transfer/materialRequest/edit'
 import { getMaterialRequestDropdowns } from '@/api/transfer/materialRequest/dropdown'
+import { getVehicleDropdown } from '@/api/purchase/vehicle/dropdown'
 import { showToast } from '@/components/common/Toasts'
 import styles from '@core/styles/table.module.css'
 
@@ -40,7 +31,7 @@ const EditMaterialRequestPage = () => {
   const router = useRouter()
   const params = useParams()
   const { lang, id } = params
-  
+
   const decodedId = useMemo(() => {
     if (!id) return null
     try {
@@ -61,6 +52,7 @@ const EditMaterialRequestPage = () => {
   const [chemicalOptions, setChemicalOptions] = useState([])
   const [uomOptions, setUomOptions] = useState([])
   const [supplierOptions, setSupplierOptions] = useState([])
+  const [vehicleOptions, setVehicleOptions] = useState([])
 
   // Loading states
   const [initLoading, setInitLoading] = useState(false)
@@ -107,7 +99,8 @@ const EditMaterialRequestPage = () => {
         const [dropdownRes, detailsRes, filterRes] = await Promise.all([
           getMaterialRequestDropdowns(),
           getMaterialRequestById(decodedId),
-          getPurchaseFilters()
+          getPurchaseFilters(),
+          getVehicleDropdown()
         ])
 
         // --- DROPDOWNS ---
@@ -169,14 +162,29 @@ const EditMaterialRequestPage = () => {
           })) || []
         setSupplierOptions(suppliers)
 
+        // 6. Vehicles
+        const vehicleRaw = dropdownRes?.[3]?.vehicle || dropdownRes?.vehicle || []
+        const vehicles = vehicleRaw.map(v => ({
+          label: v.vehicle_name || v.name,
+          value: v.id,
+          id: v.id
+        }))
+        setVehicleOptions(vehicles)
+
         // --- DETAILS ---
         const data = detailsRes?.data ?? detailsRes ?? {}
 
         if (data.request_date) setRequestDate(new Date(data.request_date))
 
         setOrigin(origins.find(o => o.id == data.origin_id) || null)
-        setFromVehicle(employees.find(e => e.label === data.from_vehicle) || (data.from_vehicle ? { label: data.from_vehicle, id: data.from_vehicle } : null))
-        setToVehicle(employees.find(e => e.label === data.to_vehicle) || (data.to_vehicle ? { label: data.to_vehicle, id: data.to_vehicle } : null))
+        setFromVehicle(
+          vehicles.find(v => String(v.id) === String(data.from_vehicle_id)) ||
+            (data.from_vehicle ? { label: data.from_vehicle, id: data.from_vehicle_id } : null)
+        )
+        setToVehicle(
+          vehicles.find(v => String(v.id) === String(data.to_vehicle_id)) ||
+            (data.to_vehicle ? { label: data.to_vehicle, id: data.to_vehicle_id } : null)
+        )
         setRemarks(data.remarks || '')
 
         // --- ITEMS ---
@@ -311,16 +319,18 @@ const EditMaterialRequestPage = () => {
         remarks: remarks,
         is_active: 1,
         status: 1,
-        items: JSON.stringify(items.map(item => ({
-          id: String(item.id).startsWith('temp') ? null : item.id,
-          item_id: item.chemicalId,
-          item_name: item.chemical,
-          uom: item.uom,
-          uom_id: item.uomId,
-          quantity: Number(item.quantity),
-          is_active: 1,
-          status: 1
-        })))
+        items: JSON.stringify(
+          items.map(item => ({
+            id: String(item.id).startsWith('temp') ? null : item.id,
+            item_id: item.chemicalId,
+            item_name: item.chemical,
+            uom: item.uom,
+            uom_id: item.uomId,
+            quantity: Number(item.quantity),
+            is_active: 1,
+            status: 1
+          }))
+        )
       }
 
       await updateMaterialRequest(payload)
@@ -361,26 +371,7 @@ const EditMaterialRequestPage = () => {
         <Divider />
 
         {/* HEADER FORM */}
-        <Box px={4} py={3} position='relative'>
-          {initLoading && (
-            <Box
-              sx={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                bgcolor: 'rgba(255,255,255,0.7)',
-                zIndex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <CircularProgress size={40} />
-            </Box>
-          )}
-
+        <Box px={4} py={3}>
           <Grid container spacing={3}>
             <Grid item xs={12} md={4}>
               <AppReactDatepicker
@@ -394,18 +385,13 @@ const EditMaterialRequestPage = () => {
             </Grid>
 
             <Grid item xs={12} md={4}>
-              <GlobalAutocomplete
-                label='Origin'
-                options={originOptions}
-                value={origin}
-                onChange={setOrigin}
-              />
+              <GlobalAutocomplete label='Origin' options={originOptions} value={origin} onChange={setOrigin} />
             </Grid>
 
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
                 label='From Vehicle'
-                options={employeeOptions}
+                options={vehicleOptions}
                 value={fromVehicle}
                 onChange={setFromVehicle}
               />
@@ -414,7 +400,7 @@ const EditMaterialRequestPage = () => {
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
                 label='To Vehicle'
-                options={employeeOptions}
+                options={vehicleOptions}
                 value={toVehicle}
                 onChange={setToVehicle}
               />
@@ -438,7 +424,12 @@ const EditMaterialRequestPage = () => {
         <Box px={4} py={3}>
           <Grid container spacing={2} alignItems='flex-end'>
             <Grid item xs={12} md={3}>
-              <GlobalAutocomplete label='Chemical' options={chemicalOptions} value={chemical} onChange={handleChemicalChange} />
+              <GlobalAutocomplete
+                label='Chemical'
+                options={chemicalOptions}
+                value={chemical}
+                onChange={handleChemicalChange}
+              />
             </Grid>
 
             <Grid item xs={12} md={2}>

@@ -49,51 +49,41 @@ const ProposalEditorContent = () => {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
 
-  useEffect(() => {
-    const fetchData = async () => {
-      // 1. Fetch Agreement Content
-      if (activeAgreementId) {
-        console.log('🔍 FETCHING AGREEMENT BY ID:', activeAgreementId)
-        try {
-          const res = await salesAgreementDetails(activeAgreementId)
-          const apiResponse = res?.data || res
-          if (apiResponse?.status === 'success' || apiResponse?.id || apiResponse?.data) {
-            const data = apiResponse.data || apiResponse
-            setAgreementId(data.id)
-            if (data.description) setDescription(data.description)
-            if (data.name || data.title) setTitle(data.name || data.title)
-            if (data.proposal_date) {
-              const d = new Date(data.proposal_date)
-              if (!isNaN(d.getTime())) setProposalDate(d)
-            }
-            // Use proposal_id from agreement if not already set
-            if (!activeProposalId && data.proposal_id) {
-              fetchProposalDetails(data.proposal_id)
-            }
-          }
-        } catch (err) {
-          console.error('❌ AGREEMENT FETCH ERROR:', err)
-        }
-      } else if (activeProposalId) {
-        console.log('🔍 FETCHING AGREEMENT BY PROPOSAL ID:', activeProposalId)
-        try {
-          const res = await getSalesAgreementContent(activeProposalId)
-          const apiResponse = res?.data || res
-          if (apiResponse?.status === 'success' || apiResponse?.id || apiResponse?.data) {
-            const data = apiResponse.data || apiResponse
-            setAgreementId(data.id)
-            if (data.description) setDescription(data.description)
-            if (data.name || data.title) setTitle(data.name || data.title)
-          }
-        } catch (err) {
-          console.warn('⚠️ No existing agreement for this proposal yet.')
-        }
+    const replacePlaceholders = (text, data) => {
+      if (!text || !data) return text
+      let newText = text
+
+      // Helper for formatting date DD/MM/YYYY
+      const formatDate = dateStr => {
+        if (!dateStr) return ''
+        const d = new Date(dateStr)
+        if (isNaN(d.getTime())) return ''
+        const day = String(d.getDate()).padStart(2, '0')
+        const month = String(d.getMonth() + 1).padStart(2, '0')
+        const year = d.getFullYear()
+        return `${day}/${month}/${year}`
       }
 
-      // 2. Fetch Proposal Details (Main Metadata)
-      if (activeProposalId) {
-        fetchProposalDetails(activeProposalId)
-      }
+      // 1. Proposal Date
+      // User requested: "add pandra date ...today date ok" -> using today's date if not present, or proposal date?
+      // "{$proposal_date} = add pandra date ...today date ok" - implying current/proposal date.
+      // We'll use the proposal_date from data, or fallback to Today.
+      const dateVal = data.proposal_date || data.start_date || new Date()
+      newText = newText.replace(/\{\$proposal_date\}/g, formatDate(dateVal))
+
+      // 2. Billing Address
+      const addr = data.billing_address || ''
+      newText = newText.replace(/\{\$billing_address\}/g, addr)
+
+      // 3. Contact Person Name
+      const contact = data.contact_person_name || data.contact_person || ''
+      newText = newText.replace(/\{\$contact_person_name\}/g, contact)
+
+      // 4. Invoice Remarks
+      const remarks = data.invoice_remarks || ''
+      newText = newText.replace(/\{\$invoice_remarks\}/g, remarks)
+
+      return newText
     }
 
     const fetchProposalDetails = async propId => {
@@ -103,21 +93,110 @@ const ProposalEditorContent = () => {
         const apiResponse = res?.data || res
         if (apiResponse?.status === 'success' || apiResponse?.id || apiResponse?.data) {
           const data = apiResponse.data || apiResponse
-          if (!title && (data.name || data.title)) setTitle(data.name || data.title || '')
+
+          // ❌ Removed auto-title setting for new proposals as per user request
+          // if (!title && (data.name || data.title)) setTitle(data.name || data.title || '')
+
           if (data.proposal_date || data.start_date) {
             const d = new Date(data.proposal_date || data.start_date)
             if (!isNaN(d.getTime())) setProposalDate(d)
           }
+          return data
         }
       } catch (err) {
         console.error('❌ PROPOSAL DETAILS ERROR:', err)
       }
+      return null
     }
 
-    if (activeAgreementId || activeProposalId) {
-      fetchData()
+    useEffect(() => {
+  const fetchData = async () => {
+    let currentDesc = description
+    let pData = null
+
+    // 1. Fetch Agreement Content
+    if (activeAgreementId) {
+      console.log('🔍 FETCHING AGREEMENT BY ID:', activeAgreementId)
+
+      try {
+        const res = await salesAgreementDetails(activeAgreementId)
+        const apiResponse = res?.data || res
+
+        if (apiResponse?.status === 'success' || apiResponse?.id || apiResponse?.data) {
+          const data = apiResponse.data || apiResponse
+
+          setAgreementId(data.id)
+
+          if (data.description) {
+            setDescription(data.description)
+            currentDesc = data.description
+          }
+
+          if (data.name || data.title) setTitle(data.name || data.title)
+
+          if (data.proposal_date) {
+            const d = new Date(data.proposal_date)
+            if (!isNaN(d.getTime())) setProposalDate(d)
+          }
+
+          if (!activeProposalId && data.proposal_id) {
+            pData = await fetchProposalDetails(data.proposal_id)
+          }
+        }
+      } catch (err) {
+        console.error('❌ AGREEMENT FETCH ERROR:', err)
+      }
+    } else if (activeProposalId) {
+      console.log('🔍 FETCHING AGREEMENT BY PROPOSAL ID:', activeProposalId)
+
+      try {
+        const res = await getSalesAgreementContent(activeProposalId)
+        const apiResponse = res?.data || res
+
+        let data = apiResponse?.data || apiResponse
+
+        if (data?.results && Array.isArray(data.results)) {
+          data = data.results[0]
+        } else if (Array.isArray(data)) {
+          data = data[0]
+        }
+
+        if (data && (data.id || data.description)) {
+          setAgreementId(data.id)
+
+          if (data.description) {
+            setDescription(data.description)
+            currentDesc = data.description
+          }
+
+          if (data.name || data.title) setTitle(data.name || data.title)
+        }
+      } catch (err) {
+        console.warn('⚠️ No existing agreement for this proposal yet.')
+      }
     }
-  }, [activeAgreementId, activeProposalId])
+
+    // 2. Fetch Proposal Details
+    if (activeProposalId && !pData) {
+      pData = await fetchProposalDetails(activeProposalId)
+    }
+
+    // 3. Apply Placeholders
+    if (currentDesc && pData) {
+      const replaced = replacePlaceholders(currentDesc, pData)
+
+      if (replaced !== currentDesc) {
+        console.log('✨ Placeholders Replaced')
+        setDescription(replaced)
+      }
+    }
+  }
+
+  if (activeAgreementId || activeProposalId) {
+    fetchData()
+  }
+}, [activeAgreementId, activeProposalId])
+
 
   return (
     <Card sx={{ p: 5, boxShadow: 'none' }} elevation={0}>

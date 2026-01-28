@@ -75,11 +75,6 @@ const MaterialRequestIssuedPage = () => {
   const [supplierOptions, setSupplierOptions] = useState([])
 
   const [searchText, setSearchText] = useState('')
-  const [statusOptions] = useState([
-    { label: 'Pending', value: 'Pending' },
-    { label: 'Completed', value: 'Completed' }
-  ])
-  const [selectedStatus, setSelectedStatus] = useState(null)
   const [selectedTechnician, setSelectedTechnician] = useState(null)
 
   const [rows, setRows] = useState([])
@@ -146,7 +141,6 @@ const MaterialRequestIssuedPage = () => {
         page: pagination.pageIndex + 1,
         page_size: pagination.pageSize,
         search: searchText || undefined,
-        status: selectedStatus?.value,
         technician_id: selectedTechnician?.value
       })
 
@@ -173,14 +167,8 @@ const MaterialRequestIssuedPage = () => {
             '-',
           issueNo: item.num_series || item.issue_number || '-',
           issueDate: item.issue_date ? format(new Date(item.issue_date), 'dd/MM/yyyy') : '-',
-          requestNo: item.request_no || item.request_details?.num_series || item.request_details?.request_no || '-',
-          requestDate:
-            item.request_date || item.request_details?.request_date
-              ? format(new Date(item.request_date || item.request_details?.request_date), 'dd/MM/yyyy')
-              : '-',
           noOfItems: (item.items || item.transfer_items || []).length,
           rawDate: item.issue_date,
-          status: item.issue_status || 'Pending',
           recordType: 'tm'
         }
       })
@@ -210,7 +198,7 @@ const MaterialRequestIssuedPage = () => {
   }, [
     pagination.pageIndex,
     pagination.pageSize,
-    selectedStatus,
+    pagination.pageSize,
     selectedTechnician,
     searchText,
     uiDateFilter,
@@ -228,13 +216,13 @@ const MaterialRequestIssuedPage = () => {
 
       await deleteMaterialIssue(deleteDialog.row.id)
 
-      showToast('Material Issued deleted successfully', 'delete')
+      showToast('delete', 'Material Issued deleted successfully')
 
       setDeleteDialog({ open: false, row: null })
       fetchList()
     } catch (error) {
       console.error('Delete failed', error)
-      showToast(error?.response?.data?.message || 'Failed to delete record', 'error')
+      showToast('error', error?.response?.data?.message || 'Failed to delete record')
     } finally {
       setDeleteLoading(false)
     }
@@ -281,26 +269,11 @@ const MaterialRequestIssuedPage = () => {
           )
         }
       }),
-
       columnHelper.accessor('fromVehicle', { header: 'From Vehicle' }),
       columnHelper.accessor('toVehicle', { header: 'To Vehicle' }),
       columnHelper.accessor('issueNo', { header: 'Issue No' }),
       columnHelper.accessor('issueDate', { header: 'Issue Date' }),
-      columnHelper.accessor('requestNo', { header: 'Request No' }),
-      columnHelper.accessor('requestDate', { header: 'Request Date' }),
-      columnHelper.accessor('noOfItems', { header: 'No. of Items' }),
-
-      columnHelper.accessor('status', {
-        header: 'Status',
-        cell: info => (
-          <Chip
-            label={info.getValue()}
-            color={info.getValue() === 'Completed' ? 'success' : 'warning'}
-            size='small'
-            sx={{ color: '#fff', fontWeight: 600 }}
-          />
-        )
-      })
+      columnHelper.accessor('noOfItems', { header: 'No. of Items' })
     ],
     [router]
   )
@@ -367,19 +340,6 @@ const MaterialRequestIssuedPage = () => {
             </Box>
           </Box>
 
-          {/* Status */}
-          <Box sx={{ width: 220 }}>
-            <GlobalAutocomplete
-              label='Status'
-              options={statusOptions}
-              value={selectedStatus}
-              onChange={(_, v) => {
-                setSelectedStatus(v)
-                setPagination(p => ({ ...p, pageIndex: 0 }))
-              }}
-            />
-          </Box>
-
           {/* Vehicle No (Technician) */}
           {/* <Box sx={{ width: 220 }}>
             <GlobalAutocomplete
@@ -399,7 +359,6 @@ const MaterialRequestIssuedPage = () => {
             startIcon={<RefreshIcon />}
             onClick={() => {
               setSelectedTechnician(null)
-              setSelectedStatus(null)
               setSearchText('')
               setUiDateFilter(false)
               setUiDateRange([null, null])

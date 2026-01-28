@@ -3,17 +3,7 @@
 import { useState, useMemo, useEffect, forwardRef } from 'react'
 import Link from 'next/link'
 import { useRouter, useParams } from 'next/navigation'
-import {
-  Box,
-  Card,
-  CardHeader,
-  Typography,
-  Grid,
-  Divider,
-  IconButton,
-  Breadcrumbs,
-  CircularProgress
-} from '@mui/material'
+import { Box, Card, CardHeader, Typography, Grid, Divider, IconButton, Breadcrumbs } from '@mui/material'
 
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
@@ -30,6 +20,7 @@ import styles from '@core/styles/table.module.css'
 import { getPurchaseFilters } from '@/api/purchase/purchase_order/filter'
 import { addMaterialRequest } from '@/api/transfer/materialRequest/add'
 import { getMaterialRequestDropdowns } from '@/api/transfer/materialRequest/dropdown'
+import { getVehicleDropdown } from '@/api/purchase/vehicle/dropdown'
 import { showToast } from '@/components/common/Toasts'
 
 import { format } from 'date-fns'
@@ -46,6 +37,7 @@ export default function AddMaterialRequestPage() {
   const [chemicalOptions, setChemicalOptions] = useState([])
   const [uomOptions, setUomOptions] = useState([])
   const [supplierOptions, setSupplierOptions] = useState([])
+  const [vehicleOptions, setVehicleOptions] = useState([])
 
   // Loading states
   const [initLoading, setInitLoading] = useState(false)
@@ -90,7 +82,11 @@ export default function AddMaterialRequestPage() {
     const fetchOptions = async () => {
       try {
         setInitLoading(true)
-        const [mrRes, filterRes] = await Promise.all([getMaterialRequestDropdowns(), getPurchaseFilters()])
+        const [mrRes, filterRes, vehicleRes] = await Promise.all([
+          getMaterialRequestDropdowns(),
+          getPurchaseFilters(),
+          getVehicleDropdown()
+        ])
         const materialData = mrRes?.data || mrRes
         const filterData = filterRes?.data || filterRes
         const purchaseData = filterData?.data || filterData || {}
@@ -148,6 +144,14 @@ export default function AddMaterialRequestPage() {
             value: s.id
           }))
         )
+
+        // 6. Vehicles
+        const vehicles = (vehicleRes?.vehicle || []).map(v => ({
+          label: v.vehicle_name || v.name,
+          value: v.id,
+          id: v.id
+        }))
+        setVehicleOptions(vehicles)
 
         // Set default origin if available
         const defaultOrigin = origins.find(o => o.label === 'A-Flick Pte Ltd') || origins[0]
@@ -316,26 +320,7 @@ export default function AddMaterialRequestPage() {
         <Divider />
 
         {/* HEADER FORM */}
-        <Box px={4} py={3} position='relative'>
-          {initLoading && (
-            <Box
-              sx={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                bgcolor: 'rgba(255,255,255,0.7)',
-                zIndex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <CircularProgress size={40} />
-            </Box>
-          )}
-
+        <Box px={4} py={3}>
           <Grid container spacing={3}>
             <Grid item xs={12} md={4}>
               <AppReactDatepicker
@@ -360,7 +345,7 @@ export default function AddMaterialRequestPage() {
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
                 label='From Vehicle'
-                options={employeeOptions}
+                options={vehicleOptions}
                 value={fromVehicle}
                 onChange={setFromVehicle}
               />
@@ -369,7 +354,7 @@ export default function AddMaterialRequestPage() {
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
                 label='To Vehicle'
-                options={employeeOptions}
+                options={vehicleOptions}
                 value={toVehicle}
                 onChange={setToVehicle}
               />
@@ -501,12 +486,7 @@ export default function AddMaterialRequestPage() {
           <GlobalButton color='secondary' onClick={() => router.push(`/${lang}/admin/transfer/material-request`)}>
             Close
           </GlobalButton>
-          <GlobalButton
-            variant='contained'
-            onClick={handleSaveAll}
-            disabled={saveLoading || items.length === 0}
-            startIcon={saveLoading ? <CircularProgress size={20} color='inherit' /> : null}
-          >
+          <GlobalButton variant='contained' onClick={handleSaveAll} disabled={saveLoading || items.length === 0}>
             {saveLoading ? 'Saving...' : 'Save Request'}
           </GlobalButton>
         </Box>
