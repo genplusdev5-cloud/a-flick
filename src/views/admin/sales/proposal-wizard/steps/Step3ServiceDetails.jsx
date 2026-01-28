@@ -126,14 +126,18 @@ const Step3ServiceDetails = ({
 
       {/* Report Block */}
       <Grid item xs={12} md={6}>
-        <CustomTextField
-          fullWidth
-          label={renderLabel('Report Block')}
-          name='reportBlock'
-          value={formData.reportBlock || ''}
-          onChange={handleChange}
-          inputRef={refs.reportBlockRef}
-          onKeyDown={e => handleKeyDown(e, refs.reportBlockRef)}
+        <GlobalAutocomplete
+          label='Report Block'
+          multiple
+          freeSolo
+          options={dropdowns.reportBlocks || []}
+          value={Array.isArray(formData.reportBlock) ? formData.reportBlock : []}
+          onChange={v =>
+            handleChange({
+              target: { name: 'reportBlock', value: v }
+            })
+          }
+          renderInput={params => <CustomTextField {...params} label={renderLabel('Report Block')} />}
         />
       </Grid>
 

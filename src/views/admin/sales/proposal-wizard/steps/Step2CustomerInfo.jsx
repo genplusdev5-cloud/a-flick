@@ -60,28 +60,24 @@ const Step2CustomerInfo = ({
       <Grid item xs={12} md={6}>
         <CustomTextField
           fullWidth
-          label={renderLabel('Service Address', true)}
+          label={renderLabel('Service Address')}
           name='serviceAddress'
           value={formData.serviceAddress || ''}
           onChange={handleChange}
           inputRef={refs.serviceAddressRef}
           onKeyDown={e => handleKeyDown(e, refs.serviceAddressRef)}
-          required
-          sx={requiredFieldSx}
         />
       </Grid>
 
       <Grid item xs={12} md={3}>
         <CustomTextField
           fullWidth
-          label={renderLabel('Postal Code', true)}
+          label={renderLabel('Postal Code')}
           name='postalCode'
           value={formData.postalCode || ''}
           onChange={handleChange}
           inputRef={refs.postalCodeRef}
           onKeyDown={e => handleKeyDown(e, refs.postalCodeRef)}
-          required
-          sx={requiredFieldSx}
         />
       </Grid>
       <Grid item xs={12} md={3}>
@@ -261,13 +257,11 @@ const Step2CustomerInfo = ({
 
       <Grid item xs={12} md={4}>
         <GlobalAutocomplete
-          label={renderLabel('Industry', true)}
+          label={renderLabel('Industry')}
           options={dropdowns?.industries || []}
           value={formData.industryId}
           onChange={v => handleAutocompleteChange('industry', v, refs.industryRef)}
           inputRef={refs.industryRef}
-          required
-          sx={requiredFieldSx}
         />
       </Grid>
 
@@ -283,13 +277,11 @@ const Step2CustomerInfo = ({
 
       <Grid item xs={12} md={4}>
         <GlobalAutocomplete
-          label={renderLabel('Sales Person', true)}
+          label={renderLabel('Sales Person')}
           options={dropdowns?.salesPersons || []}
           value={formData.salesPersonId}
           onChange={v => handleAutocompleteChange('salesPerson', v, refs.salesPersonRef)}
           inputRef={refs.salesPersonRef}
-          required
-          sx={requiredFieldSx}
         />
       </Grid>
 

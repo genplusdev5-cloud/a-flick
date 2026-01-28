@@ -99,13 +99,17 @@ const LoginV1 = () => {
         }
       } else {
         const msg = res?.error === 'CredentialsSignin' ? 'Invalid email or password' : 'Login failed. Please try again.'
-        setErrorMsg(msg)
+        setErrorMsg(msg + (res?.error ? ` (Error: ${res.error})` : ''))
         showToast('error', msg)
       }
     } catch (error) {
       console.error('Login error:', error)
-      setErrorMsg('An unexpected error occurred.')
-      showToast('error', 'An unexpected error occurred.')
+      let displayMsg = error instanceof Error ? error.message : 'An unexpected error occurred.'
+      if (error instanceof Error && error.stack) {
+        displayMsg += ' | STACK: ' + error.stack
+      }
+      setErrorMsg(displayMsg)
+      showToast('error', 'Login Failed')
     } finally {
       setLoading(false)
     }
@@ -186,9 +190,12 @@ const LoginV1 = () => {
 
             {/* Error Message */}
             {errorMsg && (
-              <Typography color='error' variant='body2' className='text-center'>
-                {errorMsg}
-              </Typography>
+              <div className='flex flex-col gap-2 p-4 bg-red-50 text-red-600 rounded text-sm break-all'>
+                <Typography color='error' variant='subtitle2' className='font-bold'>
+                  Error Details:
+                </Typography>
+                <div>{errorMsg}</div>
+              </div>
             )}
 
             {/* Submit Button */}

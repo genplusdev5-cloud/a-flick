@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import CustomAutocomplete from '@core/components/mui/Autocomplete'
 import CustomTextField from '@core/components/mui/TextField'
+import Chip from '@mui/material/Chip'
 
 const GlobalAutocomplete = ({
   label = 'Select',
@@ -39,14 +40,20 @@ const GlobalAutocomplete = ({
     [options]
   )
 
-  // ⭐ Sync string-value selection
-  const normalizedValue = useMemo(
-    () =>
-      typeof value === 'string' || typeof value === 'number'
-        ? normalizedOptions.find(o => String(o.value) === String(value) || o.label === value) || null
-        : value,
-    [value, normalizedOptions]
-  )
+  // ⭐ Sync value selection (handles single and multiple)
+  const normalizedValue = useMemo(() => {
+    if (props.multiple) {
+      if (!Array.isArray(value)) return []
+      return value.map(val => {
+        if (typeof val === 'object' && val !== null) return val
+        return normalizedOptions.find(o => String(o.value) === String(val) || o.label === val) || val
+      })
+    }
+
+    return typeof value === 'string' || typeof value === 'number'
+      ? normalizedOptions.find(o => String(o.value) === String(value) || o.label === value) || null
+      : value
+  }, [value, normalizedOptions, props.multiple])
 
   // ⭐ Display text
   const finalGetLabel = useMemo(
@@ -99,7 +106,28 @@ const GlobalAutocomplete = ({
           {finalGetLabel(option)}
         </li>
       )}
-      onChange={(event, newValue) => onChange(newValue || null)}
+      onChange={(event, newValue) => {
+        onChange(newValue || (props.multiple ? [] : null))
+      }}
+      renderTags={(value, getTagProps) =>
+        value.map((option, index) => (
+          <Chip
+            label={finalGetLabel(option)}
+            {...getTagProps({ index })}
+            key={index}
+            size='small'
+            sx={{
+              bgcolor: '#03C3EC',
+              color: 'white',
+              borderRadius: '6px',
+              '& .MuiChip-deleteIcon': {
+                color: 'white',
+                '&:hover': { color: '#eee' }
+              }
+            }}
+          />
+        ))
+      }
       renderInput={params => (
         <CustomTextField
           {...params}

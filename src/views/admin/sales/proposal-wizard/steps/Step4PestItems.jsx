@@ -29,6 +29,9 @@ import AppReactDatepicker from '@/libs/styles/AppReactDatepicker'
 // Icons
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
+import EventAvailableIcon from '@mui/icons-material/EventAvailable'
+import EventBusyIcon from '@mui/icons-material/EventBusy'
+import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive'
 
 import styles from '@core/styles/table.module.css'
 
@@ -140,12 +143,11 @@ const Step4PestItems = ({
   setPestSearch,
   pestPagination,
   setPestPagination,
-  pestDialogOpen,
-  setPestDialogOpen,
   handleCurrentPestItemDateChange,
   timeOptions,
   paginatedPests: propPaginatedPests,
-  filteredPests: propFilteredPests
+  filteredPests: propFilteredPests,
+  formData // ✅ Pass formData to get Step 2 dates
 }) => {
   // --- Filtering Logic (Pests) ---
   const filteredPests = useMemo(() => {
@@ -189,221 +191,272 @@ const Step4PestItems = ({
     <Grid container spacing={2} sx={{ width: '100%', m: 0 }}>
       <Grid item xs={12} display='flex' justifyContent='space-between' alignItems='center'>
         <Typography variant='h6'>Add Pests & History</Typography>
-        <Box display='flex' alignItems='center' gap={1}>
-          <Typography variant='subtitle1' color='textSecondary'>
-            Total Contract Value ($)
-          </Typography>
-          <Typography variant='h6' color='primary.main'>
-            {pestItems.reduce((acc, curr) => acc + Number(curr.totalValue || 0), 0)}
-          </Typography>
-        </Box>
       </Grid>
-      {/* --- INLINE ADD FORM (ONLY FOR ADD MODE) --- */}
-      {!id && (
-        <Grid item xs={12}>
-          <Box
-            sx={{
-              p: 3,
-              bgcolor: '#fff',
-              borderRadius: 1,
-              border: '1px solid #e0e0e0',
-              mb: 4
-            }}
+      {/* --- INLINE ADD FORM (ALWAYS VISIBLE) --- */}
+      <Grid item xs={12}>
+        <Box
+          sx={{
+            p: 3,
+            bgcolor: '#fff',
+            borderRadius: 1,
+            border: '1px solid #e0e0e0',
+            mb: 4
+          }}
+        >
+          <Typography
+            variant='subtitle2'
+            sx={{ mb: 3, fontWeight: 'bold', color: '#8b0000', textTransform: 'uppercase' }}
           >
-            <Typography
-              variant='subtitle2'
-              sx={{ mb: 3, fontWeight: 'bold', color: '#8b0000', textTransform: 'uppercase' }}
-            >
-              {editingItemId ? 'Update Pest Item' : 'Enter Pest Details'}
-            </Typography>
-            <Grid container spacing={3} alignItems='flex-end'>
-              {/* Row 1: Dates */}
-              <Grid item xs={12} md={4}>
-                <AppReactDatepicker
-                  selected={currentPestItem.startDate}
-                  onChange={date => handleCurrentPestItemDateChange('startDate', date)}
-                  dateFormat='dd/MM/yyyy'
-                  customInput={
-                    <CustomTextField
-                      fullWidth
-                      label={renderLabel('Start Date', true)}
-                      placeholder='dd/mm/yyyy'
-                      required
-                      sx={requiredFieldSx}
-                    />
-                  }
-                />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <AppReactDatepicker
-                  selected={currentPestItem.endDate}
-                  onChange={date => handleCurrentPestItemDateChange('endDate', date)}
-                  dateFormat='dd/MM/yyyy'
-                  customInput={
-                    <CustomTextField
-                      fullWidth
-                      label={renderLabel('End Date', true)}
-                      placeholder='dd/mm/yyyy'
-                      required
-                      sx={requiredFieldSx}
-                    />
-                  }
-                />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <AppReactDatepicker
-                  selected={currentPestItem.reminderDate}
-                  onChange={date => handleCurrentPestItemDateChange('reminderDate', date)}
-                  dateFormat='dd/MM/yyyy'
-                  customInput={
-                    <CustomTextField
-                      fullWidth
-                      label={renderLabel('Reminder Date', true)}
-                      placeholder='dd/mm/yyyy'
-                      required
-                      sx={requiredFieldSx}
-                    />
-                  }
-                />
-              </Grid>
-
-              {/* Row 2: Pest & Frequency & Count */}
-              <Grid item xs={12} md={4}>
-                <GlobalAutocomplete
-                  label={renderLabel('Pest', true)}
-                  options={dropdowns.pests || []}
-                  value={currentPestItem.pestId}
-                  onChange={v => handleCurrentPestItemAutocompleteChange('pest', v, refs.pestInputRef)}
-                  inputRef={refs.pestInputRef}
-                  required
-                  sx={requiredFieldSx}
-                />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <GlobalAutocomplete
-                  label={renderLabel('Billing Frequency', true)}
-                  options={dropdowns.frequencies || []}
-                  value={currentPestItem.frequencyId}
-                  onChange={v => handleCurrentPestItemAutocompleteChange('frequency', v, refs.frequencyInputRef)}
-                  inputRef={refs.frequencyInputRef}
-                  required
-                  sx={requiredFieldSx}
-                />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <CustomTextField
-                  fullWidth
-                  label='Pest Count'
-                  name='pestCount'
-                  value={currentPestItem.pestCount || ''}
-                  InputProps={{ readOnly: true }}
-                  sx={{ '& .MuiInputBase-root': { bgcolor: '#f0f0f0' }, ...requiredFieldSx }}
-                  required
-                />
-              </Grid>
-
-              {/* Row 3: Value & Total & Time */}
-              <Grid item xs={12} md={4}>
-                <CustomTextField
-                  fullWidth
-                  label={renderLabel('Pest Value', true)}
-                  name='pestValue'
-                  type='number'
-                  value={currentPestItem.pestValue || ''}
-                  onChange={handleCurrentPestItemChange}
-                  inputRef={refs.currentPestValueRef}
-                  onKeyDown={e => handleKeyDown(e, refs.currentPestValueRef)}
-                  required
-                  sx={requiredFieldSx}
-                />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <CustomTextField
-                  fullWidth
-                  label='Total'
-                  name='totalValue'
-                  value={currentPestItem.totalValue || ''}
-                  InputProps={{ readOnly: true }}
-                  sx={{ '& .MuiInputBase-root': { bgcolor: '#f0f0f0' }, ...requiredFieldSx }}
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <GlobalAutocomplete
-                  label={renderLabel('Work Time', true)}
-                  options={timeOptions}
-                  value={currentPestItem.workTime}
-                  onChange={v => handleCurrentPestItemAutocompleteChange('workTime', v, refs.timeInputRef)}
-                  inputRef={refs.timeInputRef}
-                  required
-                  sx={requiredFieldSx}
-                />
-              </Grid>
-
-              {/* Row 4: Chemicals, Items, Button */}
-              <Grid item xs={12} md={4}>
-                <GlobalAutocomplete
-                  label={renderLabel('Chemicals', true)}
-                  options={dropdowns.chemicals || []}
-                  value={currentPestItem.chemicalId}
-                  onChange={v => handleCurrentPestItemAutocompleteChange('chemical', v, refs.currentChemicalsRef)}
-                  inputRef={refs.currentChemicalsRef}
-                  required
-                  sx={requiredFieldSx}
-                />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <CustomTextField
-                  fullWidth
-                  label={renderLabel('No of Items', true)}
-                  name='noOfItems'
-                  type='number'
-                  value={currentPestItem.noOfItems}
-                  onChange={handleCurrentPestItemChange}
-                  inputRef={refs.currentNoOfItemsRef}
-                  onKeyDown={e => handleKeyDown(e, refs.currentNoOfItemsRef)}
-                  required
-                  sx={requiredFieldSx}
-                />
-              </Grid>
-              <Grid item xs={12} md={4} display='flex' justifyContent='flex-end'>
-                <Button
-                  variant='contained'
-                  onClick={handleSavePestItem}
-                  fullWidth
-                  ref={refs.addPestButtonRef}
+            {editingItemId ? 'Update Pest Item' : 'Enter Pest Details'}
+          </Typography>
+          <Grid container spacing={3} alignItems='flex-end'>
+            {/* Row 1: Dates (Professional Read-Only Text) */}
+            <Grid item xs={12} md={4}>
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: '8px',
+                  bgcolor: 'rgba(3, 195, 236, 0.05)',
+                  border: '1px solid rgba(3, 195, 236, 0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.5
+                }}
+              >
+                <Box
                   sx={{
-                    bgcolor: '#00adef',
-                    height: 40,
-                    fontWeight: 600,
-                    fontSize: '15px',
-                    '&:hover': { bgcolor: '#008dc4' }
+                    display: 'flex',
+                    p: 1,
+                    borderRadius: '6px',
+                    bgcolor: 'rgba(3, 195, 236, 0.1)',
+                    color: '#03C3EC'
                   }}
                 >
-                  {editingItemId ? 'UPDATE PEST' : '+ ADD PEST'}
-                </Button>
-              </Grid>
+                  <EventAvailableIcon fontSize='small' />
+                </Box>
+                <Box>
+                  <Typography
+                    variant='caption'
+                    sx={{
+                      color: 'text.secondary',
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}
+                  >
+                    Start Date
+                  </Typography>
+                  <Typography variant='body1' sx={{ fontWeight: 600, color: 'text.primary' }}>
+                    {formData.startDate ? formData.startDate.toLocaleDateString('en-GB') : '-'}
+                  </Typography>
+                </Box>
+              </Box>
             </Grid>
-          </Box>
-        </Grid>
-      )}
+            <Grid item xs={12} md={4}>
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: '8px',
+                  bgcolor: 'rgba(255, 159, 67, 0.05)',
+                  border: '1px solid rgba(255, 159, 67, 0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.5
+                }}
+              >
+                <Box
+                  sx={{
+                    display: 'flex',
+                    p: 1,
+                    borderRadius: '6px',
+                    bgcolor: 'rgba(255, 159, 67, 0.1)',
+                    color: '#FF9F43'
+                  }}
+                >
+                  <EventBusyIcon fontSize='small' />
+                </Box>
+                <Box>
+                  <Typography
+                    variant='caption'
+                    sx={{
+                      color: 'text.secondary',
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}
+                  >
+                    End Date
+                  </Typography>
+                  <Typography variant='body1' sx={{ fontWeight: 600, color: 'text.primary' }}>
+                    {formData.endDate ? formData.endDate.toLocaleDateString('en-GB') : '-'}
+                  </Typography>
+                </Box>
+              </Box>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: '8px',
+                  bgcolor: 'rgba(115, 103, 240, 0.05)',
+                  border: '1px solid rgba(115, 103, 240, 0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.5
+                }}
+              >
+                <Box
+                  sx={{
+                    display: 'flex',
+                    p: 1,
+                    borderRadius: '6px',
+                    bgcolor: 'rgba(115, 103, 240, 0.1)',
+                    color: '#7367F0'
+                  }}
+                >
+                  <NotificationsActiveIcon fontSize='small' />
+                </Box>
+                <Box>
+                  <Typography
+                    variant='caption'
+                    sx={{
+                      color: 'text.secondary',
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}
+                  >
+                    Reminder Date
+                  </Typography>
+                  <Typography variant='body1' sx={{ fontWeight: 600, color: 'text.primary' }}>
+                    {formData.reminderDate ? formData.reminderDate.toLocaleDateString('en-GB') : '-'}
+                  </Typography>
+                </Box>
+              </Box>
+            </Grid>
+
+            {/* Row 2: Pest & Frequency & Count */}
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete
+                label={renderLabel('Pest', true)}
+                options={dropdowns.pests || []}
+                value={currentPestItem.pestId}
+                onChange={v => handleCurrentPestItemAutocompleteChange('pest', v, refs.pestInputRef)}
+                inputRef={refs.pestInputRef}
+                required
+                sx={requiredFieldSx}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete
+                label={renderLabel('Service Frequency', true)}
+                options={dropdowns.serviceFrequencies || []}
+                value={currentPestItem.frequencyId}
+                onChange={v => handleCurrentPestItemAutocompleteChange('frequency', v, refs.frequencyInputRef)}
+                inputRef={refs.frequencyInputRef}
+                required
+                sx={requiredFieldSx}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <CustomTextField
+                fullWidth
+                label='Pest Count'
+                name='pestCount'
+                value={currentPestItem.pestCount || ''}
+                InputProps={{ readOnly: true }}
+                sx={{ '& .MuiInputBase-root': { bgcolor: '#f0f0f0' }, ...requiredFieldSx }}
+                required
+              />
+            </Grid>
+
+            {/* Row 3: Value & Total & Time */}
+            <Grid item xs={12} md={4}>
+              <CustomTextField
+                fullWidth
+                label={renderLabel('Pest Value', true)}
+                name='pestValue'
+                type='number'
+                value={currentPestItem.pestValue || ''}
+                onChange={handleCurrentPestItemChange}
+                inputRef={refs.currentPestValueRef}
+                onKeyDown={e => handleKeyDown(e, refs.currentPestValueRef)}
+                required
+                sx={requiredFieldSx}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <CustomTextField
+                fullWidth
+                label='Total'
+                name='totalValue'
+                value={currentPestItem.totalValue || ''}
+                InputProps={{ readOnly: true }}
+                sx={{ '& .MuiInputBase-root': { bgcolor: '#f0f0f0' }, ...requiredFieldSx }}
+                required
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete
+                label='Work Time'
+                options={timeOptions}
+                value={currentPestItem.workTime}
+                onChange={v => handleCurrentPestItemAutocompleteChange('workTime', v, refs.timeInputRef)}
+                inputRef={refs.timeInputRef}
+              />
+            </Grid>
+
+            {/* Row 4: Chemicals, Items, Button */}
+            <Grid item xs={12} md={4}>
+              <GlobalAutocomplete
+                label={renderLabel('Chemicals', true)}
+                multiple
+                options={dropdowns.chemicals || []}
+                value={currentPestItem.chemical || []} // Note: state stores 'chemical' (plural 'chemicals' is for backend string)
+                onChange={v => handleCurrentPestItemAutocompleteChange('chemical', v, refs.currentChemicalsRef)}
+                inputRef={refs.currentChemicalsRef}
+                required
+                sx={requiredFieldSx}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <CustomTextField
+                fullWidth
+                label='No of Items'
+                name='noOfItems'
+                type='number'
+                value={currentPestItem.noOfItems}
+                onChange={handleCurrentPestItemChange}
+                inputRef={refs.currentNoOfItemsRef}
+                onKeyDown={e => handleKeyDown(e, refs.currentNoOfItemsRef)}
+              />
+            </Grid>
+            <Grid item xs={12} md={4} display='flex' justifyContent='flex-end'>
+              <Button
+                variant='contained'
+                onClick={handleSavePestItem}
+                fullWidth
+                ref={refs.addPestButtonRef}
+                sx={{
+                  bgcolor: '#00adef',
+                  height: 40,
+                  fontWeight: 600,
+                  fontSize: '15px',
+                  '&:hover': { bgcolor: '#008dc4' }
+                }}
+              >
+                {editingItemId ? 'UPDATE PEST' : '+ ADD PEST'}
+              </Button>
+            </Grid>
+          </Grid>
+        </Box>
+      </Grid>
 
       {/* PEST TABLE (Full Width) */}
       <Grid item xs={12}>
         <TableSection
           title='PEST DETAILS'
-          addButton={
-            id && ( // Only show in UPDATE mode
-              <Button
-                variant='contained'
-                size='small'
-                startIcon={<EditIcon sx={{ fontSize: 16 }} />}
-                onClick={() => setPestDialogOpen(true)}
-              >
-                Add New Pest
-              </Button>
-            )
-          }
+          addButton={null}
           searchText={pestSearch}
           setSearchText={setPestSearch}
           pagination={pestPagination}
@@ -416,7 +469,7 @@ const Step4PestItems = ({
                 <th>S.No</th>
                 <th>Action</th>
                 <th>Pest</th>
-                <th>Billing Frequency</th>
+                <th>Service Frequency</th>
                 <th>Pest Value</th>
                 <th>Total Value</th>
                 <th>Work Time</th>
@@ -445,7 +498,6 @@ const Step4PestItems = ({
                           sx={{ color: '#28c76f', border: '1px solid #28c76f', borderRadius: 1, p: '4px' }}
                           onClick={() => {
                             handleEditPestItem(item)
-                            if (id) setPestDialogOpen(true) // Open dialog in UPDATE mode
                           }}
                         >
                           <EditIcon fontSize='small' />
@@ -465,11 +517,28 @@ const Step4PestItems = ({
                     <td>{item.totalValue}</td>
                     <td>{item.workTime}</td>
                     <td>
-                      <Chip
-                        label={item.chemical || item.chemicals || 'NA'}
-                        size='small'
-                        sx={{ bgcolor: '#28c76f', color: '#fff', borderRadius: '4px' }}
-                      />
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                        {(() => {
+                          const val = item.chemical_name || item.chemical || item.chemicals || ''
+                          const chips = Array.isArray(val)
+                            ? val
+                            : val
+                                .split(',')
+                                .map(s => s.trim())
+                                .filter(Boolean)
+                          return chips.map((chip, cIdx) => (
+                            <Chip
+                              key={cIdx}
+                              label={chip}
+                              size='small'
+                              sx={{ bgcolor: '#28c76f', color: '#fff', borderRadius: '4px' }}
+                            />
+                          ))
+                        })()}
+                        {!(item.chemical_name || item.chemical || item.chemicals) && (
+                          <Chip label='NA' size='small' sx={{ bgcolor: '#eee', borderRadius: '4px' }} />
+                        )}
+                      </Box>
                     </td>
                     <td>{item.noOfItems}</td>
                     <td>

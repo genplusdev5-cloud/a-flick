@@ -25,11 +25,25 @@ export const authOptions = {
 
         try {
           // Use the absolute URL from .env or fallback to the one provided by the user
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://aflick.genpest360.com/api/'
+          let apiUrl = process.env.NEXT_PUBLIC_API_URL
+
+          if (!apiUrl || typeof apiUrl !== 'string') {
+            console.warn('NEXT_PUBLIC_API_URL is missing or invalid. Using default.')
+            apiUrl = 'https://aflick.genpest360.com/api/'
+          }
+          if (!apiUrl.endsWith('/')) {
+            apiUrl += '/'
+          }
+
+          console.log('NextAuth Authorize: Using API URL:', apiUrl)
+
+          const formData = new FormData()
+          formData.append('email', email)
+          formData.append('password', password)
+
           const response = await fetch(`${apiUrl}auth/login/`, {
             method: 'POST',
-            body: JSON.stringify({ email, password }),
-            headers: { 'Content-Type': 'application/json' }
+            body: formData
           })
 
           const data = await response.json()
