@@ -63,10 +63,9 @@ const EditMaterialRequestPage = () => {
   const [origin, setOrigin] = useState(null)
   const [fromVehicle, setFromVehicle] = useState(null)
   const [toVehicle, setToVehicle] = useState(null)
-  const [currentUser, setCurrentUser] = useState(null)
-
-  // Item entry fields
   const [remarks, setRemarks] = useState('')
+  const [currentUser, setCurrentUser] = useState(null)
+  const [originalData, setOriginalData] = useState(null) // 💡 NEW: Store original record data
   const [chemical, setChemical] = useState(null)
   const [uom, setUom] = useState(null)
   const [quantity, setQuantity] = useState('')
@@ -179,6 +178,7 @@ const EditMaterialRequestPage = () => {
             const data = detailsRes?.data ?? detailsRes ?? {}
 
             if (data) {
+              setOriginalData(data) // 💡 Store original data for preservation
               if (data.request_date) setRequestDate(new Date(data.request_date))
 
               setOrigin(origins.find(o => String(o.id) === String(data.origin_id)) || null)
@@ -200,16 +200,26 @@ const EditMaterialRequestPage = () => {
               const itemsList = data.items || []
 
               const mappedItems = itemsList.map(item => {
-                const chemId = item.item_id || item.item?.id || item.chemical_id
-                const uomId = item.uom_id || item.uom?.id
+                const chemId = item.item_id || item.item?.id || item.chemical_id || item.item_details?.id
+                const uomId = item.uom_id || item.uom?.id || item.uom_details?.id
 
                 return {
                   id: item.id,
-                  chemical: item.item_name || item.chemical_name || item.item?.name || '',
+                  chemical:
+                    item.item_name ||
+                    item.chemical_name ||
+                    item.item?.name ||
+                    item.item_details?.name ||
+                    item.name ||
+                    '',
                   chemicalId: chemId,
-                  uom: item.uom_name || item.uom || item.uom_details?.name || '',
+                  uom:
+                    item.uom_name ||
+                    item.uom_details?.name ||
+                    (typeof item.uom === 'object' ? item.uom.name : item.uom) ||
+                    '',
                   uomId: uomId,
-                  quantity: item.quantity,
+                  quantity: item.quantity || item.transfer_quantity || item.transfer_in_quantity || '',
                   remarks: item.remarks || ''
                 }
               })
@@ -340,10 +350,11 @@ const EditMaterialRequestPage = () => {
       setSaveLoading(true)
 
       const payload = {
+        ...originalData, // 💡 Preserve original fields (like supervisor_id, num_series, etc.)
         id: Number(decodedId),
         request_date: format(requestDate, 'yyyy-MM-dd'),
         remarks: remarks,
-        employee_id: Number(fromVehicle?.id || currentUser?.id) || null, // Priority to selected vehicle/employee
+        employee_id: Number(fromVehicle?.id || currentUser?.id) || null,
         from_vehicle: fromVehicle?.label || '-',
         from_vehicle_id: Number(fromVehicle?.id) || null,
         to_vehicle: toVehicle?.label || '-',
@@ -351,7 +362,7 @@ const EditMaterialRequestPage = () => {
         request_status: 'Pending',
         is_active: 1,
         status: 1,
-        items: items.map(item => {
+        items_input: items.map(item => {
           const itemObj = {
             item_id: Number(item.chemicalId) || null,
             item_name: item.chemical,
@@ -433,7 +444,7 @@ const EditMaterialRequestPage = () => {
 
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
-                label='From Vehicle'
+                label='Request From Vehicle'
                 options={vehicleOptions}
                 value={fromVehicle}
                 onChange={setFromVehicle}
@@ -441,12 +452,7 @@ const EditMaterialRequestPage = () => {
             </Grid>
 
             <Grid item xs={12} md={4}>
-              <GlobalAutocomplete
-                label='To Vehicle'
-                options={vehicleOptions}
-                value={toVehicle}
-                onChange={setToVehicle}
-              />
+              <GlobalAutocomplete label='Vehicle' options={vehicleOptions} value={toVehicle} onChange={setToVehicle} />
             </Grid>
 
             <Grid item xs={12} md={4}>

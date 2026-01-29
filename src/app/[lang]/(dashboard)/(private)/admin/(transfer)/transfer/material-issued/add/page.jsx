@@ -179,6 +179,14 @@ const AddMaterialRequestIssuedPage = () => {
       return
     }
 
+    // 💡 NEW: Deduplication logic
+    const existingIndex = items.findIndex(
+      item =>
+        item.chemicalId === (chemical.id || chemical.value) &&
+        item.uomId === (uom.id || uom.value) &&
+        item.id !== editId
+    )
+
     if (editId) {
       setItems(prev =>
         prev.map(item =>
@@ -195,6 +203,18 @@ const AddMaterialRequestIssuedPage = () => {
         )
       )
       setEditId(null)
+    } else if (existingIndex !== -1) {
+      // Update existing item if found
+      setItems(prev =>
+        prev.map((item, idx) =>
+          idx === existingIndex
+            ? {
+                ...item,
+                quantity: Number(item.quantity) + Number(quantity)
+              }
+            : item
+        )
+      )
     } else {
       setItems(prev => [
         ...prev,
@@ -293,7 +313,7 @@ const AddMaterialRequestIssuedPage = () => {
 
             <Grid item md={4} xs={12}>
               <GlobalAutocomplete
-                label='From Vehicle'
+                label='Request From Vehicle'
                 options={vehicleOptions}
                 value={fromVehicle}
                 onChange={setFromVehicle}
@@ -301,12 +321,7 @@ const AddMaterialRequestIssuedPage = () => {
             </Grid>
 
             <Grid item md={4} xs={12}>
-              <GlobalAutocomplete
-                label='To Vehicle'
-                options={vehicleOptions}
-                value={toVehicle}
-                onChange={setToVehicle}
-              />
+              <GlobalAutocomplete label='Vehicle' options={vehicleOptions} value={toVehicle} onChange={setToVehicle} />
             </Grid>
 
             <Grid item md={4} xs={12}>
@@ -381,12 +396,10 @@ const AddMaterialRequestIssuedPage = () => {
               <thead>
                 <tr>
                   <th>ID</th>
+                  <th style={{ textAlign: 'center' }}>Action</th>
                   <th style={{ width: '40%' }}>Chemical</th>
                   <th style={{ width: '25%' }}>UOM</th>
-                  <th align='right' style={{ width: '20%' }}>
-                    Qty
-                  </th>
-                  <th align='center'>Action</th>
+                  <th style={{ width: '20%', textAlign: 'right' }}>Qty</th>
                 </tr>
               </thead>
               <tbody>
@@ -394,10 +407,7 @@ const AddMaterialRequestIssuedPage = () => {
                   items.map((r, i) => (
                     <tr key={r.id}>
                       <td>{i + 1}</td>
-                      <td>{r.chemical}</td>
-                      <td>{r.uom}</td>
-                      <td align='right'>{r.quantity}</td>
-                      <td align='center'>
+                      <td style={{ textAlign: 'center' }}>
                         <IconButton size='small' color='primary' onClick={() => handleEditItem(r)}>
                           <EditIcon fontSize='small' />
                         </IconButton>
@@ -405,6 +415,9 @@ const AddMaterialRequestIssuedPage = () => {
                           <DeleteIcon fontSize='small' />
                         </IconButton>
                       </td>
+                      <td>{r.chemical}</td>
+                      <td>{r.uom}</td>
+                      <td style={{ textAlign: 'right' }}>{r.quantity}</td>
                     </tr>
                   ))
                 ) : (

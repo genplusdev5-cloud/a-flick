@@ -145,13 +145,13 @@ const MaterialRequestReceivedPage = () => {
 
       await deleteMaterialReceive(deleteDialog.row.id)
 
-      showToast('Material Receive deleted successfully', 'delete')
+      showToast('delete', 'Material Receive deleted successfully')
 
       setDeleteDialog({ open: false, row: null })
       fetchList()
     } catch (error) {
       console.error('Delete failed', error)
-      showToast(error?.response?.data?.message || 'Failed to delete record', 'error')
+      showToast('error', error?.response?.data?.message || 'Failed to delete record')
     } finally {
       setDeleteLoading(false)
     }

@@ -63,6 +63,7 @@ const EditMaterialRequestIssuedPage = () => {
   const [toVehicle, setToVehicle] = useState(null)
   const [issueDate, setIssueDate] = useState(null)
   const [remarks, setRemarks] = useState('')
+  const [originalData, setOriginalData] = useState(null) // 💡 NEW: Store original record data
 
   const [chemical, setChemical] = useState(null)
   const [uom, setUom] = useState(null)
@@ -154,9 +155,26 @@ const EditMaterialRequestIssuedPage = () => {
         const d = detailJson?.data || detailJson
 
         if (d && Object.keys(d).length > 0) {
+          setOriginalData(d) // 💡 Store original data for preservation
           setOrigin(origins.find(o => String(o.id) === String(d.company_id || d.origin_id)) || null)
           setRequestNo(d.request_no || d.request_details?.num_series || d.request_details?.request_no || '')
-          setIssueDate(d.issue_date ? parseISO(d.issue_date) : d.receive_date ? parseISO(d.receive_date) : null)
+          const rawDate = d.issue_date || d.receive_date || d.issue_date_details || null
+          if (rawDate) {
+            try {
+              const parsed = rawDate.includes('T') ? parseISO(rawDate) : new Date(rawDate)
+              if (!isNaN(parsed)) setIssueDate(parsed)
+              else {
+                // Try parsing DD/MM/YYYY
+                const parts = rawDate.split(' ')[0].split('/')
+                if (parts.length === 3) {
+                  const dateObj = new Date(parts[2], parts[1] - 1, parts[0])
+                  if (!isNaN(dateObj)) setIssueDate(dateObj)
+                }
+              }
+            } catch (e) {
+              console.error('Date parse failed', e)
+            }
+          }
           setRemarks(d.remarks || '')
 
           setFromVehicle(
@@ -173,13 +191,39 @@ const EditMaterialRequestIssuedPage = () => {
           )
 
           setItems(
-            (d.items || d.transfer_items || d.transfer_in_items || []).map(item => ({
+            (
+              d.items ||
+              d.items_details ||
+              d.transfer_items ||
+              d.transfer_in_items ||
+              d.transfer_in_items_details ||
+              d.inward_items ||
+              d.receive_items ||
+              []
+            ).map(item => ({
               id: item.id,
-              chemical: item.item_name || item.chemical_name || item.chemical?.name || '',
-              chemicalId: item.item_id || item.chemical_id || item.chemical?.id,
-              uom: item.uom_name || item.uom?.name || item.uom_details?.name || item.uom,
+              chemical:
+                item.item_name ||
+                item.chemical_name ||
+                item.chemical?.name ||
+                item.item_details?.name ||
+                item.chemical_details?.name ||
+                item.name ||
+                '',
+              chemicalId:
+                item.item_id ||
+                item.chemical_id ||
+                item.chemical?.id ||
+                item.item_details?.id ||
+                item.chemical_details?.id,
+              uom:
+                item.uom_name ||
+                item.uom?.name ||
+                item.uom_details?.name ||
+                (typeof item.uom === 'object' ? item.uom.name : item.uom) ||
+                '',
               uomId: item.uom_id || item.uom?.id || item.uom_details?.id,
-              quantity: item.quantity || item.transfer_quantity
+              quantity: item.quantity || item.transfer_quantity || item.transfer_in_quantity || item.in_quantity || ''
             }))
           )
         }
@@ -231,6 +275,14 @@ const EditMaterialRequestIssuedPage = () => {
       return
     }
 
+    // 💡 NEW: Deduplication logic
+    const existingIndex = items.findIndex(
+      item =>
+        item.chemicalId === (chemical.id || chemical.value) &&
+        item.uomId === (uom.id || uom.value) &&
+        item.id !== editId
+    )
+
     if (editId) {
       setItems(prev =>
         prev.map(item =>
@@ -247,6 +299,18 @@ const EditMaterialRequestIssuedPage = () => {
         )
       )
       setEditId(null)
+    } else if (existingIndex !== -1) {
+      // Update existing item if found
+      setItems(prev =>
+        prev.map((item, idx) =>
+          idx === existingIndex
+            ? {
+                ...item,
+                quantity: Number(item.quantity) + Number(quantity)
+              }
+            : item
+        )
+      )
     } else {
       setItems(prev => [
         ...prev,
@@ -281,6 +345,7 @@ const EditMaterialRequestIssuedPage = () => {
       setSaveLoading(true)
 
       const payload = {
+        ...originalData, // 💡 Preserve original fields
         id: decodedId,
         request_no: requestNo,
         origin_id: origin?.id || null,
@@ -296,25 +361,24 @@ const EditMaterialRequestIssuedPage = () => {
         remarks,
         is_active: 1,
         status: 1,
-        items: JSON.stringify(
-          items.map(i => {
-            const itemObj = {
-              item_id: i.chemicalId,
-              item_name: i.chemical,
-              uom_id: i.uomId,
-              uom: i.uom,
-              quantity: Number(i.quantity),
-              is_active: 1,
-              status: 1
-            }
+        items_input: items.map(i => {
+          const itemObj = {
+            issue_id: Number(decodedId),
+            item_id: i.chemicalId,
+            item_name: i.chemical,
+            uom_id: i.uomId,
+            uom: i.uom,
+            quantity: Number(i.quantity),
+            is_active: 1,
+            status: 1
+          }
 
-            if (i.id && !String(i.id).startsWith('temp') && String(i.id).length < 12) {
-              itemObj.id = Number(i.id)
-            }
+          if (i.id && !String(i.id).startsWith('temp') && String(i.id).length < 12) {
+            itemObj.id = Number(i.id)
+          }
 
-            return itemObj
-          })
-        )
+          return itemObj
+        })
       }
 
       await updateMaterialIssue(decodedId, payload)
@@ -355,7 +419,7 @@ const EditMaterialRequestIssuedPage = () => {
 
             <Grid item md={4} xs={12}>
               <GlobalAutocomplete
-                label='From Vehicle'
+                label='Request From Vehicle'
                 options={vehicleOptions}
                 value={fromVehicle}
                 onChange={setFromVehicle}
@@ -363,12 +427,7 @@ const EditMaterialRequestIssuedPage = () => {
             </Grid>
 
             <Grid item md={4} xs={12}>
-              <GlobalAutocomplete
-                label='To Vehicle'
-                options={vehicleOptions}
-                value={toVehicle}
-                onChange={setToVehicle}
-              />
+              <GlobalAutocomplete label='Vehicle' options={vehicleOptions} value={toVehicle} onChange={setToVehicle} />
             </Grid>
 
             <Grid item md={4} xs={12}>
@@ -443,12 +502,10 @@ const EditMaterialRequestIssuedPage = () => {
               <thead>
                 <tr>
                   <th>ID</th>
+                  <th style={{ textAlign: 'center' }}>Action</th>
                   <th style={{ width: '40%' }}>Chemical</th>
                   <th style={{ width: '25%' }}>UOM</th>
-                  <th align='right' style={{ width: '20%' }}>
-                    Qty
-                  </th>
-                  <th align='center'>Action</th>
+                  <th style={{ width: '20%', textAlign: 'right' }}>Qty</th>
                 </tr>
               </thead>
               <tbody>
@@ -456,10 +513,7 @@ const EditMaterialRequestIssuedPage = () => {
                   items.map((r, i) => (
                     <tr key={r.id}>
                       <td>{i + 1}</td>
-                      <td>{r.chemical}</td>
-                      <td>{r.uom}</td>
-                      <td align='right'>{r.quantity}</td>
-                      <td align='center'>
+                      <td style={{ textAlign: 'center' }}>
                         <IconButton size='small' color='primary' onClick={() => handleEditItem(r)}>
                           <EditIcon fontSize='small' />
                         </IconButton>
@@ -467,6 +521,9 @@ const EditMaterialRequestIssuedPage = () => {
                           <DeleteIcon fontSize='small' />
                         </IconButton>
                       </td>
+                      <td>{r.chemical}</td>
+                      <td>{r.uom}</td>
+                      <td style={{ textAlign: 'right' }}>{r.quantity}</td>
                     </tr>
                   ))
                 ) : (

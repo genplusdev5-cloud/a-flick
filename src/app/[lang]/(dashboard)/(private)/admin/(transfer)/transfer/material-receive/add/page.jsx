@@ -201,6 +201,14 @@ const AddMaterialReceivePage = () => {
       return
     }
 
+    // 💡 NEW: Deduplication logic
+    const existingIndex = items.findIndex(
+      item =>
+        item.chemicalId === (chemical.id || chemical.value) &&
+        item.uomId === (uom.id || uom.value) &&
+        item.id !== editId
+    )
+
     if (editId) {
       setItems(prev =>
         prev.map(item =>
@@ -217,6 +225,18 @@ const AddMaterialReceivePage = () => {
         )
       )
       setEditId(null)
+    } else if (existingIndex !== -1) {
+      // Update existing item if found
+      setItems(prev =>
+        prev.map((item, idx) =>
+          idx === existingIndex
+            ? {
+                ...item,
+                quantity: Number(item.quantity) + Number(quantity)
+              }
+            : item
+        )
+      )
     } else {
       setItems(prev => [
         ...prev,
@@ -282,17 +302,15 @@ const AddMaterialReceivePage = () => {
         remarks,
         is_active: 1,
         status: 1,
-        items: JSON.stringify(
-          items.map(i => ({
-            item_id: i.chemicalId,
-            item_name: i.chemical,
-            uom_id: i.uomId,
-            uom: i.uom,
-            quantity: Number(i.quantity),
-            is_active: 1,
-            status: 1
-          }))
-        )
+        items: items.map(i => ({
+          item_id: i.chemicalId,
+          item_name: i.chemical,
+          uom_id: i.uomId,
+          uom: i.uom,
+          quantity: Number(i.quantity),
+          is_active: 1,
+          status: 1
+        }))
       }
 
       await addMaterialReceive(payload)
@@ -336,7 +354,7 @@ const AddMaterialReceivePage = () => {
             </Grid>
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
-                label='From Vehicle'
+                label='Request From Vehicle'
                 options={vehicleOptions}
                 value={fromVehicle}
                 onChange={setFromVehicle}
@@ -344,12 +362,7 @@ const AddMaterialReceivePage = () => {
             </Grid>
 
             <Grid item xs={12} md={4}>
-              <GlobalAutocomplete
-                label='To Vehicle'
-                options={vehicleOptions}
-                value={toVehicle}
-                onChange={setToVehicle}
-              />
+              <GlobalAutocomplete label='Vehicle' options={vehicleOptions} value={toVehicle} onChange={setToVehicle} />
             </Grid>
 
             <Grid item xs={12} md={4}>
@@ -426,12 +439,10 @@ const AddMaterialReceivePage = () => {
               <thead>
                 <tr>
                   <th>ID</th>
+                  <th style={{ textAlign: 'center' }}>Action</th>
                   <th style={{ width: '40%' }}>Chemical</th>
                   <th style={{ width: '25%' }}>UOM</th>
-                  <th align='right' style={{ width: '20%' }}>
-                    Quantity
-                  </th>
-                  <th align='center'>Action</th>
+                  <th style={{ width: '20%', textAlign: 'right' }}>Quantity</th>
                 </tr>
               </thead>
               <tbody>
@@ -439,10 +450,7 @@ const AddMaterialReceivePage = () => {
                   items.map((i, idx) => (
                     <tr key={i.id}>
                       <td>{idx + 1}</td>
-                      <td>{i.chemical}</td>
-                      <td>{i.uom}</td>
-                      <td align='right'>{i.quantity}</td>
-                      <td align='center'>
+                      <td style={{ textAlign: 'center' }}>
                         <IconButton size='small' color='primary' onClick={() => handleEditItem(i)}>
                           <EditIcon fontSize='small' />
                         </IconButton>
@@ -450,6 +458,9 @@ const AddMaterialReceivePage = () => {
                           <DeleteIcon fontSize='small' />
                         </IconButton>
                       </td>
+                      <td>{i.chemical}</td>
+                      <td>{i.uom}</td>
+                      <td style={{ textAlign: 'right' }}>{i.quantity}</td>
                     </tr>
                   ))
                 ) : (

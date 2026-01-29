@@ -286,7 +286,7 @@ export default function AddMaterialRequestPage() {
         request_status: 'Pending',
         is_active: 1,
         status: 1,
-        items: items.map(i => ({
+        items_input: items.map(i => ({
           item_id: Number(i.chemicalId) || null,
           item_name: i.chemical,
           uom: i.uom,
@@ -364,7 +364,7 @@ export default function AddMaterialRequestPage() {
 
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
-                label='From Vehicle'
+                label='Request From Vehicle'
                 options={vehicleOptions}
                 value={fromVehicle}
                 onChange={setFromVehicle}
@@ -373,7 +373,7 @@ export default function AddMaterialRequestPage() {
 
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
-                label='To Vehicle'
+                label='Vehicle'
                 options={vehicleOptions}
                 value={toVehicle}
                 onChange={setToVehicle}
