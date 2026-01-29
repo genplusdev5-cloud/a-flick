@@ -14,7 +14,6 @@ import {
   TableRow,
   Chip,
   Typography,
-  CircularProgress,
   Radio,
   RadioGroup,
   FormControl,
@@ -80,12 +79,6 @@ export default function DashboardList() {
 
   return (
     <Box sx={{ mt: 2 }}>
-      {loading && (
-        <Box sx={{ textAlign: 'center', mb: 2 }}>
-          <CircularProgress size={28} />
-        </Box>
-      )}
-
       <Grid container spacing={3}>
         {/* ================= CARD 1 : TODAY SERVICE REQUESTS ================= */}
         <Grid item xs={12} md={6}>
@@ -129,7 +122,7 @@ export default function DashboardList() {
                   {filteredServiceRequests.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={4} align='center'>
-                        No {svcFilter.toLowerCase()} service requests today
+                        {loading ? 'Loading...' : `No ${svcFilter.toLowerCase()} service requests today`}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -168,7 +161,7 @@ export default function DashboardList() {
                   {followups.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={4} align='center'>
-                        No followups today
+                        {loading ? 'Loading...' : 'No followups today'}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -208,7 +201,7 @@ export default function DashboardList() {
                   {renewals.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} align='center'>
-                        No renewal pending
+                        {loading ? 'Loading...' : 'No renewal pending'}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -250,7 +243,7 @@ export default function DashboardList() {
                   {kivList.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} align='center'>
-                        No KIV records
+                        {loading ? 'Loading...' : 'No KIV records'}
                       </TableCell>
                     </TableRow>
                   ) : (

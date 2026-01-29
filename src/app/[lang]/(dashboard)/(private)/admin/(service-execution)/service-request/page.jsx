@@ -36,7 +36,14 @@ import TablePaginationComponent from '@/components/TablePaginationComponent'
 
 import { getTicketReportList, getReportDropdowns } from '@/api/service_group/service_request/report'
 import { getTicketDetails, addTicket, updateTicket, deleteTicket, searchTicket } from '@/api/service_group/ticket'
-import { addTicketPest, updateTicketPest, deleteTicketPest, addTicketTechnician, updateTicketTechnician, deleteTicketTechnician } from '@/api/service_group/ticket'
+import {
+  addTicketPest,
+  updateTicketPest,
+  deleteTicketPest,
+  addTicketTechnician,
+  updateTicketTechnician,
+  deleteTicketTechnician
+} from '@/api/service_group/ticket'
 import { getPestList } from '@/api/master/pest/list'
 import { getServiceFrequencyList } from '@/api/master/serviceFrequency/list'
 
@@ -421,7 +428,7 @@ const ServiceRequestPageContent = () => {
           id: j.id || null,
           technician_id: j.technician_id || (typeof j.id === 'string' ? '' : j.id),
           production_value: Number(j.production_value || j.productivity_value || j.productivity || 0),
-          is_attachment_technician: (j.is_attachment_technician || j.is_attachment) ? 1 : 0,
+          is_attachment_technician: j.is_attachment_technician || j.is_attachment ? 1 : 0,
           ticket_id: d.id
         }))
       }
@@ -550,13 +557,7 @@ const ServiceRequestPageContent = () => {
           const color = s === 'Allocated' ? 'info' : 'secondary'
 
           return (
-            <Chip
-              label={s}
-              color={color}
-              size='small'
-              variant='tonal'
-              sx={{ fontWeight: 600, borderRadius: '6px' }}
-            />
+            <Chip label={s} color={color} size='small' variant='tonal' sx={{ fontWeight: 600, borderRadius: '6px' }} />
           )
         }
       }),
@@ -573,13 +574,7 @@ const ServiceRequestPageContent = () => {
           else if (['SCHEDULED', 'ALLOCATED', 'OPEN', 'IN-PROGRESS', 'PAUSED'].includes(sUpper)) color = 'info'
 
           return (
-            <Chip
-              label={s}
-              color={color}
-              size='small'
-              variant='tonal'
-              sx={{ fontWeight: 600, borderRadius: '6px' }}
-            />
+            <Chip label={s} color={color} size='small' variant='tonal' sx={{ fontWeight: 600, borderRadius: '6px' }} />
           )
         }
       }),
@@ -596,13 +591,7 @@ const ServiceRequestPageContent = () => {
           else if (['SCHEDULED', 'ALLOCATED', 'OPEN', 'IN-PROGRESS', 'PAUSED'].includes(sUpper)) color = 'info'
 
           return (
-            <Chip
-              label={s}
-              color={color}
-              size='small'
-              variant='tonal'
-              sx={{ fontWeight: 600, borderRadius: '6px' }}
-            />
+            <Chip label={s} color={color} size='small' variant='tonal' sx={{ fontWeight: 600, borderRadius: '6px' }} />
           )
         }
       })
@@ -1135,7 +1124,6 @@ const ServiceRequestPageContent = () => {
           </Box>
 
           <Box sx={{ position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-
             <StickyTableWrapper rowCount={rows.length}>
               <table className={styles.table}>
                 <thead>
@@ -1162,7 +1150,13 @@ const ServiceRequestPageContent = () => {
                   ))}
                 </thead>
                 <tbody>
-                  {rows.length > 0 ? (
+                  {loading ? (
+                    <tr>
+                      <td colSpan={columns.length} className='text-center py-6'>
+                        Loading...
+                      </td>
+                    </tr>
+                  ) : rows.length > 0 ? (
                     table.getRowModel().rows.map(row => (
                       <tr key={row.id}>
                         {row.getVisibleCells().map(cell => (
@@ -1276,7 +1270,7 @@ const ServiceRequestPageContent = () => {
         <DialogContent dividers sx={{ p: 6 }}>
           {editDialog.details ? (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, pt: 2 }}>
-              {/* SECTION 1: DATES & TIMES */}
+              {/* SECTION 1: SCHEDULED TIMES */}
               <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3 }}>
                 <Box>
                   <AppReactDatepicker
@@ -1293,7 +1287,7 @@ const ServiceRequestPageContent = () => {
                 </Box>
                 <CustomTextField
                   fullWidth
-                  label='Scheduled Start Time'
+                  label='Start Time'
                   type='time'
                   value={editDialog.details.schedule_start_time || ''}
                   onChange={e =>
@@ -1306,7 +1300,7 @@ const ServiceRequestPageContent = () => {
                 />
                 <CustomTextField
                   fullWidth
-                  label='Scheduled End Time'
+                  label='End Time'
                   type='time'
                   value={editDialog.details.schedule_end_time || ''}
                   onChange={e =>
@@ -1319,12 +1313,95 @@ const ServiceRequestPageContent = () => {
                 />
               </Box>
 
-              {/* SECTION 2: STATUS & TYPE */}
+              {/* SECTION 2: APPOINTMENT TIMES */}
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3 }}>
+                <Box>
+                  <AppReactDatepicker
+                    selected={safeParseDate(editDialog.details.ticket_date)}
+                    onChange={date =>
+                      setEditDialog(prev => ({
+                        ...prev,
+                        details: { ...prev.details, ticket_date: date ? format(date, 'yyyy-MM-dd') : '' }
+                      }))
+                    }
+                    placeholderText='Select Appointment Date'
+                    customInput={<CustomTextField label='Appointment Date' fullWidth />}
+                  />
+                </Box>
+                <CustomTextField
+                  fullWidth
+                  label='Start Time'
+                  type='time'
+                  value={editDialog.details.start_time || ''}
+                  onChange={e =>
+                    setEditDialog(prev => ({
+                      ...prev,
+                      details: { ...prev.details, start_time: e.target.value }
+                    }))
+                  }
+                  InputLabelProps={{ shrink: true }}
+                />
+                <CustomTextField
+                  fullWidth
+                  label='End Time'
+                  type='time'
+                  value={editDialog.details.end_time || ''}
+                  onChange={e =>
+                    setEditDialog(prev => ({
+                      ...prev,
+                      details: { ...prev.details, end_time: e.target.value }
+                    }))
+                  }
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Box>
+
+              {/* SECTION 3: ACTUAL TIMES & STATUS */}
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3 }}>
+                <CustomTextField
+                  fullWidth
+                  label='Actual Start Time'
+                  value={editDialog.details.actual_start_date_time || ''}
+                  disabled
+                  sx={{
+                    '& .MuiInputBase-input.Mui-disabled': {
+                      color: 'rgba(0, 0, 0, 0.87)',
+                      WebkitTextFillColor: 'rgba(0, 0, 0, 0.87)'
+                    },
+                    '& .MuiInputLabel-root.Mui-disabled': { color: 'rgba(0, 0, 0, 0.6)' }
+                  }}
+                />
+                <CustomTextField
+                  fullWidth
+                  label='Actual End Time'
+                  value={editDialog.details.actual_end_date_time || ''}
+                  disabled
+                  sx={{
+                    '& .MuiInputBase-input.Mui-disabled': {
+                      color: 'rgba(0, 0, 0, 0.87)',
+                      WebkitTextFillColor: 'rgba(0, 0, 0, 0.87)'
+                    },
+                    '& .MuiInputLabel-root.Mui-disabled': { color: 'rgba(0, 0, 0, 0.6)' }
+                  }}
+                />
+
+                <CustomAutocomplete
+                  options={appointmentStatusList}
+                  value={appointmentStatusList.find(o => o.id === editDialog.details.ticket_status) || null}
+                  onChange={(_, v) =>
+                    setEditDialog(prev => ({ ...prev, details: { ...prev.details, ticket_status: v?.id || '' } }))
+                  }
+                  getOptionLabel={option => option?.label || ''}
+                  renderInput={params => <CustomTextField {...params} label='Appointment Status' fullWidth />}
+                />
+              </Box>
+
+              {/* SECTION 4: REMARKS & FINDINGS */}
               <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3 }}>
                 <CustomTextField
                   fullWidth
                   multiline
-                  rows={2}
+                  rows={4}
                   label='Action'
                   value={editDialog.details.action || ''}
                   onChange={e =>
@@ -1337,20 +1414,7 @@ const ServiceRequestPageContent = () => {
                 <CustomTextField
                   fullWidth
                   multiline
-                  rows={2}
-                  label='Findings'
-                  value={editDialog.details.findings || editDialog.details.finding || ''}
-                  onChange={e =>
-                    setEditDialog(prev => ({
-                      ...prev,
-                      details: { ...prev.details, findings: e.target.value }
-                    }))
-                  }
-                />
-                <CustomTextField
-                  fullWidth
-                  multiline
-                  rows={2}
+                  rows={4}
                   label='Recommendation'
                   value={editDialog.details.recommendation || ''}
                   onChange={e =>
@@ -1360,19 +1424,57 @@ const ServiceRequestPageContent = () => {
                     }))
                   }
                 />
-              </Box>
-
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3 }}>
-                <CustomTextField
-                  fullWidth
-                  label='Call Type'
-                  value={editDialog.details.ticket_type || ''}
-                  InputProps={{ readOnly: true }}
-                />
                 <CustomTextField
                   fullWidth
                   multiline
-                  rows={2}
+                  rows={4}
+                  label='Incidents'
+                  value={editDialog.details.findings || editDialog.details.finding || ''}
+                  onChange={e =>
+                    setEditDialog(prev => ({
+                      ...prev,
+                      details: { ...prev.details, findings: e.target.value }
+                    }))
+                  }
+                />
+              </Box>
+
+              {/* SECTION 5: CALL TYPE & NOTES */}
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3 }}>
+                <Box>
+                  <CustomTextField
+                    fullWidth
+                    label='Call Type'
+                    value={editDialog.details.ticket_type_name || editDialog.details.ticket_type || ''}
+                    disabled
+                    sx={{
+                      mb: 4,
+                      '& .MuiInputBase-input.Mui-disabled': {
+                        color: 'rgba(0, 0, 0, 0.87)',
+                        WebkitTextFillColor: 'rgba(0, 0, 0, 0.87)'
+                      },
+                      '& .MuiInputLabel-root.Mui-disabled': { color: 'rgba(0, 0, 0, 0.6)' }
+                    }}
+                  />
+
+                  <CustomTextField
+                    fullWidth
+                    label='Appointment Remarks (this service)'
+                    multiline
+                    rows={4}
+                    value={editDialog.details.remarks || ''}
+                    onChange={e =>
+                      setEditDialog(prev => ({
+                        ...prev,
+                        details: { ...prev.details, remarks: e.target.value }
+                      }))
+                    }
+                  />
+                </Box>
+                <CustomTextField
+                  fullWidth
+                  multiline
+                  rows={7.2}
                   label='Special note for Technician (this service)'
                   value={editDialog.details.instructions || ''}
                   onChange={e =>
@@ -1384,37 +1486,37 @@ const ServiceRequestPageContent = () => {
                 />
               </Box>
 
-              {/* SECTION 3: REMARKS */}
+              {/* SECTION 6: CONTRACT REMARKS (READONLY) */}
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3 }}>
                 <CustomTextField
                   fullWidth
                   multiline
-                  rows={2}
-                  label='Appointment Remarks (this service)'
-                  value={editDialog.details.remarks || ''}
-                  onChange={e =>
-                    setEditDialog(prev => ({
-                      ...prev,
-                      details: { ...prev.details, remarks: e.target.value }
-                    }))
-                  }
-                />
-                <Box /> {/* Spacer */}
-                <CustomTextField
-                  fullWidth
-                  multiline
-                  rows={2}
+                  rows={3}
                   label='Appointment Remarks (From Contract)'
                   value={editDialog.details.contract_remarks || ''}
-                  InputProps={{ readOnly: true }}
+                  disabled
+                  sx={{
+                    '& .MuiInputBase-input.Mui-disabled': {
+                      color: 'rgba(0, 0, 0, 0.87)',
+                      WebkitTextFillColor: 'rgba(0, 0, 0, 0.87)'
+                    },
+                    '& .MuiInputLabel-root.Mui-disabled': { color: 'rgba(0, 0, 0, 0.6)' }
+                  }}
                 />
                 <CustomTextField
                   fullWidth
                   multiline
-                  rows={2}
+                  rows={3}
                   label='Technician Remarks (From Contract)'
                   value={editDialog.details.contract_tech_remarks || ''}
-                  InputProps={{ readOnly: true }}
+                  disabled
+                  sx={{
+                    '& .MuiInputBase-input.Mui-disabled': {
+                      color: 'rgba(0, 0, 0, 0.87)',
+                      '-webkit-text-fill-color': 'rgba(0, 0, 0, 0.87)'
+                    },
+                    '& .MuiInputLabel-root.Mui-disabled': { color: 'rgba(0, 0, 0, 0.6)' }
+                  }}
                 />
               </Box>
 
@@ -1534,7 +1636,8 @@ const ServiceRequestPageContent = () => {
                               </Box>
                             </td>
                             <td style={{ padding: '8px' }}>
-                              {technicianOptions.find(o => String(o.id) === String(tech.technician_id || tech.id))?.label ||
+                              {technicianOptions.find(o => String(o.id) === String(tech.technician_id || tech.id))
+                                ?.label ||
                                 tech.technician_name ||
                                 tech.technician ||
                                 'N/A'}
@@ -1560,7 +1663,7 @@ const ServiceRequestPageContent = () => {
             <Typography sx={{ p: 4, textAlign: 'center' }}>No details available</Typography>
           )}
         </DialogContent>
-        <DialogActions sx={{ p: 6 }}>
+        <DialogActions sx={{ px: 6, pb: 8, pt: 3 }}>
           <Button onClick={() => setEditDialog({ open: false, row: null })} variant='tonal' color='secondary'>
             Close
           </Button>
@@ -1622,20 +1725,26 @@ const ServiceRequestPageContent = () => {
                 <CustomAutocomplete
                   options={['Job', 'Follow Up', 'Complaint']}
                   value={pestModal.data.pest_purpose || ''}
-                  onChange={(_, v) => setPestModal(prev => ({ ...prev, data: { ...prev.data, pest_purpose: v || '' } }))}
+                  onChange={(_, v) =>
+                    setPestModal(prev => ({ ...prev, data: { ...prev.data, pest_purpose: v || '' } }))
+                  }
                   renderInput={p => <CustomTextField {...p} label='Purpose' />}
                 />
                 <CustomTextField
                   label='Pest Count'
                   type='number'
                   value={pestModal.data.pest_count || 0}
-                  onChange={e => setPestModal(prev => ({ ...prev, data: { ...prev.data, pest_count: e.target.value } }))}
+                  onChange={e =>
+                    setPestModal(prev => ({ ...prev, data: { ...prev.data, pest_count: e.target.value } }))
+                  }
                 />
                 <CustomTextField
                   label='Pest Value'
                   type='number'
                   value={pestModal.data.pest_value || 0}
-                  onChange={e => setPestModal(prev => ({ ...prev, data: { ...prev.data, pest_value: e.target.value } }))}
+                  onChange={e =>
+                    setPestModal(prev => ({ ...prev, data: { ...prev.data, pest_value: e.target.value } }))
+                  }
                 />
                 <FormControl fullWidth>
                   <Typography variant='caption' sx={{ mb: 1 }}>
@@ -1671,7 +1780,9 @@ const ServiceRequestPageContent = () => {
                     multiline
                     rows={3}
                     value={pestModal.data.ticket_pest_action || pestModal.data.action || ''}
-                    onChange={e => setPestModal(prev => ({ ...prev, data: { ...prev.data, ticket_pest_action: e.target.value } }))}
+                    onChange={e =>
+                      setPestModal(prev => ({ ...prev, data: { ...prev.data, ticket_pest_action: e.target.value } }))
+                    }
                   />
                 </Box>
                 <Box sx={{ gridColumn: 'span 1' }}>
@@ -1682,7 +1793,10 @@ const ServiceRequestPageContent = () => {
                     rows={3}
                     value={pestModal.data.ticket_pest_recommendation || pestModal.data.recommendation || ''}
                     onChange={e =>
-                      setPestModal(prev => ({ ...prev, data: { ...prev.data, ticket_pest_recommendation: e.target.value } }))
+                      setPestModal(prev => ({
+                        ...prev,
+                        data: { ...prev.data, ticket_pest_recommendation: e.target.value }
+                      }))
                     }
                   />
                 </Box>
@@ -1745,7 +1859,12 @@ const ServiceRequestPageContent = () => {
               control={
                 <Checkbox
                   checked={!!(techModal.data.is_attachment_technician || techModal.data.is_attachment)}
-                  onChange={e => setTechModal(prev => ({ ...prev, data: { ...prev.data, is_attachment_technician: e.target.checked ? 1 : 0 } }))}
+                  onChange={e =>
+                    setTechModal(prev => ({
+                      ...prev,
+                      data: { ...prev.data, is_attachment_technician: e.target.checked ? 1 : 0 }
+                    }))
+                  }
                 />
               }
               label='Attachment Technician'
@@ -1763,9 +1882,14 @@ const ServiceRequestPageContent = () => {
       </Dialog>
 
       {/* NESTED DELETE CONFIRMATION */}
-      <Dialog open={deleteDialogNested.open} onClose={() => setDeleteDialogNested({ ...deleteDialogNested, open: false })}>
+      <Dialog
+        open={deleteDialogNested.open}
+        onClose={() => setDeleteDialogNested({ ...deleteDialogNested, open: false })}
+      >
         <DialogTitle>
-          <Typography variant='h5' component='span'>Confirm Delete</Typography>
+          <Typography variant='h5' component='span'>
+            Confirm Delete
+          </Typography>
         </DialogTitle>
         <DialogContent>
           <Typography>Are you sure you want to delete this {deleteDialogNested.type}?</Typography>

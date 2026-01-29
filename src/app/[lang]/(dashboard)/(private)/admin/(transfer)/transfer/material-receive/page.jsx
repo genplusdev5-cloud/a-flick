@@ -38,6 +38,7 @@ import { getMaterialReceiveList, deleteMaterialReceive } from '@/api/transfer/ma
 import { getMaterialIssueList } from '@/api/transfer/material_issue'
 import { getMaterialRequestDropdowns } from '@/api/transfer/materialRequest/dropdown'
 import { getPurchaseFilters } from '@/api/purchase/purchase_order'
+import { getVehicleDropdown } from '@/api/purchase/vehicle/dropdown'
 
 import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns'
 
@@ -73,6 +74,7 @@ const MaterialRequestReceivedPage = () => {
 
   // FILTER OPTIONS
   const [employeeOptions, setEmployeeOptions] = useState([])
+  const [vehicleOptions, setVehicleOptions] = useState([])
   const [supplierOptions, setSupplierOptions] = useState([])
 
   // FILTER VALUES
@@ -104,10 +106,11 @@ const MaterialRequestReceivedPage = () => {
   useEffect(() => {
     const fetchFilters = async () => {
       try {
-        const [purchaseRes, materialRes, issueRes] = await Promise.all([
+        const [purchaseRes, materialRes, issueRes, vehicleRes] = await Promise.all([
           getPurchaseFilters(),
           getMaterialRequestDropdowns(),
-          getMaterialIssueList({ page_size: 1000 })
+          getMaterialIssueList({ page_size: 1000 }),
+          getVehicleDropdown()
         ])
 
         const purchaseData = purchaseRes?.data?.data || purchaseRes?.data || {}
@@ -116,6 +119,13 @@ const MaterialRequestReceivedPage = () => {
         const techList = materialData?.employee?.name || []
 
         setEmployeeOptions(techList.map(e => ({ label: e.name, id: e.id, value: e.id })))
+
+        const vehicles = (vehicleRes?.vehicle || []).map(v => ({
+          label: v.vehicle_name || v.name,
+          value: v.id,
+          id: v.id
+        }))
+        setVehicleOptions(vehicles)
 
         const issues = (issueRes?.data?.results || issueRes?.results || []).map(i => {
           const trNo = i.num_series || i.issue_number || `Issue #${i.id}`
@@ -175,8 +185,8 @@ const MaterialRequestReceivedPage = () => {
 
       const mapped = (data?.results || []).map((item, index) => {
         const fromV =
-          employeeOptions.find(e => String(e.id) === String(item.from_vehicle_id))?.label || item.from_vehicle
-        const toV = employeeOptions.find(e => String(e.id) === String(item.to_vehicle_id))?.label || item.to_vehicle
+          vehicleOptions.find(v => String(v.id) === String(item.from_vehicle_id))?.label || item.from_vehicle
+        const toV = vehicleOptions.find(v => String(v.id) === String(item.to_vehicle_id))?.label || item.to_vehicle
 
         let displayStatus = item.receive_status || 'Pending'
         if (item.status === 1 && !item.receive_status) displayStatus = 'Pending'
@@ -229,7 +239,7 @@ const MaterialRequestReceivedPage = () => {
     selectedIssue,
     uiDateFilter,
     uiDateRange,
-    employeeOptions
+    vehicleOptions
   ])
 
   /* ───────── COLUMNS ───────── */
@@ -381,7 +391,7 @@ const MaterialRequestReceivedPage = () => {
             <GlobalAutocomplete
               label='From Vehicle'
               placeholder='Select From Vehicle'
-              options={employeeOptions}
+              options={vehicleOptions}
               value={selectedFromVehicle}
               onChange={(_, val) => {
                 setSelectedFromVehicle(val)
@@ -395,7 +405,7 @@ const MaterialRequestReceivedPage = () => {
             <GlobalAutocomplete
               label='To Vehicle'
               placeholder='Select To Vehicle'
-              options={employeeOptions}
+              options={vehicleOptions}
               value={selectedToVehicle}
               onChange={(_, val) => {
                 setSelectedToVehicle(val)

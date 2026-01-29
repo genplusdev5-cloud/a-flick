@@ -56,7 +56,13 @@ import StickyListLayout from '@/components/common/StickyListLayout'
 import StickyTableWrapper from '@/components/common/StickyTableWrapper'
 
 // API
-import { getInvoiceList, deleteInvoice, getInvoiceDropdowns, updateInvoice, getInvoicePDF } from '@/api/invoice_group/invoice'
+import {
+  getInvoiceList,
+  deleteInvoice,
+  getInvoiceDropdowns,
+  updateInvoice,
+  getInvoicePDF
+} from '@/api/invoice_group/invoice'
 import { decodeId } from '@/utils/urlEncoder'
 
 import { showToast } from '@/components/common/Toasts'
@@ -169,8 +175,14 @@ const InvoiceListPageFullContent = () => {
   const encodedCustomer = searchParams.get('customer')
   const encodedContract = searchParams.get('contract')
 
-  const decodedCustomerId = useMemo(() => (encodedCustomer ? Number(decodeId(encodedCustomer)) : null), [encodedCustomer])
-  const decodedContractId = useMemo(() => (encodedContract ? Number(decodeId(encodedContract)) : null), [encodedContract])
+  const decodedCustomerId = useMemo(
+    () => (encodedCustomer ? Number(decodeId(encodedCustomer)) : null),
+    [encodedCustomer]
+  )
+  const decodedContractId = useMemo(
+    () => (encodedContract ? Number(decodeId(encodedContract)) : null),
+    [encodedContract]
+  )
 
   // ✅ REQUIRED STATES (YOU MISSED THIS)
   const [uiCustomer, setUiCustomer] = useState(null)
@@ -303,7 +315,6 @@ const InvoiceListPageFullContent = () => {
     return params
   }
 
-
   // ── Load List + Dropdowns ─────────────────────
 
   // ── Load Dropdowns ──────────────────────────
@@ -338,11 +349,15 @@ const InvoiceListPageFullContent = () => {
           { id: 3, label: 'Continuous Job' },
           { id: 4, label: 'Warranty' }
         ],
-        invoice_types: [
-          { id: 1, label: 'Initial' }
-        ]
+        invoice_types: [{ id: 1, label: 'Initial' }]
       }
       setDropdownData(processedDropdowns)
+
+      // Set default Origin UI state (WITHOUT triggering applied filter)
+      if (processedDropdowns.origins.length > 0) {
+        const defaultOrigin = processedDropdowns.origins.find(o => o.label === 'A-Flick Pte Ltd')
+        if (defaultOrigin) setUiOrigin(defaultOrigin)
+      }
     } catch (err) {
       console.error('Failed to load dropdowns:', err)
     }
@@ -521,7 +536,6 @@ const InvoiceListPageFullContent = () => {
     try {
       // Removed redundant dynamic import
 
-
       const invoiceData = await getInvoicePDF(invoice.id)
 
       setSelectedInvoiceData(invoiceData)
@@ -583,7 +597,6 @@ const InvoiceListPageFullContent = () => {
     pdf.addImage(imgData, 'PNG', 0, 0, width, height)
     pdf.save(`invoice_${Date.now()}.pdf`)
   }
-
 
   // ── Dropdown options from API (fallback to empty array) ─────
   const originOptions = dropdownData.origins || []
@@ -719,7 +732,11 @@ const InvoiceListPageFullContent = () => {
       }),
       columnHelper.accessor('total', {
         header: () => <div className='text-right'>Total Amount</div>,
-        cell: info => <div className='text-right'><strong>{info.getValue() || 0}</strong></div>
+        cell: info => (
+          <div className='text-right'>
+            <strong>{info.getValue() || 0}</strong>
+          </div>
+        )
       }),
       // columnHelper.accessor('accountItemCode', { header: 'Account Item Code' }),
       // columnHelper.accessor('poNo', { header: 'PO.No' }),
@@ -820,7 +837,6 @@ const InvoiceListPageFullContent = () => {
 
         {/* FILTERS */}
         <Box sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-
           {/* FILTERS */}
           <Box sx={{ pb: 3, flexShrink: 0 }}>
             <Grid container spacing={3} alignItems='flex-end'>
@@ -1002,7 +1018,7 @@ const InvoiceListPageFullContent = () => {
               </Grid>
             </Grid>
 
-            <Divider />
+            <Divider sx={{ my: 4 }} />
 
             {/* SEARCH + ENTRIES */}
             <Box display='flex' justifyContent='space-between' alignItems='center' gap={2} mt={4}>

@@ -20,11 +20,7 @@ export default function ProtectedRoute({ children }) {
   }, [router])
 
   if (loading) {
-    return (
-      <Box className='flex justify-center items-center min-h-screen'>
-        <CircularProgress />
-      </Box>
-    )
+    return null
   }
 
   return <>{children}</>
