@@ -24,24 +24,14 @@ export const authOptions = {
         if (!email || !password) return null
 
         try {
-          // Use the absolute URL from .env or fallback to the one provided by the user
-          let apiUrl = process.env.NEXT_PUBLIC_API_URL
-
-          if (!apiUrl || typeof apiUrl !== 'string') {
-            console.warn('NEXT_PUBLIC_API_URL is missing or invalid. Using default.')
-            apiUrl = 'https://aflick.genpest360.com/api/'
-          }
-          if (!apiUrl.endsWith('/')) {
-            apiUrl += '/'
-          }
-
-          console.log('NextAuth Authorize: Using API URL:', apiUrl)
+          const apiUrl = 'https://aflick.genpest360.com/api/auth/login/'
+          console.log('NextAuth Authorize: Login attempt to', apiUrl)
 
           const formData = new FormData()
           formData.append('email', email)
           formData.append('password', password)
 
-          const response = await fetch(`${apiUrl}auth/login/`, {
+          const response = await fetch(apiUrl, {
             method: 'POST',
             body: formData
           })
@@ -50,13 +40,18 @@ export const authOptions = {
 
           if (data.status === 'success' && data.data) {
             // Return user object for next-auth session
+            // We map the API response exactly as requested to match Postman output
             return {
               id: data.data.user_id || data.data.id,
+              // Some systems need 'id' as a string for NextAuth.
+              user_id: data.data.user_id,
+              auth_id: data.data.auth_id,
               name: data.data.name,
               email: data.data.email,
               access_token: data.data.access,
               refresh_token: data.data.refresh,
-              user_data: data.data // Keep the full data for JWT callback
+              user_privileges: data.data.user_privileges || [], // Explicitly expose privileges
+              user_data: data.data // Keep the full data for JWT callback as fallback
             }
           }
 
@@ -92,6 +87,11 @@ export const authOptions = {
         token.access_token = user.access_token
         token.refresh_token = user.refresh_token
         token.user_data = user.user_data
+
+        // Match Postman response fields
+        token.auth_id = user.auth_id
+        token.user_id = user.user_id
+        token.user_privileges = user.user_privileges
       }
       return token
     },
@@ -103,6 +103,11 @@ export const authOptions = {
         session.access_token = token.access_token
         session.refresh_token = token.refresh_token
         session.user_data = token.user_data
+
+        // Match Postman response fields
+        session.user.auth_id = token.auth_id
+        session.user.user_id = token.user_id
+        session.user.user_privileges = token.user_privileges
       }
       return session
     },

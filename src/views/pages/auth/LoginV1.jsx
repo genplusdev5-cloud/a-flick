@@ -8,7 +8,8 @@ import Link from 'next/link'
 import { useRouter, useParams } from 'next/navigation'
 
 // ✅ Next Auth Imports
-import { signIn, getSession } from 'next-auth/react'
+// ✅ API Import
+import { loginUser } from '@/api/auth/login'
 
 // ✅ MUI Imports
 import Card from '@mui/material/Card'
@@ -30,7 +31,7 @@ import CustomTextField from '@core/components/mui/TextField'
 import themeConfig from '@configs/themeConfig'
 
 // ✅ Custom Utils
-import { saveTokens } from '@/utils/tokenUtils'
+// ✅ Custom Utils
 import { showToast } from '@/components/common/Toasts'
 
 const LoginV1 = () => {
@@ -63,53 +64,21 @@ const LoginV1 = () => {
     setErrorMsg('')
 
     try {
-      // ✅ Use NextAuth signIn to establish session cookie
-      const res = await signIn('credentials', {
-        email: data.email,
-        password: data.password,
-        redirect: false
-      })
+      // ✅ Direct API Call
+      await loginUser(data.email, data.password)
 
-      if (res?.ok) {
-        // ✅ Get session to extract custom tokens and user data for localStorage (used by PermissionContext)
-        const session = await getSession()
+      showToast('success', 'Login successful! Welcome back.')
 
-        if (session) {
-          const { access_token, refresh_token, user_data } = session
-
-          // ✅ Save to localStorage for client-side logic
-          saveTokens(access_token, refresh_token)
-          localStorage.setItem('user_info', JSON.stringify(user_data))
-
-          // ✅ Dispatch events for UI updates
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new Event('user-info-update'))
-            window.dispatchEvent(new Event('privilege-update'))
-          }
-
-          showToast('success', 'Login successful! Welcome back.')
-
-          // ✅ Give small delay to ensure state is settled before redirect
-          setTimeout(() => {
-            const redirectUrl = `/${locale}/admin/dashboards`
-            router.push(redirectUrl)
-          }, 500)
-        } else {
-          setErrorMsg('Failed to fetch session. Please try again.')
-        }
-      } else {
-        const msg = res?.error === 'CredentialsSignin' ? 'Invalid email or password' : 'Login failed. Please try again.'
-        setErrorMsg(msg + (res?.error ? ` (Error: ${res.error})` : ''))
-        showToast('error', msg)
-      }
+      // ✅ Redirect
+      setTimeout(() => {
+        const redirectUrl = `/${locale}/admin/dashboards`
+        router.push(redirectUrl)
+      }, 500)
     } catch (error) {
       console.error('Login error:', error)
-      let displayMsg = error instanceof Error ? error.message : 'An unexpected error occurred.'
-      if (error instanceof Error && error.stack) {
-        displayMsg += ' | STACK: ' + error.stack
-      }
-      setErrorMsg(displayMsg)
-      showToast('error', 'Login Failed')
+      const msg = error?.message || 'Login failed. Please try again.'
+      setErrorMsg(msg)
+      showToast('error', msg)
     } finally {
       setLoading(false)
     }

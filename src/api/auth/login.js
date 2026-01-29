@@ -3,7 +3,11 @@ import { saveTokens } from '@/utils/tokenUtils'
 
 export const loginUser = async (email, password) => {
   try {
-    const response = await api.post('auth/login/', { email, password })
+    const formData = new FormData()
+    formData.append('email', email)
+    formData.append('password', password)
+
+    const response = await api.post('auth/login/', formData)
 
     if (response.data?.status === 'success') {
       const { access, refresh, ...userData } = response.data.data
