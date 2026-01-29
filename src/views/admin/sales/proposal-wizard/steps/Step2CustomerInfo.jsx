@@ -268,7 +268,7 @@ const Step2CustomerInfo = ({
       <Grid item xs={12} md={4}>
         <GlobalAutocomplete
           label={renderLabel('Payment Term')}
-          options={['0 days', '30 days']}
+          options={['0 days', '15 days', '30 days']}
           value={formData.paymentTerm}
           onChange={v => handleAutocompleteChange('paymentTerm', v, refs.paymentTermRef)}
           inputRef={refs.paymentTermRef}

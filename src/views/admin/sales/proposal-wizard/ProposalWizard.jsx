@@ -286,7 +286,7 @@ export default function ProposalWizard({ id }) {
     pestCount: '',
     pestValue: '',
     total: '',
-    time: '',
+    workTime: '',
     chemicals: '',
     chemical: '',
     chemicalId: '',
@@ -678,12 +678,35 @@ export default function ProposalWizard({ id }) {
           }))
         }
 
-        // 💡 NEW: Extract Default Report Blocks
-        const rawBlocks = filters?.default_item?.name || filters?.default_item || filters?.report_blocks || []
+        // 💡 NEW: Extract sales people from filters (User's image shows filters.sales.label)
+        const salesList = filters?.sales?.label || []
+        if (Array.isArray(salesList) && salesList.length > 0) {
+          const formattedSales = salesList.map(s => ({
+            label: s.label || s.name || '',
+            value: s.id,
+            id: s.id,
+            name: s.label || s.name || ''
+          }))
+          setDropdowns(prev => ({
+            ...prev,
+            salesPersons: formattedSales
+          }))
+        }
 
-        if (Array.isArray(rawBlocks) && rawBlocks.length > 0) {
-          const allBlocks = rawBlocks.map(b => (typeof b === 'object' ? b.name : b))
+        // 💡 NEW: Extract Report Blocks (All Options vs Defaults)
+        // User provided structure: sales_proposal_item.name for full list, default_item.name for defaults
+        const allBlocksRaw =
+          filters?.sales_proposal_item?.name || filters?.report_blocks?.label || filters?.report_blocks || []
+        const defaultBlocksRaw = filters?.default_item?.name || filters?.default_item || []
 
+        const allBlocks = Array.isArray(allBlocksRaw)
+          ? allBlocksRaw.map(b => (typeof b === 'object' ? b.name || b.label : b))
+          : []
+        const defaultBlocks = Array.isArray(defaultBlocksRaw)
+          ? defaultBlocksRaw.map(b => (typeof b === 'object' ? b.name || b.label : b))
+          : []
+
+        if (allBlocks.length > 0) {
           setDropdowns(prev => ({
             ...prev,
             reportBlocks: allBlocks
@@ -692,7 +715,7 @@ export default function ProposalWizard({ id }) {
           // 💡 Pre-select Default Items if not already set (e.g. for New Proposal)
           setFormData(prev => {
             if (!prev.reportBlock || prev.reportBlock.length === 0) {
-              return { ...prev, reportBlock: allBlocks }
+              return { ...prev, reportBlock: defaultBlocks }
             }
             return prev
           })
@@ -965,13 +988,9 @@ export default function ProposalWizard({ id }) {
 
   const validateStep = step => {
     if (step === 0) {
-      const isMissing = [
-        formData.customerId,
-        formData.contractType,
-        formData.name,
-        formData.billingName,
-        formData.billingPostalCode
-      ].some(val => !val || (typeof val === 'string' && val.trim() === ''))
+      const isMissing = [formData.customerId, formData.contractType, formData.name].some(
+        val => !val || (typeof val === 'string' && val.trim() === '')
+      )
 
       if (isMissing) {
         showToast('warning', 'Please fill all mandatory fields in Sales Type')
@@ -1280,8 +1299,8 @@ export default function ProposalWizard({ id }) {
       ? currentPestItem.chemical.join(', ')
       : currentPestItem.chemical || currentPestItem.chemicals || ''
 
-    if (!currentPestItem.pest || !currentPestItem.frequency || !chemicalNames) {
-      showToast('warning', 'Pest, Service Frequency, and Chemicals are mandatory.')
+    if (!currentPestItem.pest || !currentPestItem.frequency) {
+      showToast('warning', 'Pest and Service Frequency are mandatory.')
       return
     }
 
@@ -1307,12 +1326,22 @@ export default function ProposalWizard({ id }) {
       reminder_date: formatDateToLocal(formData.reminderDate || formData.startDate) || null
     }
 
+    // 💡 NEW: Prevent duplicate rows for same Pest & Frequency
+    const existingItem = pestItems.find(
+      item =>
+        String(item.pestId) === String(currentPestItem.pestId) &&
+        String(item.frequencyId) === String(currentPestItem.frequencyId) &&
+        item.id !== editingItemId
+    )
+
     try {
       if (id) {
         let res
-        if (editingItemId && currentPestItem.item_id) {
-          // Update existing item
-          res = await updateProposalPest(currentPestItem.item_id, itemPayload)
+        const targetItemId = editingItemId && currentPestItem.item_id ? currentPestItem.item_id : existingItem?.item_id
+
+        if (targetItemId) {
+          // Update existing item (either explicitly editing or found a duplicate)
+          res = await updateProposalPest(targetItemId, itemPayload)
         } else {
           // Add new item to existing proposal
           res = await addProposalPest(itemPayload)
@@ -1349,21 +1378,21 @@ export default function ProposalWizard({ id }) {
         }
       } else {
         // Local mode for new proposal
-        if (editingItemId) {
+        if (editingItemId || existingItem) {
+          const targetId = editingItemId || existingItem.id
           setPestItems(prev =>
             prev.map(item =>
-              item.id === editingItemId
+              item.id === targetId
                 ? {
                     ...item,
                     ...currentPestItem,
-                    id: editingItemId,
+                    id: targetId,
                     totalValue: totalValueSum,
                     workTime: currentPestItem.workTime || '0:00'
                   }
                 : item
             )
           )
-          setEditingItemId(null)
         } else {
           setPestItems(prev => [
             ...prev,
@@ -1371,7 +1400,7 @@ export default function ProposalWizard({ id }) {
               ...currentPestItem,
               id: Date.now().toString(36),
               totalValue: totalValueSum,
-              workTime: currentPestItem.time || '0:00'
+              workTime: currentPestItem.workTime || '0:00'
             }
           ])
         }
@@ -1386,7 +1415,7 @@ export default function ProposalWizard({ id }) {
         pestCount: prev.pestCount,
         pestValue: '',
         total: '',
-        time: '',
+        workTime: '',
         chemicals: '',
         chemical: '',
         chemicalId: '',
@@ -1415,7 +1444,7 @@ export default function ProposalWizard({ id }) {
       pestCount: item.pestCount || '',
       pestValue: item.pestValue || '',
       totalValue: item.totalValue || '',
-      time: item.workTime || '0:00',
+      workTime: item.workTime || '0:00',
       chemical: Array.isArray(item.chemical)
         ? item.chemical
         : (item.chemical || item.chemicals || '')

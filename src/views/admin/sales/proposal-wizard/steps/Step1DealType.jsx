@@ -148,14 +148,12 @@ const Step1DealType = ({
       <Grid item xs={12} md={4}>
         <CustomTextField
           fullWidth
-          label={renderLabel('Billing Name', true)}
+          label={renderLabel('Billing Name')}
           name='billingName'
           value={formData.billingName || ''}
           onChange={handleChange}
           inputRef={refs.billingNameRef}
           onKeyDown={e => handleKeyDown(e, refs.billingNameRef)}
-          required
-          sx={requiredFieldSx}
         />
       </Grid>
       <Grid item xs={12} md={8}>
@@ -173,14 +171,12 @@ const Step1DealType = ({
       <Grid item xs={12} md={3}>
         <CustomTextField
           fullWidth
-          label={renderLabel('Billing Postal Code', true)}
+          label={renderLabel('Billing Postal Code')}
           name='billingPostalCode'
           value={formData.billingPostalCode || ''}
           onChange={handleChange}
           inputRef={refs.billingPostalCodeRef}
           onKeyDown={e => handleKeyDown(e, refs.billingPostalCodeRef)}
-          required
-          sx={requiredFieldSx}
         />
       </Grid>
 

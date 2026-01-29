@@ -409,14 +409,12 @@ const Step4PestItems = ({
             {/* Row 4: Chemicals, Items, Button */}
             <Grid item xs={12} md={4}>
               <GlobalAutocomplete
-                label={renderLabel('Chemicals', true)}
+                label={renderLabel('Chemicals')}
                 multiple
                 options={dropdowns.chemicals || []}
                 value={currentPestItem.chemical || []} // Note: state stores 'chemical' (plural 'chemicals' is for backend string)
                 onChange={v => handleCurrentPestItemAutocompleteChange('chemical', v, refs.currentChemicalsRef)}
                 inputRef={refs.currentChemicalsRef}
-                required
-                sx={requiredFieldSx}
               />
             </Grid>
             <Grid item xs={12} md={4}>

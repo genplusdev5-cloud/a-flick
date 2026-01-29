@@ -196,6 +196,14 @@ export default function AddMaterialRequestPage() {
       return
     }
 
+    // 💡 NEW: Deduplication logic
+    const existingIndex = items.findIndex(
+      item =>
+        item.chemicalId === (chemical.id || chemical.value) &&
+        item.uomId === (uom.id || uom.value) &&
+        item.id !== editId
+    )
+
     if (editId) {
       setItems(prev =>
         prev.map(item =>
@@ -212,6 +220,18 @@ export default function AddMaterialRequestPage() {
         )
       )
       setEditId(null)
+    } else if (existingIndex !== -1) {
+      // Update existing item if found
+      setItems(prev =>
+        prev.map((item, idx) =>
+          idx === existingIndex
+            ? {
+                ...item,
+                quantity: Number(item.quantity) + Number(quantity)
+              }
+            : item
+        )
+      )
     } else {
       setItems(prev => [
         ...prev,

@@ -261,6 +261,14 @@ const EditMaterialRequestPage = () => {
       return
     }
 
+    // 💡 NEW: Deduplication logic
+    const existingIndex = items.findIndex(
+      item =>
+        item.chemicalId === (chemical.id || chemical.value) &&
+        item.uomId === (uom.id || uom.value) &&
+        item.id !== editId
+    )
+
     if (editId) {
       setItems(prev =>
         prev.map(item =>
@@ -277,6 +285,18 @@ const EditMaterialRequestPage = () => {
         )
       )
       setEditId(null)
+    } else if (existingIndex !== -1) {
+      // Update existing item if found
+      setItems(prev =>
+        prev.map((item, idx) =>
+          idx === existingIndex
+            ? {
+                ...item,
+                quantity: Number(item.quantity) + Number(quantity)
+              }
+            : item
+        )
+      )
     } else {
       setItems(prev => [
         ...prev,
@@ -327,28 +347,27 @@ const EditMaterialRequestPage = () => {
         from_vehicle: fromVehicle?.label || '-',
         from_vehicle_id: Number(fromVehicle?.id) || null,
         to_vehicle: toVehicle?.label || '-',
+        to_vehicle_id: Number(toVehicle?.id) || null,
         request_status: 'Pending',
         is_active: 1,
         status: 1,
-        items: JSON.stringify(
-          items.map(item => {
-            const itemObj = {
-              item_id: Number(item.chemicalId) || null,
-              item_name: item.chemical,
-              uom: item.uom,
-              uom_id: Number(item.uomId) || null,
-              quantity: Number(item.quantity),
-              is_active: 1,
-              status: 1
-            }
+        items: items.map(item => {
+          const itemObj = {
+            item_id: Number(item.chemicalId) || null,
+            item_name: item.chemical,
+            uom: item.uom,
+            uom_id: Number(item.uomId) || null,
+            quantity: Number(item.quantity),
+            is_active: 1,
+            status: 1
+          }
 
-            if (item.id && !String(item.id).startsWith('temp')) {
-              itemObj.id = Number(item.id)
-            }
+          if (item.id && !String(item.id).startsWith('temp')) {
+            itemObj.id = Number(item.id)
+          }
 
-            return itemObj
-          })
-        )
+          return itemObj
+        })
       }
 
       // Only include origin if selected to avoid backend attribute errors
@@ -449,7 +468,7 @@ const EditMaterialRequestPage = () => {
           <Grid container spacing={2} alignItems='flex-end'>
             <Grid item xs={12} md={3}>
               <GlobalAutocomplete
-                label='Chemical'
+                label='Chemicals'
                 options={chemicalOptions}
                 value={chemical}
                 onChange={handleChemicalChange}

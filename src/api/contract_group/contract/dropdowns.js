@@ -86,7 +86,7 @@ export const getAllDropdowns = async () => {
       pests: unwrap(null, raw.pest),
       chemicals: unwrap(null, raw.chemicals || raw.chemical || raw.chemical_master),
       industries: unwrap(null, raw.industry),
-      salesPeople: unwrap(null, raw.sales),
+      salesPeople: unwrap(null, raw.sales || raw.sales_person || raw.sales_people),
       supervisors: unwrap(null, raw.supervisor),
       technicians: unwrap(null, raw.technician),
       employees: []
