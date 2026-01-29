@@ -50,12 +50,12 @@ import styles from '@core/styles/table.module.css'
 
 // API
 import {
-  addProposal,
-  updateProposal,
-  getProposalDetails,
-  getProposalList,
-  duplicateProposal
-} from '@/api/sales/proposal'
+  createContract,
+  updateContract,
+  getContractDetails,
+  getContractList,
+  duplicateContract as duplicateContractApi
+} from '@/api/contract_group/contract'
 import {
   listSalesAgreement,
   deleteSalesAgreement,
@@ -66,7 +66,7 @@ import { getContractDates, getInvoiceCount, getPestCount, getInvoiceRemark } fro
 import { getAllDropdowns } from '@/api/contract_group/contract/dropdowns'
 import { getCustomerDetails } from '@/api/customer_group/customer'
 import { listCallLogs, addCallLog, updateCallLog, deleteCallLog } from '@/api/contract_group/contract/details/call_log'
-import { addProposalPest, updateProposalPest, deleteProposalPest } from '@/api/sales/proposal/pest'
+import { addContractPest, updateContractPest, deleteContractPest } from '@/api/contract_group/contract/details/pest'
 import { decodeId, encodeId } from '@/utils/urlEncoder'
 import addContractFile from '@/api/contract_group/contract/details/contract_file/add'
 import callLogReminder from '@/api/contract_group/contract/details/call_log/reminder'
@@ -166,7 +166,7 @@ const generateTimeOptions = () => {
 
 const timeOptions = generateTimeOptions()
 
-export default function ProposalWizard({ id }) {
+export default function ContractWizard({ id }) {
   const router = useRouter()
   const { lang = 'en' } = useParams()
   const [activeStep, setActiveStep] = useState(0)
@@ -186,7 +186,7 @@ export default function ProposalWizard({ id }) {
     origin: '',
     salesMode: '',
     contractType: '',
-    proposalStatus: 'Draft',
+    contractStatus: 'Draft',
     name: '',
     contractCode: '',
     // Additional Step 1 Fields
@@ -262,7 +262,7 @@ export default function ProposalWizard({ id }) {
 
   // Table Data State
   const [callLogs, setCallLogs] = useState([])
-  const [proposals, setProposals] = useState([])
+  const [contractAgreements, setContractAgreements] = useState([])
 
   const [callLogSearch, setCallLogSearch] = useState('')
   const [propSearch, setPropSearch] = useState('')
@@ -274,7 +274,7 @@ export default function ProposalWizard({ id }) {
 
   const [callLogDialogOpen, setCallLogDialogOpen] = useState(false)
   const [isEditCallLog, setIsEditCallLog] = useState(false)
-  const [deleteProposalDialog, setDeleteProposalDialog] = useState({ open: false, row: null })
+  const [deleteAgreementDialog, setDeleteAgreementDialog] = useState({ open: false, row: null })
   const [deleteCallLogDialog, setDeleteCallLogDialog] = useState({ open: false, row: null })
   const [deletePestDialog, setDeletePestDialog] = useState({ open: false, id: null, row: null })
 
@@ -483,7 +483,7 @@ export default function ProposalWizard({ id }) {
     init()
   }, [id])
 
-  // Load Call Logs when proposal ID is available
+  // Load Call Logs when contract ID is available
   useEffect(() => {
     if (id) {
       fetchCallLogs()
@@ -507,9 +507,9 @@ export default function ProposalWizard({ id }) {
 
   const fetchCallLogs = async () => {
     try {
-      const decodedProposalId = decodeId(id) || id
-      console.log('🔄 FETCHING CALL LOGS FOR:', decodedProposalId)
-      const res = await listCallLogs({ contract_id: String(decodedProposalId) })
+      const decodedContractId = decodeId(id) || id
+      console.log('🔄 FETCHING CALL LOGS FOR:', decodedContractId)
+      const res = await listCallLogs({ contract_id: String(decodedContractId) })
 
       const apiResponse = res?.data || res
       const apiData =
@@ -526,12 +526,12 @@ export default function ProposalWizard({ id }) {
     }
   }
 
-  // ✅ Fetch Sales Agreements (Generated Proposals) for the CURRENT proposal independently
+  // ✅ Fetch Sales Agreements (Agreements) for the CURRENT contract independently
   useEffect(() => {
     if (id) {
-      const decodedProposalId = decodeId(id) || id
-      console.log('🔍 FETCHING PROPOSALS FOR:', decodedProposalId)
-      listSalesAgreement({ proposal_id: Number(decodedProposalId) })
+      const decodedContractId = decodeId(id) || id
+      console.log('🔍 FETCHING AGREEMENTS FOR:', decodedContractId)
+      listSalesAgreement({ proposal_id: Number(decodedContractId) })
         .then(res => {
           const apiResponse = res?.data || res
           const apiData =
@@ -540,12 +540,12 @@ export default function ProposalWizard({ id }) {
             (Array.isArray(apiResponse?.data) ? apiResponse.data : Array.isArray(apiResponse) ? apiResponse : [])
 
           if (Array.isArray(apiData)) {
-            setProposals(apiData)
+            setContractAgreements(apiData)
           }
         })
         .catch(err => console.error('Fetch Agreements Error:', err))
     } else {
-      if (proposals.length > 0) setProposals([])
+      if (contractAgreements.length > 0) setContractAgreements([])
     }
   }, [id])
 
@@ -563,55 +563,55 @@ export default function ProposalWizard({ id }) {
   }, [filteredCallLogs, callLogPagination])
 
   // --- External Tables Logic (Proposals) ---
-  const filteredProposals = useMemo(() => {
-    if (!Array.isArray(proposals)) return []
-    if (!propSearch) return proposals
+  const filteredAgreements = useMemo(() => {
+    if (!Array.isArray(contractAgreements)) return []
+    if (!propSearch) return contractAgreements
     const lower = propSearch.toLowerCase()
-    return proposals.filter(i => Object.values(i).some(v => String(v).toLowerCase().includes(lower)))
-  }, [proposals, propSearch])
+    return contractAgreements.filter(i => Object.values(i).some(v => String(v).toLowerCase().includes(lower)))
+  }, [contractAgreements, propSearch])
 
-  const paginatedProposals = useMemo(() => {
+  const paginatedAgreements = useMemo(() => {
     const start = propPagination.pageIndex * propPagination.pageSize
-    return filteredProposals.slice(start, start + propPagination.pageSize)
-  }, [filteredProposals, propPagination])
+    return filteredAgreements.slice(start, start + propPagination.pageSize)
+  }, [filteredAgreements, propPagination])
 
   const onSaveCallLog = () => {
     handleSaveCallLog()
     setCallLogDialogOpen(false)
   }
 
-  const handleDeleteProposalClick = row => {
-    setDeleteProposalDialog({ open: true, row })
+  const handleDeleteAgreementClick = row => {
+    setDeleteAgreementDialog({ open: true, row })
   }
 
-  const confirmDeleteSalesProposal = async () => {
-    const propId = deleteProposalDialog.row?.id
+  const confirmDeleteAgreement = async () => {
+    const propId = deleteAgreementDialog.row?.id
     if (!propId) return
 
     try {
       await deleteSalesAgreement({ id: propId })
-      showToast('delete', 'Proposal agreement deleted successfully')
+      showToast('delete', 'Agreement deleted successfully')
 
       // Refresh list
-      const decodedProposalId = decodeId(id) || id
-      console.log('🔄 REFRESHING PROPOSALS FOR:', decodedProposalId)
-      const res = await listSalesAgreement({ proposal_id: Number(decodedProposalId) })
+      const decodedContractId = decodeId(id) || id
+      console.log('🔄 REFRESHING AGREEMENTS FOR:', decodedContractId)
+      const res = await listSalesAgreement({ proposal_id: Number(decodedContractId) })
       const apiResponse = res?.data || res
       const apiData =
         apiResponse?.data?.results ||
         apiResponse?.results ||
         (Array.isArray(apiResponse?.data) ? apiResponse.data : Array.isArray(apiResponse) ? apiResponse : [])
 
-      if (Array.isArray(apiData)) setProposals(apiData)
+      if (Array.isArray(apiData)) setContractAgreements(apiData)
     } catch (err) {
       console.error('Delete error:', err)
       showToast('error', 'Failed to delete proposal agreement')
     } finally {
-      setDeleteProposalDialog({ open: false, row: null })
+      setDeleteAgreementDialog({ open: false, row: null })
     }
   }
 
-  const handleUpdateProposalStatus = async (row, status) => {
+  const handleUpdateAgreementStatus = async (row, status) => {
     try {
       if (!row.id) return
 
@@ -622,18 +622,18 @@ export default function ProposalWizard({ id }) {
 
       const res = await updateSalesAgreementStatus(row.id, payload)
       if (res?.status === 'success' || res?.message === 'success' || res?.data) {
-        showToast('success', `Proposal ${status === 1 ? 'Approved' : 'Rejected'} Successfully`)
+        showToast('success', `Agreement ${status === 1 ? 'Approved' : 'Rejected'} Successfully`)
 
         // Refresh list
-        const decodedProposalId = decodeId(id) || id
-        const listRes = await listSalesAgreement({ proposal_id: Number(decodedProposalId) })
+        const decodedContractId = decodeId(id) || id
+        const listRes = await listSalesAgreement({ proposal_id: Number(decodedContractId) })
         const apiResponse = listRes?.data || listRes
         const apiData =
           apiResponse?.data?.results ||
           apiResponse?.results ||
           (Array.isArray(apiResponse?.data) ? apiResponse.data : Array.isArray(apiResponse) ? apiResponse : [])
 
-        if (Array.isArray(apiData)) setProposals(apiData)
+        if (Array.isArray(apiData)) setContractAgreements(apiData)
       } else {
         showToast('error', res?.message || 'Failed to update status')
       }
@@ -716,10 +716,10 @@ export default function ProposalWizard({ id }) {
     }
   }
 
-  const loadDetails = async proposalId => {
+  const loadDetails = async contractId => {
     try {
-      const decodedId = decodeId(proposalId) || proposalId
-      const res = await getProposalDetails(decodedId)
+      const decodedId = decodeId(contractId) || contractId
+      const res = await getContractDetails(decodedId)
       const data = res?.status === 'success' || res ? res.data || res : null
 
       if (data) {
@@ -826,7 +826,7 @@ export default function ProposalWizard({ id }) {
           )
         }
       }
-      return data // ✅ Return fetched data for external use
+      return data
     } catch (err) {
       console.error(err)
       showToast('error', 'Failed to load details')
@@ -929,7 +929,7 @@ export default function ProposalWizard({ id }) {
       const decodedProposalId = decodeId(id) || id
       console.log('📡 Generating Invoice Remarks for ID:', decodedProposalId)
 
-      const res = await getInvoiceRemark({ proposal_id: Number(decodedProposalId) })
+      const res = await getInvoiceRemark({ contract_id: Number(decodedProposalId) })
 
       if (res?.status === 'success' || res?.message === 'success' || res?.data) {
         // Handle potential array or comma-separated string response
@@ -1312,18 +1312,17 @@ export default function ProposalWizard({ id }) {
         let res
         if (editingItemId && currentPestItem.item_id) {
           // Update existing item
-          res = await updateProposalPest(currentPestItem.item_id, itemPayload)
+          res = await updateContractPest(currentPestItem.item_id, itemPayload)
         } else {
           // Add new item to existing proposal
-          res = await addProposalPest(itemPayload)
+          res = await addContractPest(itemPayload)
         }
 
         if (res?.status === 'success' || res) {
-          showToast('success', `Pest item ${editingItemId ? 'updated' : 'added'} successfully`)
           // Capture current manual contract value before reload might wipe it
           const userDefinedContractValue = formData.contractValue
 
-          const updatedData = await loadDetails(id) // Refresh all details
+          const updatedData = await loadDetails(id) // Refresh all details to get the new list
           await fetchGeneratedInvoiceRemarks() // ✅ Auto-generate remarks
 
           // 💡 NEW: Explicitly update total contract value in DB
@@ -1336,12 +1335,9 @@ export default function ProposalWizard({ id }) {
             }
 
             const decodedId = decodeId(id) || id
-            // We invoke updateProposal to sync the total value.
-            // We use a minimal payload assuming the API supports partial updates or at least won't wipe other fields if missing.
-            // If API requires full payload, this might be risky, but usually contract_value is independent.
-            await updateProposal(decodedId, { contract_value: newTotal })
+            await updateContract(decodedId, { contract_value: newTotal })
 
-            // Restore manual value to UI if it exists and differs from what loadDetails might have set
+            // Restore manual value to UI if it exists
             if (userDefinedContractValue) {
               setFormData(prev => ({ ...prev, contractValue: userDefinedContractValue }))
             }
@@ -1445,9 +1441,8 @@ export default function ProposalWizard({ id }) {
       // Find the item to get its server-side ID if available
       if (itemToDelete?.item_id) {
         try {
-          await deleteProposalPest({ id: itemToDelete.item_id })
+          await deleteContractPest({ id: itemToDelete.item_id })
           showToast('delete', 'Pest item deleted successfully')
-
           // Capture current manual contract value before reload might wipe it
           const userDefinedContractValue = formData.contractValue
 
@@ -1464,7 +1459,7 @@ export default function ProposalWizard({ id }) {
             }
 
             const decodedId = decodeId(id) || id
-            await updateProposal(decodedId, { contract_value: newTotal })
+            await updateContract(decodedId, { contract_value: newTotal })
 
             // Restore manual value to UI if it exists
             if (userDefinedContractValue) {
@@ -1491,9 +1486,9 @@ export default function ProposalWizard({ id }) {
   }
 
   const handleSaveCallLog = async () => {
-    const decodedProposalId = decodeId(id) || id
-    if (!decodedProposalId) {
-      showToast('error', 'Proposal ID missing')
+    const decodedContractId = decodeId(id) || id
+    if (!decodedContractId) {
+      showToast('error', 'Contract ID missing')
       return
     }
 
@@ -1720,7 +1715,7 @@ export default function ProposalWizard({ id }) {
       covered_location: formData.coveredLocation || null,
       po_number: formData.poNumber || null,
       po_expiry_date: formatDateToLocal(formData.poExpiry) || null,
-      proposal_date: formatDateToLocal(new Date()),
+      contract_date: formatDateToLocal(new Date()),
       preferred_time: formData.preferredTime ? formData.preferredTime.toTimeString().slice(0, 8) : '09:00:00',
       report_email: formData.reportEmail || null,
       contact_person_name: formData.contactPerson || null,
@@ -1802,36 +1797,23 @@ export default function ProposalWizard({ id }) {
       }))
     }
 
-    console.log('🚀 SUBMITTING PROPOSAL (JSON):', JSON.stringify(payload, null, 2))
+    console.log('🚀 SUBMITTING CONTRACT (JSON):', JSON.stringify(payload, null, 2))
 
     try {
       let res
       if (id) {
         const decodedId = decodeId(id) || id
-        res = await updateProposal(decodedId, payload)
+        res = await updateContract(decodedId, payload)
       } else {
-        res = await addProposal(payload)
+        res = await createContract(payload)
       }
 
       console.log('✅ API RESPONSE:', res)
 
-      const proposalId = res?.data?.id || res?.id
-      if (res?.status === 'success' || res?.status === 200 || proposalId) {
-        showToast('success', `Proposal ${id ? 'Updated' : 'Added'} Successfully!`)
-        // redirect only if adding new proposal. For update, stay on page.
-        // redirect only if adding new proposal. For update, stay on page.
-        if (!id) {
-          if (proposalId) {
-            const encodedId = encodeId(proposalId)
-            router.push(`/${lang}/admin/proposal-editor?proposal_id=${encodedId}`)
-          } else {
-            // Fallback if ID is missing (should not happen if success)
-            router.push(`/${lang}/admin/sales-quotation`)
-          }
-        } else {
-          // Optional: reload details to show updated data
-          await loadDetails(id)
-        }
+      const contractId = res?.data?.id || res?.id
+      if (res?.status === 'success' || res?.status === 200 || contractId) {
+        showToast('success', `Contract ${id ? 'Updated' : 'Added'} Successfully!`)
+        router.push(`/${lang}/admin/contracts`)
       } else {
         console.error('❌ API FAILURE (Logic):', res)
         showToast('error', res?.message || 'Operation failed')
@@ -1931,7 +1913,7 @@ export default function ProposalWizard({ id }) {
       <Card className='flex flex-col md:flex-row' sx={{ minHeight: 0 }}>
         <CardContent className='max-md:border-be md:border-ie md:min-is-[300px]' sx={{ overflowY: 'auto' }}>
           <Typography variant='h5' className='m-4 mb-6 font-bold'>
-            {id ? 'Update Proposal' : 'Add Proposal'} <span style={{ fontSize: '12px', color: '#999' }}>`</span>
+            {id ? 'Update Contract' : 'Add Contract'} <span style={{ fontSize: '12px', color: '#999' }}>`</span>
           </Typography>
           <StepperWrapper>
             <Stepper activeStep={activeStep} orientation='vertical' className='flex flex-col gap-4 min-is-[220px]'>
@@ -2001,7 +1983,7 @@ export default function ProposalWizard({ id }) {
                     isSubmitting ? <CircularProgress size={20} color='inherit' /> : <i className='tabler-check' />
                   }
                 >
-                  {isSubmitting ? 'Updating...' : 'Update Proposal'}
+                  {isSubmitting ? 'Updating...' : 'Update Contract'}
                 </Button>
               )}
             </Box>
@@ -2019,8 +2001,8 @@ export default function ProposalWizard({ id }) {
                 ? isSubmitting
                   ? 'Submitting...'
                   : id
-                    ? 'Update Proposal'
-                    : 'Submit Proposal'
+                    ? 'Update Contract'
+                    : 'Submit Contract'
                 : 'Next'}
             </Button>
           </Box>
@@ -2177,7 +2159,7 @@ export default function ProposalWizard({ id }) {
           {/* PROPOSALS CARD */}
           <Grid item xs={12} md={6}>
             <TableSection
-              title='SALES PROPOSAL'
+              title='SALES AGREEMENTS'
               addButton={
                 <Button
                   variant='contained'
@@ -2188,34 +2170,34 @@ export default function ProposalWizard({ id }) {
                     router.push(`/${lang}/admin/proposal-editor?proposal_id=${encodedId}`)
                   }}
                 >
-                  Add Proposal
+                  Add Agreement
                 </Button>
               }
               searchText={propSearch}
               setSearchText={setPropSearch}
               pagination={propPagination}
               setPagination={setPropPagination}
-              filteredCount={filteredProposals.length}
+              filteredCount={filteredAgreements.length}
             >
               <table className={styles.table}>
                 <thead>
                   <tr>
                     <th>S.No</th>
                     <th>Action</th>
-                    <th>Proposal Date</th>
+                    <th>Agreement Date</th>
                     <th>Title</th>
                     <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedProposals.length === 0 ? (
+                  {paginatedAgreements.length === 0 ? (
                     <tr>
                       <td colSpan={6} align='center'>
-                        No proposals found
+                        No agreements found
                       </td>
                     </tr>
                   ) : (
-                    paginatedProposals.map((prop, idx) => (
+                    paginatedAgreements.map((prop, idx) => (
                       <tr key={prop.id || idx}>
                         <td>{idx + 1 + propPagination.pageIndex * propPagination.pageSize}</td>
                         <td>
@@ -2234,7 +2216,7 @@ export default function ProposalWizard({ id }) {
                             >
                               <i className='tabler-edit' />
                             </IconButton>
-                            <IconButton size='small' color='error' onClick={() => handleDeleteProposalClick(prop)}>
+                            <IconButton size='small' color='error' onClick={() => handleDeleteAgreementClick(prop)}>
                               <i className='tabler-trash' />
                             </IconButton>
                             <IconButton
@@ -2287,7 +2269,7 @@ export default function ProposalWizard({ id }) {
                                 }}
                                 onClick={() => {
                                   if (prop.quotation_status !== 'approved') {
-                                    handleUpdateProposalStatus(prop, 1)
+                                    handleUpdateAgreementStatus(prop, 1)
                                   }
                                 }}
                                 disabled={prop.quotation_status === 'approved'}
@@ -2310,7 +2292,7 @@ export default function ProposalWizard({ id }) {
                                 }}
                                 onClick={() => {
                                   if (prop.quotation_status !== 'rejected') {
-                                    handleUpdateProposalStatus(prop, 2)
+                                    handleUpdateAgreementStatus(prop, 2)
                                   }
                                 }}
                                 disabled={prop.quotation_status === 'rejected'}
@@ -2432,10 +2414,10 @@ export default function ProposalWizard({ id }) {
         </DialogActions>
       </Dialog>
 
-      {/* Delete Proposal Confirmation Dialog */}
+      {/* Delete Agreement Confirmation Dialog */}
       <Dialog
-        onClose={() => setDeleteProposalDialog({ open: false, row: null })}
-        open={deleteProposalDialog.open}
+        onClose={() => setDeleteAgreementDialog({ open: false, row: null })}
+        open={deleteAgreementDialog.open}
         PaperProps={{
           sx: {
             overflow: 'visible',
@@ -2460,7 +2442,7 @@ export default function ProposalWizard({ id }) {
           <WarningAmberIcon color='error' sx={{ fontSize: 26 }} />
           Confirm Delete
           <DialogCloseButton
-            onClick={() => setDeleteProposalDialog({ open: false, row: null })}
+            onClick={() => setDeleteAgreementDialog({ open: false, row: null })}
             disableRipple
             sx={{ position: 'absolute', right: 3, top: 2 }}
           >
@@ -2470,9 +2452,9 @@ export default function ProposalWizard({ id }) {
 
         <DialogContent sx={{ px: 5, pt: 1 }}>
           <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6 }}>
-            Are you sure you want to delete proposal{' '}
+            Are you sure you want to delete agreement{' '}
             <strong style={{ color: '#d32f2f' }}>
-              {deleteProposalDialog.row?.name || deleteProposalDialog.row?.title}
+              {deleteAgreementDialog.row?.name || deleteAgreementDialog.row?.title}
             </strong>
             ?
             <br />
@@ -2482,7 +2464,7 @@ export default function ProposalWizard({ id }) {
 
         <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 3, pt: 2 }}>
           <GlobalButton
-            onClick={() => setDeleteProposalDialog({ open: false, row: null })}
+            onClick={() => setDeleteAgreementDialog({ open: false, row: null })}
             color='secondary'
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 500 }}
           >
@@ -2490,7 +2472,7 @@ export default function ProposalWizard({ id }) {
           </GlobalButton>
 
           <GlobalButton
-            onClick={confirmDeleteSalesProposal}
+            onClick={confirmDeleteAgreement}
             variant='contained'
             color='error'
             sx={{ minWidth: 100, textTransform: 'none', fontWeight: 600 }}

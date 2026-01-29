@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import AddContractWizard from '@/views/admin/contract/contracts/add-wizard'
+import ContractWizard from '@/views/admin/contract/contracts/contract-wizard/ContractWizard'
 import Link from 'next/link'
 import StickyListLayout from '@/components/common/StickyListLayout'
 import { Breadcrumbs, Typography } from '@mui/material'
@@ -22,7 +22,7 @@ const AddContractPage = () => {
         </Breadcrumbs>
       }
     >
-      <AddContractWizard />
+      <ContractWizard />
     </StickyListLayout>
   )
 }
